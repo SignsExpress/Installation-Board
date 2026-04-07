@@ -328,7 +328,7 @@ button {
 
 .upcoming-item span,
 .upcoming-item small {
-  color: var(--muted);
+  color: #64748b;
 }
 
 .board-loading {
@@ -433,6 +433,13 @@ button {
   border-right: 1px solid var(--sx-main-border);
   display: flex;
   align-items: start;
+  cursor: pointer;
+}
+
+.holiday-stack {
+  display: grid;
+  gap: 8px;
+  width: 100%;
 }
 
 .holiday-pill,
@@ -448,6 +455,77 @@ button {
   background: var(--sx-holiday-bg);
   color: var(--sx-holiday-text);
   font-weight: 700;
+}
+
+.staff-holiday-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(95, 60, 116, 0.1);
+  color: var(--sx-main-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.staff-holiday-pill b {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.holiday-delete {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font-weight: 700;
+  margin-left: auto;
+}
+
+.holiday-editor {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--sx-main-border);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.holiday-editor label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sx-slate);
+}
+
+.duration-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.duration-button {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.duration-button.active {
+  background: var(--sx-main-soft);
+  color: var(--sx-main-text);
+  border-color: var(--sx-main-border);
+}
+
+.holiday-save {
+  min-height: 40px;
 }
 
 .job-stack {
@@ -469,6 +547,23 @@ button {
   cursor: grabbing;
 }
 
+.drag-preview {
+  opacity: 0.96;
+  transform: rotate(-3deg);
+  animation: drag-wobble 0.32s ease-in-out infinite alternate;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+}
+
+@keyframes drag-wobble {
+  from {
+    transform: rotate(-3deg) translateY(0);
+  }
+
+  to {
+    transform: rotate(2deg) translateY(-2px);
+  }
+}
+
 .job-card-top {
   display: flex;
   justify-content: space-between;
@@ -482,11 +577,56 @@ button {
   color: #475569;
 }
 
+.job-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.job-meta-grid p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #475569;
+}
+
 .job-tag {
-  background: var(--sx-main-soft);
-  color: var(--sx-main-text);
   white-space: nowrap;
   font-weight: 700;
+}
+
+.job-type-install {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.job-type-vehicle {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.job-type-delivery {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.job-type-subcontractor {
+  background: #ffedd5;
+  color: #c2410c;
+}
+
+.job-type-signs-express {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.job-type-survey {
+  background: #fce7f3;
+  color: #be185d;
+}
+
+.job-type-other {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 @media (max-width: 1120px) {
@@ -540,6 +680,10 @@ button {
   .date-cell,
   .holiday-cell {
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 1px solid var(--sx-main-border);
+  }
+
+  .job-meta-grid {
+    grid-template-columns: 1fr;
   }
 }

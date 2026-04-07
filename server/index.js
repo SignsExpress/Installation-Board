@@ -12,12 +12,9 @@ const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
+const streamClients = new Set();
 
-const weekdayFormatter = new Intl.DateTimeFormat("en-GB", {
-  weekday: "short",
-  timeZone: TIME_ZONE
-});
-
+const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
   weekday: "long",
   day: "numeric",
@@ -25,21 +22,13 @@ const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
   year: "numeric",
   timeZone: TIME_ZONE
 });
-
-const monthFormatter = new Intl.DateTimeFormat("en-GB", {
-  month: "long",
-  year: "numeric",
-  timeZone: TIME_ZONE
-});
-
+const monthFormatter = new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: TIME_ZONE });
 const dayFormatter = new Intl.DateTimeFormat("en-CA", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
   timeZone: TIME_ZONE
 });
-
-const streamClients = new Set();
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
@@ -49,31 +38,43 @@ function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, "[]\n", "utf8");
+    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [] }, null, 2)}\n`, "utf8");
   }
 }
 
-async function readJobs() {
+async function readStore() {
   ensureStoreFile();
   const raw = await fsp.readFile(getDataFile(), "utf8");
 
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (Array.isArray(parsed)) {
+      return { jobs: parsed, holidays: [] };
+    }
+    return {
+      jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : []
+    };
   } catch (error) {
-    console.error("Invalid job store JSON, returning empty array.", error);
-    return [];
+    console.error("Invalid board store JSON, returning empty store.", error);
+    return { jobs: [], holidays: [] };
   }
 }
 
-async function writeJobs(jobs) {
+async function writeStore(store) {
   ensureStoreFile();
-  const sorted = [...jobs].sort((left, right) => {
-    if (left.date !== right.date) return left.date.localeCompare(right.date);
-    return String(left.title || "").localeCompare(String(right.title || ""));
-  });
-  await fsp.writeFile(getDataFile(), `${JSON.stringify(sorted, null, 2)}\n`, "utf8");
-  return sorted;
+  const nextStore = {
+    jobs: [...store.jobs].sort((left, right) => {
+      if (left.date !== right.date) return left.date.localeCompare(right.date);
+      return String(left.customerName || "").localeCompare(String(right.customerName || ""));
+    }),
+    holidays: [...store.holidays].sort((left, right) => {
+      if (left.date !== right.date) return left.date.localeCompare(right.date);
+      return String(left.person || "").localeCompare(String(right.person || ""));
+    })
+  };
+  await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
+  return nextStore;
 }
 
 function makeId() {
@@ -117,15 +118,11 @@ function getRollingWindow(today = getTodayInLondon()) {
 function getWeekdaysInRange(start, end) {
   const dates = [];
   let cursor = start;
-
   while (cursor <= end) {
     const day = cursor.getUTCDay();
-    if (day >= 1 && day <= 5) {
-      dates.push(cursor);
-    }
+    if (day >= 1 && day <= 5) dates.push(cursor);
     cursor = addDays(cursor, 1);
   }
-
   return dates;
 }
 
@@ -214,21 +211,20 @@ function getUkBankHolidays(year) {
 function getHolidayMap(start, end) {
   const years = new Set([start.getUTCFullYear(), end.getUTCFullYear()]);
   const map = new Map();
-
   for (const year of years) {
     getUkBankHolidays(year).forEach((holiday) => {
       map.set(holiday.date, holiday.label);
     });
   }
-
   return map;
 }
 
-function buildBoardRows(jobs, today = getTodayInLondon()) {
+function buildBoardRows(jobs, staffHolidays, today = getTodayInLondon()) {
   const { start, end } = getRollingWindow(today);
   const weekdayDates = getWeekdaysInRange(start, end);
   const holidayMap = getHolidayMap(start, end);
   const todayIso = toIsoDate(today);
+
   const jobsByDate = jobs.reduce((map, job) => {
     const existing = map.get(job.date) || [];
     existing.push(job);
@@ -236,10 +232,20 @@ function buildBoardRows(jobs, today = getTodayInLondon()) {
     return map;
   }, new Map());
 
+  const staffHolidaysByDate = staffHolidays.reduce((map, entry) => {
+    const existing = map.get(entry.date) || [];
+    existing.push(entry);
+    map.set(entry.date, existing);
+    return map;
+  }, new Map());
+
   const rows = weekdayDates.map((date) => {
     const isoDate = toIsoDate(date);
     const sameDayJobs = (jobsByDate.get(isoDate) || []).sort((left, right) =>
-      String(left.title || "").localeCompare(String(right.title || ""))
+      String(left.customerName || "").localeCompare(String(right.customerName || ""))
+    );
+    const sameDayStaffHolidays = (staffHolidaysByDate.get(isoDate) || []).sort((left, right) =>
+      String(left.person || "").localeCompare(String(right.person || ""))
     );
 
     return {
@@ -247,7 +253,8 @@ function buildBoardRows(jobs, today = getTodayInLondon()) {
       dayLabel: weekdayFormatter.format(date).toUpperCase(),
       dayNumber: String(date.getUTCDate()).padStart(2, "0"),
       fullDateLabel: longDateFormatter.format(date),
-      holiday: holidayMap.get(isoDate) || "",
+      bankHoliday: holidayMap.get(isoDate) || "",
+      staffHolidays: sameDayStaffHolidays,
       isToday: isoDate === todayIso,
       isPast: isoDate < todayIso,
       jobs: sameDayJobs
@@ -279,10 +286,26 @@ function sanitizeJob(payload) {
   return {
     id: String(payload.id || makeId()),
     date: String(payload.date || "").trim(),
-    title: String(payload.title || "").trim(),
-    crew: String(payload.crew || "").trim(),
+    orderReference: String(payload.orderReference || "").trim(),
+    customerName: String(payload.customerName || "").trim(),
+    contact: String(payload.contact || "").trim(),
+    number: String(payload.number || "").trim(),
+    address: String(payload.address || "").trim(),
+    installers: String(payload.installers || "").trim(),
+    jobType: String(payload.jobType || "Install").trim(),
+    customJobType: String(payload.customJobType || "").trim(),
     notes: String(payload.notes || "").trim(),
-    category: String(payload.category || "Install").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeStaffHoliday(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    date: String(payload.date || "").trim(),
+    person: String(payload.person || "").trim(),
+    duration: String(payload.duration || "Full Day").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -299,6 +322,15 @@ function broadcast(event, payload) {
   }
 }
 
+async function getBoardPayload() {
+  const store = await readStore();
+  return {
+    jobs: store.jobs,
+    holidays: store.holidays,
+    board: buildBoardRows(store.jobs, store.holidays)
+  };
+}
+
 function createServer() {
   ensureStoreFile();
   const app = express();
@@ -312,45 +344,96 @@ function createServer() {
   });
 
   app.get("/api/board", async (request, response) => {
-    const jobs = await readJobs();
-    response.json(buildBoardRows(jobs));
+    const payload = await getBoardPayload();
+    response.json(payload.board);
   });
 
   app.get("/api/jobs", async (request, response) => {
-    const jobs = await readJobs();
-    response.json(jobs);
+    const store = await readStore();
+    response.json(store.jobs);
   });
 
   app.post("/api/jobs", async (request, response) => {
     const nextJob = sanitizeJob(request.body || {});
-
-    if (!nextJob.title || !isValidIsoDate(nextJob.date)) {
-      response.status(400).json({ error: "A valid date and job title are required." });
+    if (!nextJob.customerName || !isValidIsoDate(nextJob.date)) {
+      response.status(400).json({ error: "A valid date and customer name are required." });
       return;
     }
 
-    const jobs = await readJobs();
-    const existingIndex = jobs.findIndex((job) => job.id === nextJob.id);
-
-    if (existingIndex >= 0) {
-      nextJob.createdAt = jobs[existingIndex].createdAt || nextJob.createdAt;
-      jobs[existingIndex] = nextJob;
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => job.id === nextJob.id);
+    if (index >= 0) {
+      nextJob.createdAt = store.jobs[index].createdAt || nextJob.createdAt;
+      store.jobs[index] = nextJob;
     } else {
-      jobs.unshift(nextJob);
+      store.jobs.unshift(nextJob);
     }
 
-    const saved = await writeJobs(jobs);
-    const board = buildBoardRows(saved);
-    broadcast("board-updated", board);
-    response.json({ jobs: saved, board });
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: savedStore.jobs,
+      holidays: savedStore.holidays,
+      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
   });
 
   app.delete("/api/jobs/:id", async (request, response) => {
-    const jobs = await readJobs();
-    const saved = await writeJobs(jobs.filter((job) => job.id !== request.params.id));
-    const board = buildBoardRows(saved);
-    broadcast("board-updated", board);
-    response.json({ jobs: saved, board });
+    const store = await readStore();
+    store.jobs = store.jobs.filter((job) => job.id !== request.params.id);
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: savedStore.jobs,
+      holidays: savedStore.holidays,
+      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.get("/api/holidays", async (request, response) => {
+    const store = await readStore();
+    response.json(store.holidays);
+  });
+
+  app.post("/api/holidays", async (request, response) => {
+    const nextHoliday = sanitizeStaffHoliday(request.body || {});
+    if (!nextHoliday.person || !isValidIsoDate(nextHoliday.date)) {
+      response.status(400).json({ error: "A valid date and person are required." });
+      return;
+    }
+
+    const store = await readStore();
+    const index = store.holidays.findIndex((item) => item.id === nextHoliday.id);
+    if (index >= 0) {
+      nextHoliday.createdAt = store.holidays[index].createdAt || nextHoliday.createdAt;
+      store.holidays[index] = nextHoliday;
+    } else {
+      store.holidays.unshift(nextHoliday);
+    }
+
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: savedStore.jobs,
+      holidays: savedStore.holidays,
+      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.delete("/api/holidays/:id", async (request, response) => {
+    const store = await readStore();
+    store.holidays = store.holidays.filter((item) => item.id !== request.params.id);
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: savedStore.jobs,
+      holidays: savedStore.holidays,
+      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
   });
 
   app.get("/api/events", (request, response) => {

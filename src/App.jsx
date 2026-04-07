@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 
+const JOB_TYPES = [
+  { value: "Install", colorClass: "job-type-install" },
+  { value: "Vehicle", colorClass: "job-type-vehicle" },
+  { value: "Delivery", colorClass: "job-type-delivery" },
+  { value: "Subcontractor", colorClass: "job-type-subcontractor" },
+  { value: "Signs Express", colorClass: "job-type-signs-express" },
+  { value: "Survey", colorClass: "job-type-survey" },
+  { value: "Other", colorClass: "job-type-other" }
+];
+
+const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
+const HOLIDAY_DURATIONS = ["Morning", "Afternoon", "Full Day"];
+
 const EMPTY_FORM = {
   id: "",
   date: "",
-  title: "",
-  crew: "",
-  category: "Install",
+  orderReference: "",
+  customerName: "",
+  contact: "",
+  number: "",
+  address: "",
+  installers: "",
+  jobType: "Install",
+  customJobType: "",
   notes: ""
 };
-
-const CATEGORY_OPTIONS = ["Install", "Delivery", "Survey", "Access", "Holiday", "Other"];
 
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -27,6 +43,7 @@ function createMessage(text, tone = "info") {
 export default function App() {
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [holidays, setHolidays] = useState([]);
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -34,6 +51,8 @@ export default function App() {
   const [message, setMessage] = useState(null);
   const [draggingJobId, setDraggingJobId] = useState("");
   const [dropDate, setDropDate] = useState("");
+  const [activeHolidayDate, setActiveHolidayDate] = useState("");
+  const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
 
   useEffect(() => {
     let active = true;
@@ -41,15 +60,24 @@ export default function App() {
     async function loadBoard() {
       try {
         setLoading(true);
-        const [boardResponse, jobsResponse] = await Promise.all([fetch("/api/board"), fetch("/api/jobs")]);
-        if (!boardResponse.ok || !jobsResponse.ok) {
+        const [boardResponse, jobsResponse, holidaysResponse] = await Promise.all([
+          fetch("/api/board"),
+          fetch("/api/jobs"),
+          fetch("/api/holidays")
+        ]);
+        if (!boardResponse.ok || !jobsResponse.ok || !holidaysResponse.ok) {
           throw new Error("Could not load the installation board.");
         }
 
-        const [boardData, jobsData] = await Promise.all([boardResponse.json(), jobsResponse.json()]);
+        const [boardData, jobsData, holidaysData] = await Promise.all([
+          boardResponse.json(),
+          jobsResponse.json(),
+          holidaysResponse.json()
+        ]);
         if (!active) return;
         setBoard(boardData);
         setJobs(Array.isArray(jobsData) ? jobsData : []);
+        setHolidays(Array.isArray(holidaysData) ? holidaysData : []);
       } catch (error) {
         console.error(error);
         if (active) setMessage(createMessage("Could not load the shared board.", "error"));
@@ -99,7 +127,7 @@ export default function App() {
       .filter((job) => job.date >= today)
       .sort((left, right) => {
         if (left.date !== right.date) return left.date.localeCompare(right.date);
-        return left.title.localeCompare(right.title);
+        return left.customerName.localeCompare(right.customerName);
       })
       .slice(0, 8);
   }, [board?.today, jobs]);
@@ -118,26 +146,32 @@ export default function App() {
     setForm({
       id: job.id,
       date: job.date,
-      title: job.title || "",
-      crew: job.crew || "",
-      category: job.category || "Install",
+      orderReference: job.orderReference || "",
+      customerName: job.customerName || "",
+      contact: job.contact || "",
+      number: job.number || "",
+      address: job.address || "",
+      installers: job.installers || "",
+      jobType: job.jobType || "Install",
+      customJobType: job.customJobType || "",
       notes: job.notes || ""
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function refreshJobs() {
-    const response = await fetch("/api/jobs");
-    if (!response.ok) throw new Error("Could not refresh jobs.");
-    const nextJobs = await response.json();
+  async function refreshData() {
+    const [jobsResponse, holidaysResponse] = await Promise.all([fetch("/api/jobs"), fetch("/api/holidays")]);
+    if (!jobsResponse.ok || !holidaysResponse.ok) throw new Error("Could not refresh data.");
+    const [nextJobs, nextHolidays] = await Promise.all([jobsResponse.json(), holidaysResponse.json()]);
     setJobs(Array.isArray(nextJobs) ? nextJobs : []);
+    setHolidays(Array.isArray(nextHolidays) ? nextHolidays : []);
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!form.date || !form.title.trim()) {
-      setMessage(createMessage("Pick a date and enter a job title.", "error"));
+    if (!form.date || !form.customerName.trim()) {
+      setMessage(createMessage("Pick a date and enter the customer name.", "error"));
       return;
     }
 
@@ -150,9 +184,14 @@ export default function App() {
         body: JSON.stringify({
           id: editingId || form.id || undefined,
           date: form.date,
-          title: form.title.trim(),
-          crew: form.crew.trim(),
-          category: form.category,
+          orderReference: form.orderReference.trim(),
+          customerName: form.customerName.trim(),
+          contact: form.contact.trim(),
+          number: form.number.trim(),
+          address: form.address.trim(),
+          installers: form.installers.trim(),
+          jobType: form.jobType,
+          customJobType: form.customJobType.trim(),
           notes: form.notes.trim()
         })
       });
@@ -162,6 +201,7 @@ export default function App() {
       const payload = await response.json();
       setBoard(payload.board);
       setJobs(payload.jobs);
+      setHolidays(payload.holidays);
       setMessage(createMessage(editingId ? "Job updated." : "Job added.", "success"));
       resetForm(form.date);
     } catch (error) {
@@ -180,6 +220,7 @@ export default function App() {
       const payload = await response.json();
       setBoard(payload.board);
       setJobs(payload.jobs);
+      setHolidays(payload.holidays);
       if (editingId === jobId) resetForm();
       setMessage(createMessage("Job deleted.", "success"));
     } catch (error) {
@@ -211,6 +252,7 @@ export default function App() {
       const payload = await response.json();
       setBoard(payload.board);
       setJobs(payload.jobs);
+      setHolidays(payload.holidays);
       if (editingId === jobId) {
         setForm((current) => ({ ...current, date: nextDate }));
       }
@@ -224,9 +266,69 @@ export default function App() {
     }
   }
 
+  function getJobTypeMeta(jobType) {
+    return JOB_TYPES.find((option) => option.value === jobType) || JOB_TYPES[JOB_TYPES.length - 1];
+  }
+
+  function getJobTypeLabel(job) {
+    return job.jobType === "Other" ? job.customJobType || "Other" : job.jobType;
+  }
+
+  function buildDragPreview(element) {
+    const preview = element.cloneNode(true);
+    preview.classList.add("drag-preview");
+    preview.style.width = `${element.offsetWidth}px`;
+    preview.style.position = "fixed";
+    preview.style.top = "-9999px";
+    preview.style.left = "-9999px";
+    document.body.appendChild(preview);
+    return preview;
+  }
+
+  async function saveHoliday(date) {
+    try {
+      const response = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          person: holidayForm.person,
+          duration: holidayForm.duration
+        })
+      });
+      if (!response.ok) throw new Error("Could not save holiday.");
+
+      const payload = await response.json();
+      setBoard(payload.board);
+      setJobs(payload.jobs);
+      setHolidays(payload.holidays);
+      setMessage(createMessage("Holiday added.", "success"));
+      setHolidayForm({ person: STAFF_NAMES[0], duration: "Full Day" });
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not save holiday.", "error"));
+    }
+  }
+
+  async function deleteHoliday(holidayId) {
+    try {
+      const response = await fetch(`/api/holidays/${holidayId}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Could not delete holiday.");
+
+      const payload = await response.json();
+      setBoard(payload.board);
+      setJobs(payload.jobs);
+      setHolidays(payload.holidays);
+      setMessage(createMessage("Holiday removed.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not delete holiday.", "error"));
+    }
+  }
+
   async function handleManualRefresh() {
     try {
-      const [boardResponse] = await Promise.all([fetch("/api/board"), refreshJobs()]);
+      const [boardResponse] = await Promise.all([fetch("/api/board"), refreshData()]);
       if (!boardResponse.ok) throw new Error("Could not refresh the board.");
       setBoard(await boardResponse.json());
       setMessage(createMessage("Board refreshed.", "success"));
@@ -271,46 +373,90 @@ export default function App() {
               </label>
 
               <label>
-                Job title
+                Order reference
                 <input
                   type="text"
-                  placeholder="Moor Park remove"
-                  value={form.title}
-                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                  value={form.orderReference}
+                  onChange={(event) => setForm((current) => ({ ...current, orderReference: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                Customer name
+                <input
+                  type="text"
+                  value={form.customerName}
+                  onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))}
                 />
               </label>
 
               <div className="split-fields">
                 <label>
-                  Crew / initials
+                  Contact
                   <input
                     type="text"
-                    placeholder="MC + KC"
-                    value={form.crew}
-                    onChange={(event) => setForm((current) => ({ ...current, crew: event.target.value }))}
+                    value={form.contact}
+                    onChange={(event) => setForm((current) => ({ ...current, contact: event.target.value }))}
                   />
                 </label>
 
                 <label>
-                  Type
-                  <select
-                    value={form.category}
-                    onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))}
-                  >
-                    {CATEGORY_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
+                  Number
+                  <input
+                    type="text"
+                    value={form.number}
+                    onChange={(event) => setForm((current) => ({ ...current, number: event.target.value }))}
+                  />
                 </label>
               </div>
+
+              <label>
+                Address
+                <textarea
+                  rows="3"
+                  value={form.address}
+                  onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                Installers
+                <input
+                  type="text"
+                  value={form.installers}
+                  onChange={(event) => setForm((current) => ({ ...current, installers: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                Job type
+                <select
+                  value={form.jobType}
+                  onChange={(event) => setForm((current) => ({ ...current, jobType: event.target.value }))}
+                >
+                  {JOB_TYPES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {form.jobType === "Other" ? (
+                <label>
+                  Other job type
+                  <input
+                    type="text"
+                    value={form.customJobType}
+                    onChange={(event) => setForm((current) => ({ ...current, customJobType: event.target.value }))}
+                  />
+                </label>
+              ) : null}
 
               <label>
                 Notes
                 <textarea
                   rows="4"
-                  placeholder="Access kit, timing, customer note, delivery details"
                   value={form.notes}
                   onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                 />
@@ -343,8 +489,8 @@ export default function App() {
                   {upcomingJobs.map((job) => (
                     <button key={job.id} className="upcoming-item" type="button" onClick={() => editJob(job)}>
                       <span>{job.date}</span>
-                      <strong>{job.title}</strong>
-                      <small>{job.crew || job.category}</small>
+                      <strong>{job.customerName}</strong>
+                      <small>{job.orderReference || getJobTypeLabel(job)}</small>
                     </button>
                   ))}
                 </div>
@@ -384,7 +530,7 @@ export default function App() {
                         className={[
                           "board-row",
                           row.isToday ? "is-today" : "",
-                          row.holiday ? "is-holiday" : "",
+                          row.bankHoliday || row.staffHolidays.length ? "is-holiday" : "",
                           row.isPast ? "is-past" : "",
                           dropDate === row.isoDate ? "is-drop-target" : ""
                         ].join(" ").trim()}
@@ -411,8 +557,56 @@ export default function App() {
                           <strong className="date-number">{row.dayNumber}</strong>
                         </button>
 
-                        <div className="holiday-cell">
-                          {row.holiday ? <span className="holiday-pill">{row.holiday}</span> : <span className="muted">-</span>}
+                        <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
+                          <div className="holiday-stack">
+                            {row.bankHoliday ? <span className="holiday-pill">{row.bankHoliday}</span> : null}
+                            {row.staffHolidays.map((holiday) => (
+                              <div key={holiday.id} className="staff-holiday-pill">
+                                <span>{holiday.person}</span>
+                                <b>{holiday.duration}</b>
+                                <button
+                                  type="button"
+                                  className="holiday-delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteHoliday(holiday.id);
+                                  }}
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
+                            {activeHolidayDate === row.isoDate ? (
+                              <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
+                                <label>
+                                  Name
+                                  <select value={holidayForm.person} onChange={(event) => setHolidayForm((current) => ({ ...current, person: event.target.value }))}>
+                                    {STAFF_NAMES.map((name) => (
+                                      <option key={name} value={name}>
+                                        {name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <div className="duration-group">
+                                  {HOLIDAY_DURATIONS.map((duration) => (
+                                    <button
+                                      key={duration}
+                                      type="button"
+                                      className={`duration-button ${holidayForm.duration === duration ? "active" : ""}`}
+                                      onClick={() => setHolidayForm((current) => ({ ...current, duration }))}
+                                    >
+                                      {duration}
+                                    </button>
+                                  ))}
+                                </div>
+                                <button className="ghost-button holiday-save" type="button" onClick={() => saveHoliday(row.isoDate)}>
+                                  Add Holiday
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
 
                         <div className="jobs-cell">
@@ -420,39 +614,51 @@ export default function App() {
                             <span className="muted">No jobs booked</span>
                           ) : (
                             <div className="job-stack">
-                              {row.jobs.map((job) => (
-                                <div
-                                  key={job.id}
-                                  className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
-                                  draggable
-                                  onDragStart={(event) => {
-                                    event.dataTransfer.setData("text/plain", job.id);
-                                    event.dataTransfer.effectAllowed = "move";
-                                    setDraggingJobId(job.id);
-                                  }}
-                                  onDragEnd={() => {
-                                    setDraggingJobId("");
-                                    setDropDate("");
-                                  }}
-                                >
-                                  <div className="job-card-top">
-                                    <div>
-                                      <strong>{job.title}</strong>
-                                      <p>{job.crew || "Crew not added yet"}</p>
+                              {row.jobs.map((job) => {
+                                const meta = getJobTypeMeta(job.jobType);
+                                return (
+                                  <div
+                                    key={job.id}
+                                    className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+                                    draggable
+                                    onDragStart={(event) => {
+                                      event.dataTransfer.setData("text/plain", job.id);
+                                      event.dataTransfer.effectAllowed = "move";
+                                      const preview = buildDragPreview(event.currentTarget);
+                                      event.dataTransfer.setDragImage(preview, 32, 18);
+                                      window.setTimeout(() => preview.remove(), 0);
+                                      setDraggingJobId(job.id);
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggingJobId("");
+                                      setDropDate("");
+                                    }}
+                                  >
+                                    <div className="job-card-top">
+                                      <div>
+                                        <strong>{job.customerName}</strong>
+                                        <p>{job.orderReference || "No order reference"}</p>
+                                      </div>
+                                      <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
                                     </div>
-                                    <span className="job-tag">{job.category}</span>
+                                    <div className="job-meta-grid">
+                                      <p><b>Contact:</b> {job.contact || "-"}</p>
+                                      <p><b>Number:</b> {job.number || "-"}</p>
+                                      <p><b>Installers:</b> {job.installers || "-"}</p>
+                                    </div>
+                                    {job.address ? <p className="job-notes"><b>Address:</b> {job.address}</p> : null}
+                                    {job.notes ? <p className="job-notes"><b>Notes:</b> {job.notes}</p> : null}
+                                    <div className="job-actions">
+                                      <button className="text-button" type="button" onClick={() => editJob(job)}>
+                                        Edit
+                                      </button>
+                                      <button className="text-button danger" type="button" onClick={() => handleDelete(job.id)}>
+                                        Delete
+                                      </button>
+                                    </div>
                                   </div>
-                                  {job.notes ? <p className="job-notes">{job.notes}</p> : null}
-                                  <div className="job-actions">
-                                    <button className="text-button" type="button" onClick={() => editJob(job)}>
-                                      Edit
-                                    </button>
-                                    <button className="text-button danger" type="button" onClick={() => handleDelete(job.id)}>
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
