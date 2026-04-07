@@ -10,6 +10,16 @@ const JOB_TYPES = [
   { value: "Other", colorClass: "job-type-other" }
 ];
 
+const INSTALLER_OPTIONS = [
+  { value: "MC", colorClass: "installer-mc" },
+  { value: "KC", colorClass: "installer-kc" },
+  { value: "ED", colorClass: "installer-ed" },
+  { value: "KW", colorClass: "installer-kw" },
+  { value: "PM", colorClass: "installer-pm" },
+  { value: "MR", colorClass: "installer-mr" },
+  { value: "Custom", colorClass: "installer-custom" }
+];
+
 const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
 const HOLIDAY_DURATIONS = ["Morning", "Afternoon", "Full Day"];
 const HOLIDAY_PERSON_COLORS = {
@@ -33,7 +43,8 @@ const EMPTY_FORM = {
   contact: "",
   number: "",
   address: "",
-  installers: "",
+  installers: [],
+  customInstaller: "",
   jobType: "Install",
   customJobType: "",
   notes: ""
@@ -197,7 +208,12 @@ export default function App() {
       contact: job.contact || "",
       number: job.number || "",
       address: job.address || "",
-      installers: job.installers || "",
+      installers: Array.isArray(job.installers)
+        ? job.installers
+        : typeof job.installers === "string" && job.installers.trim()
+          ? job.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
+          : [],
+      customInstaller: job.customInstaller || "",
       jobType: job.jobType || "Install",
       customJobType: job.customJobType || "",
       notes: job.notes || ""
@@ -236,7 +252,8 @@ export default function App() {
           contact: form.contact.trim(),
           number: form.number.trim(),
           address: form.address.trim(),
-          installers: form.installers.trim(),
+          installers: form.installers,
+          customInstaller: form.customInstaller.trim(),
           jobType: form.jobType,
           customJobType: form.customJobType.trim(),
           notes: form.notes.trim()
@@ -319,6 +336,33 @@ export default function App() {
 
   function getJobTypeLabel(job) {
     return job.jobType === "Other" ? job.customJobType || "Other" : job.jobType;
+  }
+
+  function toggleInstaller(value) {
+    setForm((current) => ({
+      ...current,
+      installers: current.installers.includes(value)
+        ? current.installers.filter((item) => item !== value)
+        : [...current.installers, value]
+    }));
+  }
+
+  function getInstallerMeta(value) {
+    return INSTALLER_OPTIONS.find((option) => option.value === value) || { value, colorClass: "installer-custom" };
+  }
+
+  function getInstallerDisplayList(item) {
+    const source = Array.isArray(item.installers)
+      ? item.installers
+      : typeof item.installers === "string" && item.installers.trim()
+        ? item.installers.split(/[,/]+/).map((entry) => entry.trim()).filter(Boolean)
+        : [];
+
+    const visible = source.filter((entry) => entry !== "Custom");
+    if (source.includes("Custom") && item.customInstaller) {
+      visible.push(item.customInstaller);
+    }
+    return visible;
   }
 
   function getHolidayPersonColor(person) {
@@ -584,10 +628,23 @@ export default function App() {
                                       <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
                                     </div>
                                     <div className="job-meta-grid">
-                                      <p><b>Installers:</b> {job.installers || "-"}</p>
                                       <p><b>Ref:</b> {job.orderReference || "-"}</p>
                                       <p><b>Contact:</b> {job.contact || "-"}</p>
                                       <p><b>Number:</b> {job.number || "-"}</p>
+                                    </div>
+                                    <div className="installer-badges">
+                                      {getInstallerDisplayList(job).length ? (
+                                        getInstallerDisplayList(job).map((installer) => {
+                                          const metaInstaller = getInstallerMeta(installer);
+                                          return (
+                                            <span key={`${job.id}-${installer}`} className={`installer-badge ${metaInstaller.colorClass}`}>
+                                              {installer}
+                                            </span>
+                                          );
+                                        })
+                                      ) : (
+                                        <span className="muted">No installers set</span>
+                                      )}
                                     </div>
                                     {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
                                     {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
@@ -695,12 +752,30 @@ export default function App() {
 
               <label>
                 Installers
-                <input
-                  type="text"
-                  value={form.installers}
-                  onChange={(event) => setForm((current) => ({ ...current, installers: event.target.value }))}
-                />
+                <div className="installer-picker">
+                  {INSTALLER_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`installer-chip ${option.colorClass} ${form.installers.includes(option.value) ? "active" : ""}`}
+                      onClick={() => toggleInstaller(option.value)}
+                    >
+                      {option.value}
+                    </button>
+                  ))}
+                </div>
               </label>
+
+              {form.installers.includes("Custom") ? (
+                <label>
+                  Custom installer
+                  <input
+                    type="text"
+                    value={form.customInstaller}
+                    onChange={(event) => setForm((current) => ({ ...current, customInstaller: event.target.value }))}
+                  />
+                </label>
+              ) : null}
 
               <label>
                 Job type

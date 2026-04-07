@@ -283,6 +283,12 @@ function buildBoardRows(jobs, staffHolidays, today = getTodayInLondon()) {
 }
 
 function sanitizeJob(payload) {
+  const rawInstallers = Array.isArray(payload.installers)
+    ? payload.installers.map(String)
+    : typeof payload.installers === "string" && payload.installers.trim()
+      ? payload.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
+      : [];
+
   return {
     id: String(payload.id || makeId()),
     date: String(payload.date || "").trim(),
@@ -292,7 +298,8 @@ function sanitizeJob(payload) {
     contact: String(payload.contact || "").trim(),
     number: String(payload.number || "").trim(),
     address: String(payload.address || "").trim(),
-    installers: String(payload.installers || "").trim(),
+    installers: rawInstallers,
+    customInstaller: String(payload.customInstaller || "").trim(),
     jobType: String(payload.jobType || "Install").trim(),
     customJobType: String(payload.customJobType || "").trim(),
     notes: String(payload.notes || "").trim(),
