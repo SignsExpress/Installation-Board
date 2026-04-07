@@ -55,6 +55,7 @@ export default function App() {
   const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
+  const dragPositionRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     let active = true;
@@ -126,8 +127,15 @@ export default function App() {
   useEffect(() => {
     function handleWindowDragOver(event) {
       if (!dragPreviewRef.current) return;
+      const deltaX = event.clientX - dragPositionRef.current.x;
+      const deltaY = event.clientY - dragPositionRef.current.y;
+      dragPositionRef.current = { x: event.clientX, y: event.clientY };
+
+      const tilt = Math.max(-12, Math.min(12, deltaX * 0.6));
+      const lift = Math.max(-8, Math.min(8, -deltaY * 0.25));
       dragPreviewRef.current.style.left = `${event.clientX + 18}px`;
       dragPreviewRef.current.style.top = `${event.clientY + 18}px`;
+      dragPreviewRef.current.style.transform = `rotate(${tilt}deg) translateY(${lift}px)`;
     }
 
     function handleWindowDrop() {
@@ -666,8 +674,10 @@ export default function App() {
                                     event.dataTransfer.effectAllowed = "move";
                                     const preview = buildDragPreview(event.currentTarget);
                                     dragPreviewRef.current = preview;
+                                    dragPositionRef.current = { x: event.clientX, y: event.clientY };
                                     preview.style.left = `${event.clientX + 18}px`;
                                     preview.style.top = `${event.clientY + 18}px`;
+                                    preview.style.transform = "rotate(-2deg) translateY(0)";
                                     event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
                                     setDraggingJobId(job.id);
                                   }}
