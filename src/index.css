@@ -527,7 +527,7 @@ button {
 .holiday-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .holiday-pill,
@@ -550,19 +550,29 @@ button {
   align-items: center;
   gap: 6px;
   justify-content: space-between;
-  padding: 8px 9px;
-  border-radius: 14px;
+  padding: 7px 8px;
+  border-radius: 12px;
   background: rgba(95, 60, 116, 0.1);
   color: var(--sx-main-text);
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   font-weight: 700;
   width: 100%;
   border: 1px solid transparent;
   text-align: left;
+  min-width: 0;
 }
 
 .staff-holiday-pill.active {
   box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.15);
+}
+
+.staff-holiday-pill span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  flex: 1 1 auto;
 }
 
 .holiday-person-black {
@@ -587,17 +597,18 @@ button {
 }
 
 .holiday-duplicate {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.72);
   color: inherit;
   font-weight: 900;
   cursor: grab;
   flex: 0 0 auto;
+  font-size: 0.72rem;
 }
 
 .jobs-lane-button {
