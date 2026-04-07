@@ -649,20 +649,6 @@ export default function App() {
                                       <p><b>Contact:</b> {job.contact || "-"}</p>
                                       <p><b>Number:</b> {job.number || "-"}</p>
                                     </div>
-                                    <div className="installer-badges">
-                                      {installerLabels.length ? (
-                                        installerLabels.map((installer) => {
-                                          const metaInstaller = getInstallerMeta(installer);
-                                          return (
-                                            <span key={`${job.id}-${installer}`} className={`installer-badge ${metaInstaller.colorClass}`}>
-                                              {installer}
-                                            </span>
-                                          );
-                                        })
-                                      ) : (
-                                        <span className="muted">No installers set</span>
-                                      )}
-                                    </div>
                                     <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
                                     <div className="job-actions">
                                       <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>

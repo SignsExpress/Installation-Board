@@ -662,10 +662,11 @@ button {
   border: 1px solid #dbe2ea;
   border-radius: 16px;
   background: #fff;
-  padding: 10px 12px;
+  padding: 11px 13px;
   display: grid;
-  gap: 7px;
+  gap: 8px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .job-type-install-card {
@@ -736,6 +737,8 @@ button {
 
 .job-card-top p {
   font-size: 0.82rem;
+  color: #111827;
+  font-style: italic;
 }
 
 .job-title-line {
@@ -755,16 +758,14 @@ button {
   display: grid;
   grid-template-columns: 2fr 1.2fr 1.2fr;
   gap: 4px 12px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(95, 60, 116, 0.08);
 }
 
 .job-meta-grid p {
   margin: 0;
   font-size: 0.77rem;
   color: #475569;
-}
-
-.installer-badges {
-  margin-top: -1px;
 }
 
 .job-tag {
@@ -818,6 +819,7 @@ button {
 .job-notes.compact {
   font-size: 0.77rem;
   line-height: 1.35;
+  padding-top: 2px;
 }
 
 .job-actions {
