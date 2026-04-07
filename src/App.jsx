@@ -198,13 +198,16 @@ export default function App() {
     <div className="app-shell">
       <div className="page">
         <section className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">Signs Express installation planning</p>
-            <h1>Installation Board</h1>
-            <p className="lede">
-              A live shared board that mirrors the paper pad: date down the left, bank holidays in the middle, jobs on the
-              right, and a rolling view of last week, this week, next week, and the week after.
-            </p>
+          <div className="hero-brand">
+            <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+            <div className="hero-copy">
+              <p className="eyebrow">Signs Express installation planning</p>
+              <h1>Installation Board</h1>
+              <p className="lede">
+                A live shared board that mirrors the paper pad: date down the left, bank holidays in the middle, jobs on the
+                right, and a rolling view of last week, this week, next week, and the week after.
+              </p>
+            </div>
           </div>
           <div className="hero-stats">
             <div className="stat-card">
