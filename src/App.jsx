@@ -575,6 +575,10 @@ export default function App() {
                             {row.staffHolidays.length ? (
                               <div className="holiday-grid">
                                 {row.staffHolidays.map((holiday) => (
+                                  (() => {
+                                    const durationLabel =
+                                      holiday.duration === "Morning" ? "AM" : holiday.duration === "Afternoon" ? "PM" : "";
+                                    return (
                                   <button
                                     key={holiday.id}
                                     type="button"
@@ -586,7 +590,7 @@ export default function App() {
                                     }}
                                   >
                                     <span>{holiday.person}</span>
-                                    {holiday.duration !== "Full Day" ? <b>{holiday.duration}</b> : null}
+                                    {durationLabel ? <b>{durationLabel}</b> : null}
                                     <span
                                       className="holiday-duplicate"
                                       draggable
@@ -612,6 +616,8 @@ export default function App() {
                                       +
                                     </span>
                                   </button>
+                                    );
+                                  })()
                                 ))}
                               </div>
                             ) : null}

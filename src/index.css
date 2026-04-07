@@ -591,9 +591,10 @@ button {
 }
 
 .staff-holiday-pill b {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  flex: 0 0 auto;
 }
 
 .holiday-duplicate {
