@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -53,6 +53,8 @@ export default function App() {
   const [dropDate, setDropDate] = useState("");
   const [activeHolidayDate, setActiveHolidayDate] = useState("");
   const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
+  const dragPreviewRef = useRef(null);
+  const transparentDragImageRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -120,6 +122,26 @@ export default function App() {
     const timer = window.setTimeout(() => setMessage(null), 3000);
     return () => window.clearTimeout(timer);
   }, [message]);
+
+  useEffect(() => {
+    function handleWindowDragOver(event) {
+      if (!dragPreviewRef.current) return;
+      dragPreviewRef.current.style.left = `${event.clientX + 18}px`;
+      dragPreviewRef.current.style.top = `${event.clientY + 18}px`;
+    }
+
+    function handleWindowDrop() {
+      clearDragPreview();
+    }
+
+    window.addEventListener("dragover", handleWindowDragOver);
+    window.addEventListener("drop", handleWindowDrop);
+
+    return () => {
+      window.removeEventListener("dragover", handleWindowDragOver);
+      window.removeEventListener("drop", handleWindowDrop);
+    };
+  }, []);
 
   const upcomingJobs = useMemo(() => {
     const today = board?.today || getLocalTodayIso();
@@ -279,10 +301,28 @@ export default function App() {
     preview.classList.add("drag-preview");
     preview.style.width = `${element.offsetWidth}px`;
     preview.style.position = "fixed";
-    preview.style.top = "-9999px";
-    preview.style.left = "-9999px";
+    preview.style.top = "0";
+    preview.style.left = "0";
     document.body.appendChild(preview);
     return preview;
+  }
+
+  function getTransparentDragImage() {
+    if (!transparentDragImageRef.current) {
+      const image = new Image();
+      image.src =
+        "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+      transparentDragImageRef.current = image;
+    }
+
+    return transparentDragImageRef.current;
+  }
+
+  function clearDragPreview() {
+    if (dragPreviewRef.current) {
+      dragPreviewRef.current.remove();
+      dragPreviewRef.current = null;
+    }
   }
 
   async function saveHoliday(date) {
@@ -621,19 +661,22 @@ export default function App() {
                                     key={job.id}
                                     className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
                                     draggable
-                                    onDragStart={(event) => {
-                                      event.dataTransfer.setData("text/plain", job.id);
-                                      event.dataTransfer.effectAllowed = "move";
-                                      const preview = buildDragPreview(event.currentTarget);
-                                      event.dataTransfer.setDragImage(preview, 32, 18);
-                                      window.setTimeout(() => preview.remove(), 0);
-                                      setDraggingJobId(job.id);
-                                    }}
-                                    onDragEnd={() => {
-                                      setDraggingJobId("");
-                                      setDropDate("");
-                                    }}
-                                  >
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData("text/plain", job.id);
+                                    event.dataTransfer.effectAllowed = "move";
+                                    const preview = buildDragPreview(event.currentTarget);
+                                    dragPreviewRef.current = preview;
+                                    preview.style.left = `${event.clientX + 18}px`;
+                                    preview.style.top = `${event.clientY + 18}px`;
+                                    event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                                    setDraggingJobId(job.id);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggingJobId("");
+                                    setDropDate("");
+                                    clearDragPreview();
+                                  }}
+                                >
                                     <div className="job-card-top">
                                       <div>
                                         <strong>{job.customerName}</strong>

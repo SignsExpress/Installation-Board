@@ -552,6 +552,9 @@ button {
   transform: rotate(-3deg);
   animation: drag-wobble 0.32s ease-in-out infinite alternate;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.2);
+  pointer-events: none;
+  z-index: 9999;
+  margin: 0;
 }
 
 @keyframes drag-wobble {
