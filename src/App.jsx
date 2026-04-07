@@ -64,6 +64,8 @@ function createMessage(text, tone = "info") {
 }
 
 export default function App() {
+  const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
+  const isClientMode = pathname.startsWith("/client");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -237,6 +239,7 @@ export default function App() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (isClientMode) return;
 
     if (!form.date || !form.customerName.trim()) {
       setMessage(createMessage("Pick a date and enter the customer name.", "error"));
@@ -283,6 +286,7 @@ export default function App() {
   }
 
   async function handleDelete(jobId) {
+    if (isClientMode) return;
     try {
       const response = await fetch(`/api/jobs/${jobId}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not delete the job.");
@@ -300,6 +304,7 @@ export default function App() {
   }
 
   async function moveJobToDate(jobId, nextDate) {
+    if (isClientMode) return;
     const job = jobsById.get(jobId);
     if (!job || !nextDate || job.date === nextDate) {
       setDropDate("");
@@ -405,6 +410,7 @@ export default function App() {
   }
 
   async function saveHoliday(date) {
+    if (isClientMode) return;
     try {
       const response = await fetch("/api/holidays", {
         method: "POST",
@@ -430,6 +436,7 @@ export default function App() {
   }
 
   async function deleteHoliday(holidayId) {
+    if (isClientMode) return;
     try {
       const response = await fetch(`/api/holidays/${holidayId}`, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not delete holiday.");
@@ -446,6 +453,7 @@ export default function App() {
   }
 
   async function duplicateHolidayToDate(holidayId, nextDate) {
+    if (isClientMode) return;
     const holiday = holidaysById.get(holidayId);
     if (!holiday || !nextDate) {
       setDraggingHolidayId("");
@@ -509,7 +517,7 @@ export default function App() {
             <div className="panel-head">
               <div>
                 <p className="panel-kicker">Live board</p>
-                <h2>Rolling installation calendar</h2>
+                <h2>{isClientMode ? "Rolling installation calendar - View only" : "Rolling installation calendar"}</h2>
               </div>
               <div className="board-range">{board ? `${board.start} to ${board.end}` : "Loading"}</div>
             </div>
@@ -542,6 +550,7 @@ export default function App() {
                           dropDate === row.isoDate ? "is-drop-target" : ""
                         ].join(" ").trim()}
                         onDragOver={(event) => {
+                          if (isClientMode) return;
                           event.preventDefault();
                           if (draggingJobId) setDropDate(row.isoDate);
                         }}
@@ -549,6 +558,7 @@ export default function App() {
                           if (dropDate === row.isoDate) setDropDate("");
                         }}
                         onDrop={(event) => {
+                          if (isClientMode) return;
                           event.preventDefault();
                           const holidayId = event.dataTransfer.getData("holiday-copy");
                           if (holidayId || draggingHolidayId) {
@@ -584,6 +594,7 @@ export default function App() {
                                     type="button"
                                     className={`staff-holiday-pill ${getHolidayPersonColor(holiday.person)} ${activeHolidayId === holiday.id ? "active" : ""}`}
                                     onClick={(event) => {
+                                      if (isClientMode) return;
                                       event.stopPropagation();
                                       setActiveHolidayDate(row.isoDate);
                                       setActiveHolidayId((current) => (current === holiday.id ? "" : holiday.id));
@@ -593,8 +604,9 @@ export default function App() {
                                     {durationLabel ? <b>{durationLabel}</b> : null}
                                     <span
                                       className="holiday-duplicate"
-                                      draggable
+                                      draggable={!isClientMode}
                                       onDragStart={(event) => {
+                                        if (isClientMode) return;
                                         event.stopPropagation();
                                         event.dataTransfer.setData("holiday-copy", holiday.id);
                                         event.dataTransfer.effectAllowed = "copy";
@@ -607,6 +619,7 @@ export default function App() {
                                         setDraggingHolidayId(holiday.id);
                                       }}
                                       onDragEnd={() => {
+                                        if (isClientMode) return;
                                         setDraggingHolidayId("");
                                         setDropDate("");
                                         clearDragPreview();
@@ -621,15 +634,15 @@ export default function App() {
                                 ))}
                               </div>
                             ) : null}
-                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
-                            {activeHolidayDate === row.isoDate && activeHolidayId ? (
+                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">{isClientMode ? "-" : "Click to add holiday"}</span> : null}
+                            {!isClientMode && activeHolidayDate === row.isoDate && activeHolidayId ? (
                               <div className="holiday-entry-actions" onClick={(event) => event.stopPropagation()}>
                                 <button className="danger-inline-button" type="button" onClick={() => { deleteHoliday(activeHolidayId); setActiveHolidayId(""); }}>
                                   Delete Selected
                                 </button>
                               </div>
                             ) : null}
-                            {activeHolidayDate === row.isoDate ? (
+                            {!isClientMode && activeHolidayDate === row.isoDate ? (
                               <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
                                 <label>
                                   Name
@@ -665,7 +678,9 @@ export default function App() {
                           <button
                             type="button"
                             className={`jobs-lane-button ${row.jobs.length === 0 ? "is-empty" : ""}`}
+                            disabled={isClientMode}
                             onClick={() => {
+                              if (isClientMode) return;
                               setJobModalDate(row.isoDate);
                               setForm((current) => ({
                                 ...EMPTY_FORM,
@@ -675,7 +690,7 @@ export default function App() {
                               setEditingId("");
                             }}
                           >
-                            {row.jobs.length === 0 ? <span className="muted">No jobs booked</span> : <span className="lane-add-label">Click anywhere here to add another job</span>}
+                            {row.jobs.length === 0 ? <span className="muted">No jobs booked</span> : <span className="lane-add-label">{isClientMode ? "View only" : "Click anywhere here to add another job"}</span>}
                           </button>
 
                           {row.jobs.length > 0 ? (
@@ -686,8 +701,9 @@ export default function App() {
                                   <div
                                     key={job.id}
                                     className={`job-card ${meta.colorClass}-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
-                                    draggable
+                                    draggable={!isClientMode}
                                     onDragStart={(event) => {
+                                      if (isClientMode) return;
                                       event.dataTransfer.setData("text/plain", job.id);
                                       event.dataTransfer.effectAllowed = "move";
                                       const preview = buildDragPreview(event.currentTarget);
@@ -700,11 +716,14 @@ export default function App() {
                                       setDraggingJobId(job.id);
                                     }}
                                     onDragEnd={() => {
+                                      if (isClientMode) return;
                                       setDraggingJobId("");
                                       setDropDate("");
                                       clearDragPreview();
                                     }}
-                                    onClick={() => editJob(job)}
+                                    onClick={() => {
+                                      if (!isClientMode) editJob(job);
+                                    }}
                                   >
                                     {(() => {
                                       const installerLabels = getInstallerDisplayList(job);
@@ -739,12 +758,18 @@ export default function App() {
                                     </div>
                                     <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
                                     <div className="job-actions">
-                                      <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
-                                        Edit
-                                      </button>
-                                      <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
-                                        Delete
-                                      </button>
+                                      {!isClientMode ? (
+                                        <>
+                                          <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
+                                            Edit
+                                          </button>
+                                          <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
+                                            Delete
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <span className="muted">View only</span>
+                                      )}
                                     </div>
                                         </>
                                       );
@@ -764,7 +789,7 @@ export default function App() {
           </section>
         </div>
       </div>
-      {jobModalDate ? (
+      {!isClientMode && jobModalDate ? (
         <div className="modal-backdrop" onClick={() => resetForm()}>
           <div className="modal job-modal" onClick={(event) => event.stopPropagation()}>
             <div className="modal-head">
