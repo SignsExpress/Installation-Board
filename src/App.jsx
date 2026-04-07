@@ -620,21 +620,31 @@ export default function App() {
                                     }}
                                     onClick={() => editJob(job)}
                                   >
+                                    {(() => {
+                                      const installerLabels = getInstallerDisplayList(job);
+                                      return (
+                                        <>
                                     <div className="job-card-top">
                                       <div>
-                                        <strong>{job.customerName}</strong>
+                                        <strong className="job-title-line">
+                                          <span>{job.orderReference || "No ref"}</span>
+                                          <span>|</span>
+                                          <span>{job.customerName}</span>
+                                          {installerLabels.length ? <span>-</span> : null}
+                                          {installerLabels.length ? <span>({installerLabels.join(", ")})</span> : null}
+                                        </strong>
                                         <p>{job.description || "No description"}</p>
                                       </div>
                                       <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
                                     </div>
                                     <div className="job-meta-grid">
-                                      <p><b>Ref:</b> {job.orderReference || "-"}</p>
+                                      <p><b>Address:</b> {job.address || "-"}</p>
                                       <p><b>Contact:</b> {job.contact || "-"}</p>
                                       <p><b>Number:</b> {job.number || "-"}</p>
                                     </div>
                                     <div className="installer-badges">
-                                      {getInstallerDisplayList(job).length ? (
-                                        getInstallerDisplayList(job).map((installer) => {
+                                      {installerLabels.length ? (
+                                        installerLabels.map((installer) => {
                                           const metaInstaller = getInstallerMeta(installer);
                                           return (
                                             <span key={`${job.id}-${installer}`} className={`installer-badge ${metaInstaller.colorClass}`}>
@@ -646,8 +656,7 @@ export default function App() {
                                         <span className="muted">No installers set</span>
                                       )}
                                     </div>
-                                    {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
-                                    {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
+                                    <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
                                     <div className="job-actions">
                                       <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
                                         Edit
@@ -656,6 +665,9 @@ export default function App() {
                                         Delete
                                       </button>
                                     </div>
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 );
                               })}

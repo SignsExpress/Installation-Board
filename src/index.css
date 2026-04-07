@@ -731,10 +731,18 @@ button {
   font-size: 0.82rem;
 }
 
+.job-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  line-height: 1.25;
+}
+
 .job-meta-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px 10px;
+  grid-template-columns: 2fr 1.2fr 1.2fr;
+  gap: 4px 12px;
 }
 
 .job-meta-grid p {
