@@ -104,10 +104,10 @@ button {
 
 .hero {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 24px;
   align-items: flex-start;
-  padding: 22px 28px;
+  padding: 18px 28px;
 }
 
 .eyebrow,
@@ -145,40 +145,9 @@ button {
   line-height: 1.05;
 }
 
-.lede {
-  margin: 10px 0 0;
-  max-width: 60ch;
-  color: #475569;
-}
-
-.hero-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.stat-card {
-  min-width: 150px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: #f8fafc;
-  border: none;
+.hero-copy {
   display: grid;
-  gap: 4px;
-  text-align: left;
-}
-
-.stat-card span {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #64748b;
-}
-
-.stat-card strong {
-  font-size: 15px;
-  color: #0f172a;
+  align-content: center;
 }
 
 .layout {
@@ -433,6 +402,11 @@ button {
   opacity: 0.88;
 }
 
+.board-row.is-drop-target {
+  background: rgba(95, 60, 116, 0.14);
+  box-shadow: inset 0 0 0 2px rgba(95, 60, 116, 0.18);
+}
+
 .date-cell {
   border: 0;
   border-right: 1px solid var(--sx-main-border);
@@ -488,6 +462,11 @@ button {
   padding: 14px 16px;
   display: grid;
   gap: 10px;
+}
+
+.job-card.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
 }
 
 .job-card-top {

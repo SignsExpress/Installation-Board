@@ -32,6 +32,8 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  const [draggingJobId, setDraggingJobId] = useState("");
+  const [dropDate, setDropDate] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -101,6 +103,10 @@ export default function App() {
       })
       .slice(0, 8);
   }, [board?.today, jobs]);
+
+  const jobsById = useMemo(() => {
+    return new Map(jobs.map((job) => [job.id, job]));
+  }, [jobs]);
 
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
@@ -182,6 +188,42 @@ export default function App() {
     }
   }
 
+  async function moveJobToDate(jobId, nextDate) {
+    const job = jobsById.get(jobId);
+    if (!job || !nextDate || job.date === nextDate) {
+      setDropDate("");
+      setDraggingJobId("");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...job,
+          date: nextDate
+        })
+      });
+
+      if (!response.ok) throw new Error("Could not move the job.");
+
+      const payload = await response.json();
+      setBoard(payload.board);
+      setJobs(payload.jobs);
+      if (editingId === jobId) {
+        setForm((current) => ({ ...current, date: nextDate }));
+      }
+      setMessage(createMessage(`Job moved to ${nextDate}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not move the job.", "error"));
+    } finally {
+      setDropDate("");
+      setDraggingJobId("");
+    }
+  }
+
   async function handleManualRefresh() {
     try {
       const [boardResponse] = await Promise.all([fetch("/api/board"), refreshJobs()]);
@@ -201,26 +243,7 @@ export default function App() {
           <div className="hero-brand">
             <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
             <div className="hero-copy">
-              <p className="eyebrow">Signs Express installation planning</p>
               <h1>Installation Board</h1>
-              <p className="lede">
-                A live shared board that mirrors the paper pad: date down the left, bank holidays in the middle, jobs on the
-                right, and a rolling view of last week, this week, next week, and the week after.
-              </p>
-            </div>
-          </div>
-          <div className="hero-stats">
-            <div className="stat-card">
-              <span>Weeks shown</span>
-              <strong>{board?.weeks?.length || 4}</strong>
-            </div>
-            <div className="stat-card">
-              <span>Jobs saved</span>
-              <strong>{jobs.length}</strong>
-            </div>
-            <div className="stat-card">
-              <span>Live status</span>
-              <strong>Realtime</strong>
             </div>
           </div>
         </section>
@@ -362,8 +385,21 @@ export default function App() {
                           "board-row",
                           row.isToday ? "is-today" : "",
                           row.holiday ? "is-holiday" : "",
-                          row.isPast ? "is-past" : ""
+                          row.isPast ? "is-past" : "",
+                          dropDate === row.isoDate ? "is-drop-target" : ""
                         ].join(" ").trim()}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (draggingJobId) setDropDate(row.isoDate);
+                        }}
+                        onDragLeave={() => {
+                          if (dropDate === row.isoDate) setDropDate("");
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
+                          moveJobToDate(jobId, row.isoDate);
+                        }}
                       >
                         <button
                           type="button"
@@ -385,7 +421,20 @@ export default function App() {
                           ) : (
                             <div className="job-stack">
                               {row.jobs.map((job) => (
-                                <div key={job.id} className="job-card">
+                                <div
+                                  key={job.id}
+                                  className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+                                  draggable
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData("text/plain", job.id);
+                                    event.dataTransfer.effectAllowed = "move";
+                                    setDraggingJobId(job.id);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggingJobId("");
+                                    setDropDate("");
+                                  }}
+                                >
                                   <div className="job-card-top">
                                     <div>
                                       <strong>{job.title}</strong>
