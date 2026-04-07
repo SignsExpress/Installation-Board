@@ -288,6 +288,7 @@ function sanitizeJob(payload) {
     date: String(payload.date || "").trim(),
     orderReference: String(payload.orderReference || "").trim(),
     customerName: String(payload.customerName || "").trim(),
+    description: String(payload.description || "").trim(),
     contact: String(payload.contact || "").trim(),
     number: String(payload.number || "").trim(),
     address: String(payload.address || "").trim(),

@@ -18,6 +18,7 @@ const EMPTY_FORM = {
   date: "",
   orderReference: "",
   customerName: "",
+  description: "",
   contact: "",
   number: "",
   address: "",
@@ -178,6 +179,7 @@ export default function App() {
       date: job.date,
       orderReference: job.orderReference || "",
       customerName: job.customerName || "",
+      description: job.description || "",
       contact: job.contact || "",
       number: job.number || "",
       address: job.address || "",
@@ -216,6 +218,7 @@ export default function App() {
           date: form.date,
           orderReference: form.orderReference.trim(),
           customerName: form.customerName.trim(),
+          description: form.description.trim(),
           contact: form.contact.trim(),
           number: form.number.trim(),
           address: form.address.trim(),
@@ -438,6 +441,15 @@ export default function App() {
                 />
               </label>
 
+              <label>
+                Description
+                <input
+                  type="text"
+                  value={form.description}
+                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </label>
+
               <div className="split-fields">
                 <label>
                   Contact
@@ -460,8 +472,8 @@ export default function App() {
 
               <label>
                 Address
-                <textarea
-                  rows="3"
+                <input
+                  type="text"
                   value={form.address}
                   onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
                 />
@@ -538,7 +550,7 @@ export default function App() {
                     <button key={job.id} className="upcoming-item" type="button" onClick={() => editJob(job)}>
                       <span>{job.date}</span>
                       <strong>{job.customerName}</strong>
-                      <small>{job.orderReference || getJobTypeLabel(job)}</small>
+                      <small>{job.description || job.installers || job.orderReference || getJobTypeLabel(job)}</small>
                     </button>
                   ))}
                 </div>
@@ -690,17 +702,17 @@ export default function App() {
                                     <div className="job-card-top">
                                       <div>
                                         <strong>{job.customerName}</strong>
-                                        <p>{job.orderReference || "No order reference"}</p>
+                                        <p>{job.description || "No description"}</p>
                                       </div>
                                       <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
                                     </div>
                                     <div className="job-meta-grid">
-                                      <p><b>Contact:</b> {job.contact || "-"}</p>
-                                      <p><b>Number:</b> {job.number || "-"}</p>
                                       <p><b>Installers:</b> {job.installers || "-"}</p>
+                                      <p><b>Ref:</b> {job.orderReference || "-"}</p>
+                                      <p><b>Contact:</b> {job.contact || "-"}</p>
                                     </div>
-                                    {job.address ? <p className="job-notes"><b>Address:</b> {job.address}</p> : null}
-                                    {job.notes ? <p className="job-notes"><b>Notes:</b> {job.notes}</p> : null}
+                                    {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
+                                    {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
                                     <div className="job-actions">
                                       <button className="text-button" type="button" onClick={() => editJob(job)}>
                                         Edit

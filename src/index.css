@@ -206,7 +206,7 @@ button {
   border: 1px solid #cbd5e1;
   border-radius: 18px;
   background: white;
-  padding: 11px 14px;
+  padding: 10px 13px;
   color: #0f172a;
 }
 
@@ -381,12 +381,12 @@ button {
 .board-header > div,
 .holiday-cell,
 .jobs-cell {
-  padding: 14px 18px;
+  padding: 12px 14px;
 }
 
 .board-row {
   border-top: 1px solid var(--sx-main-border);
-  min-height: 118px;
+  min-height: 92px;
   background: rgba(255, 255, 255, 0.62);
 }
 
@@ -411,10 +411,10 @@ button {
   border: 0;
   border-right: 1px solid var(--sx-main-border);
   background: transparent;
-  padding: 18px;
+  padding: 14px;
   display: grid;
   align-content: start;
-  gap: 6px;
+  gap: 4px;
   text-align: left;
 }
 
@@ -424,7 +424,7 @@ button {
 }
 
 .date-number {
-  font-size: 2rem;
+  font-size: 1.7rem;
   line-height: 1;
   color: var(--sx-main-text);
 }
@@ -530,16 +530,16 @@ button {
 
 .job-stack {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .job-card {
   border: 1px solid #dbe2ea;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #fff;
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 
 .job-card.is-dragging {
@@ -565,25 +565,35 @@ button {
 
 .job-card-top p,
 .job-notes {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #475569;
+}
+
+.job-card-top strong {
+  font-size: 0.98rem;
+}
+
+.job-card-top p {
+  font-size: 0.82rem;
 }
 
 .job-meta-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 12px;
+  gap: 4px 10px;
 }
 
 .job-meta-grid p {
   margin: 0;
-  font-size: 0.84rem;
+  font-size: 0.77rem;
   color: #475569;
 }
 
 .job-tag {
   white-space: nowrap;
   font-weight: 700;
+  padding: 5px 9px;
+  font-size: 0.75rem;
 }
 
 .job-type-install {
@@ -619,6 +629,19 @@ button {
 .job-type-other {
   background: #dbeafe;
   color: #1d4ed8;
+}
+
+.job-notes.compact {
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.job-actions {
+  gap: 12px;
+}
+
+.job-actions .text-button {
+  font-size: 0.77rem;
 }
 
 @media (max-width: 1120px) {
