@@ -511,6 +511,22 @@ button {
   color: var(--sx-main-text);
 }
 
+.mobile-holiday-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.mobile-holiday-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 6px;
+  font-size: 0.64rem;
+  font-weight: 800;
+}
+
 .holiday-cell {
   border-right: 1px solid var(--sx-main-border);
   display: flex;
@@ -1091,6 +1107,14 @@ button {
   .client-mode .holiday-grid {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .client-mode .holiday-cell {
+    display: none;
+  }
+
+  .client-mode .board-row {
+    grid-template-columns: 1fr;
   }
 
   .client-mode .staff-holiday-pill {

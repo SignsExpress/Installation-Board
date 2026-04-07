@@ -63,6 +63,14 @@ function createMessage(text, tone = "info") {
   return { text, tone, id: `${Date.now()}-${Math.random()}` };
 }
 
+function toInitials(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("");
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const isClientMode = pathname.startsWith("/client");
@@ -578,6 +586,16 @@ export default function App() {
                         >
                           <span className="date-day">{row.dayLabel}</span>
                           <strong className="date-number">{row.dayNumber}</strong>
+                          {isClientMode && row.staffHolidays.length ? (
+                            <div className="mobile-holiday-inline">
+                              {row.staffHolidays.map((holiday) => (
+                                <span key={`mobile-${holiday.id}`} className={`mobile-holiday-chip ${getHolidayPersonColor(holiday.person)}`}>
+                                  {toInitials(holiday.person)}
+                                  {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </button>
 
                         <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
