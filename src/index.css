@@ -245,6 +245,13 @@ button {
   font-weight: 800;
 }
 
+.installer-badge.title-inline {
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  vertical-align: middle;
+}
+
 .installer-chip {
   border: 1px solid transparent;
   opacity: 0.78;
@@ -737,6 +744,11 @@ button {
   gap: 6px;
   align-items: baseline;
   line-height: 1.25;
+}
+
+.job-ref-inline {
+  font-weight: 400;
+  color: #64748b;
 }
 
 .job-meta-grid {

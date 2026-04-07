@@ -627,11 +627,18 @@ export default function App() {
                                     <div className="job-card-top">
                                       <div>
                                         <strong className="job-title-line">
-                                          <span>{job.orderReference || "No ref"}</span>
-                                          <span>|</span>
+                                          {job.orderReference ? <span className="job-ref-inline">{job.orderReference}</span> : null}
                                           <span>{job.customerName}</span>
-                                          {installerLabels.length ? <span>-</span> : null}
-                                          {installerLabels.length ? <span>({installerLabels.join(", ")})</span> : null}
+                                          {installerLabels.length
+                                            ? installerLabels.map((installer) => {
+                                                const metaInstaller = getInstallerMeta(installer);
+                                                return (
+                                                  <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
+                                                    {installer}
+                                                  </span>
+                                                );
+                                              })
+                                            : null}
                                         </strong>
                                         <p>{job.description || "No description"}</p>
                                       </div>
