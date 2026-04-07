@@ -73,8 +73,10 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [draggingJobId, setDraggingJobId] = useState("");
+  const [draggingHolidayId, setDraggingHolidayId] = useState("");
   const [dropDate, setDropDate] = useState("");
   const [activeHolidayDate, setActiveHolidayDate] = useState("");
+  const [activeHolidayId, setActiveHolidayId] = useState("");
   const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
   const [jobModalDate, setJobModalDate] = useState("");
   const dragPreviewRef = useRef(null);
@@ -189,6 +191,10 @@ export default function App() {
   const jobsById = useMemo(() => {
     return new Map(jobs.map((job) => [job.id, job]));
   }, [jobs]);
+
+  const holidaysById = useMemo(() => {
+    return new Map(holidays.map((holiday) => [holiday.id, holiday]));
+  }, [holidays]);
 
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
@@ -439,6 +445,41 @@ export default function App() {
     }
   }
 
+  async function duplicateHolidayToDate(holidayId, nextDate) {
+    const holiday = holidaysById.get(holidayId);
+    if (!holiday || !nextDate) {
+      setDraggingHolidayId("");
+      setDropDate("");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: nextDate,
+          person: holiday.person,
+          duration: holiday.duration
+        })
+      });
+      if (!response.ok) throw new Error("Could not duplicate holiday.");
+
+      const payload = await response.json();
+      setBoard(payload.board);
+      setJobs(payload.jobs);
+      setHolidays(payload.holidays);
+      setMessage(createMessage("Holiday copied.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not duplicate holiday.", "error"));
+    } finally {
+      setDraggingHolidayId("");
+      setDropDate("");
+      clearDragPreview();
+    }
+  }
+
   async function handleManualRefresh() {
     try {
       const [boardResponse] = await Promise.all([fetch("/api/board"), refreshData()]);
@@ -509,6 +550,11 @@ export default function App() {
                         }}
                         onDrop={(event) => {
                           event.preventDefault();
+                          const holidayId = event.dataTransfer.getData("holiday-copy");
+                          if (holidayId || draggingHolidayId) {
+                            duplicateHolidayToDate(holidayId || draggingHolidayId, row.isoDate);
+                            return;
+                          }
                           const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
                           moveJobToDate(jobId, row.isoDate);
                         }}
@@ -526,23 +572,57 @@ export default function App() {
                         <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
                           <div className="holiday-stack">
                             {row.bankHoliday ? <span className="holiday-pill">{row.bankHoliday}</span> : null}
-                            {row.staffHolidays.map((holiday) => (
-                              <div key={holiday.id} className={`staff-holiday-pill ${getHolidayPersonColor(holiday.person)}`}>
-                                <span>{holiday.person}</span>
-                                {holiday.duration !== "Full Day" ? <b>{holiday.duration}</b> : null}
-                                <button
-                                  type="button"
-                                  className="holiday-delete"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    deleteHoliday(holiday.id);
-                                  }}
-                                >
-                                  x
+                            {row.staffHolidays.length ? (
+                              <div className="holiday-grid">
+                                {row.staffHolidays.map((holiday) => (
+                                  <button
+                                    key={holiday.id}
+                                    type="button"
+                                    className={`staff-holiday-pill ${getHolidayPersonColor(holiday.person)} ${activeHolidayId === holiday.id ? "active" : ""}`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setActiveHolidayDate(row.isoDate);
+                                      setActiveHolidayId((current) => (current === holiday.id ? "" : holiday.id));
+                                    }}
+                                  >
+                                    <span>{holiday.person}</span>
+                                    {holiday.duration !== "Full Day" ? <b>{holiday.duration}</b> : null}
+                                    <span
+                                      className="holiday-duplicate"
+                                      draggable
+                                      onDragStart={(event) => {
+                                        event.stopPropagation();
+                                        event.dataTransfer.setData("holiday-copy", holiday.id);
+                                        event.dataTransfer.effectAllowed = "copy";
+                                        const preview = buildDragPreview(event.currentTarget.closest(".staff-holiday-pill"));
+                                        dragPreviewRef.current = preview;
+                                        dragPositionRef.current = { x: event.clientX, y: event.clientY };
+                                        preview.style.left = `${event.clientX + 18}px`;
+                                        preview.style.top = `${event.clientY + 18}px`;
+                                        event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                                        setDraggingHolidayId(holiday.id);
+                                      }}
+                                      onDragEnd={() => {
+                                        setDraggingHolidayId("");
+                                        setDropDate("");
+                                        clearDragPreview();
+                                      }}
+                                      title="Drag to copy"
+                                    >
+                                      +
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
+                            {activeHolidayDate === row.isoDate && activeHolidayId ? (
+                              <div className="holiday-entry-actions" onClick={(event) => event.stopPropagation()}>
+                                <button className="danger-inline-button" type="button" onClick={() => { deleteHoliday(activeHolidayId); setActiveHolidayId(""); }}>
+                                  Delete Selected
                                 </button>
                               </div>
-                            ))}
-                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
+                            ) : null}
                             {activeHolidayDate === row.isoDate ? (
                               <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
                                 <label>
