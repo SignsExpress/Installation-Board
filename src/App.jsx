@@ -532,19 +532,23 @@ export default function App() {
                         </div>
 
                         <div className="jobs-cell">
-                          {row.jobs.length === 0 ? (
-                            <button
-                              type="button"
-                              className="empty-job-button"
-                              onClick={() => {
-                                setJobModalDate(row.isoDate);
-                                setForm((current) => ({ ...EMPTY_FORM, date: row.isoDate, jobType: current.jobType || "Install" }));
-                                setEditingId("");
-                              }}
-                            >
-                              No jobs booked
-                            </button>
-                          ) : (
+                          <button
+                            type="button"
+                            className={`jobs-lane-button ${row.jobs.length === 0 ? "is-empty" : ""}`}
+                            onClick={() => {
+                              setJobModalDate(row.isoDate);
+                              setForm((current) => ({
+                                ...EMPTY_FORM,
+                                date: row.isoDate,
+                                jobType: current.jobType || "Install"
+                              }));
+                              setEditingId("");
+                            }}
+                          >
+                            {row.jobs.length === 0 ? <span className="muted">No jobs booked</span> : <span className="lane-add-label">Click anywhere here to add another job</span>}
+                          </button>
+
+                          {row.jobs.length > 0 ? (
                             <div className="job-stack">
                               {row.jobs.map((job) => {
                                 const meta = getJobTypeMeta(job.jobType);
@@ -553,24 +557,25 @@ export default function App() {
                                     key={job.id}
                                     className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
                                     draggable
-                                  onDragStart={(event) => {
-                                    event.dataTransfer.setData("text/plain", job.id);
-                                    event.dataTransfer.effectAllowed = "move";
-                                    const preview = buildDragPreview(event.currentTarget);
-                                    dragPreviewRef.current = preview;
-                                    dragPositionRef.current = { x: event.clientX, y: event.clientY };
-                                    preview.style.left = `${event.clientX + 18}px`;
-                                    preview.style.top = `${event.clientY + 18}px`;
-                                    preview.style.transform = "rotate(-2deg) translateY(0)";
-                                    event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                                    setDraggingJobId(job.id);
-                                  }}
-                                  onDragEnd={() => {
-                                    setDraggingJobId("");
-                                    setDropDate("");
-                                    clearDragPreview();
-                                  }}
-                                >
+                                    onDragStart={(event) => {
+                                      event.dataTransfer.setData("text/plain", job.id);
+                                      event.dataTransfer.effectAllowed = "move";
+                                      const preview = buildDragPreview(event.currentTarget);
+                                      dragPreviewRef.current = preview;
+                                      dragPositionRef.current = { x: event.clientX, y: event.clientY };
+                                      preview.style.left = `${event.clientX + 18}px`;
+                                      preview.style.top = `${event.clientY + 18}px`;
+                                      preview.style.transform = "rotate(-2deg) translateY(0)";
+                                      event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                                      setDraggingJobId(job.id);
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggingJobId("");
+                                      setDropDate("");
+                                      clearDragPreview();
+                                    }}
+                                    onClick={() => editJob(job)}
+                                  >
                                     <div className="job-card-top">
                                       <div>
                                         <strong>{job.customerName}</strong>
@@ -586,10 +591,10 @@ export default function App() {
                                     {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
                                     {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
                                     <div className="job-actions">
-                                      <button className="text-button" type="button" onClick={() => editJob(job)}>
+                                      <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
                                         Edit
                                       </button>
-                                      <button className="text-button danger" type="button" onClick={() => handleDelete(job.id)}>
+                                      <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
                                         Delete
                                       </button>
                                     </div>
@@ -597,7 +602,7 @@ export default function App() {
                                 );
                               })}
                             </div>
-                          )}
+                          ) : null}
                         </div>
                       </article>
                     ))}

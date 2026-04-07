@@ -388,6 +388,12 @@ button {
   padding: 12px 14px;
 }
 
+.jobs-cell {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
 .board-row {
   border-top: 1px solid var(--sx-main-border);
   min-height: 92px;
@@ -504,22 +510,31 @@ button {
   margin-left: auto;
 }
 
-.empty-job-button {
+.jobs-lane-button {
   width: 100%;
-  min-height: 56px;
   border: 1px dashed #cbd5e1;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.86);
   color: #64748b;
   font-weight: 700;
   text-align: left;
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 
-.empty-job-button:hover {
+.jobs-lane-button:hover {
   background: #f8fafc;
   color: var(--sx-main-text);
   border-color: var(--sx-main-border);
+}
+
+.jobs-lane-button.is-empty {
+  min-height: 56px;
+  padding: 12px 14px;
+}
+
+.lane-add-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
 }
 
 .holiday-editor {
@@ -577,6 +592,7 @@ button {
   padding: 10px 12px;
   display: grid;
   gap: 7px;
+  cursor: pointer;
 }
 
 .job-card.is-dragging {
@@ -635,6 +651,8 @@ button {
 
 .job-modal {
   width: min(720px, 100%);
+  max-height: 90vh;
+  overflow: auto;
 }
 
 .job-type-install {
