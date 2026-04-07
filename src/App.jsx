@@ -555,7 +555,7 @@ export default function App() {
                                 return (
                                   <div
                                     key={job.id}
-                                    className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+                                    className={`job-card ${meta.colorClass}-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
                                     draggable
                                     onDragStart={(event) => {
                                       event.dataTransfer.setData("text/plain", job.id);
@@ -587,6 +587,7 @@ export default function App() {
                                       <p><b>Installers:</b> {job.installers || "-"}</p>
                                       <p><b>Ref:</b> {job.orderReference || "-"}</p>
                                       <p><b>Contact:</b> {job.contact || "-"}</p>
+                                      <p><b>Number:</b> {job.number || "-"}</p>
                                     </div>
                                     {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
                                     {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}

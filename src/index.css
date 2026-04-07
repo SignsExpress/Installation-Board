@@ -583,6 +583,7 @@ button {
 .job-stack {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .job-card {
@@ -593,6 +594,41 @@ button {
   display: grid;
   gap: 7px;
   cursor: pointer;
+}
+
+.job-type-install-card {
+  background: #fff5f5;
+  border-color: #fca5a5;
+}
+
+.job-type-vehicle-card {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+
+.job-type-delivery-card {
+  background: #f5f3ff;
+  border-color: #c4b5fd;
+}
+
+.job-type-subcontractor-card {
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.job-type-signs-express-card {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.job-type-survey-card {
+  background: #fdf2f8;
+  border-color: #f9a8d4;
+}
+
+.job-type-other-card {
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .job-card.is-dragging {
@@ -810,6 +846,10 @@ button {
   }
 
   .job-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-stack {
     grid-template-columns: 1fr;
   }
 }
