@@ -12,6 +12,17 @@ const JOB_TYPES = [
 
 const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
 const HOLIDAY_DURATIONS = ["Morning", "Afternoon", "Full Day"];
+const HOLIDAY_PERSON_COLORS = {
+  "Matt R": "holiday-person-black",
+  "Dawn D": "holiday-person-black",
+  "Tom V-B": "holiday-person-black",
+  "Amber H": "holiday-person-black",
+  "Eddy D'A": "holiday-person-black",
+  "Paul M": "holiday-person-green",
+  "Kyle W": "holiday-person-green",
+  "Matt C": "holiday-person-red",
+  "Keilan C": "holiday-person-red"
+};
 
 const EMPTY_FORM = {
   id: "",
@@ -54,6 +65,7 @@ export default function App() {
   const [dropDate, setDropDate] = useState("");
   const [activeHolidayDate, setActiveHolidayDate] = useState("");
   const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
+  const [jobModalDate, setJobModalDate] = useState("");
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -170,10 +182,12 @@ export default function App() {
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
+    setJobModalDate("");
   }
 
   function editJob(job) {
     setEditingId(job.id);
+    setJobModalDate(job.date);
     setForm({
       id: job.id,
       date: job.date,
@@ -307,6 +321,10 @@ export default function App() {
     return job.jobType === "Other" ? job.customJobType || "Other" : job.jobType;
   }
 
+  function getHolidayPersonColor(person) {
+    return HOLIDAY_PERSON_COLORS[person] || "holiday-person-black";
+  }
+
   function buildDragPreview(element) {
     const preview = element.cloneNode(true);
     preview.classList.add("drag-preview");
@@ -402,14 +420,204 @@ export default function App() {
         </section>
 
         <div className="layout">
-          <section className="panel form-panel">
+          <section className="panel board-panel board-panel-full">
             <div className="panel-head">
               <div>
-                <p className="panel-kicker">Board editor</p>
-                <h2>{editingId ? "Edit job" : "Add a job"}</h2>
+                <p className="panel-kicker">Live board</p>
+                <h2>Rolling installation calendar</h2>
               </div>
-              <button className="ghost-button" type="button" onClick={() => resetForm()}>
-                Clear
+              <div className="board-range">{board ? `${board.start} to ${board.end}` : "Loading"}</div>
+            </div>
+
+            {loading || !board ? (
+              <div className="board-loading">Loading the shared installation board...</div>
+            ) : (
+              <div className="board">
+                {board.weeks.map((week) => (
+                  <section key={week.id} className="week-block">
+                    <header className="week-header">
+                      <span>Week</span>
+                      <strong>{week.label}</strong>
+                    </header>
+
+                    <div className="board-header">
+                      <div>Date</div>
+                      <div>Holidays</div>
+                      <div>Jobs</div>
+                    </div>
+
+                    {week.rows.map((row) => (
+                      <article
+                        key={row.isoDate}
+                        className={[
+                          "board-row",
+                          row.isToday ? "is-today" : "",
+                          row.bankHoliday || row.staffHolidays.length ? "is-holiday" : "",
+                          row.isPast ? "is-past" : "",
+                          dropDate === row.isoDate ? "is-drop-target" : ""
+                        ].join(" ").trim()}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          if (draggingJobId) setDropDate(row.isoDate);
+                        }}
+                        onDragLeave={() => {
+                          if (dropDate === row.isoDate) setDropDate("");
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
+                          moveJobToDate(jobId, row.isoDate);
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="date-cell"
+                          onClick={() => setForm((current) => ({ ...current, date: row.isoDate }))}
+                          title={row.fullDateLabel}
+                        >
+                          <span className="date-day">{row.dayLabel}</span>
+                          <strong className="date-number">{row.dayNumber}</strong>
+                        </button>
+
+                        <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
+                          <div className="holiday-stack">
+                            {row.bankHoliday ? <span className="holiday-pill">{row.bankHoliday}</span> : null}
+                            {row.staffHolidays.map((holiday) => (
+                              <div key={holiday.id} className={`staff-holiday-pill ${getHolidayPersonColor(holiday.person)}`}>
+                                <span>{holiday.person}</span>
+                                {holiday.duration !== "Full Day" ? <b>{holiday.duration}</b> : null}
+                                <button
+                                  type="button"
+                                  className="holiday-delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteHoliday(holiday.id);
+                                  }}
+                                >
+                                  x
+                                </button>
+                              </div>
+                            ))}
+                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
+                            {activeHolidayDate === row.isoDate ? (
+                              <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
+                                <label>
+                                  Name
+                                  <select value={holidayForm.person} onChange={(event) => setHolidayForm((current) => ({ ...current, person: event.target.value }))}>
+                                    {STAFF_NAMES.map((name) => (
+                                      <option key={name} value={name}>
+                                        {name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <div className="duration-group">
+                                  {HOLIDAY_DURATIONS.map((duration) => (
+                                    <button
+                                      key={duration}
+                                      type="button"
+                                      className={`duration-button ${holidayForm.duration === duration ? "active" : ""}`}
+                                      onClick={() => setHolidayForm((current) => ({ ...current, duration }))}
+                                    >
+                                      {duration}
+                                    </button>
+                                  ))}
+                                </div>
+                                <button className="ghost-button holiday-save" type="button" onClick={() => saveHoliday(row.isoDate)}>
+                                  Add Holiday
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="jobs-cell">
+                          {row.jobs.length === 0 ? (
+                            <button
+                              type="button"
+                              className="empty-job-button"
+                              onClick={() => {
+                                setJobModalDate(row.isoDate);
+                                setForm((current) => ({ ...EMPTY_FORM, date: row.isoDate, jobType: current.jobType || "Install" }));
+                                setEditingId("");
+                              }}
+                            >
+                              No jobs booked
+                            </button>
+                          ) : (
+                            <div className="job-stack">
+                              {row.jobs.map((job) => {
+                                const meta = getJobTypeMeta(job.jobType);
+                                return (
+                                  <div
+                                    key={job.id}
+                                    className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+                                    draggable
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.setData("text/plain", job.id);
+                                    event.dataTransfer.effectAllowed = "move";
+                                    const preview = buildDragPreview(event.currentTarget);
+                                    dragPreviewRef.current = preview;
+                                    dragPositionRef.current = { x: event.clientX, y: event.clientY };
+                                    preview.style.left = `${event.clientX + 18}px`;
+                                    preview.style.top = `${event.clientY + 18}px`;
+                                    preview.style.transform = "rotate(-2deg) translateY(0)";
+                                    event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                                    setDraggingJobId(job.id);
+                                  }}
+                                  onDragEnd={() => {
+                                    setDraggingJobId("");
+                                    setDropDate("");
+                                    clearDragPreview();
+                                  }}
+                                >
+                                    <div className="job-card-top">
+                                      <div>
+                                        <strong>{job.customerName}</strong>
+                                        <p>{job.description || "No description"}</p>
+                                      </div>
+                                      <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+                                    </div>
+                                    <div className="job-meta-grid">
+                                      <p><b>Installers:</b> {job.installers || "-"}</p>
+                                      <p><b>Ref:</b> {job.orderReference || "-"}</p>
+                                      <p><b>Contact:</b> {job.contact || "-"}</p>
+                                    </div>
+                                    {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
+                                    {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
+                                    <div className="job-actions">
+                                      <button className="text-button" type="button" onClick={() => editJob(job)}>
+                                        Edit
+                                      </button>
+                                      <button className="text-button danger" type="button" onClick={() => handleDelete(job.id)}>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+      {jobModalDate ? (
+        <div className="modal-backdrop" onClick={() => resetForm()}>
+          <div className="modal job-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>{editingId ? "Edit Job" : "Add Job"}</h3>
+                <p>{jobModalDate}</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => resetForm()}>
+                x
               </button>
             </div>
 
@@ -526,216 +734,14 @@ export default function App() {
                 <button className="primary-button" type="submit" disabled={saving}>
                   {saving ? "Saving..." : editingId ? "Update job" : "Add job"}
                 </button>
-                <button className="ghost-button" type="button" onClick={handleManualRefresh}>
-                  Refresh
+                <button className="ghost-button" type="button" onClick={() => resetForm()}>
+                  Cancel
                 </button>
               </div>
             </form>
-
-            {message && <div className={`flash ${message.tone}`}>{message.text}</div>}
-
-            <div className="upcoming">
-              <div className="panel-head compact">
-                <div>
-                  <p className="panel-kicker">Next up</p>
-                  <h3>Upcoming jobs</h3>
-                </div>
-              </div>
-
-              {upcomingJobs.length === 0 ? (
-                <p className="muted">No upcoming jobs saved yet.</p>
-              ) : (
-                <div className="upcoming-list">
-                  {upcomingJobs.map((job) => (
-                    <button key={job.id} className="upcoming-item" type="button" onClick={() => editJob(job)}>
-                      <span>{job.date}</span>
-                      <strong>{job.customerName}</strong>
-                      <small>{job.description || job.installers || job.orderReference || getJobTypeLabel(job)}</small>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
-
-          <section className="panel board-panel">
-            <div className="panel-head">
-              <div>
-                <p className="panel-kicker">Live board</p>
-                <h2>Rolling installation calendar</h2>
-              </div>
-              <div className="board-range">{board ? `${board.start} to ${board.end}` : "Loading"}</div>
-            </div>
-
-            {loading || !board ? (
-              <div className="board-loading">Loading the shared installation board...</div>
-            ) : (
-              <div className="board">
-                {board.weeks.map((week) => (
-                  <section key={week.id} className="week-block">
-                    <header className="week-header">
-                      <span>Week</span>
-                      <strong>{week.label}</strong>
-                    </header>
-
-                    <div className="board-header">
-                      <div>Date</div>
-                      <div>Holidays</div>
-                      <div>Jobs</div>
-                    </div>
-
-                    {week.rows.map((row) => (
-                      <article
-                        key={row.isoDate}
-                        className={[
-                          "board-row",
-                          row.isToday ? "is-today" : "",
-                          row.bankHoliday || row.staffHolidays.length ? "is-holiday" : "",
-                          row.isPast ? "is-past" : "",
-                          dropDate === row.isoDate ? "is-drop-target" : ""
-                        ].join(" ").trim()}
-                        onDragOver={(event) => {
-                          event.preventDefault();
-                          if (draggingJobId) setDropDate(row.isoDate);
-                        }}
-                        onDragLeave={() => {
-                          if (dropDate === row.isoDate) setDropDate("");
-                        }}
-                        onDrop={(event) => {
-                          event.preventDefault();
-                          const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
-                          moveJobToDate(jobId, row.isoDate);
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="date-cell"
-                          onClick={() => setForm((current) => ({ ...current, date: row.isoDate }))}
-                          title={row.fullDateLabel}
-                        >
-                          <span className="date-day">{row.dayLabel}</span>
-                          <strong className="date-number">{row.dayNumber}</strong>
-                        </button>
-
-                        <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
-                          <div className="holiday-stack">
-                            {row.bankHoliday ? <span className="holiday-pill">{row.bankHoliday}</span> : null}
-                            {row.staffHolidays.map((holiday) => (
-                              <div key={holiday.id} className="staff-holiday-pill">
-                                <span>{holiday.person}</span>
-                                <b>{holiday.duration}</b>
-                                <button
-                                  type="button"
-                                  className="holiday-delete"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    deleteHoliday(holiday.id);
-                                  }}
-                                >
-                                  x
-                                </button>
-                              </div>
-                            ))}
-                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">Click to add holiday</span> : null}
-                            {activeHolidayDate === row.isoDate ? (
-                              <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
-                                <label>
-                                  Name
-                                  <select value={holidayForm.person} onChange={(event) => setHolidayForm((current) => ({ ...current, person: event.target.value }))}>
-                                    {STAFF_NAMES.map((name) => (
-                                      <option key={name} value={name}>
-                                        {name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <div className="duration-group">
-                                  {HOLIDAY_DURATIONS.map((duration) => (
-                                    <button
-                                      key={duration}
-                                      type="button"
-                                      className={`duration-button ${holidayForm.duration === duration ? "active" : ""}`}
-                                      onClick={() => setHolidayForm((current) => ({ ...current, duration }))}
-                                    >
-                                      {duration}
-                                    </button>
-                                  ))}
-                                </div>
-                                <button className="ghost-button holiday-save" type="button" onClick={() => saveHoliday(row.isoDate)}>
-                                  Add Holiday
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="jobs-cell">
-                          {row.jobs.length === 0 ? (
-                            <span className="muted">No jobs booked</span>
-                          ) : (
-                            <div className="job-stack">
-                              {row.jobs.map((job) => {
-                                const meta = getJobTypeMeta(job.jobType);
-                                return (
-                                  <div
-                                    key={job.id}
-                                    className={`job-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
-                                    draggable
-                                  onDragStart={(event) => {
-                                    event.dataTransfer.setData("text/plain", job.id);
-                                    event.dataTransfer.effectAllowed = "move";
-                                    const preview = buildDragPreview(event.currentTarget);
-                                    dragPreviewRef.current = preview;
-                                    dragPositionRef.current = { x: event.clientX, y: event.clientY };
-                                    preview.style.left = `${event.clientX + 18}px`;
-                                    preview.style.top = `${event.clientY + 18}px`;
-                                    preview.style.transform = "rotate(-2deg) translateY(0)";
-                                    event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                                    setDraggingJobId(job.id);
-                                  }}
-                                  onDragEnd={() => {
-                                    setDraggingJobId("");
-                                    setDropDate("");
-                                    clearDragPreview();
-                                  }}
-                                >
-                                    <div className="job-card-top">
-                                      <div>
-                                        <strong>{job.customerName}</strong>
-                                        <p>{job.description || "No description"}</p>
-                                      </div>
-                                      <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
-                                    </div>
-                                    <div className="job-meta-grid">
-                                      <p><b>Installers:</b> {job.installers || "-"}</p>
-                                      <p><b>Ref:</b> {job.orderReference || "-"}</p>
-                                      <p><b>Contact:</b> {job.contact || "-"}</p>
-                                    </div>
-                                    {job.address ? <p className="job-notes compact"><b>Address:</b> {job.address}</p> : null}
-                                    {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
-                                    <div className="job-actions">
-                                      <button className="text-button" type="button" onClick={() => editJob(job)}>
-                                        Edit
-                                      </button>
-                                      <button className="text-button danger" type="button" onClick={() => handleDelete(job.id)}>
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </section>
-                ))}
-              </div>
-            )}
-          </section>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
