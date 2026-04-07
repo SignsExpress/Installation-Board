@@ -725,6 +725,11 @@ button {
   gap: 12px;
 }
 
+.job-title-wrap {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .job-card-top p,
 .job-notes {
   margin: 2px 0 0;
@@ -743,15 +748,34 @@ button {
 
 .job-title-line {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   align-items: baseline;
   line-height: 1.25;
+  min-width: 0;
 }
 
 .job-ref-inline {
   font-weight: 400;
   color: #64748b;
+  flex: 0 0 auto;
+}
+
+.job-customer-inline {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  flex: 1 1 auto;
+}
+
+.job-title-installers {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .job-meta-grid {

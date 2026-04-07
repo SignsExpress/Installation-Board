@@ -625,23 +625,25 @@ export default function App() {
                                       return (
                                         <>
                                     <div className="job-card-top">
-                                      <div>
+                                      <div className="job-title-wrap">
                                         <strong className="job-title-line">
                                           {job.orderReference ? <span className="job-ref-inline">{job.orderReference}</span> : null}
-                                          <span>{job.customerName}</span>
-                                          {installerLabels.length
-                                            ? installerLabels.map((installer) => {
-                                                const metaInstaller = getInstallerMeta(installer);
-                                                return (
-                                                  <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
-                                                    {installer}
-                                                  </span>
-                                                );
-                                              })
-                                            : null}
+                                          <span className="job-customer-inline">{job.customerName}</span>
                                         </strong>
                                         <p>{job.description || "No description"}</p>
                                       </div>
+                                      {installerLabels.length ? (
+                                        <div className="job-title-installers">
+                                          {installerLabels.map((installer) => {
+                                            const metaInstaller = getInstallerMeta(installer);
+                                            return (
+                                              <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
+                                                {installer}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : null}
                                       <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
                                     </div>
                                     <div className="job-meta-grid">
