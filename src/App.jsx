@@ -81,6 +81,7 @@ export default function App() {
   const [activeHolidayId, setActiveHolidayId] = useState("");
   const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
   const [jobModalDate, setJobModalDate] = useState("");
+  const [activeClientJob, setActiveClientJob] = useState(null);
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -501,7 +502,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
         <section className="hero">
           <div className="hero-brand">
@@ -722,7 +723,11 @@ export default function App() {
                                       clearDragPreview();
                                     }}
                                     onClick={() => {
-                                      if (!isClientMode) editJob(job);
+                                      if (isClientMode) {
+                                        setActiveClientJob(job);
+                                      } else {
+                                        editJob(job);
+                                      }
                                     }}
                                   >
                                     {(() => {
@@ -767,9 +772,7 @@ export default function App() {
                                             Delete
                                           </button>
                                         </>
-                                      ) : (
-                                        <span className="muted">View only</span>
-                                      )}
+                                      ) : null}
                                     </div>
                                         </>
                                       );
@@ -938,6 +941,51 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+      {isClientMode && activeClientJob ? (
+        <div className="modal-backdrop" onClick={() => setActiveClientJob(null)}>
+          <div className="modal client-detail-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>{activeClientJob.customerName}</h3>
+                <p>{activeClientJob.description || "No description"}</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setActiveClientJob(null)}>
+                x
+              </button>
+            </div>
+            <div className="detail-grid">
+              <div className="detail-card">
+                <strong>Order Ref</strong>
+                <p>{activeClientJob.orderReference || "-"}</p>
+              </div>
+              <div className="detail-card">
+                <strong>Job Type</strong>
+                <p>{getJobTypeLabel(activeClientJob)}</p>
+              </div>
+              <div className="detail-card detail-card-wide">
+                <strong>Installers</strong>
+                <p>{getInstallerDisplayList(activeClientJob).join(", ") || "-"}</p>
+              </div>
+              <div className="detail-card">
+                <strong>Contact</strong>
+                <p>{activeClientJob.contact || "-"}</p>
+              </div>
+              <div className="detail-card">
+                <strong>Number</strong>
+                <p>{activeClientJob.number || "-"}</p>
+              </div>
+              <div className="detail-card detail-card-wide">
+                <strong>Address</strong>
+                <p>{activeClientJob.address || "-"}</p>
+              </div>
+              <div className="detail-card detail-card-wide">
+                <strong>Notes</strong>
+                <p>{activeClientJob.notes || "-"}</p>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

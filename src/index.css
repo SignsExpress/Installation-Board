@@ -850,6 +850,37 @@ button {
   overflow: auto;
 }
 
+.client-detail-modal {
+  width: min(640px, 100%);
+}
+
+.detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detail-card {
+  background: #f8fafc;
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+.detail-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.detail-card p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.45;
+}
+
+.detail-card-wide {
+  grid-column: 1 / -1;
+}
+
 .job-type-install {
   background: #fee2e2;
   color: #b91c1c;
@@ -1015,5 +1046,89 @@ button {
 
   .job-stack {
     grid-template-columns: 1fr;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 780px) {
+  .client-mode .hero {
+    padding: 14px 18px;
+  }
+
+  .client-mode .panel {
+    padding: 14px;
+  }
+
+  .client-mode .panel-head {
+    margin-bottom: 10px;
+  }
+
+  .client-mode .panel-kicker,
+  .client-mode .board-range,
+  .client-mode .jobs-lane-button,
+  .client-mode .job-meta-grid,
+  .client-mode .job-notes.compact,
+  .client-mode .job-actions,
+  .client-mode .holiday-duplicate {
+    display: none;
+  }
+
+  .client-mode .week-header {
+    padding: 10px 14px;
+  }
+
+  .client-mode .date-cell {
+    padding: 12px 14px;
+  }
+
+  .client-mode .date-number {
+    font-size: 1.45rem;
+  }
+
+  .client-mode .holiday-grid {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .client-mode .staff-holiday-pill {
+    padding: 6px 8px;
+    font-size: 0.74rem;
+  }
+
+  .client-mode .jobs-cell {
+    padding-top: 10px;
+  }
+
+  .client-mode .job-card {
+    padding: 10px 11px;
+    gap: 6px;
+  }
+
+  .client-mode .job-card-top {
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .client-mode .job-card-top p {
+    margin-top: 3px;
+    font-size: 0.84rem;
+  }
+
+  .client-mode .job-tag {
+    font-size: 0.68rem;
+    padding: 4px 8px;
+  }
+
+  .client-mode .job-title-installers {
+    gap: 4px;
+  }
+
+  .client-mode .installer-badge.title-inline {
+    min-height: 20px;
+    padding: 2px 6px;
+    font-size: 0.66rem;
   }
 }
