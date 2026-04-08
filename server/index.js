@@ -886,6 +886,26 @@ function pickPreferredCoreBridgeContactRole(record) {
   );
 }
 
+function pickDestinationCoreBridgeRole(record) {
+  const roles = Array.isArray(record?.ContactRoles) ? record.ContactRoles : [];
+  if (!roles.length) return null;
+
+  const hasAddressLocator = (role) =>
+    Array.isArray(role?.OrderContactRoleLocators) &&
+    role.OrderContactRoleLocators.some((locator) => Number(locator?.LocatorType) === 1 && String(locator?.Locator || "").trim());
+
+  return (
+    roles.find(
+      (role) =>
+        role?.DestinationID &&
+        String(role?.RoleType || "").toLowerCase() === "shipto" &&
+        hasAddressLocator(role)
+    ) ||
+    roles.find((role) => role?.DestinationID && hasAddressLocator(role)) ||
+    null
+  );
+}
+
 function pickRoleLocator(role, locatorType) {
   const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
   return locators.find((locator) => Number(locator?.LocatorType) === locatorType) || null;
@@ -1013,6 +1033,7 @@ function pickBestCoreBridgeAddress(flatRecord) {
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
   const preferredRole = pickPreferredCoreBridgeContactRole(record);
+  const destinationRole = pickDestinationCoreBridgeRole(record);
   const directDescription = String(
     record?.SE_EstimateDescription ||
     record?.EstimateDescription ||
@@ -1020,7 +1041,7 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
-  const preferredRoleAddress = buildAddressFromRole(preferredRole);
+  const destinationRoleAddress = buildAddressFromRole(destinationRole);
   const directRoleAddress = buildAddressFromAliases(flat, [
     [
       "contactroles.0.ordercontactrolelocators.0.metadata.street1",
@@ -1093,7 +1114,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: preferredRolePhone || directRolePhone,
-    address: preferredRoleAddress || directRoleAddress || "",
+    address: destinationRoleAddress || directRoleAddress || "",
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
