@@ -17,7 +17,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const DEV_FRONTEND_PORT = Number(process.env.DEV_FRONTEND_PORT || 5173);
 const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
-const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers.json");
+const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers-live.json");
 const DEFAULT_REQUESTS_FILE = path.join(__dirname, "..", "data", "requests.json");
 const LEGACY_INSTALLER_DIRECTORY = "/var/data/sx-installer-directory";
 const LEGACY_INSTALLERS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "installers.json");
@@ -232,12 +232,24 @@ async function readInstallersStore() {
 
   try {
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed) && parsed.length === 0 && installersFile !== DEFAULT_INSTALLERS_FILE && fs.existsSync(DEFAULT_INSTALLERS_FILE)) {
+    if (Array.isArray(parsed) && installersFile !== DEFAULT_INSTALLERS_FILE && fs.existsSync(DEFAULT_INSTALLERS_FILE)) {
       const seedRaw = await fsp.readFile(DEFAULT_INSTALLERS_FILE, "utf8");
       const seedParsed = JSON.parse(seedRaw);
+
       if (Array.isArray(seedParsed) && seedParsed.length > 0) {
-        await fsp.writeFile(installersFile, `${JSON.stringify(seedParsed, null, 2)}\n`, "utf8");
-        return seedParsed;
+        const isSubsetOfSeed =
+          parsed.length === 0 ||
+          parsed.every((item) => seedParsed.some((seedItem) => String(seedItem?.id || "") === String(item?.id || "")));
+
+        if (isSubsetOfSeed && parsed.length < seedParsed.length) {
+          await fsp.writeFile(installersFile, `${JSON.stringify(seedParsed, null, 2)}\n`, "utf8");
+          return seedParsed;
+        }
+
+        if (parsed.length === 0) {
+          await fsp.writeFile(installersFile, `${JSON.stringify(seedParsed, null, 2)}\n`, "utf8");
+          return seedParsed;
+        }
       }
     }
 
