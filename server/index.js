@@ -664,6 +664,18 @@ function buildCoreBridgeOrderDestinationsUrl(config, orderId) {
   return url.toString();
 }
 
+function buildCoreBridgeDestinationDetailUrl(config, destinationId) {
+  const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const destinationPath = normalizedPath.replace(/order\/?$/i, `destination/${destinationId}`);
+  const url = new URL(destinationPath, normalizedBase);
+
+  url.searchParams.set("apiversion", config.apiVersion);
+  url.searchParams.set("contactlevel", "full");
+
+  return url.toString();
+}
+
 function flattenRecord(record, prefix = "", bucket = {}) {
   if (!record || typeof record !== "object") return bucket;
 
@@ -1297,6 +1309,20 @@ function pickBestCoreBridgeDestinationRecord(records) {
   );
 }
 
+function pickDestinationLookupId(record) {
+  if (!record || typeof record !== "object") return "";
+
+  return String(
+    record?.ID ??
+      record?.id ??
+      record?.OrderDestinationID ??
+      record?.orderDestinationId ??
+      record?.DestinationID ??
+      record?.destinationId ??
+      ""
+  ).trim();
+}
+
 function looksLikeCoreBridgeOrderRecord(record, orderId) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return false;
   const numericOrderId = Number(orderId);
@@ -1415,9 +1441,36 @@ async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   }
 
   const body = JSON.parse(rawBody);
-  const records = extractCoreBridgeRecords(body);
+  const records = extractCoreBridgeDestinationRecords(body);
   const destinationRecord = pickBestCoreBridgeDestinationRecord(records);
-  return getCoreBridgeDestinationAddressFromRecord(destinationRecord);
+  const inlineAddress = getCoreBridgeDestinationAddressFromRecord(destinationRecord);
+  if (inlineAddress) return inlineAddress;
+
+  const destinationLookupId = pickDestinationLookupId(destinationRecord);
+  if (!destinationLookupId) return "";
+
+  const detailResponse = await fetch(buildCoreBridgeDestinationDetailUrl(config, destinationLookupId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+
+  if (!detailResponse.ok) {
+    throw new Error(`Destination detail lookup failed for ${destinationLookupId} (${detailResponse.status})`);
+  }
+
+  const detailContentType = String(detailResponse.headers.get("content-type") || "");
+  const detailRawBody = await detailResponse.text();
+  if (detailContentType.includes("text/html") || /^\s*</.test(detailRawBody)) {
+    throw new Error(`Destination detail lookup returned HTML for ${destinationLookupId}`);
+  }
+
+  const detailBody = JSON.parse(detailRawBody);
+  const detailRecords = extractCoreBridgeDestinationRecords(detailBody);
+  const detailRecord = detailRecords[0] || detailBody;
+  return getCoreBridgeDestinationAddressFromRecord(detailRecord);
 }
 
 function extractCoreBridgeRecords(payload) {
@@ -1441,6 +1494,53 @@ function extractCoreBridgeRecords(payload) {
   if (payload.data && typeof payload.data === "object") {
     for (const nested of [payload.data.items, payload.data.results, payload.data.records, payload.data.orders, payload.data.rows]) {
       if (Array.isArray(nested)) return nested;
+    }
+  }
+
+  return [];
+}
+
+function looksLikeCoreBridgeDestinationRecord(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+
+  return Boolean(
+    record.DestinationID !== undefined ||
+    record.destinationId !== undefined ||
+    record.DestinationNumber ||
+    record.destinationNumber ||
+    Array.isArray(record.ContactRoles) ||
+    Array.isArray(record.OrderContactRoles) ||
+    Array.isArray(record.OrderDestinationItems)
+  );
+}
+
+function extractCoreBridgeDestinationRecords(payload) {
+  if (Array.isArray(payload)) {
+    return payload.filter((item) => looksLikeCoreBridgeDestinationRecord(item));
+  }
+
+  if (!payload || typeof payload !== "object") return [];
+
+  if (looksLikeCoreBridgeDestinationRecord(payload)) {
+    return [payload];
+  }
+
+  const directCandidates = [
+    payload.data,
+    payload.destination,
+    payload.destinations,
+    payload.result,
+    payload.item,
+    payload.value,
+    payload.rows
+  ];
+
+  for (const candidate of directCandidates) {
+    if (Array.isArray(candidate)) {
+      const matches = candidate.filter((item) => looksLikeCoreBridgeDestinationRecord(item));
+      if (matches.length) return matches;
+    } else if (looksLikeCoreBridgeDestinationRecord(candidate)) {
+      return [candidate];
     }
   }
 
