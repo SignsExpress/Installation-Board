@@ -1120,6 +1120,71 @@ function buildCoreBridgeDebugFields(record) {
     }));
 }
 
+function looksLikeCoreBridgeOrderRecord(record, orderId) {
+  if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+  const numericOrderId = Number(orderId);
+  const recordId = Number(record.ID ?? record.id ?? record.OrderID ?? record.orderId);
+  if (!Number.isFinite(recordId) || recordId !== numericOrderId) return false;
+
+  return Boolean(
+    record.FormattedNumber ||
+    record.formattedNumber ||
+    Array.isArray(record.ContactRoles) ||
+    Array.isArray(record.contactRoles) ||
+    record.CompanyID !== undefined ||
+    record.companyId !== undefined ||
+    record.TransactionType !== undefined ||
+    record.transactionType !== undefined
+  );
+}
+
+function extractCoreBridgeDetailRecord(payload, orderId) {
+  if (looksLikeCoreBridgeOrderRecord(payload, orderId)) return payload;
+
+  const directCandidates = [
+    payload?.data,
+    payload?.order,
+    payload?.result,
+    payload?.item,
+    payload?.value
+  ];
+
+  for (const candidate of directCandidates) {
+    if (looksLikeCoreBridgeOrderRecord(candidate, orderId)) return candidate;
+  }
+
+  const queue = [payload];
+  const visited = new Set();
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current || typeof current !== "object") continue;
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    if (looksLikeCoreBridgeOrderRecord(current, orderId)) {
+      return current;
+    }
+
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        if (item && typeof item === "object") {
+          queue.push(item);
+        }
+      }
+      continue;
+    }
+
+    for (const value of Object.values(current)) {
+      if (value && typeof value === "object") {
+        queue.push(value);
+      }
+    }
+  }
+
+  return payload;
+}
+
 async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false) {
   const response = await fetch(buildCoreBridgeOrderDetailUrl(config, orderId), {
     headers: {
@@ -1140,13 +1205,14 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
   }
 
   const body = JSON.parse(rawBody);
-  const normalized = normalizeCoreBridgeOrder(body, 0);
+  const record = extractCoreBridgeDetailRecord(body, orderId);
+  const normalized = normalizeCoreBridgeOrder(record, 0);
   normalized._detailFetched = true;
   normalized._detailOrderId = orderId;
 
   if (includeDebug) {
-    normalized.debugFields = buildCoreBridgeDebugFields(body);
-    normalized.debugRaw = JSON.stringify(body, null, 2);
+    normalized.debugFields = buildCoreBridgeDebugFields(record);
+    normalized.debugRaw = JSON.stringify(record, null, 2);
   }
 
   return normalized;
