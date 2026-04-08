@@ -946,6 +946,21 @@ button {
   font-size: 0.77rem;
 }
 
+.card-duplicate-handle {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #334155;
+  font-weight: 900;
+  cursor: grab;
+  flex: 0 0 auto;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

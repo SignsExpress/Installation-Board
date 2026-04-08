@@ -83,6 +83,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [draggingJobId, setDraggingJobId] = useState("");
+  const [duplicatingJobId, setDuplicatingJobId] = useState("");
   const [draggingHolidayId, setDraggingHolidayId] = useState("");
   const [dropDate, setDropDate] = useState("");
   const [activeHolidayDate, setActiveHolidayDate] = useState("");
@@ -350,6 +351,43 @@ export default function App() {
     }
   }
 
+  async function duplicateJobToDate(jobId, nextDate) {
+    if (isClientMode) return;
+    const job = jobsById.get(jobId);
+    if (!job || !nextDate) {
+      setDuplicatingJobId("");
+      setDropDate("");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...job,
+          id: undefined,
+          date: nextDate
+        })
+      });
+
+      if (!response.ok) throw new Error("Could not duplicate the job.");
+
+      const payload = await response.json();
+      setBoard(payload.board);
+      setJobs(payload.jobs);
+      setHolidays(payload.holidays);
+      setMessage(createMessage(`Job copied to ${nextDate}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not duplicate the job.", "error"));
+    } finally {
+      setDuplicatingJobId("");
+      setDropDate("");
+      clearDragPreview();
+    }
+  }
+
   function getJobTypeMeta(jobType) {
     return JOB_TYPES.find((option) => option.value === jobType) || JOB_TYPES[JOB_TYPES.length - 1];
   }
@@ -569,6 +607,11 @@ export default function App() {
                         onDrop={(event) => {
                           if (isClientMode) return;
                           event.preventDefault();
+                          const duplicateJobId = event.dataTransfer.getData("job-copy");
+                          if (duplicateJobId || duplicatingJobId) {
+                            duplicateJobToDate(duplicateJobId || duplicatingJobId, row.isoDate);
+                            return;
+                          }
                           const holidayId = event.dataTransfer.getData("holiday-copy");
                           if (holidayId || draggingHolidayId) {
                             duplicateHolidayToDate(holidayId || draggingHolidayId, row.isoDate);
@@ -786,6 +829,30 @@ export default function App() {
                                           <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
                                             Edit
                                           </button>
+                                          <span
+                                            className="card-duplicate-handle"
+                                            draggable
+                                            onDragStart={(event) => {
+                                              event.stopPropagation();
+                                              event.dataTransfer.setData("job-copy", job.id);
+                                              event.dataTransfer.effectAllowed = "copy";
+                                              const preview = buildDragPreview(event.currentTarget.closest(".job-card"));
+                                              dragPreviewRef.current = preview;
+                                              dragPositionRef.current = { x: event.clientX, y: event.clientY };
+                                              preview.style.left = `${event.clientX + 18}px`;
+                                              preview.style.top = `${event.clientY + 18}px`;
+                                              event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                                              setDuplicatingJobId(job.id);
+                                            }}
+                                            onDragEnd={() => {
+                                              setDuplicatingJobId("");
+                                              setDropDate("");
+                                              clearDragPreview();
+                                            }}
+                                            title="Drag to copy"
+                                          >
+                                            +
+                                          </span>
                                           <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
                                             Delete
                                           </button>
