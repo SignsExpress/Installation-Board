@@ -1105,11 +1105,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: directRolePhone || buildPhoneFromRole(preferredRole),
-    address:
-      directRecordRoleAddress ||
-      directRoleAddress ||
-      buildAddressFromRole(preferredRole) ||
-      pickBestCoreBridgeAddress(flat),
+    address: directRecordRoleAddress || directRoleAddress || "",
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
