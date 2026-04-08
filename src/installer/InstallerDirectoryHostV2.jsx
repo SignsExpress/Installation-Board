@@ -70,15 +70,13 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
           fetch("/api/installers/status")
         ]);
 
-        if (!installersResponse.ok || !requestsResponse.ok || !statusResponse.ok) {
-          throw new Error("Could not load server data.");
+        if (!installersResponse.ok) {
+          throw new Error("Could not load installer data.");
         }
 
-        const [installersPayload, requestsPayload, statusPayload] = await Promise.all([
-          installersResponse.json(),
-          requestsResponse.json(),
-          statusResponse.json()
-        ]);
+        const installersPayload = await installersResponse.json();
+        const requestsPayload = requestsResponse.ok ? await requestsResponse.json() : [];
+        const statusPayload = statusResponse.ok ? await statusResponse.json() : null;
 
         if (!active) return;
         setInstallers((Array.isArray(installersPayload) ? installersPayload : []).map(normalizeInstaller));
