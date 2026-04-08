@@ -86,18 +86,17 @@ button {
   padding: 12px 20px 24px;
 }
 
+.app-shell:has(.auth-panel) {
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
 .page {
   max-width: 1680px;
   margin: 0 auto;
   display: grid;
   gap: 14px;
-}
-
-.editor-mode .page:has(.auth-panel),
-.client-mode .page:has(.auth-panel) {
-  min-height: 100vh;
-  place-content: center;
-  justify-items: center;
 }
 
 .hero,
@@ -211,7 +210,7 @@ button {
 
 .auth-brand h1 {
   margin: 0;
-  font-size: clamp(1.12rem, 2vw, 1.38rem);
+  font-size: clamp(0.98rem, 1.5vw, 1.14rem);
   line-height: 1.05;
 }
 
