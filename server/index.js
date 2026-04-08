@@ -269,6 +269,32 @@ async function writeRequestsStore(requests) {
   return nextRequests;
 }
 
+async function inspectJsonArrayFile(file) {
+  const exists = fs.existsSync(file);
+  if (!exists) {
+    return { file, exists: false, size: 0, count: 0 };
+  }
+
+  const raw = await fsp.readFile(file, "utf8");
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      file,
+      exists: true,
+      size: Buffer.byteLength(raw, "utf8"),
+      count: Array.isArray(parsed) ? parsed.length : 0
+    };
+  } catch (error) {
+    return {
+      file,
+      exists: true,
+      size: Buffer.byteLength(raw, "utf8"),
+      count: 0,
+      invalidJson: true
+    };
+  }
+}
+
 function makeId() {
   return crypto.randomUUID();
 }
@@ -987,7 +1013,9 @@ function createServer() {
 
   app.get("/api/installers", async (request, response) => {
     if (!requireHost(request, response)) return;
-    response.json(await readInstallersStore());
+    const installers = await readInstallersStore();
+    console.log(`Serving ${installers.length} installers from ${getInstallersFile()}`);
+    response.json(installers);
   });
 
   app.get("/api/installers/status", async (request, response) => {
@@ -997,6 +1025,28 @@ function createServer() {
     response.json({
       installers: installers.length,
       requests: requests.length
+    });
+  });
+
+  app.get("/api/installers/debug", async (request, response) => {
+    if (!requireHost(request, response)) return;
+
+    const candidates = [
+      LEGACY_INSTALLERS_FILE,
+      process.env.DATA_FILE ? path.join(path.dirname(process.env.DATA_FILE), "installers.json") : "",
+      DEFAULT_INSTALLERS_FILE
+    ].filter(Boolean);
+
+    const uniqueCandidates = [...new Set(candidates)];
+    const inspections = await Promise.all(uniqueCandidates.map((file) => inspectJsonArrayFile(file)));
+    const currentFile = getInstallersFile();
+    const installers = await readInstallersStore();
+
+    response.json({
+      currentFile,
+      currentCount: installers.length,
+      sample: installers.slice(0, 3),
+      candidates: inspections
     });
   });
 
