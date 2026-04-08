@@ -95,7 +95,7 @@ button {
 
 .editor-mode .page:has(.auth-panel),
 .client-mode .page:has(.auth-panel) {
-  min-height: calc(100vh - 36px);
+  min-height: 100vh;
   place-content: center;
   justify-items: center;
 }
@@ -205,13 +205,13 @@ button {
 }
 
 .auth-logo {
-  width: 160px;
+  width: 176px;
   height: auto;
 }
 
 .auth-brand h1 {
   margin: 0;
-  font-size: clamp(1.25rem, 2.5vw, 1.55rem);
+  font-size: clamp(1.12rem, 2vw, 1.38rem);
   line-height: 1.05;
 }
 
@@ -223,7 +223,7 @@ button {
 }
 
 .auth-form label {
-  text-align: center;
+  text-align: left;
 }
 
 .auth-form .primary-button {
