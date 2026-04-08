@@ -1013,10 +1013,6 @@ function pickBestCoreBridgeAddress(flatRecord) {
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
   const preferredRole = pickPreferredCoreBridgeContactRole(record);
-  const directRecordRoleMeta =
-    record?.ContactRoles?.[0]?.OrderContactRoleLocators?.[0]?.MetaData ||
-    record?.ContactRoles?.[0]?.OrderContactRoleLocators?.[0]?.MetaDataObject ||
-    {};
   const directDescription = String(
     record?.SE_EstimateDescription ||
     record?.EstimateDescription ||
@@ -1024,16 +1020,7 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
-  const directRecordRoleAddress = [
-    directRecordRoleMeta?.Street1,
-    directRecordRoleMeta?.Street2,
-    directRecordRoleMeta?.City,
-    directRecordRoleMeta?.State,
-    directRecordRoleMeta?.PostalCode
-  ]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .join(", ");
+  const preferredRoleAddress = buildAddressFromRole(preferredRole);
   const directRoleAddress = buildAddressFromAliases(flat, [
     [
       "contactroles.0.ordercontactrolelocators.0.metadata.street1",
@@ -1058,6 +1045,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "ordercontactroles.0.ordercontactrolelocators.0.metadata.postcode"
     ]
   ]);
+  const preferredRolePhone = buildPhoneFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
     "contactroles.0.ordercontactrolelocators.1.locator",
     "ordercontactroles.0.ordercontactrolelocators.1.locator",
@@ -1104,8 +1092,8 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
-    number: directRolePhone || buildPhoneFromRole(preferredRole),
-    address: directRecordRoleAddress || directRoleAddress || "",
+    number: preferredRolePhone || directRolePhone,
+    address: preferredRoleAddress || directRoleAddress || "",
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
