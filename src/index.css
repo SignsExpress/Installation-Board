@@ -968,7 +968,7 @@ button {
 
 .order-lookup-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 12px;
 }
 
@@ -1034,6 +1034,66 @@ button {
 
 .order-result-address {
   font-size: 0.86rem;
+}
+
+.order-result-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.active-debug-toggle {
+  border-color: #c7b7d2;
+  background: var(--sx-main-soft);
+  color: var(--sx-main);
+}
+
+.corebridge-debug-modal {
+  width: min(1080px, 100%);
+}
+
+.corebridge-debug-help {
+  display: grid;
+  gap: 4px;
+  color: #475569;
+}
+
+.corebridge-debug-table {
+  border: 1px solid #dbe2ea;
+  border-radius: 18px;
+  overflow: hidden;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+.corebridge-debug-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.6fr);
+  border-top: 1px solid #e2e8f0;
+}
+
+.corebridge-debug-row:first-child {
+  border-top: none;
+}
+
+.corebridge-debug-key,
+.corebridge-debug-value {
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+
+.corebridge-debug-key {
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  color: #334155;
+  font-family: Consolas, "Courier New", monospace;
+}
+
+.corebridge-debug-value {
+  background: white;
+  color: #0f172a;
+  word-break: break-word;
 }
 
 .detail-grid {
@@ -2119,6 +2179,15 @@ button {
 
   .order-lookup-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .corebridge-debug-row {
+    grid-template-columns: 1fr;
+  }
+
+  .corebridge-debug-key {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
   }
 
   .installer-toolbar {

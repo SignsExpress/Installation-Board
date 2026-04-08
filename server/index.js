@@ -988,6 +988,16 @@ function normalizeCoreBridgeOrder(record, index) {
   return normalized;
 }
 
+function buildCoreBridgeDebugFields(record) {
+  const flat = flattenRecord(record);
+  return Object.entries(flat)
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([key, value]) => ({
+      key,
+      value
+    }));
+}
+
 function extractCoreBridgeRecords(payload) {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
@@ -1043,7 +1053,7 @@ function filterCoreBridgeOrders(orders, searchTerm = "") {
   );
 }
 
-async function fetchCoreBridgeOrders(searchTerm = "") {
+async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
   const config = getCoreBridgeConfig();
   if (!config.token || !config.subscriptionKey) {
     const error = new Error("CoreBridge is not configured yet.");
@@ -1109,9 +1119,16 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
       }
 
       const records = extractCoreBridgeRecords(body);
-      const orders = filterCoreBridgeOrders(records.map(normalizeCoreBridgeOrder), normalizedSearch).filter(
-        (order) => order.orderReference || order.customerName
-      );
+      const orders = filterCoreBridgeOrders(
+        records.map((record, index) => {
+          const normalized = normalizeCoreBridgeOrder(record, index);
+          if (includeDebug) {
+            normalized.debugFields = buildCoreBridgeDebugFields(record);
+          }
+          return normalized;
+        }),
+        normalizedSearch
+      ).filter((order) => order.orderReference || order.customerName);
 
       if (orders.length || !normalizedSearch) {
         return {
@@ -1279,7 +1296,8 @@ function createServer() {
     if (!requireHost(request, response)) return;
     try {
       const searchTerm = String(request.query.q || "").trim();
-      const payload = await fetchCoreBridgeOrders(searchTerm);
+      const includeDebug = String(request.query.debug || "").trim() === "1";
+      const payload = await fetchCoreBridgeOrders(searchTerm, includeDebug);
       response.json(payload);
     } catch (error) {
       console.error("CoreBridge lookup failed.", error.message);

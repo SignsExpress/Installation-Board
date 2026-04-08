@@ -205,6 +205,8 @@ export default function App() {
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupResults, setOrderLookupResults] = useState([]);
   const [orderLookupError, setOrderLookupError] = useState("");
+  const [orderLookupDebugMode, setOrderLookupDebugMode] = useState(false);
+  const [activeCoreBridgeDebugOrder, setActiveCoreBridgeDebugOrder] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loginUsers, setLoginUsers] = useState([]);
@@ -481,14 +483,17 @@ export default function App() {
     setHolidays(Array.isArray(nextHolidays) ? nextHolidays : []);
   }
 
-  async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
+  async function searchCoreBridgeOrders(searchTerm = orderLookupQuery, debugMode = orderLookupDebugMode) {
     if (isClientMode) return;
 
     try {
       setOrderLookupLoading(true);
       setOrderLookupError("");
       const query = String(searchTerm || "").trim();
-      const url = query ? `/api/corebridge/orders?q=${encodeURIComponent(query)}` : "/api/corebridge/orders";
+      const params = new URLSearchParams();
+      if (query) params.set("q", query);
+      if (debugMode) params.set("debug", "1");
+      const url = params.toString() ? `/api/corebridge/orders?${params.toString()}` : "/api/corebridge/orders";
       const response = await fetch(url);
       const raw = await response.text();
       let payload = {};
@@ -516,6 +521,7 @@ export default function App() {
   async function openOrderLookup() {
     setOrderLookupOpen(true);
     setOrderLookupError("");
+    setActiveCoreBridgeDebugOrder(null);
   }
 
   function applyCoreBridgeOrder(order) {
@@ -530,6 +536,7 @@ export default function App() {
       notes: order.notes || current.notes
     }));
     setOrderLookupOpen(false);
+    setActiveCoreBridgeDebugOrder(null);
     setMessage(createMessage("Order details copied into the job form.", "success"));
   }
 
@@ -1347,6 +1354,16 @@ export default function App() {
               <button className="primary-button" type="button" onClick={() => searchCoreBridgeOrders(orderLookupQuery)} disabled={orderLookupLoading}>
                 {orderLookupLoading ? "Searching..." : "Search"}
               </button>
+              <button
+                className={`ghost-button ${orderLookupDebugMode ? "active-debug-toggle" : ""}`}
+                type="button"
+                onClick={() => {
+                  setOrderLookupDebugMode((current) => !current);
+                  setActiveCoreBridgeDebugOrder(null);
+                }}
+              >
+                {orderLookupDebugMode ? "Debug on" : "Debug off"}
+              </button>
             </div>
 
             {orderLookupError ? <div className="flash error">{orderLookupError}</div> : null}
@@ -1356,11 +1373,9 @@ export default function App() {
                 <div className="board-loading compact">Looking up CoreBridge orders...</div>
               ) : orderLookupResults.length ? (
                 orderLookupResults.map((order) => (
-                  <button
+                  <div
                     key={`${order.id}-${order.orderReference}-${order.customerName}`}
-                    type="button"
                     className="order-result-card"
-                    onClick={() => applyCoreBridgeOrder(order)}
                   >
                     <div className="order-result-top">
                       <strong>{order.orderReference || "No order ref"}</strong>
@@ -1373,11 +1388,55 @@ export default function App() {
                       <span><b>Number:</b> {order.number || "-"}</span>
                     </div>
                     <p className="order-result-address"><b>Address:</b> {order.address || "-"}</p>
-                  </button>
+                    <div className="order-result-actions">
+                      <button className="primary-button" type="button" onClick={() => applyCoreBridgeOrder(order)}>
+                        Use this order
+                      </button>
+                      {orderLookupDebugMode ? (
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => setActiveCoreBridgeDebugOrder(order)}
+                        >
+                          Inspect fields
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                 ))
               ) : (
                 <div className="board-loading compact">No CoreBridge orders found yet.</div>
               )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {!isClientMode && activeCoreBridgeDebugOrder ? (
+        <div className="modal-backdrop" onClick={() => setActiveCoreBridgeDebugOrder(null)}>
+          <div className="modal corebridge-debug-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>CoreBridge Field Debug</h3>
+                <p>
+                  {activeCoreBridgeDebugOrder.orderReference || "No order ref"} -{" "}
+                  {activeCoreBridgeDebugOrder.customerName || "Unnamed customer"}
+                </p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setActiveCoreBridgeDebugOrder(null)}>
+                x
+              </button>
+            </div>
+            <div className="corebridge-debug-help">
+              <strong>Tell me which variable has the right value.</strong>
+              <span>Left column is the field name from CoreBridge. Right column is the value.</span>
+            </div>
+            <div className="corebridge-debug-table">
+              {(activeCoreBridgeDebugOrder.debugFields || []).map((field) => (
+                <div key={field.key} className="corebridge-debug-row">
+                  <div className="corebridge-debug-key">{field.key}</div>
+                  <div className="corebridge-debug-value">{field.value}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
