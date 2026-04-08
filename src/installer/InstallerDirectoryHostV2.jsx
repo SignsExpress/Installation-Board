@@ -412,9 +412,8 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
                       placeholder="Search by company, name, phone, email or notes"
                     />
                   </label>
-                  <div className="stat-pill showing-pill">
-                    <span>Showing</span>
-                    <strong>{visibleInstallers.length}</strong>
+                  <div className="subcontractor-count-pill" aria-label={`${visibleInstallers.length} Subcontractors`}>
+                    <strong>{visibleInstallers.length} Subcontractors</strong>
                   </div>
                 </div>
                 <div className="toolbar-inline-row">

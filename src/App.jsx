@@ -119,27 +119,22 @@ function HostLandingPage({ currentUser, onLogout }) {
   return (
     <div className="app-shell host-landing-shell">
       <div className="page host-landing-page">
+        <div className="host-landing-brand">
+          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+        </div>
         <HostNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
           <div className="host-landing-intro">
-            <img className="hero-logo host-landing-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-            <div>
-              <p className="panel-kicker">Host home</p>
-              <h1>Choose a workspace</h1>
-            </div>
+            <h1>Choose a workspace</h1>
           </div>
           <div className="host-landing-actions">
             <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
-              <span className="panel-kicker">Host only</span>
-              <strong>Subcontractor Installer Database</strong>
-              <p>Search, review and manage your subcontractor installer list.</p>
+              <strong>Subcontractor Database</strong>
             </button>
 
             <button className="host-launch-card" type="button" onClick={() => goTo("/board")}>
-              <span className="panel-kicker">Shared board</span>
               <strong>Installation Board</strong>
-              <p>Open the live installation calendar and manage upcoming jobs.</p>
             </button>
           </div>
         </section>
@@ -864,14 +859,6 @@ export default function App() {
 
         <div className="layout">
           <section className="panel board-panel board-panel-full">
-            <div className="panel-head">
-              <div>
-                <p className="panel-kicker">Live board</p>
-                <h2>{isClientMode ? "Rolling installation calendar - View only" : "Rolling installation calendar"}</h2>
-              </div>
-              <div className="board-range">{board ? `${board.start} to ${board.end}` : "Loading"}</div>
-            </div>
-
             {loading || !board ? (
               <div className="board-loading">Loading the shared installation board...</div>
             ) : (

@@ -306,6 +306,18 @@ button {
   white-space: nowrap;
 }
 
+@keyframes map-region-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.035);
+    opacity: 0.92;
+  }
+}
+
 .job-form,
 .upcoming-list,
 .board {
@@ -1184,11 +1196,22 @@ button {
   padding: 28px;
 }
 
+.host-landing-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2px;
+}
+
+.host-landing-brand-logo {
+  width: 180px;
+  max-width: 28vw;
+}
+
 .host-landing-intro {
   display: flex;
-  align-items: center;
-  gap: 18px;
+  justify-content: center;
   margin-bottom: 24px;
+  text-align: center;
 }
 
 .host-landing-logo {
@@ -1205,15 +1228,17 @@ button {
 .host-launch-card {
   border: 1px solid var(--sx-main-border);
   border-radius: 28px;
-  padding: 26px 24px;
+  padding: 30px 24px;
   background: linear-gradient(180deg, #fcfbfd 0%, #f3edf6 100%);
-  text-align: left;
-  display: grid;
-  gap: 10px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
 }
 
 .host-launch-card strong {
-  font-size: 1.45rem;
+  font-size: 1.35rem;
   line-height: 1.1;
 }
 
@@ -1904,6 +1929,19 @@ button {
   min-width: 108px;
 }
 
+.installer-host-view .subcontractor-count-pill {
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 16px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
 .installer-host-view .star-row {
   display: flex;
   align-items: center;
@@ -2030,7 +2068,7 @@ button {
 
   .host-landing-intro {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .hero-logo {

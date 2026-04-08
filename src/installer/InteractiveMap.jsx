@@ -20,6 +20,10 @@ function styleMap(container, installersByRegion, selectedRegion, hoveredRegion) 
     shape.style.transition = "fill 160ms ease";
     shape.style.stroke = "#ffffff";
     shape.style.strokeWidth = "3px";
+    shape.style.transformBox = "fill-box";
+    shape.style.transformOrigin = "center";
+    shape.style.animation = selectedRegion === region.id ? "map-region-pulse 1.6s ease-in-out infinite" : "none";
+    shape.style.filter = selectedRegion === region.id ? "drop-shadow(0 0 10px rgba(95, 60, 116, 0.4))" : "none";
   });
 }
 
