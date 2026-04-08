@@ -721,12 +721,6 @@ export default function App() {
               <img className="auth-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
               <h1>Installation Board</h1>
             </div>
-            <div className="panel-head compact">
-              <div>
-                <p className="panel-kicker">Secure Access</p>
-                <h2>Sign In</h2>
-              </div>
-            </div>
             <form className="job-form auth-form" onSubmit={handleLogin}>
               <label>
                 Username
