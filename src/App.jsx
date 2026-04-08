@@ -260,9 +260,6 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
-  const hostUsers = useMemo(() => loginUsers.filter((user) => user.role === "host"), [loginUsers]);
-  const clientUsers = useMemo(() => loginUsers.filter((user) => user.role === "client"), [loginUsers]);
-
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
@@ -740,16 +737,18 @@ export default function App() {
               <div>
                 <p className="panel-kicker">Secure Access</p>
                 <h2>Sign In</h2>
+                <p className="muted auth-copy">Use your named login to open the installation board.</p>
               </div>
             </div>
             <form className="job-form auth-form" onSubmit={handleLogin}>
               <label>
-                User
-                <select value={loginDisplayName} onChange={(event) => setLoginDisplayName(event.target.value)}>
-                  <option value="">Select your login</option>
-                  {hostUsers.length ? <optgroup label="Host">{hostUsers.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}</optgroup> : null}
-                  {clientUsers.length ? <optgroup label="Client">{clientUsers.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}</optgroup> : null}
-                </select>
+                Username
+                <input
+                  type="text"
+                  value={loginDisplayName}
+                  placeholder="Enter your full name"
+                  onChange={(event) => setLoginDisplayName(event.target.value)}
+                />
               </label>
 
               <label>
@@ -757,6 +756,7 @@ export default function App() {
                 <input
                   type="password"
                   value={loginPassword}
+                  placeholder="Enter your password"
                   onChange={(event) => setLoginPassword(event.target.value)}
                 />
               </label>
@@ -769,6 +769,10 @@ export default function App() {
                 </button>
               </div>
             </form>
+
+            <div className="auth-help">
+              <span>Host logins and client logins use the same sign-in form.</span>
+            </div>
           </section>
         </div>
       </div>
