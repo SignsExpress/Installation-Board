@@ -72,7 +72,7 @@ function toInitials(name) {
 
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
-  const isClientMode = pathname.startsWith("/client");
+  const isClientRoute = pathname.startsWith("/client");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -94,11 +94,52 @@ export default function App() {
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupResults, setOrderLookupResults] = useState([]);
   const [orderLookupError, setOrderLookupError] = useState("");
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [loginUsers, setLoginUsers] = useState([]);
+  const [loginDisplayName, setLoginDisplayName] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
+  const isClientMode = isClientRoute || currentUser?.role === "client";
 
   useEffect(() => {
+    let active = true;
+
+    async function loadAuth() {
+      try {
+        const [usersResponse, meResponse] = await Promise.all([
+          fetch("/api/auth/users"),
+          fetch("/api/auth/me")
+        ]);
+
+        const usersPayload = usersResponse.ok ? await usersResponse.json() : [];
+        const mePayload = meResponse.ok ? await meResponse.json() : null;
+
+        if (!active) return;
+
+        setLoginUsers(Array.isArray(usersPayload) ? usersPayload : []);
+        if (mePayload?.user) {
+          setCurrentUser(mePayload.user);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (active) setAuthChecked(true);
+      }
+    }
+
+    loadAuth();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
     let active = true;
 
     async function loadBoard() {
@@ -134,9 +175,17 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.role === "client" && !isClientRoute) {
+      window.location.replace("/client");
+    }
+  }, [currentUser, isClientRoute]);
+
+  useEffect(() => {
+    if (!currentUser) return undefined;
     const stream = new EventSource("/api/events");
 
     function handleUpdate(event) {
@@ -157,7 +206,7 @@ export default function App() {
       stream.removeEventListener("board-updated", handleUpdate);
       stream.close();
     };
-  }, []);
+  }, [currentUser]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -211,6 +260,9 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
+  const hostUsers = useMemo(() => loginUsers.filter((user) => user.role === "host"), [loginUsers]);
+  const clientUsers = useMemo(() => loginUsers.filter((user) => user.role === "client"), [loginUsers]);
+
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
@@ -219,6 +271,59 @@ export default function App() {
     setOrderLookupQuery("");
     setOrderLookupResults([]);
     setOrderLookupError("");
+  }
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    try {
+      setLoginLoading(true);
+      setLoginError("");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: loginDisplayName,
+          password: loginPassword
+        })
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not sign in.");
+      }
+
+      setCurrentUser(payload.user);
+      setLoginPassword("");
+      if (payload.user?.role === "client" && !isClientRoute) {
+        window.location.replace("/client");
+        return;
+      }
+    } catch (error) {
+      console.error(error);
+      setLoginError(error.message || "Could not sign in.");
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setCurrentUser(null);
+      setBoard(null);
+      setJobs([]);
+      setHolidays([]);
+      setLoginPassword("");
+      setLoginError("");
+      if (isClientRoute) {
+        window.location.replace("/client");
+      } else {
+        window.location.replace("/");
+      }
+    }
   }
 
   function editJob(job) {
@@ -598,6 +703,78 @@ export default function App() {
     }
   }
 
+  if (!authChecked) {
+    return (
+      <div className="app-shell">
+        <div className="page">
+          <section className="hero">
+            <div className="hero-brand">
+              <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+              <div className="hero-copy">
+                <h1>Installation Board</h1>
+              </div>
+            </div>
+          </section>
+          <section className="panel auth-panel">
+            <div className="board-loading">Checking login...</div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="app-shell">
+        <div className="page">
+          <section className="hero">
+            <div className="hero-brand">
+              <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+              <div className="hero-copy">
+                <h1>Installation Board</h1>
+              </div>
+            </div>
+          </section>
+          <section className="panel auth-panel">
+            <div className="panel-head compact">
+              <div>
+                <p className="panel-kicker">Secure Access</p>
+                <h2>Sign In</h2>
+              </div>
+            </div>
+            <form className="job-form auth-form" onSubmit={handleLogin}>
+              <label>
+                User
+                <select value={loginDisplayName} onChange={(event) => setLoginDisplayName(event.target.value)}>
+                  <option value="">Select your login</option>
+                  {hostUsers.length ? <optgroup label="Host">{hostUsers.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}</optgroup> : null}
+                  {clientUsers.length ? <optgroup label="Client">{clientUsers.map((user) => <option key={user.id} value={user.displayName}>{user.displayName}</option>)}</optgroup> : null}
+                </select>
+              </label>
+
+              <label>
+                Password
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(event) => setLoginPassword(event.target.value)}
+                />
+              </label>
+
+              {loginError ? <div className="flash error">{loginError}</div> : null}
+
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={loginLoading || !loginDisplayName || !loginPassword}>
+                  {loginLoading ? "Signing in..." : "Sign in"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
@@ -607,6 +784,16 @@ export default function App() {
             <div className="hero-copy">
               <h1>Installation Board</h1>
             </div>
+          </div>
+          <div className="hero-user">
+            <div>
+              <p className="panel-kicker">Signed In</p>
+              <strong>{currentUser.displayName}</strong>
+              <p className="muted">{currentUser.role === "host" ? "Host access" : "Client access"}</p>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => handleLogout()}>
+              Log out
+            </button>
           </div>
         </section>
 

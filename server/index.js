@@ -4,6 +4,12 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const {
+  ensureUsersFile,
+  readUsersStore,
+  sanitizeUser,
+  verifyPassword
+} = require("./auth-store");
 
 const PORT = Number(process.env.PORT || 3030);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -15,6 +21,9 @@ const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
 const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
 const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
+const SESSION_COOKIE_NAME = "installation_board_session";
+const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+const sessions = new Map();
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -34,6 +43,83 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
+}
+
+function parseCookies(headerValue) {
+  return String(headerValue || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((accumulator, pair) => {
+      const separator = pair.indexOf("=");
+      if (separator === -1) return accumulator;
+      const key = decodeURIComponent(pair.slice(0, separator).trim());
+      const value = decodeURIComponent(pair.slice(separator + 1).trim());
+      accumulator[key] = value;
+      return accumulator;
+    }, {});
+}
+
+function serializeSessionCookie(sessionId, { expiresAt, clear = false } = {}) {
+  const parts = [
+    `${SESSION_COOKIE_NAME}=${clear ? "" : encodeURIComponent(sessionId)}`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax"
+  ];
+
+  if (process.env.NODE_ENV === "production") {
+    parts.push("Secure");
+  }
+
+  if (clear) {
+    parts.push("Max-Age=0");
+    parts.push("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  } else if (expiresAt) {
+    parts.push(`Expires=${new Date(expiresAt).toUTCString()}`);
+  }
+
+  return parts.join("; ");
+}
+
+function createSession(user) {
+  const sessionId = crypto.randomUUID();
+  const expiresAt = Date.now() + SESSION_TTL_MS;
+  sessions.set(sessionId, {
+    user,
+    expiresAt
+  });
+  return { sessionId, expiresAt };
+}
+
+function getSessionFromRequest(request) {
+  const cookies = parseCookies(request.headers.cookie);
+  const sessionId = cookies[SESSION_COOKIE_NAME];
+  if (!sessionId) return null;
+
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    sessions.delete(sessionId);
+    return null;
+  }
+
+  return { sessionId, ...session };
+}
+
+function clearExpiredSessions() {
+  const now = Date.now();
+  for (const [sessionId, session] of sessions.entries()) {
+    if (session.expiresAt <= now) {
+      sessions.delete(sessionId);
+    }
+  }
+}
+
+function requireHost(request, response) {
+  if (request.user?.role === "host") return true;
+  response.status(403).json({ error: "Host access required." });
+  return false;
 }
 
 function ensureStoreFile() {
@@ -666,11 +752,80 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
 
 function createServer() {
   ensureStoreFile();
+  ensureUsersFile();
   const app = express();
 
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
   app.use(express.static(PUBLIC_DIR));
+  app.use((request, response, next) => {
+    clearExpiredSessions();
+    next();
+  });
+
+  app.get("/api/auth/users", async (request, response) => {
+    const store = await readUsersStore();
+    response.json(store.users.map(sanitizeUser));
+  });
+
+  app.get("/api/auth/me", (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Not signed in." });
+      return;
+    }
+
+    response.json({ user: session.user });
+  });
+
+  app.post("/api/auth/login", async (request, response) => {
+    const displayName = String(request.body?.displayName || "").trim();
+    const password = String(request.body?.password || "");
+    const store = await readUsersStore();
+    const user = store.users.find(
+      (entry) => String(entry.displayName || "").toLowerCase() === displayName.toLowerCase()
+    );
+
+    if (!user || !user.passwordHash) {
+      response.status(401).json({ error: "That account is not ready yet." });
+      return;
+    }
+
+    if (!verifyPassword(password, user)) {
+      response.status(401).json({ error: "Incorrect password." });
+      return;
+    }
+
+    const sessionUser = sanitizeUser(user);
+    const { sessionId, expiresAt } = createSession(sessionUser);
+    response.setHeader("Set-Cookie", serializeSessionCookie(sessionId, { expiresAt }));
+    response.json({ user: sessionUser });
+  });
+
+  app.post("/api/auth/logout", (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (session?.sessionId) {
+      sessions.delete(session.sessionId);
+    }
+    response.setHeader("Set-Cookie", serializeSessionCookie("", { clear: true }));
+    response.json({ ok: true });
+  });
+
+  app.use("/api", (request, response, next) => {
+    if (request.path.startsWith("/auth/")) {
+      next();
+      return;
+    }
+
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
+    request.user = session.user;
+    next();
+  });
 
   app.get("/healthz", (request, response) => {
     response.json({ ok: true });
@@ -687,6 +842,7 @@ function createServer() {
   });
 
   app.get("/api/corebridge/orders", async (request, response) => {
+    if (!requireHost(request, response)) return;
     try {
       const searchTerm = String(request.query.q || "").trim();
       const payload = await fetchCoreBridgeOrders(searchTerm);
@@ -704,6 +860,7 @@ function createServer() {
   });
 
   app.post("/api/jobs", async (request, response) => {
+    if (!requireHost(request, response)) return;
     const nextJob = sanitizeJob(request.body || {});
     if (!nextJob.customerName || !isValidIsoDate(nextJob.date)) {
       response.status(400).json({ error: "A valid date and customer name are required." });
@@ -730,6 +887,7 @@ function createServer() {
   });
 
   app.delete("/api/jobs/:id", async (request, response) => {
+    if (!requireHost(request, response)) return;
     const store = await readStore();
     store.jobs = store.jobs.filter((job) => job.id !== request.params.id);
     const savedStore = await writeStore(store);
@@ -748,6 +906,7 @@ function createServer() {
   });
 
   app.post("/api/holidays", async (request, response) => {
+    if (!requireHost(request, response)) return;
     const nextHoliday = sanitizeStaffHoliday(request.body || {});
     if (!nextHoliday.person || !isValidIsoDate(nextHoliday.date)) {
       response.status(400).json({ error: "A valid date and person are required." });
@@ -774,6 +933,7 @@ function createServer() {
   });
 
   app.delete("/api/holidays/:id", async (request, response) => {
+    if (!requireHost(request, response)) return;
     const store = await readStore();
     store.holidays = store.holidays.filter((item) => item.id !== request.params.id);
     const savedStore = await writeStore(store);

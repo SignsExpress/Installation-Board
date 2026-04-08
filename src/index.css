@@ -110,6 +110,14 @@ button {
   padding: 18px 28px;
 }
 
+.hero-user {
+  margin-left: auto;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+}
+
 .eyebrow,
 .panel-kicker {
   margin: 0 0 10px;
@@ -163,6 +171,15 @@ button {
 
 .panel {
   padding: 22px;
+}
+
+.auth-panel {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.auth-form {
+  gap: 16px;
 }
 
 .panel-head {
@@ -1046,6 +1063,12 @@ button {
 
   .hero {
     display: grid;
+  }
+
+  .hero-user {
+    margin-left: 0;
+    justify-items: start;
+    text-align: left;
   }
 }
 
