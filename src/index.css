@@ -180,10 +180,9 @@ button {
 }
 
 .auth-panel {
-  width: min(520px, calc(100vw - 40px));
-  min-height: 520px;
+  width: min(430px, calc(100vw - 40px));
   margin: 0 auto;
-  padding: 36px 40px;
+  padding: 28px 28px 30px;
   border-radius: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 247, 252, 0.96) 100%);
@@ -191,36 +190,33 @@ button {
     0 32px 90px rgba(15, 23, 42, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   text-align: center;
-  display: grid;
-  align-content: center;
 }
 
 .auth-form {
-  gap: 16px;
-  max-width: 360px;
-  margin: 0 auto;
+  gap: 14px;
+  width: 100%;
 }
 
 .auth-brand {
   display: grid;
   justify-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .auth-logo {
-  width: 176px;
+  width: 168px;
   height: auto;
 }
 
 .auth-brand h1 {
   margin: 0;
-  font-size: clamp(0.98rem, 1.5vw, 1.14rem);
+  font-size: clamp(0.98rem, 1.4vw, 1.1rem);
   line-height: 1.05;
 }
 
 .auth-form input {
-  min-height: 58px;
+  min-height: 56px;
   border-radius: 20px;
   padding: 0 16px;
   background: rgba(255, 255, 255, 0.98);
@@ -231,13 +227,13 @@ button {
 }
 
 .auth-form .primary-button {
-  min-width: 150px;
-  min-height: 50px;
+  width: 100%;
+  min-height: 52px;
   border-radius: 18px;
 }
 
 .auth-form .form-actions {
-  justify-content: center;
+  justify-content: stretch;
 }
 
 .panel-head {
@@ -1130,7 +1126,6 @@ button {
   }
 
   .auth-panel {
-    min-height: auto;
     padding: 30px 24px;
   }
 }
