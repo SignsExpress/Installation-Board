@@ -14,15 +14,7 @@ const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
 const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
-const DEFAULT_COREBRIDGE_ENDPOINT_PATHS = [
-  "/installation-board-data",
-  "/installation-board",
-  "/installationboarddata",
-  "/orders",
-  "/sales/orders",
-  "/workorders",
-  "/jobs"
-];
+const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -350,38 +342,31 @@ async function getBoardPayload() {
 }
 
 function getCoreBridgeConfig() {
-  const endpointPaths = String(
-    process.env.COREBRIDGE_ENDPOINT_PATHS || process.env.COREBRIDGE_ENDPOINT_PATH || ""
-  )
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
   return {
     baseUrl: String(process.env.COREBRIDGE_BASE_URL || DEFAULT_COREBRIDGE_BASE_URL).trim(),
     token: String(process.env.COREBRIDGE_TOKEN || process.env.COREBRIDGE_AUTH_TOKEN || "").trim(),
     subscriptionKey: String(
       process.env.COREBRIDGE_SUBSCRIPTION_KEY || process.env.COREBRIDGE_OCP_KEY || ""
     ).trim(),
-    endpointPaths: endpointPaths.length ? endpointPaths : DEFAULT_COREBRIDGE_ENDPOINT_PATHS
+    orderPath: String(process.env.COREBRIDGE_ORDER_PATH || process.env.COREBRIDGE_ENDPOINT_PATH || DEFAULT_COREBRIDGE_ORDER_PATH).trim(),
+    apiVersion: String(process.env.COREBRIDGE_API_VERSION || "v3.0").trim()
   };
 }
 
-function buildCoreBridgeCandidateUrls(baseUrl, endpointPath, searchTerm = "") {
-  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  const normalizedPath = endpointPath.startsWith("/") ? endpointPath.slice(1) : endpointPath;
-  const bare = new URL(normalizedPath, normalizedBase);
-  const candidates = [bare.toString()];
+function buildCoreBridgeOrderUrl(config, params = {}) {
+  const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const url = new URL(normalizedPath, normalizedBase);
 
-  if (searchTerm) {
-    for (const key of ["q", "query", "search", "term"]) {
-      const url = new URL(bare.toString());
-      url.searchParams.set(key, searchTerm);
-      candidates.push(url.toString());
+  url.searchParams.set("apiversion", config.apiVersion);
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") {
+      url.searchParams.set(key, String(value));
     }
   }
 
-  return [...new Set(candidates)];
+  return url.toString();
 }
 
 function flattenRecord(record, prefix = "", bucket = {}) {
@@ -400,6 +385,11 @@ function flattenRecord(record, prefix = "", bucket = {}) {
         bucket[normalizedPrefix] = joined;
         bucket[key.toLowerCase()] = joined;
       }
+      value.forEach((item, index) => {
+        if (item && typeof item === "object") {
+          flattenRecord(item, `${nextPrefix}.${index}`, bucket);
+        }
+      });
       continue;
     }
 
@@ -432,7 +422,14 @@ function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
 
   const address = [
-    pickFirst(flat, ["address1", "address.line1", "siteaddress1", "shiptoaddress1"]),
+    pickFirst(flat, [
+      "address1",
+      "address.line1",
+      "siteaddress1",
+      "shiptoaddress1",
+      "locationlocators.0.locator",
+      "locator"
+    ]),
     pickFirst(flat, ["address2", "address.line2", "siteaddress2", "shiptoaddress2"]),
     pickFirst(flat, ["address3", "address.line3", "siteaddress3", "shiptoaddress3"]),
     pickFirst(flat, ["city", "address.city", "town", "sitecity", "shiptocity"]),
@@ -445,6 +442,7 @@ function normalizeCoreBridgeOrder(record, index) {
   const normalized = {
     id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
     orderReference: pickFirst(flat, [
+      "formattednumber",
       "ordernumber",
       "orderreference",
       "reference",
@@ -453,6 +451,11 @@ function normalizeCoreBridgeOrder(record, index) {
       "salesordernumber"
     ]),
     customerName: pickFirst(flat, [
+      "company.displayname",
+      "company.name",
+      "company.longname",
+      "company.legalname",
+      "contactcompany",
       "customername",
       "customer",
       "companyname",
@@ -461,12 +464,42 @@ function normalizeCoreBridgeOrder(record, index) {
       "clientname",
       "name"
     ]),
-    description: pickFirst(flat, ["description", "jobdescription", "title", "summary", "projectdescription"]),
-    contact: pickFirst(flat, ["contact", "contactname", "primarycontact", "contactperson", "customercontact"]),
-    number: pickFirst(flat, ["phone", "telephone", "mobilenumber", "contactphone", "contactnumber"]),
+    description: pickFirst(flat, [
+      "description",
+      "jobdescription",
+      "title",
+      "summary",
+      "projectdescription",
+      "items.0.name",
+      "name"
+    ]),
+    contact: pickFirst(flat, [
+      "contact",
+      "contactname",
+      "primarycontact",
+      "contactperson",
+      "customercontact",
+      "contactroles.0.contactname"
+    ]),
+    number: pickFirst(flat, [
+      "phone",
+      "telephone",
+      "mobilenumber",
+      "contactphone",
+      "contactnumber",
+      "contactroles.0.ordercontactrolelocators.0.locator"
+    ]),
     address: address || pickFirst(flat, ["address", "siteaddress", "shiptoaddress"]),
-    notes: pickFirst(flat, ["notes", "internalnotes", "comments", "specialinstructions", "instructions"]),
-    status: pickFirst(flat, ["status", "orderstatus", "jobstatus"]),
+    notes: pickFirst(flat, [
+      "notes.0.note",
+      "note",
+      "notes",
+      "internalnotes",
+      "comments",
+      "specialinstructions",
+      "instructions"
+    ]),
+    status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"]),
     raw: record
   };
 
@@ -537,38 +570,62 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
   }
 
   const attempts = [];
+  const normalizedSearch = String(searchTerm || "").trim();
+  const looksLikeFormattedNumber = /[a-z]{2,5}-?\d+/i.test(normalizedSearch);
+  const requestPlans = [
+    {
+      label: "detailed",
+      url: buildCoreBridgeOrderUrl(config, {
+        take: 200,
+        sortBy: "-modifiedDT",
+        companylevel: "full",
+        contactlevel: "full",
+        notelevel: "full",
+        destinationlevel: "full",
+        itemlevel: "full",
+        formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+      })
+    },
+    {
+      label: "basic",
+      url: buildCoreBridgeOrderUrl(config, {
+        take: 200,
+        sortBy: "-modifiedDT",
+        formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+      })
+    }
+  ];
 
-  for (const endpointPath of config.endpointPaths) {
-    const candidateUrls = buildCoreBridgeCandidateUrls(config.baseUrl, endpointPath, searchTerm);
-    for (const url of candidateUrls) {
-      try {
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${config.token}`,
-            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
-            Accept: "application/json"
-          }
-        });
-
-        if (!response.ok) {
-          attempts.push(`${response.status} ${url}`);
-          continue;
+  for (const plan of requestPlans) {
+    try {
+      const response = await fetch(plan.url, {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+          Accept: "application/json"
         }
+      });
 
-        const contentType = String(response.headers.get("content-type") || "");
-        const body = contentType.includes("application/json") ? await response.json() : JSON.parse(await response.text());
-        const records = extractCoreBridgeRecords(body);
-        const orders = filterCoreBridgeOrders(records.map(normalizeCoreBridgeOrder), searchTerm).filter(
-          (order) => order.orderReference || order.customerName
-        );
+      if (!response.ok) {
+        attempts.push(`${response.status} ${plan.url}`);
+        continue;
+      }
 
+      const contentType = String(response.headers.get("content-type") || "");
+      const body = contentType.includes("application/json") ? await response.json() : JSON.parse(await response.text());
+      const records = extractCoreBridgeRecords(body);
+      const orders = filterCoreBridgeOrders(records.map(normalizeCoreBridgeOrder), normalizedSearch).filter(
+        (order) => order.orderReference || order.customerName
+      );
+
+      if (orders.length || !normalizedSearch) {
         return {
           orders,
-          sourceUrl: url
+          sourceUrl: plan.url
         };
-      } catch (error) {
-        attempts.push(`ERR ${url} ${error.message}`);
       }
+    } catch (error) {
+      attempts.push(`ERR ${plan.url} ${error.message}`);
     }
   }
 
