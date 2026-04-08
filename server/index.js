@@ -735,6 +735,8 @@ function isGenericCoreBridgeDescription(value) {
 
 function pickBestCoreBridgeDescription(flatRecord) {
   const aliases = [
+    "se_estimatedescription",
+    "estimate.descriptiontext",
     "orderdescription",
     "order.description",
     "transactionheaderdata.description",
