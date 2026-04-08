@@ -518,6 +518,13 @@ export default function App() {
     await deleteHoliday(existing.id);
   }
 
+  async function handleHolidayChipClick(date, person, closePicker = false) {
+    await cycleHoliday(date, person);
+    if (closePicker) {
+      setActiveHolidayDate("");
+    }
+  }
+
   async function handleManualRefresh() {
     try {
       const [boardResponse] = await Promise.all([fetch("/api/board"), refreshData()]);
@@ -631,9 +638,17 @@ export default function App() {
                                       ? ".PM"
                                       : "";
                                 return (
-                                  <span key={`summary-${holiday.id}`} className={`date-holiday-chip ${getHolidayPersonColor(holiday.person)} active`}>
+                                  <button
+                                    key={`summary-${holiday.id}`}
+                                    type="button"
+                                    className={`date-holiday-chip ${getHolidayPersonColor(holiday.person)} active`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleHolidayChipClick(row.isoDate, holiday.person, false);
+                                    }}
+                                  >
                                     {toInitials(holiday.person)}{durationLabel}
-                                  </span>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -656,7 +671,7 @@ export default function App() {
                                     className={`date-holiday-chip ${getHolidayPersonColor(name)} ${existing ? "active" : ""}`}
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      cycleHoliday(row.isoDate, name);
+                                      handleHolidayChipClick(row.isoDate, name, true);
                                     }}
                                   >
                                     {initials}{durationLabel}
