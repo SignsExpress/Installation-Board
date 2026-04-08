@@ -1200,7 +1200,6 @@ function normalizeCoreBridgeOrder(record, index) {
   ).trim();
   const destinationRoleAddress =
     buildAddressFromRole(destinationRole) ||
-    buildAddressFromRole(preferredRole) ||
     pickDestinationAddressFromFlat(flat);
   const preferredRolePhone = buildPhoneFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
@@ -1283,7 +1282,6 @@ function getCoreBridgeDestinationAddressFromRecord(record) {
   const flat = flattenRecord(record);
   const objectRoleAddress = buildAddressFromRole(pickDestinationCoreBridgeRole(record));
   if (objectRoleAddress) return objectRoleAddress;
-
   const flatRoleAddress = pickDestinationAddressFromFlat(flat);
   if (flatRoleAddress) return flatRoleAddress;
 
