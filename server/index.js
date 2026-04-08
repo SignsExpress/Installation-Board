@@ -1146,6 +1146,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
           const normalized = normalizeCoreBridgeOrder(record, index);
           if (includeDebug) {
             normalized.debugFields = buildCoreBridgeDebugFields(record);
+            normalized.debugRaw = JSON.stringify(record, null, 2);
           }
           return normalized;
         }),

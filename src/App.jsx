@@ -207,6 +207,7 @@ export default function App() {
   const [orderLookupError, setOrderLookupError] = useState("");
   const [orderLookupDebugMode, setOrderLookupDebugMode] = useState(false);
   const [activeCoreBridgeDebugOrder, setActiveCoreBridgeDebugOrder] = useState(null);
+  const [coreBridgeDebugView, setCoreBridgeDebugView] = useState("fields");
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loginUsers, setLoginUsers] = useState([]);
@@ -522,6 +523,7 @@ export default function App() {
     setOrderLookupOpen(true);
     setOrderLookupError("");
     setActiveCoreBridgeDebugOrder(null);
+    setCoreBridgeDebugView("fields");
   }
 
   function applyCoreBridgeOrder(order) {
@@ -1394,9 +1396,12 @@ export default function App() {
                       </button>
                       {orderLookupDebugMode ? (
                         <button
-                          className="ghost-button"
+                  className="ghost-button"
                           type="button"
-                          onClick={() => setActiveCoreBridgeDebugOrder(order)}
+                          onClick={() => {
+                            setActiveCoreBridgeDebugOrder(order);
+                            setCoreBridgeDebugView("fields");
+                          }}
                         >
                           Inspect fields
                         </button>
@@ -1426,18 +1431,42 @@ export default function App() {
                 x
               </button>
             </div>
+            <div className="corebridge-debug-switches">
+              <button
+                type="button"
+                className={`ghost-button ${coreBridgeDebugView === "fields" ? "active-debug-toggle" : ""}`}
+                onClick={() => setCoreBridgeDebugView("fields")}
+              >
+                Flattened fields
+              </button>
+              <button
+                type="button"
+                className={`ghost-button ${coreBridgeDebugView === "raw" ? "active-debug-toggle" : ""}`}
+                onClick={() => setCoreBridgeDebugView("raw")}
+              >
+                Raw JSON
+              </button>
+            </div>
             <div className="corebridge-debug-help">
               <strong>Tell me which variable has the right value.</strong>
-              <span>Left column is the field name from CoreBridge. Right column is the value.</span>
+              <span>
+                {coreBridgeDebugView === "fields"
+                  ? "Left column is the field name from CoreBridge. Right column is the value."
+                  : "Open Raw JSON and search for the exact text, for example Wigton - Valve Markers."}
+              </span>
             </div>
-            <div className="corebridge-debug-table">
-              {(activeCoreBridgeDebugOrder.debugFields || []).map((field) => (
-                <div key={field.key} className="corebridge-debug-row">
-                  <div className="corebridge-debug-key">{field.key}</div>
-                  <div className="corebridge-debug-value">{field.value}</div>
-                </div>
-              ))}
-            </div>
+            {coreBridgeDebugView === "fields" ? (
+              <div className="corebridge-debug-table">
+                {(activeCoreBridgeDebugOrder.debugFields || []).map((field) => (
+                  <div key={field.key} className="corebridge-debug-row">
+                    <div className="corebridge-debug-key">{field.key}</div>
+                    <div className="corebridge-debug-value">{field.value}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <pre className="corebridge-debug-raw">{activeCoreBridgeDebugOrder.debugRaw || "{}"}</pre>
+            )}
           </div>
         </div>
       ) : null}
