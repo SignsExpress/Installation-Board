@@ -125,9 +125,6 @@ function HostLandingPage({ currentUser, onLogout }) {
         <HostNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
-          <div className="host-landing-intro">
-            <h1>Choose a workspace</h1>
-          </div>
           <div className="host-landing-actions">
             <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
               <strong>Subcontractor Database</strong>
