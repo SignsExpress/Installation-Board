@@ -71,6 +71,46 @@ function toInitials(name) {
     .join("");
 }
 
+function HostNavBar({ currentUser, active = "home", onLogout }) {
+  function goTo(path) {
+    window.location.assign(path);
+  }
+
+  return (
+    <nav className="panel host-nav">
+      <div className="host-nav-links">
+        <button
+          type="button"
+          className={`host-nav-link ${active === "home" ? "active" : ""}`}
+          onClick={() => goTo("/")}
+        >
+          Home
+        </button>
+        <button
+          type="button"
+          className={`host-nav-link ${active === "board" ? "active" : ""}`}
+          onClick={() => goTo("/board")}
+        >
+          Installation Board
+        </button>
+        <button
+          type="button"
+          className={`host-nav-link ${active === "installer" ? "active" : ""}`}
+          onClick={() => goTo("/installer")}
+        >
+          Subcontractor Directory
+        </button>
+      </div>
+      <div className="host-nav-meta">
+        <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
+        <button className="host-nav-logout" type="button" onClick={onLogout}>
+          Log out
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function HostLandingPage({ currentUser, onLogout }) {
   function goTo(path) {
     window.location.assign(path);
@@ -79,23 +119,16 @@ function HostLandingPage({ currentUser, onLogout }) {
   return (
     <div className="app-shell host-landing-shell">
       <div className="page host-landing-page">
-        <section className="hero">
-          <div className="hero-brand">
-            <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-            <div className="hero-copy">
-              <p className="panel-kicker">Host home</p>
-              <h1>Choose a workspace</h1>
-              <p className="muted">Signed in as {currentUser.displayName}</p>
-            </div>
-          </div>
-          <div className="hero-user">
-            <button className="ghost-button" type="button" onClick={onLogout}>
-              Log out
-            </button>
-          </div>
-        </section>
+        <HostNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
+          <div className="host-landing-intro">
+            <img className="hero-logo host-landing-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+            <div>
+              <p className="panel-kicker">Host home</p>
+              <h1>Choose a workspace</h1>
+            </div>
+          </div>
           <div className="host-landing-actions">
             <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
               <span className="panel-kicker">Host only</span>
@@ -827,24 +860,7 @@ export default function App() {
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
-        <section className="hero">
-          <div className="hero-brand">
-            <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-            <div className="hero-copy">
-              <h1>Installation Board</h1>
-            </div>
-          </div>
-          <div className="hero-user">
-            <div>
-              <p className="panel-kicker">Signed In</p>
-              <strong>{currentUser.displayName}</strong>
-              <p className="muted">{currentUser.role === "host" ? "Host access" : "Client access"}</p>
-            </div>
-            <button className="ghost-button" type="button" onClick={() => handleLogout()}>
-              Log out
-            </button>
-          </div>
-        </section>
+        {!isClientMode ? <HostNavBar currentUser={currentUser} active="board" onLogout={handleLogout} /> : null}
 
         <div className="layout">
           <section className="panel board-panel board-panel-full">

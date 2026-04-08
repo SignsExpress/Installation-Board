@@ -57,6 +57,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
   const [lookupAddress, setLookupAddress] = useState("");
   const [lookupMessage, setLookupMessage] = useState("");
   const [serverInfo, setServerInfo] = useState(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -223,6 +224,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
       tags: installer.tags || []
     });
     setEditingId(installer.id);
+    setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -295,42 +297,32 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
     });
     setReviewingRequestId(requestItem.id);
     setEditingId(null);
+    setIsFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
     <div className="app-shell installer-host-view">
       <div className="page">
-        <section className="hero">
-          <div className="hero-brand">
-            <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+        <nav className="panel host-nav">
+          <div className="host-nav-links">
+            <button type="button" className="host-nav-link" onClick={() => navigate("/")}>
+              Home
+            </button>
+            <button type="button" className="host-nav-link" onClick={() => navigate("/board")}>
+              Installation Board
+            </button>
+            <button type="button" className="host-nav-link active" onClick={() => navigate("/installer")}>
+              Subcontractor Directory
+            </button>
           </div>
-          <div className="hero-user">
-            <div className="host-top-actions">
-              <div className="stat-pill">
-                <span>Signed in</span>
-                <strong>{currentUser.displayName}</strong>
-              </div>
-              <div className="stat-pill">
-                <span>Installers</span>
-                <strong>{serverInfo?.installers ?? installers.length}</strong>
-              </div>
-              <div className="stat-pill">
-                <span>Pending requests</span>
-                <strong>{serverInfo?.requests ?? requests.length}</strong>
-              </div>
-              <button className="ghost-button" type="button" onClick={() => navigate("/")}>
-                Home
-              </button>
-              <button className="ghost-button" type="button" onClick={() => navigate("/board")}>
-                Installation Board
-              </button>
-              <button className="ghost-button" type="button" onClick={onLogout}>
-                Log out
-              </button>
-            </div>
+          <div className="host-nav-meta">
+            <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
+            <button className="host-nav-logout" type="button" onClick={onLogout}>
+              Log out
+            </button>
           </div>
-        </section>
+        </nav>
 
         <div className="workspace-grid">
           <section className="card card-large map-panel-card">
@@ -533,134 +525,160 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
           </section>
         </div>
 
-        <section className="card form-card request-form-card">
-          {requests.length > 0 ? (
-            <div className="request-panel">
-              <div className="request-panel-head">
-                <strong>Pending requests</strong>
-                <span>{requests.length}</span>
+        <section className="card form-card request-form-card collapsed-form-card">
+          <button
+            type="button"
+            className="subcontractor-toggle"
+            onClick={() => setIsFormOpen((current) => !current)}
+          >
+            <span>Add Subcontractor</span>
+            <span className={cls("subcontractor-toggle-icon", isFormOpen && "open")}>⌄</span>
+          </button>
+
+          {isFormOpen ? (
+            <div className="subcontractor-form-wrap">
+              <div className="subcontractor-form-top">
+                <div className="subcontractor-stats">
+                  <div className="stat-pill">
+                    <span>Installers</span>
+                    <strong>{serverInfo?.installers ?? installers.length}</strong>
+                  </div>
+                  <div className="stat-pill">
+                    <span>Pending requests</span>
+                    <strong>{serverInfo?.requests ?? requests.length}</strong>
+                  </div>
+                </div>
               </div>
-              <div className="request-list">
-                {requests.map((requestItem) => (
-                  <button
-                    key={requestItem.id}
-                    type="button"
-                    className="request-item"
-                    onClick={() => reviewRequest(requestItem)}
-                  >
-                    <strong>{requestItem.company || requestItem.name || "Unnamed request"}</strong>
-                    <span>
-                      {requestItem.name || "No contact name"}
-                      {requestItem.createdAt
-                        ? ` - ${new Date(requestItem.createdAt).toLocaleDateString("en-GB")}`
-                        : ""}
-                    </span>
+
+              {requests.length > 0 ? (
+                <div className="request-panel">
+                  <div className="request-panel-head">
+                    <strong>Pending requests</strong>
+                    <span>{requests.length}</span>
+                  </div>
+                  <div className="request-list">
+                    {requests.map((requestItem) => (
+                      <button
+                        key={requestItem.id}
+                        type="button"
+                        className="request-item"
+                        onClick={() => reviewRequest(requestItem)}
+                      >
+                        <strong>{requestItem.company || requestItem.name || "Unnamed request"}</strong>
+                        <span>
+                          {requestItem.name || "No contact name"}
+                          {requestItem.createdAt
+                            ? ` - ${new Date(requestItem.createdAt).toLocaleDateString("en-GB")}`
+                            : ""}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {trailMode ? (
+                <div className="lookup-message">
+                  Trail Mode is on. Live installer details are masked and editing is disabled.
+                </div>
+              ) : null}
+
+              <form className="installer-form" onSubmit={submitForm}>
+                <label>
+                  Company
+                  <input
+                    value={form.company}
+                    onChange={(event) => setForm({ ...form, company: event.target.value })}
+                    placeholder="ABC Installations Ltd"
+                  />
+                </label>
+                <label>
+                  Contact name
+                  <input
+                    value={form.name}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                    placeholder="John Smith"
+                  />
+                </label>
+                <div className="split">
+                  <label>
+                    Phone
+                    <input
+                      value={form.phone}
+                      onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                      placeholder="07700 900000"
+                    />
+                  </label>
+                  <label>
+                    Email
+                    <input
+                      value={form.email}
+                      onChange={(event) => setForm({ ...form, email: event.target.value })}
+                      placeholder="name@company.co.uk"
+                    />
+                  </label>
+                </div>
+                <label>
+                  Address
+                  <input
+                    value={form.address}
+                    onChange={(event) => setForm({ ...form, address: event.target.value })}
+                    onBlur={() => {
+                      if (form.regions.length > 0) return;
+                      const match = getRegionFromAddress(form.address);
+                      if (!match) return;
+                      setForm((current) => ({ ...current, regions: [...current.regions, match.id] }));
+                    }}
+                    placeholder="Town, county or full address"
+                  />
+                </label>
+                <label>
+                  Notes
+                  <textarea
+                    value={form.notes}
+                    onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                    placeholder="Access kit, preferred work, coverage notes, RAMS info"
+                    rows={3}
+                  />
+                </label>
+                <div>
+                  <span className="field-label">Rating</span>
+                  <StarRating
+                    rating={form.rating}
+                    setRating={(value) => setForm({ ...form, rating: value })}
+                    editable
+                  />
+                </div>
+                <div>
+                  <span className="field-label">Qualifications and status</span>
+                  <FilterButtons activeIds={form.tags} onToggle={(tagId) => toggleArrayValue("tags", tagId)} />
+                </div>
+                <div>
+                  <span className="field-label">Regions covered</span>
+                  <div className="chip-grid">
+                    {REGIONS.map((region) => (
+                      <button
+                        key={region.id}
+                        type="button"
+                        className={cls("chip-button", form.regions.includes(region.id) && "active")}
+                        onClick={() => toggleArrayValue("regions", region.id)}
+                      >
+                        {region.number}. {region.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button className="primary-button" type="submit" disabled={trailMode}>
+                    {editingId ? "Update installer" : reviewingRequestId ? "Approve and save" : "Save installer"}
                   </button>
-                ))}
-              </div>
+                  <button className="ghost-button" type="button" onClick={resetForm}>
+                    Clear form
+                  </button>
+                </div>
+              </form>
             </div>
           ) : null}
-
-          {trailMode ? (
-            <div className="lookup-message">
-              Trail Mode is on. Live installer details are masked and editing is disabled.
-            </div>
-          ) : null}
-
-          <form className="installer-form" onSubmit={submitForm}>
-            <label>
-              Company
-              <input
-                value={form.company}
-                onChange={(event) => setForm({ ...form, company: event.target.value })}
-                placeholder="ABC Installations Ltd"
-              />
-            </label>
-            <label>
-              Contact name
-              <input
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                placeholder="John Smith"
-              />
-            </label>
-            <div className="split">
-              <label>
-                Phone
-                <input
-                  value={form.phone}
-                  onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                  placeholder="07700 900000"
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  value={form.email}
-                  onChange={(event) => setForm({ ...form, email: event.target.value })}
-                  placeholder="name@company.co.uk"
-                />
-              </label>
-            </div>
-            <label>
-              Address
-              <input
-                value={form.address}
-                onChange={(event) => setForm({ ...form, address: event.target.value })}
-                onBlur={() => {
-                  if (form.regions.length > 0) return;
-                  const match = getRegionFromAddress(form.address);
-                  if (!match) return;
-                  setForm((current) => ({ ...current, regions: [...current.regions, match.id] }));
-                }}
-                placeholder="Town, county or full address"
-              />
-            </label>
-            <label>
-              Notes
-              <textarea
-                value={form.notes}
-                onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                placeholder="Access kit, preferred work, coverage notes, RAMS info"
-                rows={3}
-              />
-            </label>
-            <div>
-              <span className="field-label">Rating</span>
-              <StarRating
-                rating={form.rating}
-                setRating={(value) => setForm({ ...form, rating: value })}
-                editable
-              />
-            </div>
-            <div>
-              <span className="field-label">Qualifications and status</span>
-              <FilterButtons activeIds={form.tags} onToggle={(tagId) => toggleArrayValue("tags", tagId)} />
-            </div>
-            <div>
-              <span className="field-label">Regions covered</span>
-              <div className="chip-grid">
-                {REGIONS.map((region) => (
-                  <button
-                    key={region.id}
-                    type="button"
-                    className={cls("chip-button", form.regions.includes(region.id) && "active")}
-                    onClick={() => toggleArrayValue("regions", region.id)}
-                  >
-                    {region.number}. {region.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="form-actions">
-              <button className="primary-button" type="submit" disabled={trailMode}>
-                {editingId ? "Update installer" : reviewingRequestId ? "Approve and save" : "Save installer"}
-              </button>
-              <button className="ghost-button" type="button" onClick={resetForm}>
-                Clear form
-              </button>
-            </div>
-          </form>
         </section>
       </div>
 

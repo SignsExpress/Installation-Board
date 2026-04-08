@@ -108,6 +108,53 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.host-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 18px;
+  border-radius: 20px;
+}
+
+.host-nav-links,
+.host-nav-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.host-nav-link,
+.host-nav-logout {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+}
+
+.host-nav-link.active {
+  background: var(--sx-main-soft);
+  border-color: #c7b7d2;
+  color: var(--sx-main);
+}
+
+.host-nav-user {
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.host-nav-user strong {
+  color: #0f172a;
+}
+
+.host-nav-logout {
+  background: transparent;
+}
+
 .hero {
   display: flex;
   justify-content: flex-start;
@@ -418,6 +465,16 @@ button {
   font-weight: 600;
 }
 
+.danger-button {
+  min-height: 46px;
+  border-radius: 16px;
+  padding: 0 18px;
+  border: 1px solid #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+  font-weight: 700;
+}
+
 .text-button {
   background: transparent;
   border: none;
@@ -436,6 +493,11 @@ button {
 
 .ghost-button:hover {
   background: #f3eef6;
+}
+
+.danger-button:hover {
+  background: #ffe4e6;
+  border-color: #fb7185;
 }
 
 .text-button:hover,
@@ -1122,6 +1184,18 @@ button {
   padding: 28px;
 }
 
+.host-landing-intro {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.host-landing-logo {
+  width: 150px;
+  max-width: 24vw;
+}
+
 .host-landing-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1309,20 +1383,11 @@ button {
   max-width: 1680px;
 }
 
-.installer-host-view .hero {
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.installer-host-view .hero-user {
-  margin-left: auto;
-}
-
 .installer-host-view .workspace-grid {
   display: grid;
   gap: 20px;
   grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.88fr);
-  align-items: stretch;
+  align-items: start;
 }
 
 .installer-host-view .card {
@@ -1340,7 +1405,7 @@ button {
 
 .installer-host-view .map-panel-card,
 .installer-host-view .contacts-panel-card {
-  height: calc(100dvh - 36px);
+  height: clamp(560px, 72vh, 860px);
 }
 
 .installer-host-view .map-panel-card {
@@ -1582,7 +1647,51 @@ button {
 }
 
 .installer-host-view .request-form-card {
-  padding: 18px 20px;
+  padding: 14px 18px;
+}
+
+.installer-host-view .collapsed-form-card {
+  display: grid;
+  gap: 14px;
+}
+
+.installer-host-view .subcontractor-toggle {
+  width: 100%;
+  min-height: 52px;
+  border-radius: 20px;
+  border: 1px solid var(--sx-main-border);
+  background: linear-gradient(180deg, #fdfbfd 0%, #f4eef7 100%);
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.installer-host-view .subcontractor-toggle-icon {
+  color: var(--sx-main);
+  transition: transform 0.18s ease;
+}
+
+.installer-host-view .subcontractor-toggle-icon.open {
+  transform: rotate(180deg);
+}
+
+.installer-host-view .subcontractor-form-wrap {
+  display: grid;
+  gap: 14px;
+}
+
+.installer-host-view .subcontractor-form-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.installer-host-view .subcontractor-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .installer-host-view .request-panel {
@@ -1860,6 +1969,16 @@ button {
     display: grid;
   }
 
+  .host-nav {
+    display: grid;
+    justify-items: stretch;
+  }
+
+  .host-nav-links,
+  .host-nav-meta {
+    justify-content: center;
+  }
+
   .hero-user {
     margin-left: 0;
     justify-items: start;
@@ -1909,6 +2028,11 @@ button {
     gap: 16px;
   }
 
+  .host-landing-intro {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .hero-logo {
     width: 180px;
     max-width: 55vw;
@@ -1954,6 +2078,12 @@ button {
   .installer-host-view .split,
   .installer-host-view .lookup-row {
     grid-template-columns: 1fr;
+  }
+
+  .host-nav-links,
+  .host-nav-meta,
+  .installer-host-view .subcontractor-form-top {
+    justify-content: flex-start;
   }
 }
 
