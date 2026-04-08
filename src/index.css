@@ -180,9 +180,10 @@ button {
 }
 
 .auth-panel {
-  width: min(520px, 100%);
+  width: min(520px, calc(100vw - 40px));
+  min-height: 520px;
   margin: 0 auto;
-  padding: 34px 40px 34px;
+  padding: 36px 40px;
   border-radius: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 247, 252, 0.96) 100%);
@@ -190,6 +191,8 @@ button {
     0 32px 90px rgba(15, 23, 42, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
   text-align: center;
+  display: grid;
+  align-content: center;
 }
 
 .auth-form {
@@ -1124,6 +1127,11 @@ button {
     margin-left: 0;
     justify-items: start;
     text-align: left;
+  }
+
+  .auth-panel {
+    min-height: auto;
+    padding: 30px 24px;
   }
 }
 
