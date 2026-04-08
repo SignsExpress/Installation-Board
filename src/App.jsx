@@ -704,14 +704,6 @@ export default function App() {
     return (
       <div className="app-shell">
         <div className="page">
-          <section className="hero">
-            <div className="hero-brand">
-              <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-              <div className="hero-copy">
-                <h1>Installation Board</h1>
-              </div>
-            </div>
-          </section>
           <section className="panel auth-panel">
             <div className="board-loading">Checking login...</div>
           </section>
@@ -724,20 +716,15 @@ export default function App() {
     return (
       <div className="app-shell">
         <div className="page">
-          <section className="hero">
-            <div className="hero-brand">
-              <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-              <div className="hero-copy">
-                <h1>Installation Board</h1>
-              </div>
-            </div>
-          </section>
           <section className="panel auth-panel">
+            <div className="auth-brand">
+              <img className="auth-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+              <h1>Installation Board</h1>
+            </div>
             <div className="panel-head compact">
               <div>
                 <p className="panel-kicker">Secure Access</p>
                 <h2>Sign In</h2>
-                <p className="muted auth-copy">Use your named login to open the installation board.</p>
               </div>
             </div>
             <form className="job-form auth-form" onSubmit={handleLogin}>
@@ -769,10 +756,6 @@ export default function App() {
                 </button>
               </div>
             </form>
-
-            <div className="auth-help">
-              <span>Host logins and client logins use the same sign-in form.</span>
-            </div>
           </section>
         </div>
       </div>
