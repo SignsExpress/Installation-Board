@@ -1485,11 +1485,11 @@ function createServer() {
     response.json(await readRequestsStore());
   });
 
-  app.get("/api/corebridge/orders", async (request, response) => {
-    if (!requireHost(request, response)) return;
-    try {
-      const searchTerm = String(request.query.q || "").trim();
-      const includeDebug = String(request.query.debug || "").trim() === "1";
+app.get("/api/corebridge/orders", async (request, response) => {
+  if (!requireHost(request, response)) return;
+  try {
+    const searchTerm = String(request.query.q || "").trim();
+    const includeDebug = String(request.query.debug || "").trim() === "1";
       const payload = await fetchCoreBridgeOrders(searchTerm, includeDebug);
       response.json(payload);
     } catch (error) {
@@ -1499,6 +1499,33 @@ function createServer() {
           error.statusCode === 503
             ? "CoreBridge is not configured yet."
             : "Could not reach CoreBridge order lookup yet.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.get("/api/corebridge/orders/:id", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    try {
+      const orderId = String(request.params.id || "").trim();
+      const includeDebug = String(request.query.debug || "").trim() === "1";
+      if (!orderId) {
+        response.status(400).json({ error: "An order id is required." });
+        return;
+      }
+
+      const config = getCoreBridgeConfig();
+      if (!config.token || !config.subscriptionKey) {
+        response.status(503).json({ error: "CoreBridge is not configured yet." });
+        return;
+      }
+
+      const order = await fetchCoreBridgeOrderDetail(config, orderId, includeDebug);
+      response.json(order);
+    } catch (error) {
+      console.error("CoreBridge detail lookup failed.", error.message);
+      response.status(500).json({
+        error: "Could not load the CoreBridge order detail.",
         detail: error.message
       });
     }
@@ -1706,5 +1733,6 @@ module.exports = {
   buildBoardRows,
   createServer,
   getUkBankHolidays,
+  normalizeCoreBridgeOrder,
   startServer
 };

@@ -526,16 +526,43 @@ export default function App() {
     setCoreBridgeDebugView("fields");
   }
 
-  function applyCoreBridgeOrder(order) {
+  async function applyCoreBridgeOrder(order) {
+    let resolvedOrder = order;
+
+    try {
+      if (order?.id) {
+        setOrderLookupLoading(true);
+        setOrderLookupError("");
+        const params = new URLSearchParams();
+        if (orderLookupDebugMode) params.set("debug", "1");
+        const url = params.toString()
+          ? `/api/corebridge/orders/${encodeURIComponent(order.id)}?${params.toString()}`
+          : `/api/corebridge/orders/${encodeURIComponent(order.id)}`;
+        const response = await fetch(url);
+        const raw = await response.text();
+        const payload = raw ? JSON.parse(raw) : {};
+        if (!response.ok) {
+          throw new Error(payload.detail || payload.error || "Could not load CoreBridge order detail.");
+        }
+        resolvedOrder = payload;
+      }
+    } catch (error) {
+      console.error(error);
+      setOrderLookupError(error.message || "Could not load CoreBridge order detail.");
+      return;
+    } finally {
+      setOrderLookupLoading(false);
+    }
+
     setForm((current) => ({
       ...current,
-      orderReference: order.orderReference ?? "",
-      customerName: order.customerName ?? "",
-      description: order.description ?? "",
-      contact: order.contact ?? "",
-      number: order.number ?? "",
-      address: order.address ?? "",
-      notes: order.notes ?? ""
+      orderReference: resolvedOrder.orderReference ?? "",
+      customerName: resolvedOrder.customerName ?? "",
+      description: resolvedOrder.description ?? "",
+      contact: resolvedOrder.contact ?? "",
+      number: resolvedOrder.number ?? "",
+      address: resolvedOrder.address ?? "",
+      notes: resolvedOrder.notes ?? ""
     }));
     setOrderLookupOpen(false);
     setActiveCoreBridgeDebugOrder(null);
