@@ -70,86 +70,6 @@ function toInitials(name) {
     .join("");
 }
 
-function extractLabeledValue(text, labels) {
-  for (const label of labels) {
-    const pattern = new RegExp(`(?:^|\\n)\\s*${label}\\s*[:\\-]\\s*(.+)`, "i");
-    const match = text.match(pattern);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
-  }
-  return "";
-}
-
-function parsePastedOrderText(text) {
-  const source = String(text || "").replace(/\r/g, "").trim();
-  if (!source) {
-    return {
-      orderReference: "",
-      customerName: "",
-      description: "",
-      contact: "",
-      number: "",
-      address: "",
-      notes: ""
-    };
-  }
-
-  const lines = source
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const orderReference =
-    extractLabeledValue(source, ["order reference", "order ref", "reference", "order number", "order"]) ||
-    (lines.find((line) => /\b(?:ord|so|quote|job)[-#\s]?\d+/i.test(line)) || "");
-
-  const customerName = extractLabeledValue(source, [
-    "customer name",
-    "customer",
-    "company",
-    "company name",
-    "account",
-    "client"
-  ]);
-
-  const description = extractLabeledValue(source, ["description", "job description", "summary", "details"]);
-  const contact = extractLabeledValue(source, ["contact", "contact name", "primary contact", "name"]);
-  const number = extractLabeledValue(source, ["number", "phone", "telephone", "mobile", "contact number"]);
-  const address = extractLabeledValue(source, ["address", "site address", "delivery address", "install address"]);
-  const notes = extractLabeledValue(source, ["notes", "special instructions", "instructions", "comments"]);
-
-  const fallbackCustomerLine = lines.find(
-    (line) =>
-      line !== orderReference &&
-      line !== description &&
-      !/^address\s*[:\-]/i.test(line) &&
-      !/^contact\s*[:\-]/i.test(line) &&
-      !/^number\s*[:\-]/i.test(line) &&
-      !/^notes\s*[:\-]/i.test(line)
-  ) || "";
-
-  const fallbackDescriptionLine = lines.find(
-    (line) =>
-      line !== orderReference &&
-      line !== fallbackCustomerLine &&
-      !/^address\s*[:\-]/i.test(line) &&
-      !/^contact\s*[:\-]/i.test(line) &&
-      !/^number\s*[:\-]/i.test(line) &&
-      !/^notes\s*[:\-]/i.test(line)
-  ) || "";
-
-  return {
-    orderReference,
-    customerName: customerName || fallbackCustomerLine,
-    description: description || fallbackDescriptionLine,
-    contact,
-    number,
-    address,
-    notes
-  };
-}
-
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const isClientMode = pathname.startsWith("/client");
@@ -174,7 +94,6 @@ export default function App() {
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupResults, setOrderLookupResults] = useState([]);
   const [orderLookupError, setOrderLookupError] = useState("");
-  const [orderPasteText, setOrderPasteText] = useState("");
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -292,8 +211,6 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
-  const parsedPastedOrder = useMemo(() => parsePastedOrderText(orderPasteText), [orderPasteText]);
-
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
@@ -302,7 +219,6 @@ export default function App() {
     setOrderLookupQuery("");
     setOrderLookupResults([]);
     setOrderLookupError("");
-    setOrderPasteText("");
   }
 
   function editJob(job) {
@@ -383,16 +299,6 @@ export default function App() {
     }));
     setOrderLookupOpen(false);
     setMessage(createMessage("Order details copied into the job form.", "success"));
-  }
-
-  function applyPastedOrder() {
-    const parsed = parsePastedOrderText(orderPasteText);
-    if (!parsed.orderReference && !parsed.customerName && !parsed.description && !parsed.contact && !parsed.number && !parsed.address && !parsed.notes) {
-      setOrderLookupError("Paste some order details first.");
-      return;
-    }
-
-    applyCoreBridgeOrder(parsed);
   }
 
   async function handleSubmit(event) {
@@ -1188,56 +1094,6 @@ export default function App() {
               ) : (
                 <div className="board-loading compact">No CoreBridge orders found yet.</div>
               )}
-            </div>
-
-            <div className="paste-import-panel">
-              <div className="paste-import-head">
-                <div>
-                  <h4>Paste Order Details Instead</h4>
-                  <p>Copy the order text from CoreBridge and the board will fill what it can.</p>
-                </div>
-                <button className="ghost-button" type="button" onClick={() => applyPastedOrder()}>
-                  Use pasted details
-                </button>
-              </div>
-
-              <textarea
-                rows="7"
-                value={orderPasteText}
-                placeholder={"Paste copied order text here...\n\nOrder Reference: ORD-1234\nCustomer Name: Matt's Fridge Deliveries\nContact: Bob Johnson\nNumber: 0798120128\nAddress: 1 Example Street, Preston\nDescription: Going home in small van\nNotes: Out of hours installation"}
-                onChange={(event) => setOrderPasteText(event.target.value)}
-              />
-
-              <div className="paste-preview-grid">
-                <div className="detail-card">
-                  <strong>Order Ref</strong>
-                  <p>{parsedPastedOrder.orderReference || "-"}</p>
-                </div>
-                <div className="detail-card">
-                  <strong>Customer</strong>
-                  <p>{parsedPastedOrder.customerName || "-"}</p>
-                </div>
-                <div className="detail-card">
-                  <strong>Description</strong>
-                  <p>{parsedPastedOrder.description || "-"}</p>
-                </div>
-                <div className="detail-card">
-                  <strong>Contact</strong>
-                  <p>{parsedPastedOrder.contact || "-"}</p>
-                </div>
-                <div className="detail-card">
-                  <strong>Number</strong>
-                  <p>{parsedPastedOrder.number || "-"}</p>
-                </div>
-                <div className="detail-card detail-card-wide">
-                  <strong>Address</strong>
-                  <p>{parsedPastedOrder.address || "-"}</p>
-                </div>
-                <div className="detail-card detail-card-wide">
-                  <strong>Notes</strong>
-                  <p>{parsedPastedOrder.notes || "-"}</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
