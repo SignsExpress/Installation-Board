@@ -1020,6 +1020,36 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
+  const directRoleAddress = buildAddressFromAliases(flat, [
+    [
+      "contactroles.0.ordercontactrolelocators.0.metadata.street1",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.street1"
+    ],
+    [
+      "contactroles.0.ordercontactrolelocators.0.metadata.street2",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.street2"
+    ],
+    [
+      "contactroles.0.ordercontactrolelocators.0.metadata.city",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.city"
+    ],
+    [
+      "contactroles.0.ordercontactrolelocators.0.metadata.state",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.state"
+    ],
+    [
+      "contactroles.0.ordercontactrolelocators.0.metadata.postalcode",
+      "contactroles.0.ordercontactrolelocators.0.metadata.postcode",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.postalcode",
+      "ordercontactroles.0.ordercontactrolelocators.0.metadata.postcode"
+    ]
+  ]);
+  const directRolePhone = pickFirstPhone(flat, [
+    "contactroles.0.ordercontactrolelocators.1.locator",
+    "ordercontactroles.0.ordercontactrolelocators.1.locator",
+    "contactroles.0.ordercontactrolelocators.0.metadata.businessphone",
+    "ordercontactroles.0.ordercontactrolelocators.0.metadata.businessphone"
+  ]);
 
   const normalized = {
     id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
@@ -1060,8 +1090,8 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
-    number: buildPhoneFromRole(preferredRole) || pickBestCoreBridgePhone(flat),
-    address: buildAddressFromRole(preferredRole) || pickBestCoreBridgeAddress(flat),
+    number: directRolePhone || buildPhoneFromRole(preferredRole),
+    address: directRoleAddress || buildAddressFromRole(preferredRole) || pickBestCoreBridgeAddress(flat),
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
