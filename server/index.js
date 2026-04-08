@@ -636,6 +636,22 @@ function buildCoreBridgeOrderUrl(config, params = {}) {
   return url.toString();
 }
 
+function buildCoreBridgeOrderDetailUrl(config, orderId) {
+  const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const detailPath = `${normalizedPath}/${orderId}`;
+  const url = new URL(detailPath, normalizedBase);
+
+  url.searchParams.set("apiversion", config.apiVersion);
+  url.searchParams.set("companylevel", "full");
+  url.searchParams.set("contactlevel", "full");
+  url.searchParams.set("notelevel", "full");
+  url.searchParams.set("destinationlevel", "full");
+  url.searchParams.set("itemlevel", "full");
+
+  return url.toString();
+}
+
 function flattenRecord(record, prefix = "", bucket = {}) {
   if (!record || typeof record !== "object") return bucket;
 
@@ -1024,6 +1040,36 @@ function buildCoreBridgeDebugFields(record) {
     }));
 }
 
+async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false) {
+  const response = await fetch(buildCoreBridgeOrderDetailUrl(config, orderId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Detail lookup failed for ${orderId} (${response.status})`);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  const rawBody = await response.text();
+  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+    throw new Error(`Detail lookup returned HTML for ${orderId}`);
+  }
+
+  const body = JSON.parse(rawBody);
+  const normalized = normalizeCoreBridgeOrder(body, 0);
+
+  if (includeDebug) {
+    normalized.debugFields = buildCoreBridgeDebugFields(body);
+    normalized.debugRaw = JSON.stringify(body, null, 2);
+  }
+
+  return normalized;
+}
+
 function extractCoreBridgeRecords(payload) {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
@@ -1145,7 +1191,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
       }
 
       const records = extractCoreBridgeRecords(body);
-      const orders = filterCoreBridgeOrders(
+      let orders = filterCoreBridgeOrders(
         records.map((record, index) => {
           const normalized = normalizeCoreBridgeOrder(record, index);
           if (includeDebug) {
@@ -1156,6 +1202,25 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
         }),
         normalizedSearch
       ).filter((order) => order.orderReference || order.customerName);
+
+      if (looksLikeFormattedNumber && orders.length) {
+        orders = await Promise.all(
+          orders.slice(0, 10).map(async (order) => {
+            if (!order.id) return order;
+
+            try {
+              const detailedOrder = await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
+              return {
+                ...order,
+                ...detailedOrder
+              };
+            } catch (error) {
+              attempts.push(`DETAIL ${order.id} ${error.message}`);
+              return order;
+            }
+          })
+        );
+      }
 
       if (orders.length || !normalizedSearch) {
         return {
