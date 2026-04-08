@@ -494,6 +494,9 @@ button {
   align-content: start;
   gap: 4px;
   text-align: left;
+  min-height: 100%;
+  overflow: visible;
+  cursor: pointer;
 }
 
 .date-heading {
@@ -603,12 +606,12 @@ button {
 .date-holiday-popover {
   position: absolute;
   left: 12px;
-  top: calc(100% - 8px);
+  right: 12px;
+  top: 56px;
   z-index: 20;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  width: calc(100% - 24px);
   padding: 10px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.97);

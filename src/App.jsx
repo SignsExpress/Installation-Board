@@ -598,8 +598,7 @@ export default function App() {
                           moveJobToDate(jobId, row.isoDate);
                         }}
                       >
-                        <button
-                          type="button"
+                        <div
                           className="date-cell"
                           onClick={() => {
                             if (!isClientMode) {
@@ -655,7 +654,10 @@ export default function App() {
                                     key={`${row.isoDate}-${name}`}
                                     type="button"
                                     className={`date-holiday-chip ${getHolidayPersonColor(name)} ${existing ? "active" : ""}`}
-                                    onClick={() => cycleHoliday(row.isoDate, name)}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      cycleHoliday(row.isoDate, name);
+                                    }}
                                   >
                                     {initials}{durationLabel}
                                   </button>
@@ -664,7 +666,7 @@ export default function App() {
                             </div>
                           ) : null}
                           {!isClientMode && row.bankHoliday ? <span className="date-bank-holiday">{row.bankHoliday}</span> : null}
-                        </button>
+                        </div>
 
                         <div className="jobs-cell">
                           <button
