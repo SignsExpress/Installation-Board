@@ -972,6 +972,13 @@ function pickBestCoreBridgeAddress(flatRecord) {
 
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
+  const directDescription = String(
+    record?.SE_EstimateDescription ||
+    record?.EstimateDescription ||
+    record?.OrderDescription ||
+    record?.Description ||
+    ""
+  ).trim();
 
   const normalized = {
     id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
@@ -998,7 +1005,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "clientname",
       "name"
     ]),
-    description: pickBestCoreBridgeDescription(flat),
+    description: directDescription || pickBestCoreBridgeDescription(flat),
     contact: pickFirst(flat, [
       "contactroles.0.contactname",
       "ordercontactroles.0.contactname",
