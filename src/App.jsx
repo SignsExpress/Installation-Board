@@ -529,13 +529,13 @@ export default function App() {
   function applyCoreBridgeOrder(order) {
     setForm((current) => ({
       ...current,
-      orderReference: order.orderReference || current.orderReference,
-      customerName: order.customerName || current.customerName,
-      description: order.description || current.description,
-      contact: order.contact || current.contact,
-      number: order.number || current.number,
-      address: order.address || current.address,
-      notes: order.notes || current.notes
+      orderReference: order.orderReference ?? "",
+      customerName: order.customerName ?? "",
+      description: order.description ?? "",
+      contact: order.contact ?? "",
+      number: order.number ?? "",
+      address: order.address ?? "",
+      notes: order.notes ?? ""
     }));
     setOrderLookupOpen(false);
     setActiveCoreBridgeDebugOrder(null);
