@@ -5,6 +5,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const {
+  bootstrapPasswordsFromEnv,
   ensureUsersFile,
   readUsersStore,
   sanitizeUser,
@@ -753,6 +754,15 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
 function createServer() {
   ensureStoreFile();
   ensureUsersFile();
+  bootstrapPasswordsFromEnv()
+    .then((result) => {
+      if (result.updated) {
+        console.log(`Bootstrapped passwords for ${result.updated} users.`);
+      }
+    })
+    .catch((error) => {
+      console.error("Could not bootstrap auth passwords.", error.message);
+    });
   const app = express();
 
   app.use(cors());

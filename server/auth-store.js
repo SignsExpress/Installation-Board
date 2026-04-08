@@ -139,7 +139,45 @@ async function setUserPassword(displayName, password) {
   return sanitizeUser(user);
 }
 
+async function bootstrapPasswordsFromEnv() {
+  const raw = String(process.env.AUTH_BOOTSTRAP_PASSWORDS || "").trim();
+  if (!raw) return { updated: 0 };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error("AUTH_BOOTSTRAP_PASSWORDS must be valid JSON.");
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("AUTH_BOOTSTRAP_PASSWORDS must be a JSON object mapping display names to passwords.");
+  }
+
+  const store = await readUsersStore();
+  let updated = 0;
+
+  for (const [displayName, password] of Object.entries(parsed)) {
+    const normalizedName = String(displayName || "").toLowerCase();
+    const user = store.users.find((entry) => String(entry.displayName || "").toLowerCase() === normalizedName);
+    if (!user || !password) continue;
+
+    const { passwordSalt, passwordHash } = hashPassword(String(password));
+    user.passwordSalt = passwordSalt;
+    user.passwordHash = passwordHash;
+    user.passwordUpdatedAt = new Date().toISOString();
+    updated += 1;
+  }
+
+  if (updated > 0) {
+    await writeUsersStore(store);
+  }
+
+  return { updated };
+}
+
 module.exports = {
+  bootstrapPasswordsFromEnv,
   SEEDED_USERS,
   ensureUsersFile,
   getUsersFile,
