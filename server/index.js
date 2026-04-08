@@ -842,26 +842,88 @@ function pickBestCoreBridgePhone(flatRecord) {
   });
 }
 
-function normalizeCoreBridgeOrder(record, index) {
-  const flat = flattenRecord(record);
-
-  const address = [
-    pickFirst(flat, [
-      "address1",
-      "address.line1",
-      "siteaddress1",
-      "shiptoaddress1",
-      "locationlocators.0.locator",
-      "locator"
-    ]),
-    pickFirst(flat, ["address2", "address.line2", "siteaddress2", "shiptoaddress2"]),
-    pickFirst(flat, ["address3", "address.line3", "siteaddress3", "shiptoaddress3"]),
-    pickFirst(flat, ["city", "address.city", "town", "sitecity", "shiptocity"]),
-    pickFirst(flat, ["county", "address.county", "state", "sitestate"]),
-    pickFirst(flat, ["postcode", "postalcode", "zip", "address.postcode", "sitepostcode", "shiptopostcode"])
-  ]
+function buildAddressFromAliases(flatRecord, aliasesByLine) {
+  return aliasesByLine
+    .map((aliases) => pickFirst(flatRecord, aliases))
     .filter(Boolean)
     .join(", ");
+}
+
+function pickBestCoreBridgeAddress(flatRecord) {
+  const destinationAddress = buildAddressFromAliases(flatRecord, [
+    [
+      "destinations.0.toaddress",
+      "destinations.0.shiptoaddress",
+      "destinations.0.address1",
+      "destinations.0.toaddress1",
+      "destinations.0.shiptoaddress1",
+      "shiptoaddress1",
+      "toaddress1"
+    ],
+    [
+      "destinations.0.address2",
+      "destinations.0.toaddress2",
+      "destinations.0.shiptoaddress2",
+      "shiptoaddress2",
+      "toaddress2"
+    ],
+    [
+      "destinations.0.address3",
+      "destinations.0.toaddress3",
+      "destinations.0.shiptoaddress3",
+      "shiptoaddress3",
+      "toaddress3"
+    ],
+    [
+      "destinations.0.city",
+      "destinations.0.tocity",
+      "destinations.0.shiptocity",
+      "shiptocity",
+      "tocity"
+    ],
+    [
+      "destinations.0.county",
+      "destinations.0.state",
+      "destinations.0.tocounty",
+      "destinations.0.shiptocounty",
+      "shiptocounty",
+      "tocounty"
+    ],
+    [
+      "destinations.0.postcode",
+      "destinations.0.postalcode",
+      "destinations.0.shiptopostcode",
+      "destinations.0.topostcode",
+      "shiptopostcode",
+      "topostcode"
+    ]
+  ]);
+
+  if (destinationAddress) return destinationAddress;
+
+  const orderLevelAddress = buildAddressFromAliases(flatRecord, [
+    ["shiptoaddress1", "toaddress1", "address1", "address.line1", "siteaddress1"],
+    ["shiptoaddress2", "toaddress2", "address2", "address.line2", "siteaddress2"],
+    ["shiptoaddress3", "toaddress3", "address3", "address.line3", "siteaddress3"],
+    ["shiptocity", "tocity", "city", "address.city", "town", "sitecity"],
+    ["shiptocounty", "tocounty", "county", "address.county", "state", "sitestate"],
+    ["shiptopostcode", "topostcode", "postcode", "postalcode", "zip", "address.postcode", "sitepostcode"]
+  ]);
+
+  if (orderLevelAddress) return orderLevelAddress;
+
+  return pickFirst(flatRecord, [
+    "destinations.0.toaddress",
+    "destinations.0.shiptoaddress",
+    "shiptoaddress",
+    "toaddress",
+    "address",
+    "siteaddress"
+  ]);
+}
+
+function normalizeCoreBridgeOrder(record, index) {
+  const flat = flattenRecord(record);
 
   const normalized = {
     id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
@@ -903,7 +965,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: pickBestCoreBridgePhone(flat),
-    address: address || pickFirst(flat, ["address", "siteaddress", "shiptoaddress"]),
+    address: pickBestCoreBridgeAddress(flat),
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
