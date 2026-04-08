@@ -804,7 +804,6 @@ export default function App() {
           <section className="panel auth-panel">
             <div className="auth-brand">
               <img className="auth-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-              <h1>Installation Board</h1>
             </div>
             <form className="job-form auth-form" onSubmit={handleLogin}>
               <label>
