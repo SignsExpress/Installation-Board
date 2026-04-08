@@ -418,6 +418,23 @@ function pickFirst(flatRecord, aliases) {
   return "";
 }
 
+function looksLikePhone(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return false;
+  if (/[A-Za-z]{3,}/.test(normalized)) return false;
+
+  const digits = normalized.replace(/\D/g, "");
+  return digits.length >= 7;
+}
+
+function pickFirstPhone(flatRecord, aliases) {
+  for (const alias of aliases) {
+    const value = flatRecord[alias.toLowerCase()];
+    if (value && looksLikePhone(value)) return value;
+  }
+  return "";
+}
+
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
 
@@ -481,7 +498,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact",
       "contactroles.0.contactname"
     ]),
-    number: pickFirst(flat, [
+    number: pickFirstPhone(flat, [
       "phone",
       "telephone",
       "mobilenumber",
