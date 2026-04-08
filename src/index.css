@@ -1109,6 +1109,202 @@ button {
   border: 1px solid #cbd5e1;
 }
 
+.host-landing-shell {
+  display: grid;
+  align-items: center;
+}
+
+.host-landing-page {
+  max-width: 1240px;
+}
+
+.host-landing-panel {
+  padding: 28px;
+}
+
+.host-landing-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.host-launch-card {
+  border: 1px solid var(--sx-main-border);
+  border-radius: 28px;
+  padding: 26px 24px;
+  background: linear-gradient(180deg, #fcfbfd 0%, #f3edf6 100%);
+  text-align: left;
+  display: grid;
+  gap: 10px;
+}
+
+.host-launch-card strong {
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.host-launch-card p {
+  margin: 0;
+  color: #475569;
+}
+
+.host-launch-card:hover {
+  border-color: #b39ac1;
+  background: linear-gradient(180deg, #ffffff 0%, #efe8f3 100%);
+}
+
+.installer-layout {
+  grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
+}
+
+.installer-editor-panel,
+.installer-directory-panel {
+  align-self: start;
+}
+
+.host-top-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.installer-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.installer-toolbar input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  background: white;
+  padding: 10px 13px;
+  color: #0f172a;
+}
+
+.installer-toolbar input:focus {
+  outline: none;
+  border-color: #b39ac1;
+  box-shadow: 0 0 0 4px rgba(95, 60, 116, 0.14);
+}
+
+.map-shell {
+  padding: 18px;
+  border: 1px solid var(--sx-main-border);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fcfbfd 0%, #f4eef7 100%);
+}
+
+.map-markup svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.installer-filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.installer-filter-grid.compact {
+  margin-top: 14px;
+}
+
+.installer-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #4f365f;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.installer-filter-chip.active {
+  background: var(--sx-main);
+  border-color: var(--sx-main);
+  color: #fff;
+}
+
+.rating-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rating-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #4f365f;
+  font-weight: 700;
+}
+
+.rating-button.active {
+  background: var(--sx-main);
+  border-color: var(--sx-main);
+  color: #fff;
+}
+
+.installer-card-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.installer-card {
+  border: 1px solid #dbe2ea;
+  border-radius: 22px;
+  background: #fff;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.installer-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.installer-card-head strong {
+  font-size: 1.05rem;
+}
+
+.installer-card-head p,
+.installer-card-body p {
+  margin: 0;
+  color: #475569;
+}
+
+.installer-card-body {
+  display: grid;
+  gap: 6px;
+}
+
+.installer-rating {
+  white-space: nowrap;
+  color: #c2410c;
+  font-weight: 800;
+}
+
+.installer-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 1120px) {
   .layout,
   .hero {
@@ -1123,6 +1319,11 @@ button {
     margin-left: 0;
     justify-items: start;
     text-align: left;
+  }
+
+  .installer-layout,
+  .host-landing-actions {
+    grid-template-columns: 1fr;
   }
 
   .auth-panel {
@@ -1180,6 +1381,10 @@ button {
   }
 
   .order-lookup-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .installer-toolbar {
     grid-template-columns: 1fr;
   }
 }

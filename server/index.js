@@ -17,6 +17,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 const DEV_FRONTEND_PORT = Number(process.env.DEV_FRONTEND_PORT || 5173);
 const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
+const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers.json");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
@@ -44,6 +45,18 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
+}
+
+function getInstallersFile() {
+  if (process.env.INSTALLERS_FILE) {
+    return process.env.INSTALLERS_FILE;
+  }
+
+  if (process.env.DATA_FILE) {
+    return path.join(path.dirname(process.env.DATA_FILE), "installers.json");
+  }
+
+  return DEFAULT_INSTALLERS_FILE;
 }
 
 function parseCookies(headerValue) {
@@ -131,6 +144,14 @@ function ensureStoreFile() {
   }
 }
 
+function ensureInstallersFile() {
+  const file = getInstallersFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, `${JSON.stringify([], null, 2)}\n`, "utf8");
+  }
+}
+
 async function readStore() {
   ensureStoreFile();
   const raw = await fsp.readFile(getDataFile(), "utf8");
@@ -164,6 +185,28 @@ async function writeStore(store) {
   };
   await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
   return nextStore;
+}
+
+async function readInstallersStore() {
+  ensureInstallersFile();
+  const raw = await fsp.readFile(getInstallersFile(), "utf8");
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Invalid installers store JSON, returning empty list.", error);
+    return [];
+  }
+}
+
+async function writeInstallersStore(installers) {
+  ensureInstallersFile();
+  const nextInstallers = [...installers].sort((left, right) =>
+    String(left.name || "").localeCompare(String(right.name || ""))
+  );
+  await fsp.writeFile(getInstallersFile(), `${JSON.stringify(nextInstallers, null, 2)}\n`, "utf8");
+  return nextInstallers;
 }
 
 function makeId() {
@@ -403,6 +446,27 @@ function sanitizeStaffHoliday(payload) {
     date: String(payload.date || "").trim(),
     person: String(payload.person || "").trim(),
     duration: String(payload.duration || "Full Day").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeInstaller(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    name: String(payload.name || "").trim(),
+    company: String(payload.company || "").trim(),
+    phone: String(payload.phone || "").trim(),
+    email: String(payload.email || "").trim(),
+    address: String(payload.address || "").trim(),
+    notes: String(payload.notes || "").trim(),
+    rating: Number.isFinite(Number(payload.rating)) ? Math.max(0, Math.min(5, Number(payload.rating))) : 0,
+    regions: Array.isArray(payload.regions)
+      ? payload.regions.map((region) => String(region || "").trim()).filter(Boolean)
+      : [],
+    tags: Array.isArray(payload.tags)
+      ? payload.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+      : [],
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -753,6 +817,7 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
 
 function createServer() {
   ensureStoreFile();
+  ensureInstallersFile();
   ensureUsersFile();
   bootstrapPasswordsFromEnv()
     .then((result) => {
@@ -851,6 +916,11 @@ function createServer() {
     response.json(store.jobs);
   });
 
+  app.get("/api/installers", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    response.json(await readInstallersStore());
+  });
+
   app.get("/api/corebridge/orders", async (request, response) => {
     if (!requireHost(request, response)) return;
     try {
@@ -908,6 +978,35 @@ function createServer() {
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
+  });
+
+  app.post("/api/installers", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    const nextInstaller = sanitizeInstaller(request.body || {});
+
+    if (!nextInstaller.name) {
+      response.status(400).json({ error: "Installer name is required." });
+      return;
+    }
+
+    const installers = await readInstallersStore();
+    const index = installers.findIndex((installer) => installer.id === nextInstaller.id);
+
+    if (index >= 0) {
+      nextInstaller.createdAt = installers[index].createdAt || nextInstaller.createdAt;
+      installers[index] = nextInstaller;
+    } else {
+      installers.unshift(nextInstaller);
+    }
+
+    response.json(await writeInstallersStore(installers));
+  });
+
+  app.delete("/api/installers/:id", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    const installers = await readInstallersStore();
+    const filtered = installers.filter((installer) => installer.id !== request.params.id);
+    response.json(await writeInstallersStore(filtered));
   });
 
   app.get("/api/holidays", async (request, response) => {

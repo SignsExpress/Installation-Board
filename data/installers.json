@@ -1,0 +1,418 @@
+[
+  {
+    "id": "0d7753c2-5969-4f37-ab2b-1857734a589d",
+    "name": "Anthony Talbot",
+    "company": "AT Sign Installation",
+    "phone": "07415 007022",
+    "email": "",
+    "address": "Market Harborough",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "east-midlands"
+    ]
+  },
+  {
+    "id": "50c317be-ed38-49d8-95f4-56920036ace4",
+    "name": "Anton Redelinghuys",
+    "company": "ProX Installation",
+    "phone": "020 805 88892",
+    "email": "www.proxinstall.co.uk",
+    "address": "Wellington House, 273-275 High Street, London Colney, Hertfordshire, United Kingdom, AL2 1HA",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "d712c241-0779-4448-9186-14375b66b433",
+    "name": "Ashley Spears",
+    "company": "AC Installation LTD",
+    "phone": "07415962666",
+    "email": "",
+    "address": "Birmingham, England, United Kingdom",
+    "notes": "At the helm of AC Installation LTD, our team excels in delivering top-tier sign installations, with a focus on illuminated signs that enhance business visibility. With over 20 years of dedicated industry experience, our expertise ranges from precise installations to comprehensive graphics solutions, always prioritizing safety and aesthetic appeal. \nwhich has cemented our reputation as reliable go-to professionals for sign and graphics installations. Our mission is to provide impeccable service, ensuring that each project reflects our commitment to quality and our clients' brand integrity.",
+    "rating": 3,
+    "regions": [
+      "west-midlands"
+    ]
+  },
+  {
+    "id": "027372ac-6acf-4e60-b0de-52340626b138",
+    "name": "Ben Buchan",
+    "company": "Signetics",
+    "phone": "01767 661412",
+    "email": "sales@signetics.co.uk",
+    "address": "4 Cheere Way, Papworth Everard, Cambridge, Cambridgeshire CB23 3NZ",
+    "notes": "Luke at Signs Express Birmingham SW recommended.",
+    "rating": 3,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "b2d19046-9ced-4f60-bf7a-4fdc39adad37",
+    "name": "Bradley Northwood",
+    "company": "BN INSTALLATIONS LTD",
+    "phone": "07947874664",
+    "email": "bradn94@outlook.com",
+    "address": "Margate, England, United Kingdom",
+    "notes": "As the Owner of BN INSTALLATIONS LTD, I provide high-quality signage and vinyl installations across the UK. \n\nAfter 10 years experience in the signage industry, I have a wide knowledge of all kinds of signage systems and installation methods.\n\nTaking a professional approach to every job no matter how big or small I take pride in making sure my work is carried out professionally and safely.\n\nI hold the following cards \nCSCS, PASMA, IPAF, SPA & Asbestos training",
+    "rating": 3,
+    "regions": [
+      "south-east"
+    ]
+  },
+  {
+    "id": "0e269873-ea94-4ac4-933a-0b5f036e3dee",
+    "name": "Chris Aldous",
+    "company": "Phoenix Sign Services Ltd",
+    "phone": "07722 960158",
+    "email": "Chris.aldous@phoenixsignservices.co.uk",
+    "address": "50 Steggall Close, Needham Market, Ipswich, United Kingdom, IP6 8EB",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "0f9809a2-e67a-4c15-a422-8020c350bd56",
+    "name": "Dan Wainwright",
+    "company": "SIVA Installs Ltd",
+    "phone": "01977 803429",
+    "email": "sales@siva-installs.co.uk",
+    "address": "Unit 3 Brickyard Farm, Camblesforth Road, Selby, North Yorkshire, United Kingdom, YO8 8ND",
+    "notes": "IPAF, PASMA, CSCS & SPA qualifications",
+    "rating": 3,
+    "regions": [
+      "yorkshire-humber"
+    ]
+  },
+  {
+    "id": "0a1dd820-85df-4c83-90a3-e3916df784e0",
+    "name": "Daniel McGuckian",
+    "company": "DMcG Installations Co.",
+    "phone": "",
+    "email": "danielmcguckian@gmail.com",
+    "address": "Maidenhead, England, United Kingdom",
+    "notes": "CSCS Card • IPAF • PASMA • Asbestos Awareness",
+    "rating": 3,
+    "regions": [
+      "south-east"
+    ]
+  },
+  {
+    "id": "f9441148-af1f-4a4f-9f41-d532faf6f1e5",
+    "name": "Gary Storey",
+    "company": "Graphic & Sign Installations Limited",
+    "phone": "07702968075",
+    "email": "g.storey@gsinstallations.co.uk",
+    "address": "Stockport, England, United Kingdom",
+    "notes": "Team of 2 All CSCS Accredited",
+    "rating": 5,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "65a80e31-cf0c-4360-8447-3bf32dab5540",
+    "name": "Graham Harkness",
+    "company": "Planet Signs",
+    "phone": "07790 906147",
+    "email": "graham@planetsigns.co.uk",
+    "address": "Hadleigh Cottage, Holcot Road, Brixworth, Northampton, Northamptonshire, NN6 9BS",
+    "notes": "Not used yet - Dave Allen recommended.",
+    "rating": 3,
+    "regions": [
+      "east-midlands"
+    ]
+  },
+  {
+    "id": "8c633def-2d44-4eb7-8563-62afb18c3a90",
+    "name": "Jamie Livesey",
+    "company": "Sign Surveys North",
+    "phone": "07403 414 609",
+    "email": "jamie@signsurveysnorth.co.uk",
+    "address": "14 Roseberry Road Ashton in Makerfield Greater Manchester WN4 9TB",
+    "notes": "I'm based near Wigan with my usual coverage \nareas being within a couple of hours drive but further afield with overnights for rollout projects, generally \nBirmingham to Cumbria/NE.\n\nI usually charge a flat rate 30.00 per hour for driving, onsite & office write up up to a day rate of 300.00 plus\ntolls, parking & overnights where required.\n\nI'm just coming to the end of a 12 month project working direct with Manchester Airport so now getting back\nto the day to day and a more normal capacity.",
+    "rating": 4,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "d96b20fa-71b7-4923-8daf-8dfe022771bb",
+    "name": "Jim Mitchell",
+    "company": "Mitchell Sign Services",
+    "phone": "07973521044",
+    "email": "sales@mitchellsignservices.com",
+    "address": "Falkirk",
+    "notes": "Experienced Sign fitter based in Central Scotland with 30 years experience of working in the Sign Industry, specialising in Neon, Led, Fascias, Totems, 3D Lettering and Window Manifestations. Understands the importance of excellent customer service with the ability to liaise at all levels with clients, sub-contractors and workers. Has clean driving licence with up to date CSCS, IPAF and PASMA cards, transport and tools.\nE-mail me for my current rates and availability.",
+    "rating": 4,
+    "regions": [
+      "scotland"
+    ]
+  },
+  {
+    "id": "56b1dedb-e553-4b10-8d39-8cf32dc93395",
+    "name": "Jimmy Jarvis",
+    "company": "Jimmy Jarvis Trade Installations Ltd",
+    "phone": "07555 336106",
+    "email": "jimmy@jjti.co.uk",
+    "address": "111 Penrith Avenue, Ashton-Under-Lyne, England, OL7 9JN",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "b9bc00d9-863f-403b-a351-5db17b1f1496",
+    "name": "Josh Walker & Kane Duffy",
+    "company": "Prestige Signs and Graphix",
+    "phone": "07361 483570 & 07949 156882",
+    "email": "info@kdgraphix.co.uk",
+    "address": "Manchester Area, United Kingdom",
+    "notes": "Works with Josh Walker",
+    "rating": 4,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "ebdb343e-d303-4d39-9f0c-2323971d0016",
+    "name": "Kelly Rhodes",
+    "company": "Industrial Abseiling Ltd",
+    "phone": "07590 373055",
+    "email": "caroline@industrialabseiling.com",
+    "address": "28 Station Road Lidlington Beds MK43 0SE",
+    "notes": "Expensive but good",
+    "rating": 5,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "55109c35-c858-4afc-aa87-92d61b6d7216",
+    "name": "Kevin Sumner",
+    "company": "KS Sign Installations & Maintenance",
+    "phone": "07976 770701",
+    "email": "kevin@ks-signinstallations.co.uk",
+    "address": "129 Woodplumpton Road, Fulwood, Preston, Lancashire, United Kingdom, PR2 3LF",
+    "notes": "",
+    "rating": 2,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "f8da8845-1f4f-41a2-838b-d58e862ae15f",
+    "name": "Leigh Walker",
+    "company": "Total Designs LTD",
+    "phone": "01782 461108",
+    "email": "www.totaldesignsltd.co.uk",
+    "address": "Greater Stoke-on-Trent Area",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "west-midlands"
+    ]
+  },
+  {
+    "id": "835c7483-0783-4ea3-b8a2-ca1a9955a72f",
+    "name": "Leon Hodgson",
+    "company": "LH Signsolutions Ltd",
+    "phone": "07967 370610",
+    "email": "lhsignsolutions@gmail.com",
+    "address": "50 Cedarcroft Rd, Chessington KT9 1RP",
+    "notes": "",
+    "rating": 3,
+    "regions": [
+      "greater-london"
+    ]
+  },
+  {
+    "id": "39ec6bcc-9aac-476b-b97a-e22f163ef2da",
+    "name": "Lou Birch",
+    "company": "Birch Sign Services",
+    "phone": "07967190089",
+    "email": "lou@birchsigns.com",
+    "address": "Birch Signs Services Unit 3 Wickham Business Park, Honywood Road, Basildon, Essex, SS14 3EQ",
+    "notes": "Expensive but good to use when it's last minute or you're stuck. Has a network of installers across the UK.",
+    "rating": 3,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "d8c25cb6-a3eb-443f-bc0b-1ca1738ceff0",
+    "name": "Mark Holmes",
+    "company": "Jigsaw Retail Solutions Ltd",
+    "phone": "07840 761777",
+    "email": "mark@jigsawretailsolutions.co.uk",
+    "address": "Greater Leeds Area",
+    "notes": "We currently have 300+ installation teams across the UK signed up to our app as well as teams already on Jigsaws books and can offer you the best coverage of installers of any company in the UK.\n\nWe offer a full in-house project management team, full reporting and compliance sign off with our installer mobile app/client portal, technical support with installs and surveys/audits.\n\n\nYou’re welcome to take a look at our website at \nwww.jigsawretailsolutions.co.uk",
+    "rating": 3,
+    "regions": [
+      "yorkshire-humber"
+    ]
+  },
+  {
+    "id": "a1aa52c2-a6cf-47bf-8293-b4ffc5e959de",
+    "name": "Matt Cesarec",
+    "company": "Connect Install Ltd",
+    "phone": "(01) 685 6550",
+    "email": "Matt@connectinstall.ie",
+    "address": "Unit 2, Goldenbridge Industrial Estate, Inchicore, Dublin 8, D08 YY38",
+    "notes": "We are a signage and branding installation company based in Dublin. We have 20 full-time installers and are the largest in the country.",
+    "rating": 3,
+    "regions": [
+      "ireland"
+    ]
+  },
+  {
+    "id": "b9287589-5e64-4a2d-90de-a00f93756da3",
+    "name": "Phil Collins",
+    "company": "Sign Design Oxford",
+    "phone": "01865 842345",
+    "email": "info@signdesignoxford.co.uk",
+    "address": "13 Bankside,  Kidlington Oxford,  OX5 1JE",
+    "notes": "We are based in Oxfordshire although we install throughout the UK and Ireland. We have travelled to Europe when required. \n\nWe also offer a shop fitting services so we have a team with a wide range of skills. Carpenters, Plumbers, Electricians, Plasterers etc.",
+    "rating": 3,
+    "regions": [
+      "south-east"
+    ]
+  },
+  {
+    "id": "b59e0996-ba42-49dc-9316-3391afe0adb9",
+    "name": "Rob Winwood",
+    "company": "Signplicity",
+    "phone": "07931647657",
+    "email": "rob@signplicity.co.uk",
+    "address": "Evesham",
+    "notes": "We run a team of 60+ graphics installers across the UK covering the whole of the UK, Europe and the middle east. We can design, print, deliver and install small to large format signage and graphics. We also offer additional services like site surveys, temporary graphics, exhibition and event graphics and full stands from pop-ups to design and build custom fabrications.",
+    "rating": 3,
+    "regions": [
+      "west-midlands"
+    ]
+  },
+  {
+    "id": "84ddfcaf-c31f-4ae4-8c8a-3a51ecb1ddf5",
+    "name": "Ross Weir",
+    "company": "Dog House Installations",
+    "phone": "0779 2062 723",
+    "email": "ross@doghouseinstallations.co.uk",
+    "address": "33 Newmarket St, Ayr, KA7 1LP",
+    "notes": "Good but expensive",
+    "rating": 5,
+    "regions": [
+      "scotland"
+    ]
+  },
+  {
+    "id": "abd33404-98fb-4fb4-81cd-e5721317af69",
+    "name": "Ryan Whike",
+    "company": "Cassius Installations",
+    "phone": "07392670953",
+    "email": "info@cassius-installations.co.uk",
+    "address": "Leicester, England, United Kingdom",
+    "notes": "SSSTS - IPAF - PASMA - SPA - ASBESTOS AWARENESS - EFAW (First Aid) - NVQ LEVEL 2 IN SPECIALIST INSTALLATION OCCUPATIONS",
+    "rating": 3,
+    "regions": [
+      "east-midlands"
+    ]
+  },
+  {
+    "id": "24c58fc2-1477-4913-b735-a567018c330e",
+    "name": "Shaun Pickton",
+    "company": "Pickton Sign Services",
+    "phone": "07879771614",
+    "email": "install@picktonsignservices.co.uk",
+    "address": "Chelmsford, England, United Kingdom",
+    "notes": "Fully insured, CSCS, SSSTS, PASMA, IPAF & SPA Qualification, single and 2 man crews available",
+    "rating": 3,
+    "regions": [
+      "east-of-england"
+    ]
+  },
+  {
+    "id": "696a0ec4-31af-45d8-b262-ce9de07e4ddd",
+    "name": "Shaun Woodruff",
+    "company": "Sign-Fix Blackburn Ltd",
+    "phone": "07711 121543",
+    "email": "neonshaun@btinternet.com",
+    "address": "4 Hawthorne Close, Langho, Blackburn BB6 8DZ",
+    "notes": "",
+    "rating": 5,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "411b1df4-f7ed-4af3-b999-798a4b4122bc",
+    "name": "Stephen Burr",
+    "company": "Fusion Graphics Ltd",
+    "phone": "07786 035393",
+    "email": "info@fusiongraphicsltd.com",
+    "address": "79 Memorial Road, Hanham, Bristol BS15 3JQ",
+    "notes": "Chris @ SX Bristol recommends. The company has recently relocated to Bristol, though they still look after a number of clients in London and the South East.",
+    "rating": 3,
+    "regions": [
+      "south-west"
+    ]
+  },
+  {
+    "id": "850980b7-7453-4a86-ad9d-cf0de6172b86",
+    "name": "Steve Phillips",
+    "company": "Phillips & Bow LTD Sign and Graphics Specialists",
+    "phone": "07955236979",
+    "email": "phillipsandbowltd@outlook.com",
+    "address": "Greater Leeds Area",
+    "notes": "With a passion for the construction industry i went straight from school to obtain a NVQ level 2 in Joinery/ Shopfitting before switching  my skills to sign fitting. Now 15 years on i run 2 vans of vastly skilled Sign Installers based in Leeds. We take great pride in completing all installs to a top standard and i am forever interested in learning new skills to ensure i do the best possible job. I am always looking to widen my knowledge and connections within the industry so feel free to get in touch for any further background info, possible contracts i can assist on,  or just a general chat .",
+    "rating": 3,
+    "regions": [
+      "yorkshire-humber"
+    ]
+  },
+  {
+    "id": "765df294-c719-451c-8392-7df21bb23792",
+    "name": "Tito Mouriño",
+    "company": "Pedco Ltd",
+    "phone": "",
+    "email": "titomourino@btinternet.com",
+    "address": "Redditch, England, United Kingdom",
+    "notes": "Pedco Ltd knows  that a fantastically designed job is still not complete until it is successfully installed. I provide  full site surveys and installation services throughout the UK and internationally. All of which are carried out by my experienced crew of installation experts. Installation of graphics and signage is often time critical and Pedco Ltd recognises the need to work to deadlines with high end results. We are well equipped to handle all aspects of graphic installations and follow client instruction, specific guidelines and work in accordance to risk assessments and method statements. We work with Visual Merchandisers, Interior Designers & Architects, Graphic Designers, Marketing & Brand Managers, Exhibition Designers and Event Organisers to get graphic installed to a high end finish and in a timely manner.",
+    "rating": 3,
+    "regions": [
+      "west-midlands"
+    ]
+  },
+  {
+    "id": "5aa8a793-6317-4474-b11d-bf3828d25493",
+    "name": "Vincent Noonan",
+    "company": "Sapphire Graphics Limited",
+    "phone": "07974 955 514",
+    "email": "noonanvincent@sky.com",
+    "address": "14 Greenfield Road, Thornton-Cleveleys, Lancashire, England, FY5 3SS",
+    "notes": "Semi Retired",
+    "rating": 1,
+    "regions": [
+      "north-west"
+    ]
+  },
+  {
+    "id": "b9408c84-5bf4-479e-97fa-20c752b4499d",
+    "name": "William Dockerty",
+    "company": "M&R Installation's",
+    "phone": "07730 303003",
+    "email": "williamdockerty@googlemail.com",
+    "address": "Greater Manchester, England, United Kingdom",
+    "notes": "All CSCS Accredited / IPAF / PASMA",
+    "rating": 3,
+    "regions": [
+      "north-west"
+    ]
+  }
+]

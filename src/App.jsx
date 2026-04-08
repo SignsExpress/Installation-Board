@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import InstallerDirectoryHost from "./installer/InstallerDirectoryHost";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -70,9 +71,55 @@ function toInitials(name) {
     .join("");
 }
 
+function HostLandingPage({ currentUser, onLogout }) {
+  function goTo(path) {
+    window.location.assign(path);
+  }
+
+  return (
+    <div className="app-shell host-landing-shell">
+      <div className="page host-landing-page">
+        <section className="hero">
+          <div className="hero-brand">
+            <img className="hero-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+            <div className="hero-copy">
+              <p className="panel-kicker">Host home</p>
+              <h1>Choose a workspace</h1>
+              <p className="muted">Signed in as {currentUser.displayName}</p>
+            </div>
+          </div>
+          <div className="hero-user">
+            <button className="ghost-button" type="button" onClick={onLogout}>
+              Log out
+            </button>
+          </div>
+        </section>
+
+        <section className="panel host-landing-panel">
+          <div className="host-landing-actions">
+            <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
+              <span className="panel-kicker">Host only</span>
+              <strong>Subcontractor Installer Database</strong>
+              <p>Search, review and manage your subcontractor installer list.</p>
+            </button>
+
+            <button className="host-launch-card" type="button" onClick={() => goTo("/board")}>
+              <span className="panel-kicker">Shared board</span>
+              <strong>Installation Board</strong>
+              <p>Open the live installation calendar and manage upcoming jobs.</p>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const isClientRoute = pathname.startsWith("/client");
+  const isInstallerRoute = pathname.startsWith("/installer");
+  const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -104,7 +151,12 @@ export default function App() {
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
-  const isClientMode = isClientRoute || currentUser?.role === "client";
+  const isHostUser = currentUser?.role === "host";
+  const isClientUser = currentUser?.role === "client";
+  const isClientMode = isClientUser;
+  const showInstallerDirectory = Boolean(currentUser && isHostUser && isInstallerRoute);
+  const showBoard = Boolean(currentUser && (isClientUser || isBoardRoute));
+  const showHostLanding = Boolean(currentUser && isHostUser && !isInstallerRoute && !isBoardRoute);
 
   useEffect(() => {
     let active = true;
@@ -139,7 +191,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!currentUser) return undefined;
+    if (!currentUser || !showBoard) return undefined;
     let active = true;
 
     async function loadBoard() {
@@ -175,17 +227,22 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser]);
+  }, [currentUser, showBoard]);
 
   useEffect(() => {
     if (!currentUser) return;
     if (currentUser.role === "client" && !isClientRoute) {
       window.location.replace("/client");
+      return;
+    }
+
+    if (currentUser.role === "host" && isClientRoute) {
+      window.location.replace("/");
     }
   }, [currentUser, isClientRoute]);
 
   useEffect(() => {
-    if (!currentUser) return undefined;
+    if (!currentUser || !showBoard) return undefined;
     const stream = new EventSource("/api/events");
 
     function handleUpdate(event) {
@@ -206,7 +263,7 @@ export default function App() {
       stream.removeEventListener("board-updated", handleUpdate);
       stream.close();
     };
-  }, [currentUser]);
+  }, [currentUser, showBoard]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -294,6 +351,9 @@ export default function App() {
       if (payload.user?.role === "client" && !isClientRoute) {
         window.location.replace("/client");
         return;
+      }
+      if (payload.user?.role === "host" && isClientRoute) {
+        window.location.replace("/");
       }
     } catch (error) {
       console.error(error);
@@ -754,6 +814,14 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  if (showHostLanding) {
+    return <HostLandingPage currentUser={currentUser} onLogout={handleLogout} />;
+  }
+
+  if (showInstallerDirectory) {
+    return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} />;
   }
 
   return (
