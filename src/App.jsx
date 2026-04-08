@@ -21,7 +21,6 @@ const INSTALLER_OPTIONS = [
 ];
 
 const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
-const HOLIDAY_DURATIONS = ["Morning", "Afternoon", "Full Day"];
 const HOLIDAY_PERSON_COLORS = {
   "Matt R": "holiday-person-black",
   "Dawn D": "holiday-person-black",
@@ -88,7 +87,6 @@ export default function App() {
   const [dropDate, setDropDate] = useState("");
   const [activeHolidayDate, setActiveHolidayDate] = useState("");
   const [activeHolidayId, setActiveHolidayId] = useState("");
-  const [holidayForm, setHolidayForm] = useState({ person: STAFF_NAMES[0], duration: "Full Day" });
   const [jobModalDate, setJobModalDate] = useState("");
   const [activeClientJob, setActiveClientJob] = useState(null);
   const dragPreviewRef = useRef(null);
@@ -456,16 +454,17 @@ export default function App() {
     }
   }
 
-  async function saveHoliday(date) {
+  async function saveHoliday(date, person, duration = "Full Day", id) {
     if (isClientMode) return;
     try {
       const response = await fetch("/api/holidays", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id,
           date,
-          person: holidayForm.person,
-          duration: holidayForm.duration
+          person,
+          duration
         })
       });
       if (!response.ok) throw new Error("Could not save holiday.");
@@ -474,8 +473,7 @@ export default function App() {
       setBoard(payload.board);
       setJobs(payload.jobs);
       setHolidays(payload.holidays);
-      setMessage(createMessage("Holiday added.", "success"));
-      setHolidayForm({ person: STAFF_NAMES[0], duration: "Full Day" });
+      setMessage(createMessage("Holiday updated.", "success"));
     } catch (error) {
       console.error(error);
       setMessage(createMessage("Could not save holiday.", "error"));
@@ -499,40 +497,25 @@ export default function App() {
     }
   }
 
-  async function duplicateHolidayToDate(holidayId, nextDate) {
+  async function cycleHoliday(date, person) {
     if (isClientMode) return;
-    const holiday = holidaysById.get(holidayId);
-    if (!holiday || !nextDate) {
-      setDraggingHolidayId("");
-      setDropDate("");
+    const existing = holidays.find((item) => item.date === date && item.person === person);
+    if (!existing) {
+      await saveHoliday(date, person, "Full Day");
       return;
     }
 
-    try {
-      const response = await fetch("/api/holidays", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: nextDate,
-          person: holiday.person,
-          duration: holiday.duration
-        })
-      });
-      if (!response.ok) throw new Error("Could not duplicate holiday.");
-
-      const payload = await response.json();
-      setBoard(payload.board);
-      setJobs(payload.jobs);
-      setHolidays(payload.holidays);
-      setMessage(createMessage("Holiday copied.", "success"));
-    } catch (error) {
-      console.error(error);
-      setMessage(createMessage("Could not duplicate holiday.", "error"));
-    } finally {
-      setDraggingHolidayId("");
-      setDropDate("");
-      clearDragPreview();
+    if (existing.duration === "Full Day") {
+      await saveHoliday(date, person, "Morning", existing.id);
+      return;
     }
+
+    if (existing.duration === "Morning") {
+      await saveHoliday(date, person, "Afternoon", existing.id);
+      return;
+    }
+
+    await deleteHoliday(existing.id);
   }
 
   async function handleManualRefresh() {
@@ -582,7 +565,6 @@ export default function App() {
 
                     <div className="board-header">
                       <div>Date</div>
-                      <div>Holidays</div>
                       <div>Jobs</div>
                     </div>
 
@@ -612,11 +594,6 @@ export default function App() {
                             duplicateJobToDate(duplicateJobId || duplicatingJobId, row.isoDate);
                             return;
                           }
-                          const holidayId = event.dataTransfer.getData("holiday-copy");
-                          if (holidayId || draggingHolidayId) {
-                            duplicateHolidayToDate(holidayId || draggingHolidayId, row.isoDate);
-                            return;
-                          }
                           const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
                           moveJobToDate(jobId, row.isoDate);
                         }}
@@ -624,11 +601,17 @@ export default function App() {
                         <button
                           type="button"
                           className="date-cell"
-                          onClick={() => setForm((current) => ({ ...current, date: row.isoDate }))}
+                          onClick={() => {
+                            if (!isClientMode) {
+                              setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate));
+                            }
+                          }}
                           title={row.fullDateLabel}
                         >
-                          <span className="date-day">{row.dayLabel}</span>
-                          <strong className="date-number">{row.dayNumber}</strong>
+                          <div className="date-heading">
+                            <span className="date-day">{row.dayLabel}</span>
+                            <strong className="date-number">{row.dayNumber}</strong>
+                          </div>
                           {isClientMode && row.staffHolidays.length ? (
                             <div className="mobile-holiday-inline">
                               {row.staffHolidays.map((holiday) => (
@@ -639,102 +622,32 @@ export default function App() {
                               ))}
                             </div>
                           ) : null}
-                        </button>
-
-                        <div className="holiday-cell" onClick={() => setActiveHolidayDate((current) => (current === row.isoDate ? "" : row.isoDate))}>
-                          <div className="holiday-stack">
-                            {row.bankHoliday ? <span className="holiday-pill">{row.bankHoliday}</span> : null}
-                            {row.staffHolidays.length ? (
-                              <div className="holiday-grid">
-                                {row.staffHolidays.map((holiday) => (
-                                  (() => {
-                                    const durationLabel =
-                                      holiday.duration === "Morning" ? "AM" : holiday.duration === "Afternoon" ? "PM" : "";
-                                    return (
+                          {!isClientMode ? (
+                            <div className="date-holiday-controls" onClick={(event) => event.stopPropagation()}>
+                              {STAFF_NAMES.map((name) => {
+                                const existing = row.staffHolidays.find((holiday) => holiday.person === name);
+                                const durationLabel =
+                                  existing?.duration === "Morning"
+                                    ? ".AM"
+                                    : existing?.duration === "Afternoon"
+                                      ? ".PM"
+                                      : "";
+                                const initials = toInitials(name);
+                                return (
                                   <button
-                                    key={holiday.id}
+                                    key={`${row.isoDate}-${name}`}
                                     type="button"
-                                    className={`staff-holiday-pill ${getHolidayPersonColor(holiday.person)} ${activeHolidayId === holiday.id ? "active" : ""}`}
-                                    onClick={(event) => {
-                                      if (isClientMode) return;
-                                      event.stopPropagation();
-                                      setActiveHolidayDate(row.isoDate);
-                                      setActiveHolidayId((current) => (current === holiday.id ? "" : holiday.id));
-                                    }}
+                                    className={`date-holiday-chip ${getHolidayPersonColor(name)} ${existing ? "active" : ""}`}
+                                    onClick={() => cycleHoliday(row.isoDate, name)}
                                   >
-                                    <span>{holiday.person}</span>
-                                    {durationLabel ? <b>{durationLabel}</b> : null}
-                                    <span
-                                      className="holiday-duplicate"
-                                      draggable={!isClientMode}
-                                      onDragStart={(event) => {
-                                        if (isClientMode) return;
-                                        event.stopPropagation();
-                                        event.dataTransfer.setData("holiday-copy", holiday.id);
-                                        event.dataTransfer.effectAllowed = "copy";
-                                        const preview = buildDragPreview(event.currentTarget.closest(".staff-holiday-pill"));
-                                        dragPreviewRef.current = preview;
-                                        dragPositionRef.current = { x: event.clientX, y: event.clientY };
-                                        preview.style.left = `${event.clientX + 18}px`;
-                                        preview.style.top = `${event.clientY + 18}px`;
-                                        event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                                        setDraggingHolidayId(holiday.id);
-                                      }}
-                                      onDragEnd={() => {
-                                        if (isClientMode) return;
-                                        setDraggingHolidayId("");
-                                        setDropDate("");
-                                        clearDragPreview();
-                                      }}
-                                      title="Drag to copy"
-                                    >
-                                      +
-                                    </span>
+                                    {initials}{durationLabel}
                                   </button>
-                                    );
-                                  })()
-                                ))}
-                              </div>
-                            ) : null}
-                            {!row.bankHoliday && row.staffHolidays.length === 0 ? <span className="muted">{isClientMode ? "-" : "Click to add holiday"}</span> : null}
-                            {!isClientMode && activeHolidayDate === row.isoDate && activeHolidayId ? (
-                              <div className="holiday-entry-actions" onClick={(event) => event.stopPropagation()}>
-                                <button className="danger-inline-button" type="button" onClick={() => { deleteHoliday(activeHolidayId); setActiveHolidayId(""); }}>
-                                  Delete Selected
-                                </button>
-                              </div>
-                            ) : null}
-                            {!isClientMode && activeHolidayDate === row.isoDate ? (
-                              <div className="holiday-editor" onClick={(event) => event.stopPropagation()}>
-                                <label>
-                                  Name
-                                  <select value={holidayForm.person} onChange={(event) => setHolidayForm((current) => ({ ...current, person: event.target.value }))}>
-                                    {STAFF_NAMES.map((name) => (
-                                      <option key={name} value={name}>
-                                        {name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                                <div className="duration-group">
-                                  {HOLIDAY_DURATIONS.map((duration) => (
-                                    <button
-                                      key={duration}
-                                      type="button"
-                                      className={`duration-button ${holidayForm.duration === duration ? "active" : ""}`}
-                                      onClick={() => setHolidayForm((current) => ({ ...current, duration }))}
-                                    >
-                                      {duration}
-                                    </button>
-                                  ))}
-                                </div>
-                                <button className="ghost-button holiday-save" type="button" onClick={() => saveHoliday(row.isoDate)}>
-                                  Add Holiday
-                                </button>
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                          {!isClientMode && row.bankHoliday ? <span className="date-bank-holiday">{row.bankHoliday}</span> : null}
+                        </button>
 
                         <div className="jobs-cell">
                           <button
