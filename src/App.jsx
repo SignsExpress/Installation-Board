@@ -263,10 +263,17 @@ export default function App() {
       const query = String(searchTerm || "").trim();
       const url = query ? `/api/corebridge/orders?q=${encodeURIComponent(query)}` : "/api/corebridge/orders";
       const response = await fetch(url);
-      const payload = await response.json();
+      const raw = await response.text();
+      let payload = {};
+
+      try {
+        payload = raw ? JSON.parse(raw) : {};
+      } catch (error) {
+        throw new Error("CoreBridge returned an invalid response.");
+      }
 
       if (!response.ok) {
-        throw new Error(payload.error || "Could not load CoreBridge orders.");
+        throw new Error(payload.detail || payload.error || "Could not load CoreBridge orders.");
       }
 
       setOrderLookupResults(Array.isArray(payload.orders) ? payload.orders : []);
@@ -281,9 +288,7 @@ export default function App() {
 
   async function openOrderLookup() {
     setOrderLookupOpen(true);
-    if (!orderLookupResults.length && !orderLookupLoading) {
-      await searchCoreBridgeOrders("");
-    }
+    setOrderLookupError("");
   }
 
   function applyCoreBridgeOrder(order) {

@@ -612,7 +612,20 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
       }
 
       const contentType = String(response.headers.get("content-type") || "");
-      const body = contentType.includes("application/json") ? await response.json() : JSON.parse(await response.text());
+      const rawBody = await response.text();
+      if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+        attempts.push(`HTML ${plan.url}`);
+        continue;
+      }
+
+      let body;
+      try {
+        body = contentType.includes("application/json") ? JSON.parse(rawBody) : JSON.parse(rawBody);
+      } catch (error) {
+        attempts.push(`NONJSON ${plan.url}`);
+        continue;
+      }
+
       const records = extractCoreBridgeRecords(body);
       const orders = filterCoreBridgeOrders(records.map(normalizeCoreBridgeOrder), normalizedSearch).filter(
         (order) => order.orderReference || order.customerName
