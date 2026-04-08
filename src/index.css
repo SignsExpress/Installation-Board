@@ -180,9 +180,9 @@ button {
 }
 
 .auth-panel {
-  width: min(460px, 100%);
+  width: min(520px, 100%);
   margin: 0 auto;
-  padding: 30px 28px 30px;
+  padding: 34px 40px 34px;
   border-radius: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 247, 252, 0.96) 100%);
@@ -194,6 +194,8 @@ button {
 
 .auth-form {
   gap: 16px;
+  max-width: 360px;
+  margin: 0 auto;
 }
 
 .auth-brand {
