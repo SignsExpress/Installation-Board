@@ -875,10 +875,16 @@ function buildAddressFromAliases(flatRecord, aliasesByLine) {
     .join(", ");
 }
 
+function getCoreBridgeRoles(record) {
+  if (Array.isArray(record?.ContactRoles)) return record.ContactRoles;
+  if (Array.isArray(record?.OrderContactRoles)) return record.OrderContactRoles;
+  return [];
+}
+
 function listFlatContactRoleIndexes(flatRecord) {
   const indexes = new Set();
   for (const key of Object.keys(flatRecord || {})) {
-    const match = key.match(/^contactroles\.(\d+)\./);
+    const match = key.match(/^(?:contactroles|ordercontactroles)\.(\d+)\./);
     if (match) {
       indexes.add(Number(match[1]));
     }
@@ -886,9 +892,9 @@ function listFlatContactRoleIndexes(flatRecord) {
   return Array.from(indexes).sort((left, right) => left - right);
 }
 
-function listFlatRoleLocatorIndexes(flatRecord, roleIndex) {
+function listFlatRoleLocatorIndexes(flatRecord, rolePrefix, roleIndex) {
   const indexes = new Set();
-  const pattern = new RegExp(`^contactroles\\.${roleIndex}\\.ordercontactrolelocators\\.(\\d+)\\.`);
+  const pattern = new RegExp(`^${rolePrefix}\\.${roleIndex}\\.ordercontactrolelocators\\.(\\d+)\\.`);
 
   for (const key of Object.keys(flatRecord || {})) {
     const match = key.match(pattern);
@@ -900,23 +906,23 @@ function listFlatRoleLocatorIndexes(flatRecord, roleIndex) {
   return Array.from(indexes).sort((left, right) => left - right);
 }
 
-function buildFlatContactRoleAddress(flatRecord, roleIndex) {
-  const locatorIndexes = listFlatRoleLocatorIndexes(flatRecord, roleIndex);
+function buildFlatContactRoleAddress(flatRecord, rolePrefix, roleIndex) {
+  const locatorIndexes = listFlatRoleLocatorIndexes(flatRecord, rolePrefix, roleIndex);
 
   for (const locatorIndex of locatorIndexes) {
     const locatorType = String(
-      flatRecord[`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.locatortype`] || ""
+      flatRecord[`${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.locatortype`] || ""
     ).trim();
     if (locatorType !== "1") continue;
 
     const address = buildAddressFromAliases(flatRecord, [
-      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street1`],
-      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street2`],
-      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.city`],
-      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.state`],
+      [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street1`],
+      [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street2`],
+      [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.city`],
+      [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.state`],
       [
-        `contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postalcode`,
-        `contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postcode`
+        `${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postalcode`,
+        `${rolePrefix}.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postcode`
       ]
     ]);
 
@@ -924,34 +930,39 @@ function buildFlatContactRoleAddress(flatRecord, roleIndex) {
   }
 
   return buildAddressFromAliases(flatRecord, [
-    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.street1`],
-    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.street2`],
-    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.city`],
-    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.state`],
+    [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.street1`],
+    [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.street2`],
+    [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.city`],
+    [`${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.state`],
     [
-      `contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.postalcode`,
-      `contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.postcode`
+      `${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.postalcode`,
+      `${rolePrefix}.${roleIndex}.ordercontactrolelocators.0.metadata.postcode`
     ]
   ]);
 }
 
 function pickDestinationAddressFromFlat(flatRecord) {
   const indexes = listFlatContactRoleIndexes(flatRecord);
+  const rolePrefixes = ["contactroles", "ordercontactroles"];
 
-  for (const index of indexes) {
-    const roleType = String(flatRecord[`contactroles.${index}.roletype`] || "").toLowerCase();
-    const destinationId = String(flatRecord[`contactroles.${index}.destinationid`] || "").trim();
-    const address = buildFlatContactRoleAddress(flatRecord, index);
-    if (roleType === "shipto" && destinationId && address) {
-      return address;
+  for (const rolePrefix of rolePrefixes) {
+    for (const index of indexes) {
+      const roleType = String(flatRecord[`${rolePrefix}.${index}.roletype`] || "").toLowerCase();
+      const destinationId = String(flatRecord[`${rolePrefix}.${index}.destinationid`] || "").trim();
+      const address = buildFlatContactRoleAddress(flatRecord, rolePrefix, index);
+      if (roleType === "shipto" && destinationId && address) {
+        return address;
+      }
     }
   }
 
-  for (const index of indexes) {
-    const destinationId = String(flatRecord[`contactroles.${index}.destinationid`] || "").trim();
-    const address = buildFlatContactRoleAddress(flatRecord, index);
-    if (destinationId && address) {
-      return address;
+  for (const rolePrefix of rolePrefixes) {
+    for (const index of indexes) {
+      const destinationId = String(flatRecord[`${rolePrefix}.${index}.destinationid`] || "").trim();
+      const address = buildFlatContactRoleAddress(flatRecord, rolePrefix, index);
+      if (destinationId && address) {
+        return address;
+      }
     }
   }
 
@@ -959,7 +970,7 @@ function pickDestinationAddressFromFlat(flatRecord) {
 }
 
 function pickPreferredCoreBridgeContactRole(record) {
-  const roles = Array.isArray(record?.ContactRoles) ? record.ContactRoles : [];
+  const roles = getCoreBridgeRoles(record);
   if (!roles.length) return null;
 
   return (
@@ -970,7 +981,7 @@ function pickPreferredCoreBridgeContactRole(record) {
 }
 
 function pickDestinationCoreBridgeRole(record) {
-  const roles = Array.isArray(record?.ContactRoles) ? record.ContactRoles : [];
+  const roles = getCoreBridgeRoles(record);
   if (!roles.length) return null;
 
   const hasAddressMetadata = (role) =>
@@ -1155,6 +1166,7 @@ function pickBestCoreBridgeAddress(flatRecord) {
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
   const preferredRole = pickPreferredCoreBridgeContactRole(record);
+  const destinationRole = pickDestinationCoreBridgeRole(record);
   const directDescription = String(
     record?.SE_EstimateDescription ||
     record?.EstimateDescription ||
@@ -1162,7 +1174,10 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
-  const destinationRoleAddress = pickDestinationAddressFromFlat(flat);
+  const destinationRoleAddress =
+    buildAddressFromRole(destinationRole) ||
+    buildAddressFromRole(preferredRole) ||
+    pickDestinationAddressFromFlat(flat);
   const preferredRolePhone = buildPhoneFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
     "contactroles.0.ordercontactrolelocators.1.locator",
