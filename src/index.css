@@ -431,30 +431,16 @@ button {
 }
 
 .week-header {
-  padding: 14px 18px;
+  padding: 12px 18px;
   background: rgba(95, 60, 116, 0.08);
   align-items: center;
 }
 
-.week-header span {
-  color: #64748b;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-size: 0.72rem;
-}
-
 .week-header strong {
-  grid-column: 2 / 3;
+  grid-column: 1 / -1;
   font-size: 1.05rem;
 }
 
-.board-header {
-  background: rgba(255, 255, 255, 0.72);
-  font-weight: 700;
-  color: #334155;
-}
-
-.board-header > div,
 .jobs-cell {
   padding: 12px 14px;
 }
@@ -473,6 +459,15 @@ button {
 
 .board-row.is-today {
   background: rgba(95, 60, 116, 0.08);
+}
+
+.board-row.is-bank-holiday {
+  background: rgba(219, 234, 254, 0.9);
+}
+
+.board-row.is-bank-holiday .date-cell,
+.board-row.is-bank-holiday .jobs-cell {
+  background: transparent;
 }
 
 .board-row.is-past .date-cell {
@@ -983,17 +978,12 @@ button {
 
   .split-fields,
   .week-header,
-  .board-header,
   .board-row {
     grid-template-columns: 1fr;
   }
 
   .week-header strong {
     grid-column: auto;
-  }
-
-  .board-header {
-    display: none;
   }
 
   .date-cell {

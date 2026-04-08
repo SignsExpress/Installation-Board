@@ -566,14 +566,8 @@ export default function App() {
                 {board.weeks.map((week) => (
                   <section key={week.id} className="week-block">
                     <header className="week-header">
-                      <span>Week</span>
                       <strong>{week.label}</strong>
                     </header>
-
-                    <div className="board-header">
-                      <div>Date</div>
-                      <div>Jobs</div>
-                    </div>
 
                     {week.rows.map((row) => (
                       <article
@@ -581,7 +575,7 @@ export default function App() {
                         className={[
                           "board-row",
                           row.isToday ? "is-today" : "",
-                          row.bankHoliday || row.staffHolidays.length ? "is-holiday" : "",
+                          row.bankHoliday ? "is-bank-holiday" : "",
                           row.isPast ? "is-past" : "",
                           dropDate === row.isoDate ? "is-drop-target" : ""
                         ].join(" ").trim()}
