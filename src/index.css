@@ -1305,6 +1305,551 @@ button {
   gap: 8px;
 }
 
+.installer-host-view .page {
+  max-width: 1680px;
+}
+
+.installer-host-view .hero {
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.installer-host-view .hero-user {
+  margin-left: auto;
+}
+
+.installer-host-view .workspace-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.88fr);
+  align-items: stretch;
+}
+
+.installer-host-view .card {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+  border-radius: 32px;
+  padding: 20px;
+}
+
+.installer-host-view .card-large {
+  min-width: 0;
+}
+
+.installer-host-view .map-panel-card,
+.installer-host-view .contacts-panel-card {
+  height: calc(100dvh - 36px);
+}
+
+.installer-host-view .map-panel-card {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.installer-host-view .contacts-panel-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.installer-host-view .contacts-panel-head {
+  margin-bottom: 10px;
+}
+
+.installer-host-view .contacts-scroll-area {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.installer-host-view .contacts-list-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.installer-host-view .finder-box {
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 22px;
+  background: #f8fafc;
+  border: 1px solid #dbe2ea;
+}
+
+.installer-host-view .finder-box label,
+.installer-host-view .installer-form label,
+.installer-host-view .field-label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.installer-host-view .lookup-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.installer-host-view .lookup-row input,
+.installer-host-view .search-box input,
+.installer-host-view .installer-form input,
+.installer-host-view .installer-form textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #0f172a;
+  font-family: inherit;
+}
+
+.installer-host-view .lookup-row input,
+.installer-host-view .installer-form input,
+.installer-host-view .installer-form textarea {
+  border-radius: 18px;
+  padding: 11px 14px;
+}
+
+.installer-host-view .search-box {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  padding: 0 15px;
+  background: white;
+  min-height: 46px;
+}
+
+.installer-host-view .search-box input {
+  flex: 1;
+  border: none;
+  outline: none;
+  min-height: 44px;
+  background: transparent;
+  padding: 0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.installer-host-view .search-box:focus-within,
+.installer-host-view .lookup-row input:focus,
+.installer-host-view .installer-form input:focus,
+.installer-host-view .installer-form textarea:focus {
+  outline: none;
+  border-color: #b39ac1;
+  box-shadow: 0 0 0 4px rgba(95, 60, 116, 0.14);
+}
+
+.installer-host-view .lookup-message {
+  margin-top: 10px;
+  color: var(--sx-main);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.installer-host-view .map-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.installer-host-view .map-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.installer-host-view .map-shell {
+  position: relative;
+  min-height: 0;
+  height: 100%;
+  border-radius: 26px;
+  background: linear-gradient(180deg, #faf8fb 0%, #efebf2 100%);
+  padding: 16px 10px 10px;
+  overflow: hidden;
+}
+
+.installer-host-view .map-shell-logo {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 126px;
+  max-width: 26%;
+  height: auto;
+  z-index: 2;
+  opacity: 0.96;
+}
+
+.installer-host-view .map-markup {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.installer-host-view .map-markup svg {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.installer-host-view .side-panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.installer-host-view .region-list,
+.installer-host-view .chip-grid,
+.installer-host-view .tag-list,
+.installer-host-view .contact-list,
+.installer-host-view .form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.installer-host-view .region-list {
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.installer-host-view .region-button,
+.installer-host-view .chip-button {
+  border: none;
+  transition: 0.18s ease;
+}
+
+.installer-host-view .region-button {
+  width: 100%;
+  border-radius: 16px;
+  padding: 7px 10px;
+  background: #f1f5f9;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.installer-host-view .trail-region-button {
+  margin-top: 6px;
+}
+
+.installer-host-view .region-count {
+  color: var(--sx-main);
+}
+
+.installer-host-view .region-count.is-zero {
+  color: #bfaed0;
+}
+
+.installer-host-view .region-button.active,
+.installer-host-view .chip-button.active {
+  background: #ece4f1;
+  color: var(--sx-main);
+}
+
+.installer-host-view .region-button:hover,
+.installer-host-view .chip-button:hover {
+  background: #e2e8f0;
+}
+
+.installer-host-view .installer-form {
+  display: grid;
+  gap: 12px;
+}
+
+.installer-host-view .request-form-card {
+  padding: 18px 20px;
+}
+
+.installer-host-view .request-panel {
+  margin-bottom: 14px;
+  border-radius: 22px;
+  background: #f7f3f8;
+  border: 1px solid var(--sx-main-border);
+  padding: 14px;
+}
+
+.installer-host-view .request-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--sx-main-text);
+}
+
+.installer-host-view .request-list {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.installer-host-view .request-item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--sx-main-border);
+  background: white;
+  color: #1f2937;
+  border-radius: 16px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.installer-host-view .request-item span {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.installer-host-view .split {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.installer-host-view .chip-button {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+}
+
+.installer-host-view .filter-bar {
+  gap: 8px;
+}
+
+.installer-host-view .contacts-filter-bar,
+.installer-host-view .compact-chip-grid {
+  gap: 8px;
+}
+
+.installer-host-view .contacts-filter-bar .chip-button,
+.installer-host-view .compact-chip-grid .chip-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.installer-host-view .toolbar-block {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.installer-host-view .toolbar-top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.installer-host-view .toolbar-inline-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.installer-host-view .inline-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.installer-host-view .show-by-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.installer-host-view .inline-chip-grid {
+  gap: 6px;
+}
+
+.installer-host-view .installer-card {
+  border: 1px solid #dbe2ea;
+  border-radius: 24px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  background: #fff;
+  min-width: 0;
+}
+
+.installer-host-view .compact-installer-card {
+  border-radius: 18px;
+  padding: 10px 11px;
+  gap: 8px;
+}
+
+.installer-host-view .compact-installer-card h3 {
+  font-size: 0.95rem;
+}
+
+.installer-host-view .compact-installer-card p {
+  margin: 1px 0 4px;
+  font-size: 12px;
+}
+
+.installer-host-view .installer-main {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  min-width: 0;
+}
+
+.installer-host-view .installer-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.installer-host-view .tag,
+.installer-host-view .badge {
+  background: #f1f5f9;
+  color: #334155;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  border-radius: 18px;
+}
+
+.installer-host-view .compact-tag-list {
+  gap: 6px;
+  min-width: 0;
+}
+
+.installer-host-view .compact-tag-list .tag {
+  font-size: 11px;
+  padding: 5px 8px;
+  min-height: 28px;
+}
+
+.installer-host-view .active-tag {
+  background: #e6dceb;
+  color: var(--sx-main);
+}
+
+.installer-host-view .contact-list {
+  display: grid;
+}
+
+.installer-host-view .compact-contact-list {
+  gap: 6px;
+}
+
+.installer-host-view .compact-contact-list div {
+  font-size: 11px;
+  gap: 6px;
+  min-width: 0;
+}
+
+.installer-host-view .compact-contact-list span {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.installer-host-view .showing-pill {
+  min-width: 108px;
+}
+
+.installer-host-view .star-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.installer-host-view .star-button {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.installer-host-view .star-value {
+  margin-left: 6px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.installer-host-view .mini-clear {
+  border: 1px solid #cbd5e1;
+  background: white;
+  color: #334155;
+  border-radius: 999px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.installer-host-view .compact-card-actions {
+  gap: 8px;
+}
+
+.installer-host-view .compact-card-actions .ghost-button,
+.installer-host-view .compact-card-actions .danger-button {
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.installer-host-view .empty-state {
+  padding: 42px 20px;
+  text-align: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 20px;
+  color: #64748b;
+}
+
+.installer-host-view .compact-empty-state {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+}
+
 @media (max-width: 1120px) {
   .layout,
   .hero {
@@ -1328,6 +1873,22 @@ button {
 
   .auth-panel {
     padding: 30px 24px;
+  }
+
+  .installer-host-view .workspace-grid,
+  .installer-host-view .map-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .installer-host-view .map-panel-card,
+  .installer-host-view .contacts-panel-card {
+    min-height: auto;
+    height: auto;
+  }
+
+  .installer-host-view .contacts-scroll-area {
+    overflow: visible;
+    padding-right: 0;
   }
 }
 
@@ -1385,6 +1946,13 @@ button {
   }
 
   .installer-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .installer-host-view .toolbar-top-row,
+  .installer-host-view .contacts-list-grid,
+  .installer-host-view .split,
+  .installer-host-view .lookup-row {
     grid-template-columns: 1fr;
   }
 }

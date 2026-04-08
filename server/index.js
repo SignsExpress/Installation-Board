@@ -18,6 +18,7 @@ const DEV_FRONTEND_PORT = Number(process.env.DEV_FRONTEND_PORT || 5173);
 const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers.json");
+const DEFAULT_REQUESTS_FILE = path.join(__dirname, "..", "data", "requests.json");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
@@ -57,6 +58,18 @@ function getInstallersFile() {
   }
 
   return DEFAULT_INSTALLERS_FILE;
+}
+
+function getRequestsFile() {
+  if (process.env.REQUESTS_FILE) {
+    return process.env.REQUESTS_FILE;
+  }
+
+  if (process.env.DATA_FILE) {
+    return path.join(path.dirname(process.env.DATA_FILE), "requests.json");
+  }
+
+  return DEFAULT_REQUESTS_FILE;
 }
 
 function parseCookies(headerValue) {
@@ -152,6 +165,14 @@ function ensureInstallersFile() {
   }
 }
 
+function ensureRequestsFile() {
+  const file = getRequestsFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, `${JSON.stringify([], null, 2)}\n`, "utf8");
+  }
+}
+
 async function readStore() {
   ensureStoreFile();
   const raw = await fsp.readFile(getDataFile(), "utf8");
@@ -207,6 +228,28 @@ async function writeInstallersStore(installers) {
   );
   await fsp.writeFile(getInstallersFile(), `${JSON.stringify(nextInstallers, null, 2)}\n`, "utf8");
   return nextInstallers;
+}
+
+async function readRequestsStore() {
+  ensureRequestsFile();
+  const raw = await fsp.readFile(getRequestsFile(), "utf8");
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error("Invalid requests store JSON, returning empty list.", error);
+    return [];
+  }
+}
+
+async function writeRequestsStore(requests) {
+  ensureRequestsFile();
+  const nextRequests = [...requests].sort((left, right) =>
+    String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
+  );
+  await fsp.writeFile(getRequestsFile(), `${JSON.stringify(nextRequests, null, 2)}\n`, "utf8");
+  return nextRequests;
 }
 
 function makeId() {
@@ -467,6 +510,14 @@ function sanitizeInstaller(payload) {
     tags: Array.isArray(payload.tags)
       ? payload.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
       : [],
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeRequest(payload) {
+  return {
+    ...sanitizeInstaller(payload),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -818,6 +869,7 @@ async function fetchCoreBridgeOrders(searchTerm = "") {
 function createServer() {
   ensureStoreFile();
   ensureInstallersFile();
+  ensureRequestsFile();
   ensureUsersFile();
   bootstrapPasswordsFromEnv()
     .then((result) => {
@@ -921,6 +973,21 @@ function createServer() {
     response.json(await readInstallersStore());
   });
 
+  app.get("/api/installers/status", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    const installers = await readInstallersStore();
+    const requests = await readRequestsStore();
+    response.json({
+      installers: installers.length,
+      requests: requests.length
+    });
+  });
+
+  app.get("/api/requests", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    response.json(await readRequestsStore());
+  });
+
   app.get("/api/corebridge/orders", async (request, response) => {
     if (!requireHost(request, response)) return;
     try {
@@ -1002,11 +1069,40 @@ function createServer() {
     response.json(await writeInstallersStore(installers));
   });
 
+  app.post("/api/requests", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    const nextRequest = sanitizeRequest(request.body || {});
+
+    if (!nextRequest.name && !nextRequest.company) {
+      response.status(400).json({ error: "A company or contact name is required." });
+      return;
+    }
+
+    const requests = await readRequestsStore();
+    const index = requests.findIndex((requestItem) => requestItem.id === nextRequest.id);
+
+    if (index >= 0) {
+      nextRequest.createdAt = requests[index].createdAt || nextRequest.createdAt;
+      requests[index] = nextRequest;
+    } else {
+      requests.unshift(nextRequest);
+    }
+
+    response.json(await writeRequestsStore(requests));
+  });
+
   app.delete("/api/installers/:id", async (request, response) => {
     if (!requireHost(request, response)) return;
     const installers = await readInstallersStore();
     const filtered = installers.filter((installer) => installer.id !== request.params.id);
     response.json(await writeInstallersStore(filtered));
+  });
+
+  app.delete("/api/requests/:id", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    const requests = await readRequestsStore();
+    const filtered = requests.filter((requestItem) => requestItem.id !== request.params.id);
+    response.json(await writeRequestsStore(filtered));
   });
 
   app.get("/api/holidays", async (request, response) => {

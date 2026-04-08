@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import InstallerDirectoryHost from "./installer/InstallerDirectoryHost";
+import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },

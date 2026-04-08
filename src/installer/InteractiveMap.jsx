@@ -82,6 +82,7 @@ export default function InteractiveMap({
 
   return (
     <div className="map-shell">
+      <img className="map-shell-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
       <div ref={mapRef} className="map-markup" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
     </div>
   );
