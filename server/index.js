@@ -688,7 +688,10 @@ function pickFirst(flatRecord, aliases) {
 function looksLikePhone(value) {
   const normalized = String(value || "").trim();
   if (!normalized) return false;
+  if (/^\d{4}-\d{2}-\d{2}t\d{2}:\d{2}:\d{2}/i.test(normalized)) return false;
+  if (normalized.includes(":")) return false;
   if (/[A-Za-z]{3,}/.test(normalized)) return false;
+  if (!/^[\d\s+().\-\/&]+$/.test(normalized)) return false;
 
   const digits = normalized.replace(/\D/g, "");
   return digits.length >= 7;
@@ -711,25 +714,107 @@ function pickMatchingValue(flatRecord, matcher) {
   return "";
 }
 
+function isGenericCoreBridgeDescription(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return true;
+
+  return [
+    "courier",
+    "delivery",
+    "install",
+    "installation",
+    "survey",
+    "labor",
+    "labour",
+    "work sheet labor",
+    "worksheet labor",
+    "work sheet labour",
+    "worksheet labour"
+  ].includes(normalized);
+}
+
 function pickBestCoreBridgeDescription(flatRecord) {
-  return pickFirst(flatRecord, [
+  const aliases = [
     "estimatedescription",
     "estimate.description",
-    "headerdescription",
-    "transactiondescription",
-    "description",
+    "estimateheader.description",
+    "estimateheader.displayname",
+    "projectdescription",
+    "projectname",
     "jobdescription",
     "title",
     "summary",
-    "projectdescription",
+    "subject",
+    "displayname",
+    "headerdescription",
+    "transactiondescription",
+    "destinations.0.displayname",
+    "simpledestinations.0.displayname",
+    "items.0.displayname",
     "items.0.description",
     "items.0.invoicetext",
+    "description",
     "items.0.name",
     "name"
-  ]);
+  ];
+
+  let fallback = "";
+  for (const alias of aliases) {
+    const value = flatRecord[alias.toLowerCase()];
+    if (!value) continue;
+    if (!isGenericCoreBridgeDescription(value)) return value;
+    if (!fallback) fallback = value;
+  }
+
+  const scanned = pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (
+      normalizedKey.includes("company") ||
+      normalizedKey.includes("contact") ||
+      normalizedKey.includes("locator") ||
+      normalizedKey.includes("status") ||
+      normalizedKey.includes("type")
+    ) {
+      return false;
+    }
+
+    if (
+      normalizedKey.includes("description") ||
+      normalizedKey.includes("displayname") ||
+      normalizedKey.includes("title") ||
+      normalizedKey.includes("summary") ||
+      normalizedKey.includes("subject") ||
+      normalizedKey.includes("project") ||
+      normalizedKey.includes("name")
+    ) {
+      return !isGenericCoreBridgeDescription(value) && String(value).trim().length > 6;
+    }
+
+    return false;
+  });
+
+  return scanned || fallback;
 }
 
 function pickBestCoreBridgePhone(flatRecord) {
+  const contactRoleLocatorPhone = pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (!normalizedKey.includes("contactroles.0") || !normalizedKey.endsWith(".locator")) return false;
+    if (!looksLikePhone(value)) return false;
+
+    const baseKey = normalizedKey.slice(0, -".locator".length);
+    const subType =
+      flatRecord[`${baseKey}.locatorsubtypenavigation.name`] ||
+      flatRecord[`${baseKey}.locatortypenavigation.name`] ||
+      flatRecord[`${baseKey}.locatorsubtype`] ||
+      flatRecord[`${baseKey}.locatortype`] ||
+      "";
+
+    return /phone|mobile|tel|cell/i.test(String(subType));
+  });
+
+  if (contactRoleLocatorPhone) return contactRoleLocatorPhone;
+
   const directPhone = pickFirstPhone(flatRecord, [
     "phone",
     "telephone",
