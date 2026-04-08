@@ -172,7 +172,10 @@ function ensureInstallersFile() {
   const file = getInstallersFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify([], null, 2)}\n`, "utf8");
+    const seedInstallers = fs.existsSync(DEFAULT_INSTALLERS_FILE)
+      ? fs.readFileSync(DEFAULT_INSTALLERS_FILE, "utf8")
+      : "[]\n";
+    fs.writeFileSync(file, seedInstallers, "utf8");
   }
 }
 
@@ -180,7 +183,10 @@ function ensureRequestsFile() {
   const file = getRequestsFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify([], null, 2)}\n`, "utf8");
+    const seedRequests = fs.existsSync(DEFAULT_REQUESTS_FILE)
+      ? fs.readFileSync(DEFAULT_REQUESTS_FILE, "utf8")
+      : "[]\n";
+    fs.writeFileSync(file, seedRequests, "utf8");
   }
 }
 
