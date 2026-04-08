@@ -1470,6 +1470,115 @@ async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   return getCoreBridgeDestinationAddressFromRecord(detailRecord) || inlineAddress;
 }
 
+async function fetchCoreBridgeOrderDestinationDebug(config, orderId) {
+  const destinationUrl = buildCoreBridgeOrderDestinationsUrl(config, orderId);
+  const result = {
+    orderId: String(orderId),
+    destinationUrl,
+    destinationRecords: [],
+    chosenDestinationRecord: null,
+    inlineAddress: "",
+    destinationLookupId: "",
+    destinationDetailUrl: "",
+    destinationDetailRecord: null,
+    destinationDetailAddress: "",
+    errors: []
+  };
+
+  try {
+    const response = await fetch(destinationUrl, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+        Accept: "application/json"
+      }
+    });
+
+    result.destinationStatus = response.status;
+    const contentType = String(response.headers.get("content-type") || "");
+    const rawBody = await response.text();
+    result.destinationBodyPreview = rawBody.slice(0, 4000);
+
+    if (!response.ok) {
+      result.errors.push(`Destination lookup failed (${response.status})`);
+      return result;
+    }
+
+    if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+      result.errors.push("Destination lookup returned HTML");
+      return result;
+    }
+
+    const body = JSON.parse(rawBody);
+    const records = extractCoreBridgeDestinationRecords(body);
+    result.destinationRecords = records.map((record) => ({
+      id: pickDestinationLookupId(record),
+      destinationId: String(record?.DestinationID ?? record?.destinationId ?? ""),
+      destinationNumber: String(record?.DestinationNumber ?? record?.destinationNumber ?? ""),
+      isDefault: Boolean(record?.IsDefault),
+      inlineAddress: getCoreBridgeDestinationAddressFromRecord(record)
+    }));
+
+    const chosenRecord = pickBestCoreBridgeDestinationRecord(records);
+    result.chosenDestinationRecord = chosenRecord
+      ? {
+          id: pickDestinationLookupId(chosenRecord),
+          destinationId: String(chosenRecord?.DestinationID ?? chosenRecord?.destinationId ?? ""),
+          destinationNumber: String(chosenRecord?.DestinationNumber ?? chosenRecord?.destinationNumber ?? ""),
+          isDefault: Boolean(chosenRecord?.IsDefault)
+        }
+      : null;
+
+    result.inlineAddress = getCoreBridgeDestinationAddressFromRecord(chosenRecord);
+    const destinationLookupId = pickDestinationLookupId(chosenRecord);
+    result.destinationLookupId = destinationLookupId;
+
+    if (!destinationLookupId) {
+      result.errors.push("No destination lookup id found");
+      return result;
+    }
+
+    const destinationDetailUrl = buildCoreBridgeDestinationDetailUrl(config, destinationLookupId);
+    result.destinationDetailUrl = destinationDetailUrl;
+    const detailResponse = await fetch(destinationDetailUrl, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+        Accept: "application/json"
+      }
+    });
+
+    result.destinationDetailStatus = detailResponse.status;
+    const detailContentType = String(detailResponse.headers.get("content-type") || "");
+    const detailRawBody = await detailResponse.text();
+    result.destinationDetailBodyPreview = detailRawBody.slice(0, 4000);
+
+    if (!detailResponse.ok) {
+      result.errors.push(`Destination detail lookup failed (${detailResponse.status})`);
+      return result;
+    }
+
+    if (detailContentType.includes("text/html") || /^\s*</.test(detailRawBody)) {
+      result.errors.push("Destination detail lookup returned HTML");
+      return result;
+    }
+
+    const detailBody = JSON.parse(detailRawBody);
+    const detailRecords = extractCoreBridgeDestinationRecords(detailBody);
+    const detailRecord = detailRecords[0] || detailBody;
+    result.destinationDetailRecord = {
+      id: pickDestinationLookupId(detailRecord),
+      destinationId: String(detailRecord?.DestinationID ?? detailRecord?.destinationId ?? ""),
+      destinationNumber: String(detailRecord?.DestinationNumber ?? detailRecord?.destinationNumber ?? "")
+    };
+    result.destinationDetailAddress = getCoreBridgeDestinationAddressFromRecord(detailRecord);
+    return result;
+  } catch (error) {
+    result.errors.push(error.message || "Unknown destination debug error");
+    return result;
+  }
+}
+
 function extractCoreBridgeRecords(payload) {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
@@ -1897,6 +2006,32 @@ app.get("/api/corebridge/orders", async (request, response) => {
       console.error("CoreBridge detail lookup failed.", error.message);
       response.status(500).json({
         error: "Could not load the CoreBridge order detail.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.get("/api/corebridge/orders/:id/destination-debug", async (request, response) => {
+    if (!requireHost(request, response)) return;
+    try {
+      const orderId = String(request.params.id || "").trim();
+      if (!orderId) {
+        response.status(400).json({ error: "An order id is required." });
+        return;
+      }
+
+      const config = getCoreBridgeConfig();
+      if (!config.token || !config.subscriptionKey) {
+        response.status(503).json({ error: "CoreBridge is not configured yet." });
+        return;
+      }
+
+      const payload = await fetchCoreBridgeOrderDestinationDebug(config, orderId);
+      response.json(payload);
+    } catch (error) {
+      console.error("CoreBridge destination debug failed.", error.message);
+      response.status(500).json({
+        error: "Could not load the CoreBridge destination debug.",
         detail: error.message
       });
     }
