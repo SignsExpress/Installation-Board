@@ -805,12 +805,17 @@ function normalizeCoreBridgeOrder(record, index) {
     ]),
     description: pickBestCoreBridgeDescription(flat),
     contact: pickFirst(flat, [
+      "contactroles.0.contactname",
+      "ordercontactroles.0.contactname",
+      "estimatecontactname",
+      "estimatecontact",
+      "ordercontactname",
+      "ordercontact",
       "contact",
       "contactname",
       "primarycontact",
       "contactperson",
-      "customercontact",
-      "contactroles.0.contactname"
+      "customercontact"
     ]),
     number: pickBestCoreBridgePhone(flat),
     address: address || pickFirst(flat, ["address", "siteaddress", "shiptoaddress"]),
