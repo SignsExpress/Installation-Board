@@ -652,6 +652,18 @@ function buildCoreBridgeOrderDetailUrl(config, orderId) {
   return url.toString();
 }
 
+function buildCoreBridgeOrderDestinationsUrl(config, orderId) {
+  const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
+  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const detailPath = `${normalizedPath}/${orderId}/orderdestination`;
+  const url = new URL(detailPath, normalizedBase);
+
+  url.searchParams.set("apiversion", config.apiVersion);
+  url.searchParams.set("contactlevel", "full");
+
+  return url.toString();
+}
+
 function flattenRecord(record, prefix = "", bucket = {}) {
   if (!record || typeof record !== "object") return bucket;
 
@@ -1253,6 +1265,38 @@ function buildCoreBridgeDebugFields(record) {
     }));
 }
 
+function getCoreBridgeDestinationAddressFromRecord(record) {
+  if (!record || typeof record !== "object") return "";
+
+  const flat = flattenRecord(record);
+  const objectRoleAddress = buildAddressFromRole(pickDestinationCoreBridgeRole(record));
+  if (objectRoleAddress) return objectRoleAddress;
+
+  const flatRoleAddress = pickDestinationAddressFromFlat(flat);
+  if (flatRoleAddress) return flatRoleAddress;
+
+  return buildAddressFromAliases(flat, [
+    ["toaddress", "shiptoaddress", "address1"],
+    ["toaddress2", "shiptoaddress2", "address2"],
+    ["tocity", "shiptocity", "city"],
+    ["tocounty", "shiptocounty", "state", "county"],
+    ["topostcode", "shiptopostcode", "postcode", "postalcode"]
+  ]);
+}
+
+function pickBestCoreBridgeDestinationRecord(records) {
+  if (!Array.isArray(records) || !records.length) return null;
+
+  return (
+    records.find((record) => record?.IsDefault) ||
+    records.find((record) => {
+      const roles = getCoreBridgeRoles(record);
+      return roles.some((role) => String(role?.RoleType || "").toLowerCase() === "shipto");
+    }) ||
+    records[0]
+  );
+}
+
 function looksLikeCoreBridgeOrderRecord(record, orderId) {
   if (!record || typeof record !== "object" || Array.isArray(record)) return false;
   const numericOrderId = Number(orderId);
@@ -1349,6 +1393,31 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
   }
 
   return normalized;
+}
+
+async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
+  const response = await fetch(buildCoreBridgeOrderDestinationsUrl(config, orderId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Destination lookup failed for ${orderId} (${response.status})`);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  const rawBody = await response.text();
+  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+    throw new Error(`Destination lookup returned HTML for ${orderId}`);
+  }
+
+  const body = JSON.parse(rawBody);
+  const records = extractCoreBridgeRecords(body);
+  const destinationRecord = pickBestCoreBridgeDestinationRecord(records);
+  return getCoreBridgeDestinationAddressFromRecord(destinationRecord);
 }
 
 function extractCoreBridgeRecords(payload) {
@@ -1491,6 +1560,14 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
 
             try {
               const detailedOrder = await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
+              try {
+                const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, order.id);
+                if (destinationAddress) {
+                  detailedOrder.address = destinationAddress;
+                }
+              } catch (destinationError) {
+                attempts.push(`DESTINATION ${order.id} ${destinationError.message}`);
+              }
               return {
                 ...order,
                 ...detailedOrder,
@@ -1708,6 +1785,16 @@ app.get("/api/corebridge/orders", async (request, response) => {
       }
 
       const order = await fetchCoreBridgeOrderDetail(config, orderId, includeDebug);
+      try {
+        const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, orderId);
+        if (destinationAddress) {
+          order.address = destinationAddress;
+        }
+      } catch (destinationError) {
+        if (includeDebug) {
+          order._destinationError = destinationError.message;
+        }
+      }
       response.json(order);
     } catch (error) {
       console.error("CoreBridge detail lookup failed.", error.message);
