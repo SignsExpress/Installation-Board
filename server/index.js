@@ -702,6 +702,61 @@ function pickFirstPhone(flatRecord, aliases) {
   return "";
 }
 
+function pickMatchingValue(flatRecord, matcher) {
+  for (const [key, value] of Object.entries(flatRecord)) {
+    if (matcher(key, value)) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function pickBestCoreBridgeDescription(flatRecord) {
+  return pickFirst(flatRecord, [
+    "estimatedescription",
+    "estimate.description",
+    "headerdescription",
+    "transactiondescription",
+    "description",
+    "jobdescription",
+    "title",
+    "summary",
+    "projectdescription",
+    "items.0.description",
+    "items.0.invoicetext",
+    "items.0.name",
+    "name"
+  ]);
+}
+
+function pickBestCoreBridgePhone(flatRecord) {
+  const directPhone = pickFirstPhone(flatRecord, [
+    "phone",
+    "telephone",
+    "mobilenumber",
+    "contactphone",
+    "contactnumber",
+    "company.phone",
+    "company.telephone",
+    "contactroles.0.phone",
+    "contactroles.0.contactphone",
+    "contactroles.0.ordercontactrolelocators.0.locator"
+  ]);
+
+  if (directPhone) return directPhone;
+
+  return pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (!looksLikePhone(value)) return false;
+    return (
+      normalizedKey.includes("phone") ||
+      normalizedKey.includes("telephone") ||
+      normalizedKey.includes("mobile") ||
+      normalizedKey.includes("locator")
+    );
+  });
+}
+
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
 
@@ -748,15 +803,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "clientname",
       "name"
     ]),
-    description: pickFirst(flat, [
-      "description",
-      "jobdescription",
-      "title",
-      "summary",
-      "projectdescription",
-      "items.0.name",
-      "name"
-    ]),
+    description: pickBestCoreBridgeDescription(flat),
     contact: pickFirst(flat, [
       "contact",
       "contactname",
@@ -765,14 +812,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact",
       "contactroles.0.contactname"
     ]),
-    number: pickFirstPhone(flat, [
-      "phone",
-      "telephone",
-      "mobilenumber",
-      "contactphone",
-      "contactnumber",
-      "contactroles.0.ordercontactrolelocators.0.locator"
-    ]),
+    number: pickBestCoreBridgePhone(flat),
     address: address || pickFirst(flat, ["address", "siteaddress", "shiptoaddress"]),
     notes: pickFirst(flat, [
       "notes.0.note",
