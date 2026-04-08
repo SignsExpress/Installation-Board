@@ -886,15 +886,51 @@ function listFlatContactRoleIndexes(flatRecord) {
   return Array.from(indexes).sort((left, right) => left - right);
 }
 
-function buildFlatContactRoleAddress(flatRecord, index) {
+function listFlatRoleLocatorIndexes(flatRecord, roleIndex) {
+  const indexes = new Set();
+  const pattern = new RegExp(`^contactroles\\.${roleIndex}\\.ordercontactrolelocators\\.(\\d+)\\.`);
+
+  for (const key of Object.keys(flatRecord || {})) {
+    const match = key.match(pattern);
+    if (match) {
+      indexes.add(Number(match[1]));
+    }
+  }
+
+  return Array.from(indexes).sort((left, right) => left - right);
+}
+
+function buildFlatContactRoleAddress(flatRecord, roleIndex) {
+  const locatorIndexes = listFlatRoleLocatorIndexes(flatRecord, roleIndex);
+
+  for (const locatorIndex of locatorIndexes) {
+    const locatorType = String(
+      flatRecord[`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.locatortype`] || ""
+    ).trim();
+    if (locatorType !== "1") continue;
+
+    const address = buildAddressFromAliases(flatRecord, [
+      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street1`],
+      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.street2`],
+      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.city`],
+      [`contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.state`],
+      [
+        `contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postalcode`,
+        `contactroles.${roleIndex}.ordercontactrolelocators.${locatorIndex}.metadata.postcode`
+      ]
+    ]);
+
+    if (address) return address;
+  }
+
   return buildAddressFromAliases(flatRecord, [
-    [`contactroles.${index}.ordercontactrolelocators.0.metadata.street1`],
-    [`contactroles.${index}.ordercontactrolelocators.0.metadata.street2`],
-    [`contactroles.${index}.ordercontactrolelocators.0.metadata.city`],
-    [`contactroles.${index}.ordercontactrolelocators.0.metadata.state`],
+    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.street1`],
+    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.street2`],
+    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.city`],
+    [`contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.state`],
     [
-      `contactroles.${index}.ordercontactrolelocators.0.metadata.postalcode`,
-      `contactroles.${index}.ordercontactrolelocators.0.metadata.postcode`
+      `contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.postalcode`,
+      `contactroles.${roleIndex}.ordercontactrolelocators.0.metadata.postcode`
     ]
   ]);
 }
