@@ -227,10 +227,20 @@ async function writeStore(store) {
 
 async function readInstallersStore() {
   ensureInstallersFile();
-  const raw = await fsp.readFile(getInstallersFile(), "utf8");
+  const installersFile = getInstallersFile();
+  const raw = await fsp.readFile(installersFile, "utf8");
 
   try {
     const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length === 0 && installersFile !== DEFAULT_INSTALLERS_FILE && fs.existsSync(DEFAULT_INSTALLERS_FILE)) {
+      const seedRaw = await fsp.readFile(DEFAULT_INSTALLERS_FILE, "utf8");
+      const seedParsed = JSON.parse(seedRaw);
+      if (Array.isArray(seedParsed) && seedParsed.length > 0) {
+        await fsp.writeFile(installersFile, `${JSON.stringify(seedParsed, null, 2)}\n`, "utf8");
+        return seedParsed;
+      }
+    }
+
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
     console.error("Invalid installers store JSON, returning empty list.", error);
