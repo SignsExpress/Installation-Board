@@ -19,6 +19,9 @@ const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers.json");
 const DEFAULT_REQUESTS_FILE = path.join(__dirname, "..", "data", "requests.json");
+const LEGACY_INSTALLER_DIRECTORY = "/var/data/sx-installer-directory";
+const LEGACY_INSTALLERS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "installers.json");
+const LEGACY_REQUESTS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "requests.json");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
@@ -53,6 +56,10 @@ function getInstallersFile() {
     return process.env.INSTALLERS_FILE;
   }
 
+  if (fs.existsSync(LEGACY_INSTALLERS_FILE)) {
+    return LEGACY_INSTALLERS_FILE;
+  }
+
   if (process.env.DATA_FILE) {
     return path.join(path.dirname(process.env.DATA_FILE), "installers.json");
   }
@@ -63,6 +70,10 @@ function getInstallersFile() {
 function getRequestsFile() {
   if (process.env.REQUESTS_FILE) {
     return process.env.REQUESTS_FILE;
+  }
+
+  if (fs.existsSync(LEGACY_REQUESTS_FILE)) {
+    return LEGACY_REQUESTS_FILE;
   }
 
   if (process.env.DATA_FILE) {
