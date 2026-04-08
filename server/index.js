@@ -650,7 +650,9 @@ function flattenRecord(record, prefix = "", bucket = {}) {
         .join(", ");
       if (joined) {
         bucket[normalizedPrefix] = joined;
-        bucket[key.toLowerCase()] = joined;
+        if (!(key.toLowerCase() in bucket)) {
+          bucket[key.toLowerCase()] = joined;
+        }
       }
       value.forEach((item, index) => {
         if (item && typeof item === "object") {
@@ -669,7 +671,9 @@ function flattenRecord(record, prefix = "", bucket = {}) {
       const stringValue = String(value).trim();
       if (stringValue) {
         bucket[normalizedPrefix] = stringValue;
-        bucket[key.toLowerCase()] = stringValue;
+        if (!(key.toLowerCase() in bucket)) {
+          bucket[key.toLowerCase()] = stringValue;
+        }
       }
     }
   }
