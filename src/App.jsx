@@ -1390,6 +1390,14 @@ export default function App() {
                       <span><b>Number:</b> {order.number || "-"}</span>
                     </div>
                     <p className="order-result-address"><b>Address:</b> {order.address || "-"}</p>
+                    {orderLookupDebugMode ? (
+                      <div className="order-result-debug">
+                        <span><b>Detail fetch:</b> {order._detailFetched ? `ok (${order._detailOrderId})` : `fallback (${order._detailError || "no detail"})`}</span>
+                        <span><b>Normalized description:</b> {order.description || "-"}</span>
+                        <span><b>Normalized number:</b> {order.number || "-"}</span>
+                        <span><b>Normalized address:</b> {order.address || "-"}</span>
+                      </div>
+                    ) : null}
                     <div className="order-result-actions">
                       <button className="primary-button" type="button" onClick={() => applyCoreBridgeOrder(order)}>
                         Use this order

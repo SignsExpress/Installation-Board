@@ -1157,6 +1157,8 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
 
   const body = JSON.parse(rawBody);
   const normalized = normalizeCoreBridgeOrder(body, 0);
+  normalized._detailFetched = true;
+  normalized._detailOrderId = orderId;
 
   if (includeDebug) {
     normalized.debugFields = buildCoreBridgeDebugFields(body);
@@ -1300,7 +1302,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
       ).filter((order) => order.orderReference || order.customerName);
 
       if (looksLikeFormattedNumber && orders.length) {
-        orders = await Promise.all(
+          orders = await Promise.all(
           orders.slice(0, 10).map(async (order) => {
             if (!order.id) return order;
 
@@ -1308,11 +1310,18 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
               const detailedOrder = await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
               return {
                 ...order,
-                ...detailedOrder
+                ...detailedOrder,
+                _detailFetched: true,
+                _detailOrderId: order.id
               };
             } catch (error) {
               attempts.push(`DETAIL ${order.id} ${error.message}`);
-              return order;
+              return {
+                ...order,
+                _detailFetched: false,
+                _detailError: error.message,
+                _detailOrderId: order.id
+              };
             }
           })
         );
