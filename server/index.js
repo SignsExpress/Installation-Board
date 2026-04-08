@@ -1444,10 +1444,9 @@ async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   const records = extractCoreBridgeDestinationRecords(body);
   const destinationRecord = pickBestCoreBridgeDestinationRecord(records);
   const inlineAddress = getCoreBridgeDestinationAddressFromRecord(destinationRecord);
-  if (inlineAddress) return inlineAddress;
 
   const destinationLookupId = pickDestinationLookupId(destinationRecord);
-  if (!destinationLookupId) return "";
+  if (!destinationLookupId) return inlineAddress;
 
   const detailResponse = await fetch(buildCoreBridgeDestinationDetailUrl(config, destinationLookupId), {
     headers: {
@@ -1470,7 +1469,7 @@ async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   const detailBody = JSON.parse(detailRawBody);
   const detailRecords = extractCoreBridgeDestinationRecords(detailBody);
   const detailRecord = detailRecords[0] || detailBody;
-  return getCoreBridgeDestinationAddressFromRecord(detailRecord);
+  return getCoreBridgeDestinationAddressFromRecord(detailRecord) || inlineAddress;
 }
 
 function extractCoreBridgeRecords(payload) {
