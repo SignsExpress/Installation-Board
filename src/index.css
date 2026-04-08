@@ -485,6 +485,7 @@ button {
 }
 
 .date-cell {
+  position: relative;
   border: 0;
   border-right: 1px solid var(--sx-main-border);
   background: transparent;
@@ -590,6 +591,29 @@ button {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 8px;
+}
+
+.date-holiday-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.date-holiday-popover {
+  position: absolute;
+  left: 12px;
+  top: calc(100% - 8px);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: calc(100% - 24px);
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid var(--sx-main-border);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.12);
 }
 
 .date-holiday-chip {

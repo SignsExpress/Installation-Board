@@ -622,8 +622,25 @@ export default function App() {
                               ))}
                             </div>
                           ) : null}
-                          {!isClientMode ? (
-                            <div className="date-holiday-controls" onClick={(event) => event.stopPropagation()}>
+                          {!isClientMode && row.staffHolidays.length ? (
+                            <div className="date-holiday-summary" onClick={(event) => event.stopPropagation()}>
+                              {row.staffHolidays.map((holiday) => {
+                                const durationLabel =
+                                  holiday.duration === "Morning"
+                                    ? ".AM"
+                                    : holiday.duration === "Afternoon"
+                                      ? ".PM"
+                                      : "";
+                                return (
+                                  <span key={`summary-${holiday.id}`} className={`date-holiday-chip ${getHolidayPersonColor(holiday.person)} active`}>
+                                    {toInitials(holiday.person)}{durationLabel}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : null}
+                          {!isClientMode && activeHolidayDate === row.isoDate ? (
+                            <div className="date-holiday-popover" onClick={(event) => event.stopPropagation()}>
                               {STAFF_NAMES.map((name) => {
                                 const existing = row.staffHolidays.find((holiday) => holiday.person === name);
                                 const durationLabel =
