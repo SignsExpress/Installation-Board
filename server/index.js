@@ -13,6 +13,16 @@ const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
+const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
+const DEFAULT_COREBRIDGE_ENDPOINT_PATHS = [
+  "/installation-board-data",
+  "/installation-board",
+  "/installationboarddata",
+  "/orders",
+  "/sales/orders",
+  "/workorders",
+  "/jobs"
+];
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -339,6 +349,234 @@ async function getBoardPayload() {
   };
 }
 
+function getCoreBridgeConfig() {
+  const endpointPaths = String(
+    process.env.COREBRIDGE_ENDPOINT_PATHS || process.env.COREBRIDGE_ENDPOINT_PATH || ""
+  )
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return {
+    baseUrl: String(process.env.COREBRIDGE_BASE_URL || DEFAULT_COREBRIDGE_BASE_URL).trim(),
+    token: String(process.env.COREBRIDGE_TOKEN || process.env.COREBRIDGE_AUTH_TOKEN || "").trim(),
+    subscriptionKey: String(
+      process.env.COREBRIDGE_SUBSCRIPTION_KEY || process.env.COREBRIDGE_OCP_KEY || ""
+    ).trim(),
+    endpointPaths: endpointPaths.length ? endpointPaths : DEFAULT_COREBRIDGE_ENDPOINT_PATHS
+  };
+}
+
+function buildCoreBridgeCandidateUrls(baseUrl, endpointPath, searchTerm = "") {
+  const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const normalizedPath = endpointPath.startsWith("/") ? endpointPath.slice(1) : endpointPath;
+  const bare = new URL(normalizedPath, normalizedBase);
+  const candidates = [bare.toString()];
+
+  if (searchTerm) {
+    for (const key of ["q", "query", "search", "term"]) {
+      const url = new URL(bare.toString());
+      url.searchParams.set(key, searchTerm);
+      candidates.push(url.toString());
+    }
+  }
+
+  return [...new Set(candidates)];
+}
+
+function flattenRecord(record, prefix = "", bucket = {}) {
+  if (!record || typeof record !== "object") return bucket;
+
+  for (const [key, value] of Object.entries(record)) {
+    const nextPrefix = prefix ? `${prefix}.${key}` : key;
+    const normalizedPrefix = nextPrefix.toLowerCase();
+
+    if (Array.isArray(value)) {
+      const joined = value
+        .map((item) => (typeof item === "string" || typeof item === "number" ? String(item).trim() : ""))
+        .filter(Boolean)
+        .join(", ");
+      if (joined) {
+        bucket[normalizedPrefix] = joined;
+        bucket[key.toLowerCase()] = joined;
+      }
+      continue;
+    }
+
+    if (value && typeof value === "object") {
+      flattenRecord(value, nextPrefix, bucket);
+      continue;
+    }
+
+    if (value !== undefined && value !== null) {
+      const stringValue = String(value).trim();
+      if (stringValue) {
+        bucket[normalizedPrefix] = stringValue;
+        bucket[key.toLowerCase()] = stringValue;
+      }
+    }
+  }
+
+  return bucket;
+}
+
+function pickFirst(flatRecord, aliases) {
+  for (const alias of aliases) {
+    const value = flatRecord[alias.toLowerCase()];
+    if (value) return value;
+  }
+  return "";
+}
+
+function normalizeCoreBridgeOrder(record, index) {
+  const flat = flattenRecord(record);
+
+  const address = [
+    pickFirst(flat, ["address1", "address.line1", "siteaddress1", "shiptoaddress1"]),
+    pickFirst(flat, ["address2", "address.line2", "siteaddress2", "shiptoaddress2"]),
+    pickFirst(flat, ["address3", "address.line3", "siteaddress3", "shiptoaddress3"]),
+    pickFirst(flat, ["city", "address.city", "town", "sitecity", "shiptocity"]),
+    pickFirst(flat, ["county", "address.county", "state", "sitestate"]),
+    pickFirst(flat, ["postcode", "postalcode", "zip", "address.postcode", "sitepostcode", "shiptopostcode"])
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const normalized = {
+    id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
+    orderReference: pickFirst(flat, [
+      "ordernumber",
+      "orderreference",
+      "reference",
+      "jobnumber",
+      "documentnumber",
+      "salesordernumber"
+    ]),
+    customerName: pickFirst(flat, [
+      "customername",
+      "customer",
+      "companyname",
+      "company",
+      "accountname",
+      "clientname",
+      "name"
+    ]),
+    description: pickFirst(flat, ["description", "jobdescription", "title", "summary", "projectdescription"]),
+    contact: pickFirst(flat, ["contact", "contactname", "primarycontact", "contactperson", "customercontact"]),
+    number: pickFirst(flat, ["phone", "telephone", "mobilenumber", "contactphone", "contactnumber"]),
+    address: address || pickFirst(flat, ["address", "siteaddress", "shiptoaddress"]),
+    notes: pickFirst(flat, ["notes", "internalnotes", "comments", "specialinstructions", "instructions"]),
+    status: pickFirst(flat, ["status", "orderstatus", "jobstatus"]),
+    raw: record
+  };
+
+  return normalized;
+}
+
+function extractCoreBridgeRecords(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+
+  const directCandidates = [
+    payload.data,
+    payload.items,
+    payload.results,
+    payload.records,
+    payload.orders,
+    payload.value,
+    payload.rows
+  ];
+
+  for (const candidate of directCandidates) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+
+  if (payload.data && typeof payload.data === "object") {
+    for (const nested of [payload.data.items, payload.data.results, payload.data.records, payload.data.orders, payload.data.rows]) {
+      if (Array.isArray(nested)) return nested;
+    }
+  }
+
+  return [];
+}
+
+function filterCoreBridgeOrders(orders, searchTerm = "") {
+  const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
+  const filteredByStatus = orders.filter((order) => {
+    const status = String(order.status || "").toLowerCase();
+    return !status || !["closed", "cancelled", "canceled", "complete", "completed", "invoiced"].includes(status);
+  });
+
+  if (!normalizedSearch) {
+    return filteredByStatus.slice(0, 100);
+  }
+
+  return filteredByStatus.filter((order) =>
+    [
+      order.orderReference,
+      order.customerName,
+      order.description,
+      order.contact,
+      order.number,
+      order.address,
+      order.notes,
+      order.status
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedSearch)
+  );
+}
+
+async function fetchCoreBridgeOrders(searchTerm = "") {
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    const error = new Error("CoreBridge is not configured yet.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const attempts = [];
+
+  for (const endpointPath of config.endpointPaths) {
+    const candidateUrls = buildCoreBridgeCandidateUrls(config.baseUrl, endpointPath, searchTerm);
+    for (const url of candidateUrls) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+            Accept: "application/json"
+          }
+        });
+
+        if (!response.ok) {
+          attempts.push(`${response.status} ${url}`);
+          continue;
+        }
+
+        const contentType = String(response.headers.get("content-type") || "");
+        const body = contentType.includes("application/json") ? await response.json() : JSON.parse(await response.text());
+        const records = extractCoreBridgeRecords(body);
+        const orders = filterCoreBridgeOrders(records.map(normalizeCoreBridgeOrder), searchTerm).filter(
+          (order) => order.orderReference || order.customerName
+        );
+
+        return {
+          orders,
+          sourceUrl: url
+        };
+      } catch (error) {
+        attempts.push(`ERR ${url} ${error.message}`);
+      }
+    }
+  }
+
+  const error = new Error(`CoreBridge lookup failed. Tried: ${attempts.join(" | ") || "no endpoints"}`);
+  error.statusCode = 502;
+  throw error;
+}
+
 function createServer() {
   ensureStoreFile();
   const app = express();
@@ -359,6 +597,23 @@ function createServer() {
   app.get("/api/jobs", async (request, response) => {
     const store = await readStore();
     response.json(store.jobs);
+  });
+
+  app.get("/api/corebridge/orders", async (request, response) => {
+    try {
+      const searchTerm = String(request.query.q || "").trim();
+      const payload = await fetchCoreBridgeOrders(searchTerm);
+      response.json(payload);
+    } catch (error) {
+      console.error("CoreBridge lookup failed.", error.message);
+      response.status(error.statusCode || 500).json({
+        error:
+          error.statusCode === 503
+            ? "CoreBridge is not configured yet."
+            : "Could not reach CoreBridge order lookup yet.",
+        detail: error.message
+      });
+    }
   });
 
   app.post("/api/jobs", async (request, response) => {

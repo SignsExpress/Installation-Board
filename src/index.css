@@ -195,6 +195,13 @@ button {
   gap: 14px;
 }
 
+.corebridge-lookup-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .job-form label {
   display: grid;
   gap: 8px;
@@ -414,6 +421,10 @@ button {
   border: 1px dashed #cbd5e1;
   border-radius: 20px;
   color: #64748b;
+}
+
+.board-loading.compact {
+  min-height: 120px;
 }
 
 .week-block {
@@ -799,6 +810,80 @@ button {
   width: min(640px, 100%);
 }
 
+.order-lookup-modal {
+  width: min(900px, 100%);
+}
+
+.order-lookup-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+}
+
+.order-lookup-toolbar input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 18px;
+  background: white;
+  padding: 10px 13px;
+  color: #0f172a;
+}
+
+.order-lookup-toolbar input:focus {
+  outline: none;
+  border-color: #b39ac1;
+  box-shadow: 0 0 0 4px rgba(95, 60, 116, 0.14);
+}
+
+.order-lookup-results {
+  display: grid;
+  gap: 12px;
+  max-height: 52vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.order-result-card {
+  width: 100%;
+  border: 1px solid #dbe2ea;
+  border-radius: 20px;
+  background: white;
+  padding: 16px 18px;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.order-result-card:hover {
+  border-color: var(--sx-main-border);
+  background: #fcfbfd;
+}
+
+.order-result-card p {
+  margin: 0;
+  color: #475569;
+}
+
+.order-result-top,
+.order-result-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.order-result-customer {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.order-result-address {
+  font-size: 0.86rem;
+}
+
 .detail-grid {
   display: grid;
   gap: 12px;
@@ -1010,6 +1095,10 @@ button {
   }
 
   .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .order-lookup-toolbar {
     grid-template-columns: 1fr;
   }
 }

@@ -89,6 +89,11 @@ export default function App() {
   const [activeHolidayId, setActiveHolidayId] = useState("");
   const [jobModalDate, setJobModalDate] = useState("");
   const [activeClientJob, setActiveClientJob] = useState(null);
+  const [orderLookupOpen, setOrderLookupOpen] = useState(false);
+  const [orderLookupQuery, setOrderLookupQuery] = useState("");
+  const [orderLookupLoading, setOrderLookupLoading] = useState(false);
+  const [orderLookupResults, setOrderLookupResults] = useState([]);
+  const [orderLookupError, setOrderLookupError] = useState("");
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -210,6 +215,10 @@ export default function App() {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
     setJobModalDate("");
+    setOrderLookupOpen(false);
+    setOrderLookupQuery("");
+    setOrderLookupResults([]);
+    setOrderLookupError("");
   }
 
   function editJob(job) {
@@ -243,6 +252,53 @@ export default function App() {
     const [nextJobs, nextHolidays] = await Promise.all([jobsResponse.json(), holidaysResponse.json()]);
     setJobs(Array.isArray(nextJobs) ? nextJobs : []);
     setHolidays(Array.isArray(nextHolidays) ? nextHolidays : []);
+  }
+
+  async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
+    if (isClientMode) return;
+
+    try {
+      setOrderLookupLoading(true);
+      setOrderLookupError("");
+      const query = String(searchTerm || "").trim();
+      const url = query ? `/api/corebridge/orders?q=${encodeURIComponent(query)}` : "/api/corebridge/orders";
+      const response = await fetch(url);
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not load CoreBridge orders.");
+      }
+
+      setOrderLookupResults(Array.isArray(payload.orders) ? payload.orders : []);
+    } catch (error) {
+      console.error(error);
+      setOrderLookupResults([]);
+      setOrderLookupError(error.message || "Could not load CoreBridge orders.");
+    } finally {
+      setOrderLookupLoading(false);
+    }
+  }
+
+  async function openOrderLookup() {
+    setOrderLookupOpen(true);
+    if (!orderLookupResults.length && !orderLookupLoading) {
+      await searchCoreBridgeOrders("");
+    }
+  }
+
+  function applyCoreBridgeOrder(order) {
+    setForm((current) => ({
+      ...current,
+      orderReference: order.orderReference || current.orderReference,
+      customerName: order.customerName || current.customerName,
+      description: order.description || current.description,
+      contact: order.contact || current.contact,
+      number: order.number || current.number,
+      address: order.address || current.address,
+      notes: order.notes || current.notes
+    }));
+    setOrderLookupOpen(false);
+    setMessage(createMessage("Order details copied into the job form.", "success"));
   }
 
   async function handleSubmit(event) {
@@ -842,6 +898,13 @@ export default function App() {
                 />
               </label>
 
+              <div className="corebridge-lookup-bar">
+                <button className="ghost-button" type="button" onClick={() => openOrderLookup()}>
+                  Find order
+                </button>
+                <span className="muted">Pull live order details from CoreBridge where available.</span>
+              </div>
+
               <label>
                 Order reference
                 <input
@@ -968,6 +1031,70 @@ export default function App() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+      {!isClientMode && orderLookupOpen ? (
+        <div className="modal-backdrop" onClick={() => setOrderLookupOpen(false)}>
+          <div className="modal order-lookup-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>Find CoreBridge Order</h3>
+                <p>Search live orders and copy the matching details into this job.</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setOrderLookupOpen(false)}>
+                x
+              </button>
+            </div>
+
+            <div className="order-lookup-toolbar">
+              <input
+                type="text"
+                value={orderLookupQuery}
+                placeholder="Search by order ref, customer, phone or address"
+                onChange={(event) => setOrderLookupQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    searchCoreBridgeOrders(orderLookupQuery);
+                  }
+                }}
+              />
+              <button className="primary-button" type="button" onClick={() => searchCoreBridgeOrders(orderLookupQuery)} disabled={orderLookupLoading}>
+                {orderLookupLoading ? "Searching..." : "Search"}
+              </button>
+            </div>
+
+            {orderLookupError ? <div className="flash error">{orderLookupError}</div> : null}
+
+            <div className="order-lookup-results">
+              {orderLookupLoading ? (
+                <div className="board-loading compact">Looking up CoreBridge orders...</div>
+              ) : orderLookupResults.length ? (
+                orderLookupResults.map((order) => (
+                  <button
+                    key={`${order.id}-${order.orderReference}-${order.customerName}`}
+                    type="button"
+                    className="order-result-card"
+                    onClick={() => applyCoreBridgeOrder(order)}
+                  >
+                    <div className="order-result-top">
+                      <strong>{order.orderReference || "No order ref"}</strong>
+                      {order.status ? <span className="job-tag job-type-other">{order.status}</span> : null}
+                    </div>
+                    <p className="order-result-customer">{order.customerName || "Unnamed customer"}</p>
+                    <p>{order.description || "No description"}</p>
+                    <div className="order-result-meta">
+                      <span><b>Contact:</b> {order.contact || "-"}</span>
+                      <span><b>Number:</b> {order.number || "-"}</span>
+                    </div>
+                    <p className="order-result-address"><b>Address:</b> {order.address || "-"}</p>
+                  </button>
+                ))
+              ) : (
+                <div className="board-loading compact">No CoreBridge orders found yet.</div>
+              )}
+            </div>
           </div>
         </div>
       ) : null}
