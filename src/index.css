@@ -142,6 +142,13 @@ button {
   color: var(--sx-main);
 }
 
+.host-nav-link.disabled {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
 .host-nav-user {
   color: #475569;
   font-size: 0.95rem;
@@ -1250,6 +1257,13 @@ button {
 .host-launch-card:hover {
   border-color: #b39ac1;
   background: linear-gradient(180deg, #ffffff 0%, #efe8f3 100%);
+}
+
+.host-launch-card.disabled {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border-color: #dbe2ea;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 .installer-layout {

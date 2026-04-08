@@ -71,10 +71,15 @@ function toInitials(name) {
     .join("");
 }
 
-function HostNavBar({ currentUser, active = "home", onLogout }) {
+function MainNavBar({ currentUser, active = "home", onLogout }) {
   function goTo(path) {
     window.location.assign(path);
   }
+
+  const isClientUser = currentUser?.role === "client";
+  const homePath = isClientUser ? "/client" : "/";
+  const boardPath = isClientUser ? "/client/board" : "/board";
+  const installerPath = "/installer";
 
   return (
     <nav className="panel host-nav">
@@ -82,21 +87,25 @@ function HostNavBar({ currentUser, active = "home", onLogout }) {
         <button
           type="button"
           className={`host-nav-link ${active === "home" ? "active" : ""}`}
-          onClick={() => goTo("/")}
+          onClick={() => goTo(homePath)}
         >
           Home
         </button>
         <button
           type="button"
           className={`host-nav-link ${active === "board" ? "active" : ""}`}
-          onClick={() => goTo("/board")}
+          onClick={() => goTo(boardPath)}
         >
           Installation Board
         </button>
         <button
           type="button"
-          className={`host-nav-link ${active === "installer" ? "active" : ""}`}
-          onClick={() => goTo("/installer")}
+          className={`host-nav-link ${active === "installer" ? "active" : ""} ${isClientUser ? "disabled" : ""}`}
+          onClick={() => {
+            if (isClientUser) return;
+            goTo(installerPath);
+          }}
+          disabled={isClientUser}
         >
           Subcontractor Directory
         </button>
@@ -122,7 +131,7 @@ function HostLandingPage({ currentUser, onLogout }) {
         <div className="host-landing-brand">
           <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
         </div>
-        <HostNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
+        <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
@@ -140,9 +149,39 @@ function HostLandingPage({ currentUser, onLogout }) {
   );
 }
 
+function ClientLandingPage({ currentUser, onLogout }) {
+  function goTo(path) {
+    window.location.assign(path);
+  }
+
+  return (
+    <div className="app-shell host-landing-shell client-landing-shell">
+      <div className="page host-landing-page">
+        <div className="host-landing-brand">
+          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+        </div>
+        <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
+
+        <section className="panel host-landing-panel">
+          <div className="host-landing-actions">
+            <button className="host-launch-card disabled" type="button" disabled>
+              <strong>Subcontractor Directory</strong>
+            </button>
+
+            <button className="host-launch-card" type="button" onClick={() => goTo("/client/board")}>
+              <strong>Installation Board</strong>
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const isClientRoute = pathname.startsWith("/client");
+  const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
@@ -180,8 +219,9 @@ export default function App() {
   const isClientUser = currentUser?.role === "client";
   const isClientMode = isClientUser;
   const showInstallerDirectory = Boolean(currentUser && isHostUser && isInstallerRoute);
-  const showBoard = Boolean(currentUser && (isClientUser || isBoardRoute));
+  const showBoard = Boolean(currentUser && (isBoardRoute || (isClientUser && isClientBoardRoute)));
   const showHostLanding = Boolean(currentUser && isHostUser && !isInstallerRoute && !isBoardRoute);
+  const showClientLanding = Boolean(currentUser && isClientUser && !isClientBoardRoute);
 
   useEffect(() => {
     let active = true;
@@ -844,6 +884,10 @@ export default function App() {
     return <HostLandingPage currentUser={currentUser} onLogout={handleLogout} />;
   }
 
+  if (showClientLanding) {
+    return <ClientLandingPage currentUser={currentUser} onLogout={handleLogout} />;
+  }
+
   if (showInstallerDirectory) {
     return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} />;
   }
@@ -851,7 +895,7 @@ export default function App() {
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
-        {!isClientMode ? <HostNavBar currentUser={currentUser} active="board" onLogout={handleLogout} /> : null}
+        <MainNavBar currentUser={currentUser} active="board" onLogout={handleLogout} />
 
         <div className="layout">
           <section className="panel board-panel board-panel-full">
