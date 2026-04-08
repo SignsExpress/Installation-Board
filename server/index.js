@@ -875,6 +875,46 @@ function buildAddressFromAliases(flatRecord, aliasesByLine) {
     .join(", ");
 }
 
+function pickPreferredCoreBridgeContactRole(record) {
+  const roles = Array.isArray(record?.ContactRoles) ? record.ContactRoles : [];
+  if (!roles.length) return null;
+
+  return (
+    roles.find((role) => String(role?.RoleType || "").toLowerCase() === "shipto") ||
+    roles.find((role) => role?.DestinationID) ||
+    roles[0]
+  );
+}
+
+function pickRoleLocator(role, locatorType) {
+  const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
+  return locators.find((locator) => Number(locator?.LocatorType) === locatorType) || null;
+}
+
+function buildAddressFromRole(role) {
+  const addressLocator = pickRoleLocator(role, 1);
+  const metadata = addressLocator?.MetaData || addressLocator?.MetaDataObject || addressLocator?.metadata || {};
+
+  const parts = [
+    metadata.Street1 || metadata.street1 || "",
+    metadata.Street2 || metadata.street2 || "",
+    metadata.City || metadata.city || "",
+    metadata.State || metadata.state || "",
+    metadata.PostalCode || metadata.postalcode || metadata.Postcode || metadata.postcode || ""
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  if (parts.length) return parts.join(", ");
+  return String(addressLocator?.Locator || "").trim();
+}
+
+function buildPhoneFromRole(role) {
+  const phoneLocator = pickRoleLocator(role, 2);
+  const locatorValue = String(phoneLocator?.Locator || "").trim();
+  return looksLikePhone(locatorValue) ? locatorValue : "";
+}
+
 function pickBestCoreBridgeAddress(flatRecord) {
   const destinationAddress = buildAddressFromAliases(flatRecord, [
     [
@@ -972,6 +1012,7 @@ function pickBestCoreBridgeAddress(flatRecord) {
 
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
+  const preferredRole = pickPreferredCoreBridgeContactRole(record);
   const directDescription = String(
     record?.SE_EstimateDescription ||
     record?.EstimateDescription ||
@@ -1006,7 +1047,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "name"
     ]),
     description: directDescription || pickBestCoreBridgeDescription(flat),
-    contact: pickFirst(flat, [
+    contact: String(preferredRole?.ContactName || "").trim() || pickFirst(flat, [
       "contactroles.0.contactname",
       "ordercontactroles.0.contactname",
       "estimatecontactname",
@@ -1019,8 +1060,8 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
-    number: pickBestCoreBridgePhone(flat),
-    address: pickBestCoreBridgeAddress(flat),
+    number: buildPhoneFromRole(preferredRole) || pickBestCoreBridgePhone(flat),
+    address: buildAddressFromRole(preferredRole) || pickBestCoreBridgeAddress(flat),
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
