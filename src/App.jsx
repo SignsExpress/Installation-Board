@@ -674,7 +674,7 @@ export default function App() {
                               })}
                             </div>
                           ) : null}
-                          {!isClientMode && row.bankHoliday ? <span className="date-bank-holiday">{row.bankHoliday}</span> : null}
+                          {!isClientMode && row.bankHoliday ? <span className="date-holiday-chip date-bank-holiday">{row.bankHoliday}</span> : null}
                         </div>
 
                         <div className="jobs-cell">
@@ -770,7 +770,11 @@ export default function App() {
                                           <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
                                             Edit
                                           </button>
-                                          <span
+                                          <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
+                                            Delete
+                                          </button>
+                                          <button
+                                            type="button"
                                             className="card-duplicate-handle"
                                             draggable
                                             onDragStart={(event) => {
@@ -792,10 +796,7 @@ export default function App() {
                                             }}
                                             title="Drag to copy"
                                           >
-                                            +
-                                          </span>
-                                          <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
-                                            Delete
+                                            Drag to Copy
                                           </button>
                                         </>
                                       ) : null}

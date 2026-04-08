@@ -634,13 +634,12 @@ button {
 
 .date-bank-holiday {
   margin-top: 8px;
-  display: inline-flex;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--sx-holiday-bg);
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(30, 58, 138, 0.16);
   color: var(--sx-holiday-text);
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .job-stack {
@@ -870,6 +869,7 @@ button {
 
 .job-actions {
   gap: 12px;
+  align-items: center;
 }
 
 .job-actions .text-button {
@@ -877,18 +877,28 @@ button {
 }
 
 .card-duplicate-handle {
-  width: 22px;
-  height: 22px;
+  min-height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
+  padding: 0 10px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(15, 23, 42, 0.08);
   color: #334155;
-  font-weight: 900;
+  font-size: 0.72rem;
+  font-weight: 800;
   cursor: grab;
   flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.card-duplicate-handle:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.card-duplicate-handle:active {
+  cursor: grabbing;
 }
 
 .modal-backdrop {
