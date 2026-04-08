@@ -890,18 +890,38 @@ function pickDestinationCoreBridgeRole(record) {
   const roles = Array.isArray(record?.ContactRoles) ? record.ContactRoles : [];
   if (!roles.length) return null;
 
-  const hasAddressLocator = (role) =>
+  const hasAddressMetadata = (role) =>
     Array.isArray(role?.OrderContactRoleLocators) &&
-    role.OrderContactRoleLocators.some((locator) => Number(locator?.LocatorType) === 1 && String(locator?.Locator || "").trim());
+    role.OrderContactRoleLocators.some((locator) => {
+      if (Number(locator?.LocatorType) !== 1) return false;
+      const metadata = locator?.MetaData || locator?.MetaDataObject || locator?.metadata || {};
+      return Boolean(
+        String(
+          metadata?.Street1 ||
+            metadata?.street1 ||
+            metadata?.Street2 ||
+            metadata?.street2 ||
+            metadata?.City ||
+            metadata?.city ||
+            metadata?.State ||
+            metadata?.state ||
+            metadata?.PostalCode ||
+            metadata?.postalcode ||
+            metadata?.Postcode ||
+            metadata?.postcode ||
+            ""
+        ).trim()
+      );
+    });
 
   return (
     roles.find(
       (role) =>
         role?.DestinationID &&
         String(role?.RoleType || "").toLowerCase() === "shipto" &&
-        hasAddressLocator(role)
+        hasAddressMetadata(role)
     ) ||
-    roles.find((role) => role?.DestinationID && hasAddressLocator(role)) ||
+    roles.find((role) => role?.DestinationID && hasAddressMetadata(role)) ||
     null
   );
 }
@@ -933,6 +953,25 @@ function buildPhoneFromRole(role) {
   const phoneLocator = pickRoleLocator(role, 2);
   const locatorValue = String(phoneLocator?.Locator || "").trim();
   return looksLikePhone(locatorValue) ? locatorValue : "";
+}
+
+function buildDestinationAddressFromRole(role) {
+  const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
+  const addressLocator = locators.find((locator) => Number(locator?.LocatorType) === 1) || null;
+  if (!addressLocator) return "";
+
+  const metadata = addressLocator?.MetaData || addressLocator?.MetaDataObject || addressLocator?.metadata || {};
+  const parts = [
+    metadata?.Street1 || metadata?.street1 || "",
+    metadata?.Street2 || metadata?.street2 || "",
+    metadata?.City || metadata?.city || "",
+    metadata?.State || metadata?.state || "",
+    metadata?.PostalCode || metadata?.postalcode || metadata?.Postcode || metadata?.postcode || ""
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+
+  return parts.join(", ");
 }
 
 function pickBestCoreBridgeAddress(flatRecord) {
@@ -1041,31 +1080,7 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
-  const destinationRoleAddress = buildAddressFromRole(destinationRole);
-  const directRoleAddress = buildAddressFromAliases(flat, [
-    [
-      "contactroles.0.ordercontactrolelocators.0.metadata.street1",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.street1"
-    ],
-    [
-      "contactroles.0.ordercontactrolelocators.0.metadata.street2",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.street2"
-    ],
-    [
-      "contactroles.0.ordercontactrolelocators.0.metadata.city",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.city"
-    ],
-    [
-      "contactroles.0.ordercontactrolelocators.0.metadata.state",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.state"
-    ],
-    [
-      "contactroles.0.ordercontactrolelocators.0.metadata.postalcode",
-      "contactroles.0.ordercontactrolelocators.0.metadata.postcode",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.postalcode",
-      "ordercontactroles.0.ordercontactrolelocators.0.metadata.postcode"
-    ]
-  ]);
+  const destinationRoleAddress = buildDestinationAddressFromRole(destinationRole);
   const preferredRolePhone = buildPhoneFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
     "contactroles.0.ordercontactrolelocators.1.locator",
@@ -1114,7 +1129,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: preferredRolePhone || directRolePhone,
-    address: destinationRoleAddress || directRoleAddress || "",
+    address: destinationRoleAddress,
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
