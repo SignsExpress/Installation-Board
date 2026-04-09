@@ -4,6 +4,7 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 
 const DEFAULT_USERS_FILE = path.join(__dirname, "..", "data", "users.json");
+const PERMISSION_VALUES = ["admin", "user", "none"];
 const SEEDED_USERS = [
   { displayName: "Matt Rutlidge", role: "host" },
   { displayName: "Tom Van-Boyd", role: "host" },
@@ -33,6 +34,41 @@ function getUsersFile() {
   return DEFAULT_USERS_FILE;
 }
 
+function getDefaultPermissions(role) {
+  if (String(role || "").toLowerCase() === "host") {
+    return {
+      board: "admin",
+      installer: "admin"
+    };
+  }
+
+  return {
+    board: "user",
+    installer: "none"
+  };
+}
+
+function normalizePermissionValue(value, fallback) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return PERMISSION_VALUES.includes(normalized) ? normalized : fallback;
+}
+
+function normalizePermissions(permissions, role) {
+  const defaults = getDefaultPermissions(role);
+  return {
+    board: normalizePermissionValue(permissions?.board, defaults.board),
+    installer: normalizePermissionValue(permissions?.installer, defaults.installer)
+  };
+}
+
+function deriveRoleFromPermissions(permissions) {
+  if (permissions?.board === "user" && permissions?.installer === "none") {
+    return "client";
+  }
+
+  return "host";
+}
+
 function normalizeStore(parsed) {
   const users = Array.isArray(parsed?.users) ? parsed.users : [];
   const map = new Map(users.map((user) => [String(user.displayName || "").toLowerCase(), user]));
@@ -43,6 +79,7 @@ function normalizeStore(parsed) {
     if (existing) {
       existing.role = seeded.role;
       existing.displayName = seeded.displayName;
+      existing.permissions = normalizePermissions(existing.permissions, existing.role);
       continue;
     }
 
@@ -50,10 +87,15 @@ function normalizeStore(parsed) {
       id: makeId(),
       displayName: seeded.displayName,
       role: seeded.role,
+      permissions: getDefaultPermissions(seeded.role),
       passwordSalt: "",
       passwordHash: "",
       passwordUpdatedAt: ""
     });
+  }
+
+  for (const user of users) {
+    user.permissions = normalizePermissions(user.permissions, user.role);
   }
 
   users.sort((left, right) => {
@@ -113,10 +155,12 @@ function verifyPassword(password, user) {
 }
 
 function sanitizeUser(user) {
+  const permissions = normalizePermissions(user.permissions, user.role);
   return {
     id: user.id,
     displayName: user.displayName,
-    role: user.role,
+    role: deriveRoleFromPermissions(permissions),
+    permissions,
     hasPassword: Boolean(user.passwordHash)
   };
 }
@@ -135,6 +179,19 @@ async function setUserPassword(displayName, password) {
   user.passwordSalt = passwordSalt;
   user.passwordHash = passwordHash;
   user.passwordUpdatedAt = new Date().toISOString();
+  await writeUsersStore(store);
+  return sanitizeUser(user);
+}
+
+async function updateUserPermissions(userId, permissions) {
+  const store = await readUsersStore();
+  const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
+
+  if (!user) {
+    throw new Error(`No user found for id "${userId}".`);
+  }
+
+  user.permissions = normalizePermissions(permissions, user.role);
   await writeUsersStore(store);
   return sanitizeUser(user);
 }
@@ -185,6 +242,7 @@ module.exports = {
   readUsersStore,
   sanitizeUser,
   setUserPassword,
+  updateUserPermissions,
   verifyPassword,
   writeUsersStore
 };

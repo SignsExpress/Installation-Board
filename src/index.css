@@ -1368,6 +1368,84 @@ button {
   cursor: not-allowed;
 }
 
+.permissions-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.permissions-head {
+  display: grid;
+  gap: 6px;
+}
+
+.permissions-head p {
+  margin: 0;
+  color: #64748b;
+}
+
+.permissions-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.permissions-user-card {
+  border: 1px solid rgba(199, 183, 210, 0.5);
+  border-radius: 24px;
+  padding: 18px;
+  background: linear-gradient(180deg, rgba(252, 251, 253, 0.95) 0%, rgba(245, 239, 248, 0.9) 100%);
+  display: grid;
+  gap: 14px;
+}
+
+.permissions-user-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.permissions-owner-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--sx-main-soft);
+  color: var(--sx-main);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.permissions-app-row {
+  display: grid;
+  gap: 8px;
+}
+
+.permissions-app-label {
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.permission-segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.permission-chip {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #475569;
+  font-weight: 700;
+}
+
+.permission-chip.active {
+  background: var(--sx-main-soft);
+  border-color: #c7b7d2;
+  color: var(--sx-main);
+}
+
 .installer-layout {
   grid-template-columns: minmax(340px, 420px) minmax(0, 1fr);
 }

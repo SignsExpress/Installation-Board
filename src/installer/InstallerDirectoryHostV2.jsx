@@ -39,7 +39,7 @@ function createMessage(text, tone = "success") {
   return { text, tone, id: `${Date.now()}-${Math.random()}` };
 }
 
-export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
+export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOnly = false }) {
   const [installers, setInstallers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -67,7 +67,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
       try {
         const [installersResponse, requestsResponse, statusResponse] = await Promise.all([
           fetch("/api/installers"),
-          fetch("/api/requests"),
+          readOnly ? Promise.resolve({ ok: false }) : fetch("/api/requests"),
           fetch("/api/installers/status")
         ]);
 
@@ -211,6 +211,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
   }
 
   function editInstaller(installer) {
+    if (readOnly) return;
     setForm({
       id: installer.id || "",
       name: installer.name || "",
@@ -229,6 +230,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
   }
 
   async function handleDelete(id) {
+    if (readOnly) return;
     try {
       await removeInstaller(id);
       showSavedMessage("Installer deleted.");
@@ -283,6 +285,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
   }
 
   function reviewRequest(requestItem) {
+    if (readOnly) return;
     setForm({
       id: requestItem.id || "",
       name: requestItem.name || "",
@@ -309,7 +312,11 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
             <button type="button" className="host-nav-link" onClick={() => navigate("/")}>
               Home
             </button>
-            <button type="button" className="host-nav-link" onClick={() => navigate("/board")}>
+            <button
+              type="button"
+              className="host-nav-link"
+              onClick={() => navigate(currentUser?.permissions?.board === "admin" ? "/board" : "/client/board")}
+            >
               Installation Board
             </button>
             <button type="button" className="host-nav-link active" onClick={() => navigate("/installer")}>
@@ -507,14 +514,16 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
                             </span>
                           ))}
                         </div>
-                        <div className="card-actions form-actions compact-card-actions">
-                          <button className="ghost-button" onClick={() => editInstaller(installer)} disabled={trailMode}>
-                            Edit
-                          </button>
-                          <button className="danger-button" onClick={() => handleDelete(installer.id)}>
-                            Delete
-                          </button>
-                        </div>
+                        {!readOnly ? (
+                          <div className="card-actions form-actions compact-card-actions">
+                            <button className="ghost-button" onClick={() => editInstaller(installer)} disabled={trailMode}>
+                              Edit
+                            </button>
+                            <button className="danger-button" onClick={() => handleDelete(installer.id)}>
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
                       </article>
                     );
                   })}
@@ -524,6 +533,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
           </section>
         </div>
 
+        {!readOnly ? (
         <section className="card form-card request-form-card collapsed-form-card">
           <button
             type="button"
@@ -679,6 +689,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
             </div>
           ) : null}
         </section>
+        ) : null}
       </div>
 
       {activeInstaller ? (
@@ -735,18 +746,20 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout }) {
                   <div className="mini-head">Notes</div>
                   <p className="notes">{displayInstaller.notes || "No notes added."}</p>
                 </div>
-                <div className="form-actions">
-                  <button
-                    className="primary-button"
-                    onClick={() => {
-                      editInstaller(activeInstaller);
-                      setActiveInstaller(null);
-                    }}
-                    disabled={trailMode}
-                  >
-                    Edit installer
-                  </button>
-                </div>
+                {!readOnly ? (
+                  <div className="form-actions">
+                    <button
+                      className="primary-button"
+                      onClick={() => {
+                        editInstaller(activeInstaller);
+                        setActiveInstaller(null);
+                      }}
+                      disabled={trailMode}
+                    >
+                      Edit installer
+                    </button>
+                  </div>
+                ) : null}
               </div>
             );
           })()}

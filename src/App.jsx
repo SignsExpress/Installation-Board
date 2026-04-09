@@ -21,6 +21,12 @@ const INSTALLER_OPTIONS = [
   { value: "Custom", colorClass: "installer-custom" }
 ];
 
+const PERMISSION_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "user", label: "User" },
+  { value: "none", label: "No Access" }
+];
+
 const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
 const HOLIDAY_PERSON_COLORS = {
   "Matt R": "holiday-person-black",
@@ -71,14 +77,56 @@ function toInitials(name) {
     .join("");
 }
 
+function getPermissionForApp(user, key) {
+  const fallback =
+    key === "board"
+      ? user?.role === "host"
+        ? "admin"
+        : "user"
+      : user?.role === "host"
+        ? "admin"
+        : "none";
+  const value = String(user?.permissions?.[key] || "").trim().toLowerCase();
+  return ["admin", "user", "none"].includes(value) ? value : fallback;
+}
+
+function canAccessBoard(user) {
+  return getPermissionForApp(user, "board") !== "none";
+}
+
+function canEditBoard(user) {
+  return getPermissionForApp(user, "board") === "admin";
+}
+
+function canAccessInstaller(user) {
+  return getPermissionForApp(user, "installer") !== "none";
+}
+
+function canEditInstaller(user) {
+  return getPermissionForApp(user, "installer") === "admin";
+}
+
+function usesHostShell(user) {
+  return Boolean(user && (canAccessInstaller(user) || canEditBoard(user) || user.canManagePermissions));
+}
+
+function getHomePathForUser(user) {
+  return usesHostShell(user) ? "/" : "/client";
+}
+
+function getBoardPathForUser(user) {
+  return canEditBoard(user) ? "/board" : "/client/board";
+}
+
 function MainNavBar({ currentUser, active = "home", onLogout }) {
   function goTo(path) {
     window.location.assign(path);
   }
 
-  const isClientUser = currentUser?.role === "client";
-  const homePath = isClientUser ? "/client" : "/";
-  const boardPath = isClientUser ? "/client/board" : "/board";
+  const boardAllowed = canAccessBoard(currentUser);
+  const installerAllowed = canAccessInstaller(currentUser);
+  const homePath = getHomePathForUser(currentUser);
+  const boardPath = getBoardPathForUser(currentUser);
   const installerPath = "/installer";
 
   return (
@@ -93,19 +141,23 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
         </button>
         <button
           type="button"
-          className={`host-nav-link ${active === "board" ? "active" : ""}`}
-          onClick={() => goTo(boardPath)}
+          className={`host-nav-link ${active === "board" ? "active" : ""} ${!boardAllowed ? "disabled" : ""}`}
+          onClick={() => {
+            if (!boardAllowed) return;
+            goTo(boardPath);
+          }}
+          disabled={!boardAllowed}
         >
           Installation Board
         </button>
         <button
           type="button"
-          className={`host-nav-link ${active === "installer" ? "active" : ""} ${isClientUser ? "disabled" : ""}`}
+          className={`host-nav-link ${active === "installer" ? "active" : ""} ${!installerAllowed ? "disabled" : ""}`}
           onClick={() => {
-            if (isClientUser) return;
+            if (!installerAllowed) return;
             goTo(installerPath);
           }}
-          disabled={isClientUser}
+          disabled={!installerAllowed}
         >
           Subcontractor Directory
         </button>
@@ -120,7 +172,70 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
   );
 }
 
-function HostLandingPage({ currentUser, onLogout }) {
+function PermissionsPanel({ currentUser, users, savingKey, onChangePermission }) {
+  const visibleUsers = [...users].sort((left, right) => left.displayName.localeCompare(right.displayName));
+
+  return (
+    <section className="panel permissions-panel">
+      <div className="permissions-head">
+        <h3>Permissions</h3>
+        <p>Choose each person&apos;s access level for the Installation Board and Subcontractor Directory.</p>
+      </div>
+      <div className="permissions-grid">
+        {visibleUsers.map((user) => {
+          const isSelf = user.id === currentUser.id;
+          const boardPermission = getPermissionForApp(user, "board");
+          const installerPermission = getPermissionForApp(user, "installer");
+
+          return (
+            <article key={user.id} className="permissions-user-card">
+              <div className="permissions-user-head">
+                <strong>{user.displayName}</strong>
+                {isSelf ? <span className="permissions-owner-pill">Owner</span> : null}
+              </div>
+
+              <div className="permissions-app-row">
+                <span className="permissions-app-label">Installation Board</span>
+                <div className="permission-segment">
+                  {PERMISSION_OPTIONS.map((option) => (
+                    <button
+                      key={`${user.id}-board-${option.value}`}
+                      type="button"
+                      className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
+                      disabled={isSelf || savingKey === `${user.id}:board`}
+                      onClick={() => onChangePermission(user.id, "board", option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="permissions-app-row">
+                <span className="permissions-app-label">Subcontractor Directory</span>
+                <div className="permission-segment">
+                  {PERMISSION_OPTIONS.map((option) => (
+                    <button
+                      key={`${user.id}-installer-${option.value}`}
+                      type="button"
+                      className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
+                      disabled={isSelf || savingKey === `${user.id}:installer`}
+                      onClick={() => onChangePermission(user.id, "installer", option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePermission }) {
   function goTo(path) {
     window.location.assign(path);
   }
@@ -135,15 +250,40 @@ function HostLandingPage({ currentUser, onLogout }) {
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
-            <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
+            <button
+              className={`host-launch-card ${!canAccessInstaller(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessInstaller(currentUser)) return;
+                goTo("/installer");
+              }}
+              disabled={!canAccessInstaller(currentUser)}
+            >
               <strong>Subcontractor Database</strong>
             </button>
 
-            <button className="host-launch-card" type="button" onClick={() => goTo("/board")}>
+            <button
+              className={`host-launch-card ${!canAccessBoard(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessBoard(currentUser)) return;
+                goTo(getBoardPathForUser(currentUser));
+              }}
+              disabled={!canAccessBoard(currentUser)}
+            >
               <strong>Installation Board</strong>
             </button>
           </div>
         </section>
+
+        {currentUser?.canManagePermissions ? (
+          <PermissionsPanel
+            currentUser={currentUser}
+            users={users}
+            savingKey={savingKey}
+            onChangePermission={onChangePermission}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -168,7 +308,7 @@ function ClientLandingPage({ currentUser, onLogout }) {
               <strong>Subcontractor Directory</strong>
             </button>
 
-            <button className="host-launch-card" type="button" onClick={() => goTo("/client/board")}>
+            <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
               <strong>Installation Board</strong>
             </button>
           </div>
@@ -212,29 +352,35 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [permissionSavingKey, setPermissionSavingKey] = useState("");
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
-  const isHostUser = currentUser?.role === "host";
-  const isClientUser = currentUser?.role === "client";
-  const isClientMode = isClientUser;
-  const showInstallerDirectory = Boolean(currentUser && isHostUser && isInstallerRoute);
-  const showBoard = Boolean(currentUser && (isBoardRoute || (isClientUser && isClientBoardRoute)));
-  const showHostLanding = Boolean(currentUser && isHostUser && !isInstallerRoute && !isBoardRoute);
-  const showClientLanding = Boolean(currentUser && isClientUser && !isClientBoardRoute);
+  const boardEditable = canEditBoard(currentUser);
+  const hostShellMode = usesHostShell(currentUser);
+  const isClientMode = currentUser ? !boardEditable : false;
+  const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
+  const showBoard = Boolean(
+    currentUser &&
+      canAccessBoard(currentUser) &&
+      ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
+  );
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute);
 
   useEffect(() => {
     let active = true;
 
     async function loadAuth() {
       try {
-        const [usersResponse, meResponse] = await Promise.all([
-          fetch("/api/auth/users"),
-          fetch("/api/auth/me")
-        ]);
-
-        const usersPayload = usersResponse.ok ? await usersResponse.json() : [];
+        const meResponse = await fetch("/api/auth/me");
         const mePayload = meResponse.ok ? await meResponse.json() : null;
+        let usersPayload = [];
+
+        if (mePayload?.user) {
+          const usersResponse = await fetch("/api/auth/users");
+          usersPayload = usersResponse.ok ? await usersResponse.json() : [];
+        }
 
         if (!active) return;
 
@@ -296,15 +442,33 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) return;
-    if (currentUser.role === "client" && !isClientRoute) {
-      window.location.replace("/client");
+    const nextHomePath = getHomePathForUser(currentUser);
+    const nextBoardPath = getBoardPathForUser(currentUser);
+
+    if (isInstallerRoute && !canAccessInstaller(currentUser)) {
+      window.location.replace(nextHomePath);
       return;
     }
 
-    if (currentUser.role === "host" && isClientRoute) {
-      window.location.replace("/");
+    if ((isBoardRoute || isClientBoardRoute) && !canAccessBoard(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
     }
-  }, [currentUser, isClientRoute]);
+
+    if (hostShellMode && isClientRoute && !isClientBoardRoute) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
+    if (!hostShellMode && !isClientRoute) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
+    if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
+      window.location.replace(nextBoardPath);
+    }
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -441,13 +605,7 @@ export default function App() {
 
       setCurrentUser(payload.user);
       setLoginPassword("");
-      if (payload.user?.role === "client" && !isClientRoute) {
-        window.location.replace("/client");
-        return;
-      }
-      if (payload.user?.role === "host" && isClientRoute) {
-        window.location.replace("/");
-      }
+      window.location.replace(getHomePathForUser(payload.user));
     } catch (error) {
       console.error(error);
       setLoginError(error.message || "Could not sign in.");
@@ -468,11 +626,43 @@ export default function App() {
       setHolidays([]);
       setLoginPassword("");
       setLoginError("");
-      if (isClientRoute) {
-        window.location.replace("/client");
-      } else {
-        window.location.replace("/");
+      window.location.replace(isClientRoute ? "/client" : "/");
+    }
+  }
+
+  async function handlePermissionChange(userId, appKey, value) {
+    const targetUser = loginUsers.find((entry) => entry.id === userId);
+    if (!targetUser || !currentUser?.canManagePermissions) return;
+
+    const nextPermissions = {
+      board: getPermissionForApp(targetUser, "board"),
+      installer: getPermissionForApp(targetUser, "installer"),
+      [appKey]: value
+    };
+
+    setPermissionSavingKey(`${userId}:${appKey}`);
+
+    try {
+      const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/permissions`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nextPermissions)
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not update permissions.");
       }
+
+      setLoginUsers((current) =>
+        current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
+      );
+      setMessage(createMessage(`Updated ${targetUser.displayName}'s permissions.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update permissions.", "error"));
+    } finally {
+      setPermissionSavingKey("");
     }
   }
 
@@ -931,7 +1121,15 @@ export default function App() {
   }
 
   if (showHostLanding) {
-    return <HostLandingPage currentUser={currentUser} onLogout={handleLogout} />;
+    return (
+      <HostLandingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        users={loginUsers}
+        savingKey={permissionSavingKey}
+        onChangePermission={handlePermissionChange}
+      />
+    );
   }
 
   if (showClientLanding) {
@@ -939,7 +1137,7 @@ export default function App() {
   }
 
   if (showInstallerDirectory) {
-    return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} />;
+    return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;
   }
 
   return (

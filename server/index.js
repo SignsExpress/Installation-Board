@@ -9,6 +9,7 @@ const {
   ensureUsersFile,
   readUsersStore,
   sanitizeUser,
+  updateUserPermissions,
   verifyPassword
 } = require("./auth-store");
 
@@ -157,6 +158,61 @@ function clearExpiredSessions() {
 function requireHost(request, response) {
   if (request.user?.role === "host") return true;
   response.status(403).json({ error: "Host access required." });
+  return false;
+}
+
+function getUserPermission(user, key, fallback = "none") {
+  const value = String(user?.permissions?.[key] || "").trim().toLowerCase();
+  return ["admin", "user", "none"].includes(value) ? value : fallback;
+}
+
+function canAccessBoard(user) {
+  return getUserPermission(user, "board", user?.role === "host" ? "admin" : "user") !== "none";
+}
+
+function canEditBoard(user) {
+  return getUserPermission(user, "board", user?.role === "host" ? "admin" : "user") === "admin";
+}
+
+function canAccessInstaller(user) {
+  return getUserPermission(user, "installer", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditInstaller(user) {
+  return getUserPermission(user, "installer", user?.role === "host" ? "admin" : "none") === "admin";
+}
+
+function canManagePermissions(user) {
+  return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
+}
+
+function requireBoardAccess(request, response) {
+  if (canAccessBoard(request.user)) return true;
+  response.status(403).json({ error: "Board access required." });
+  return false;
+}
+
+function requireBoardAdmin(request, response) {
+  if (canEditBoard(request.user)) return true;
+  response.status(403).json({ error: "Board admin access required." });
+  return false;
+}
+
+function requireInstallerAccess(request, response) {
+  if (canAccessInstaller(request.user)) return true;
+  response.status(403).json({ error: "Subcontractor directory access required." });
+  return false;
+}
+
+function requireInstallerAdmin(request, response) {
+  if (canEditInstaller(request.user)) return true;
+  response.status(403).json({ error: "Subcontractor directory admin access required." });
+  return false;
+}
+
+function requirePermissionsManager(request, response) {
+  if (canManagePermissions(request.user)) return true;
+  response.status(403).json({ error: "Permissions manager access required." });
   return false;
 }
 
@@ -1910,8 +1966,21 @@ function createServer() {
   });
 
   app.get("/api/auth/users", async (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
     const store = await readUsersStore();
-    response.json(store.users.map(sanitizeUser));
+    const users = canManagePermissions(session.user)
+      ? store.users
+      : store.users.filter((user) => String(user.id || "") === String(session.user.id || ""));
+
+    response.json(users.map((user) => ({
+      ...sanitizeUser(user),
+      canManagePermissions: canManagePermissions(sanitizeUser(user))
+    })));
   });
 
   app.get("/api/auth/me", (request, response) => {
@@ -1921,7 +1990,12 @@ function createServer() {
       return;
     }
 
-    response.json({ user: session.user });
+    response.json({
+      user: {
+        ...session.user,
+        canManagePermissions: canManagePermissions(session.user)
+      }
+    });
   });
 
   app.post("/api/auth/login", async (request, response) => {
@@ -1943,6 +2017,10 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser)) {
+      response.status(403).json({ error: "That account does not have access." });
+      return;
+    }
     const { sessionId, expiresAt } = createSession(sessionUser);
     response.setHeader("Set-Cookie", serializeSessionCookie(sessionId, { expiresAt }));
     response.json({ user: sessionUser });
@@ -1955,6 +2033,27 @@ function createServer() {
     }
     response.setHeader("Set-Cookie", serializeSessionCookie("", { clear: true }));
     response.json({ ok: true });
+  });
+
+  app.patch("/api/auth/users/:id/permissions", async (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
+    request.user = session.user;
+    if (!requirePermissionsManager(request, response)) return;
+
+    try {
+      const updatedUser = await updateUserPermissions(request.params.id, {
+        board: request.body?.board,
+        installer: request.body?.installer
+      });
+      response.json({ user: updatedUser });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Could not update permissions." });
+    }
   });
 
   app.use("/api", (request, response, next) => {
@@ -1978,24 +2077,26 @@ function createServer() {
   });
 
   app.get("/api/board", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
     const payload = await getBoardPayload();
     response.json(payload.board);
   });
 
   app.get("/api/jobs", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
     const store = await readStore();
     response.json(store.jobs);
   });
 
   app.get("/api/installers", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAccess(request, response)) return;
     const installers = await readInstallersStore();
     console.log(`Serving ${installers.length} installers from ${getInstallersFile()}`);
     response.json(installers);
   });
 
   app.get("/api/installers/status", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAccess(request, response)) return;
     const installers = await readInstallersStore();
     const requests = await readRequestsStore();
     response.json({
@@ -2005,7 +2106,7 @@ function createServer() {
   });
 
   app.get("/api/installers/debug", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAccess(request, response)) return;
 
     const candidates = [
       LEGACY_INSTALLERS_FILE,
@@ -2027,12 +2128,12 @@ function createServer() {
   });
 
   app.get("/api/requests", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAdmin(request, response)) return;
     response.json(await readRequestsStore());
   });
 
 app.get("/api/corebridge/orders", async (request, response) => {
-  if (!requireHost(request, response)) return;
+  if (!requireBoardAdmin(request, response)) return;
   try {
     const searchTerm = String(request.query.q || "").trim();
     const includeDebug = String(request.query.debug || "").trim() === "1";
@@ -2051,7 +2152,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.get("/api/corebridge/orders/:id", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     try {
       const orderId = String(request.params.id || "").trim();
       const includeDebug = String(request.query.debug || "").trim() === "1";
@@ -2088,7 +2189,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.get("/api/corebridge/orders/:id/destination-debug", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     try {
       const orderId = String(request.params.id || "").trim();
       if (!orderId) {
@@ -2114,7 +2215,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.post("/api/jobs", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     const nextJob = sanitizeJob(request.body || {});
     if (!nextJob.customerName || !isValidIsoDate(nextJob.date)) {
       response.status(400).json({ error: "A valid date and customer name are required." });
@@ -2141,7 +2242,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.delete("/api/jobs/:id", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     const store = await readStore();
     store.jobs = store.jobs.filter((job) => job.id !== request.params.id);
     const savedStore = await writeStore(store);
@@ -2155,7 +2256,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.post("/api/installers", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAdmin(request, response)) return;
     const nextInstaller = sanitizeInstaller(request.body || {});
 
     if (!nextInstaller.name) {
@@ -2177,7 +2278,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.post("/api/requests", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAdmin(request, response)) return;
     const nextRequest = sanitizeRequest(request.body || {});
 
     if (!nextRequest.name && !nextRequest.company) {
@@ -2199,26 +2300,27 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.delete("/api/installers/:id", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAdmin(request, response)) return;
     const installers = await readInstallersStore();
     const filtered = installers.filter((installer) => installer.id !== request.params.id);
     response.json(await writeInstallersStore(filtered));
   });
 
   app.delete("/api/requests/:id", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireInstallerAdmin(request, response)) return;
     const requests = await readRequestsStore();
     const filtered = requests.filter((requestItem) => requestItem.id !== request.params.id);
     response.json(await writeRequestsStore(filtered));
   });
 
   app.get("/api/holidays", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
     const store = await readStore();
     response.json(store.holidays);
   });
 
   app.post("/api/holidays", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     const nextHoliday = sanitizeStaffHoliday(request.body || {});
     if (!nextHoliday.person || !isValidIsoDate(nextHoliday.date)) {
       response.status(400).json({ error: "A valid date and person are required." });
@@ -2245,7 +2347,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.delete("/api/holidays/:id", async (request, response) => {
-    if (!requireHost(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
     const store = await readStore();
     store.holidays = store.holidays.filter((item) => item.id !== request.params.id);
     const savedStore = await writeStore(store);
