@@ -1311,12 +1311,12 @@ function pickDestinationLookupId(record) {
   if (!record || typeof record !== "object") return "";
 
   return String(
-    record?.ID ??
+    record?.DestinationID ??
+      record?.destinationId ??
+      record?.ID ??
       record?.id ??
       record?.OrderDestinationID ??
       record?.orderDestinationId ??
-      record?.DestinationID ??
-      record?.destinationId ??
       ""
   ).trim();
 }
