@@ -205,9 +205,6 @@ export default function App() {
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
   const [orderLookupResults, setOrderLookupResults] = useState([]);
   const [orderLookupError, setOrderLookupError] = useState("");
-  const [orderLookupDebugMode, setOrderLookupDebugMode] = useState(false);
-  const [activeCoreBridgeDebugOrder, setActiveCoreBridgeDebugOrder] = useState(null);
-  const [coreBridgeDebugView, setCoreBridgeDebugView] = useState("fields");
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loginUsers, setLoginUsers] = useState([]);
@@ -484,7 +481,7 @@ export default function App() {
     setHolidays(Array.isArray(nextHolidays) ? nextHolidays : []);
   }
 
-  async function searchCoreBridgeOrders(searchTerm = orderLookupQuery, debugMode = orderLookupDebugMode) {
+  async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
     if (isClientMode) return;
 
     try {
@@ -493,7 +490,6 @@ export default function App() {
       const query = String(searchTerm || "").trim();
       const params = new URLSearchParams();
       if (query) params.set("q", query);
-      if (debugMode) params.set("debug", "1");
       const url = params.toString() ? `/api/corebridge/orders?${params.toString()}` : "/api/corebridge/orders";
       const response = await fetch(url);
       const raw = await response.text();
@@ -522,8 +518,6 @@ export default function App() {
   async function openOrderLookup() {
     setOrderLookupOpen(true);
     setOrderLookupError("");
-    setActiveCoreBridgeDebugOrder(null);
-    setCoreBridgeDebugView("fields");
   }
 
   async function applyCoreBridgeOrder(order) {
@@ -533,11 +527,7 @@ export default function App() {
       if (order?.id) {
         setOrderLookupLoading(true);
         setOrderLookupError("");
-        const params = new URLSearchParams();
-        if (orderLookupDebugMode) params.set("debug", "1");
-        const url = params.toString()
-          ? `/api/corebridge/orders/${encodeURIComponent(order.id)}?${params.toString()}`
-          : `/api/corebridge/orders/${encodeURIComponent(order.id)}`;
+        const url = `/api/corebridge/orders/${encodeURIComponent(order.id)}`;
         const response = await fetch(url);
         const raw = await response.text();
         const payload = raw ? JSON.parse(raw) : {};
@@ -565,7 +555,6 @@ export default function App() {
       notes: resolvedOrder.notes ?? ""
     }));
     setOrderLookupOpen(false);
-    setActiveCoreBridgeDebugOrder(null);
     setMessage(createMessage("Order details copied into the job form.", "success"));
   }
 
@@ -1383,16 +1372,6 @@ export default function App() {
               <button className="primary-button" type="button" onClick={() => searchCoreBridgeOrders(orderLookupQuery)} disabled={orderLookupLoading}>
                 {orderLookupLoading ? "Searching..." : "Search"}
               </button>
-              <button
-                className={`ghost-button ${orderLookupDebugMode ? "active-debug-toggle" : ""}`}
-                type="button"
-                onClick={() => {
-                  setOrderLookupDebugMode((current) => !current);
-                  setActiveCoreBridgeDebugOrder(null);
-                }}
-              >
-                {orderLookupDebugMode ? "Debug on" : "Debug off"}
-              </button>
             </div>
 
             {orderLookupError ? <div className="flash error">{orderLookupError}</div> : null}
@@ -1417,30 +1396,10 @@ export default function App() {
                       <span><b>Number:</b> {order.number || "-"}</span>
                     </div>
                     <p className="order-result-address"><b>Address:</b> {order.address || "-"}</p>
-                    {orderLookupDebugMode ? (
-                      <div className="order-result-debug">
-                        <span><b>Detail fetch:</b> {order._detailFetched ? `ok (${order._detailOrderId})` : `fallback (${order._detailError || "no detail"})`}</span>
-                        <span><b>Normalized description:</b> {order.description || "-"}</span>
-                        <span><b>Normalized number:</b> {order.number || "-"}</span>
-                        <span><b>Normalized address:</b> {order.address || "-"}</span>
-                      </div>
-                    ) : null}
                     <div className="order-result-actions">
                       <button className="primary-button" type="button" onClick={() => applyCoreBridgeOrder(order)}>
                         Use this order
                       </button>
-                      {orderLookupDebugMode ? (
-                        <button
-                  className="ghost-button"
-                          type="button"
-                          onClick={() => {
-                            setActiveCoreBridgeDebugOrder(order);
-                            setCoreBridgeDebugView("fields");
-                          }}
-                        >
-                          Inspect fields
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 ))
@@ -1448,60 +1407,6 @@ export default function App() {
                 <div className="board-loading compact">No CoreBridge orders found yet.</div>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
-      {!isClientMode && activeCoreBridgeDebugOrder ? (
-        <div className="modal-backdrop" onClick={() => setActiveCoreBridgeDebugOrder(null)}>
-          <div className="modal corebridge-debug-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <h3>CoreBridge Field Debug</h3>
-                <p>
-                  {activeCoreBridgeDebugOrder.orderReference || "No order ref"} -{" "}
-                  {activeCoreBridgeDebugOrder.customerName || "Unnamed customer"}
-                </p>
-              </div>
-              <button className="icon-button" type="button" onClick={() => setActiveCoreBridgeDebugOrder(null)}>
-                x
-              </button>
-            </div>
-            <div className="corebridge-debug-switches">
-              <button
-                type="button"
-                className={`ghost-button ${coreBridgeDebugView === "fields" ? "active-debug-toggle" : ""}`}
-                onClick={() => setCoreBridgeDebugView("fields")}
-              >
-                Flattened fields
-              </button>
-              <button
-                type="button"
-                className={`ghost-button ${coreBridgeDebugView === "raw" ? "active-debug-toggle" : ""}`}
-                onClick={() => setCoreBridgeDebugView("raw")}
-              >
-                Raw JSON
-              </button>
-            </div>
-            <div className="corebridge-debug-help">
-              <strong>Tell me which variable has the right value.</strong>
-              <span>
-                {coreBridgeDebugView === "fields"
-                  ? "Left column is the field name from CoreBridge. Right column is the value."
-                  : "Open Raw JSON and search for the exact text, for example Wigton - Valve Markers."}
-              </span>
-            </div>
-            {coreBridgeDebugView === "fields" ? (
-              <div className="corebridge-debug-table">
-                {(activeCoreBridgeDebugOrder.debugFields || []).map((field) => (
-                  <div key={field.key} className="corebridge-debug-row">
-                    <div className="corebridge-debug-key">{field.key}</div>
-                    <div className="corebridge-debug-value">{field.value}</div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <pre className="corebridge-debug-raw">{activeCoreBridgeDebugOrder.debugRaw || "{}"}</pre>
-            )}
           </div>
         </div>
       ) : null}
