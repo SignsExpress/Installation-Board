@@ -1198,6 +1198,7 @@ function normalizeCoreBridgeOrder(record, index) {
     record?.Description ||
     ""
   ).trim();
+  const orderDestinationAddress = getOrderDestinationAddressFromOrderRecord(record);
   const destinationRoleAddress =
     buildAddressFromRole(destinationRole) ||
     pickDestinationAddressFromFlat(flat);
@@ -1249,7 +1250,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: preferredRolePhone || directRolePhone,
-    address: destinationRoleAddress,
+    address: orderDestinationAddress || destinationRoleAddress,
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
@@ -1314,6 +1315,19 @@ function pickBestCoreBridgeDestinationRecord(records) {
     }) ||
     records[0]
   );
+}
+
+function pickBestOrderDestinationRecord(record) {
+  const destinations = Array.isArray(record?.Destinations) ? record.Destinations : [];
+  if (!destinations.length) return null;
+
+  return destinations.find((destination) => destination?.IsDefault) || destinations[0];
+}
+
+function getOrderDestinationAddressFromOrderRecord(record) {
+  const destinationRecord = pickBestOrderDestinationRecord(record);
+  if (!destinationRecord) return "";
+  return getCoreBridgeDestinationAddressFromRecord(destinationRecord);
 }
 
 function pickDestinationLookupId(record) {
