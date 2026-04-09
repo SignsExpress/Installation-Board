@@ -2166,6 +2166,29 @@ button {
 }
 
 @media (max-width: 780px) {
+  .host-nav {
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 18px;
+  }
+
+  .host-nav-links,
+  .host-nav-meta {
+    gap: 8px;
+  }
+
+  .host-nav-link,
+  .host-nav-logout {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.92rem;
+  }
+
+  .host-nav-user {
+    font-size: 0.9rem;
+    line-height: 1.25;
+  }
+
   .app-shell {
     padding: 14px;
   }
