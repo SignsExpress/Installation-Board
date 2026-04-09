@@ -379,6 +379,7 @@ export default function App() {
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
   const boardEditable = canEditBoard(currentUser);
+  const installerEditable = canEditInstaller(currentUser);
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
