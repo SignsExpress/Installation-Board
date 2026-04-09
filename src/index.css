@@ -981,20 +981,20 @@ button {
 
 .job-placeholder-watermark {
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(-18deg) scale(1.05);
-  font-size: clamp(0.92rem, 2vw, 1.2rem);
+  inset: -8% -10%;
+  display: block;
+  transform: rotate(-15deg);
+  transform-origin: top left;
+  font-size: clamp(0.9rem, 1.4vw, 1.1rem);
   font-weight: 800;
-  letter-spacing: 0.18em;
-  color: rgba(185, 28, 28, 0.075);
+  letter-spacing: 0.16em;
+  color: rgba(185, 28, 28, 0.11);
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
-  line-height: 1.9;
-  text-align: center;
+  line-height: 1.42;
+  text-align: left;
+  word-spacing: 0.18em;
 }
 
 .drag-preview {
