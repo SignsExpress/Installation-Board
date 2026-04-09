@@ -1070,7 +1070,27 @@ function buildAddressFromRole(role) {
 function buildPhoneFromRole(role) {
   const phoneLocator = pickRoleLocator(role, 2);
   const locatorValue = String(phoneLocator?.Locator || "").trim();
-  return looksLikePhone(locatorValue) ? locatorValue : "";
+  if (looksLikePhone(locatorValue)) return locatorValue;
+
+  const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
+  for (const locator of locators) {
+    const metadata = locator?.MetaData || locator?.MetaDataObject || locator?.metadata || {};
+    const metadataPhone = String(
+      metadata?.BusinessPhone ||
+        metadata?.businessPhone ||
+        metadata?.businessphone ||
+        metadata?.Phone ||
+        metadata?.phone ||
+        metadata?.Telephone ||
+        metadata?.telephone ||
+        metadata?.Mobile ||
+        metadata?.mobile ||
+        ""
+    ).trim();
+    if (looksLikePhone(metadataPhone)) return metadataPhone;
+  }
+
+  return "";
 }
 
 function buildDestinationAddressFromRole(role) {
@@ -1199,6 +1219,7 @@ function normalizeCoreBridgeOrder(record, index) {
     ""
   ).trim();
   const orderDestinationAddress = getOrderDestinationAddressFromOrderRecord(record);
+  const orderDestinationPhone = getOrderDestinationPhoneFromOrderRecord(record);
   const destinationRoleAddress =
     buildAddressFromRole(destinationRole) ||
     pickDestinationAddressFromFlat(flat);
@@ -1249,7 +1270,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
-    number: preferredRolePhone || directRolePhone,
+    number: orderDestinationPhone || preferredRolePhone || directRolePhone,
     address: orderDestinationAddress || destinationRoleAddress,
     notes: pickFirst(flat, [
       "notes.0.note",
@@ -1328,6 +1349,38 @@ function getOrderDestinationAddressFromOrderRecord(record) {
   const destinationRecord = pickBestOrderDestinationRecord(record);
   if (!destinationRecord) return "";
   return getCoreBridgeDestinationAddressFromRecord(destinationRecord);
+}
+
+function getCoreBridgeDestinationPhoneFromRecord(record) {
+  if (!record || typeof record !== "object") return "";
+
+  const roles = getCoreBridgeRoles(record);
+  const matchingRole =
+    roles.find((role) => String(role?.RoleType || "").toLowerCase() === "shipto" && buildPhoneFromRole(role)) ||
+    roles.find((role) => buildPhoneFromRole(role)) ||
+    null;
+
+  if (matchingRole) {
+    return buildPhoneFromRole(matchingRole);
+  }
+
+  const flat = flattenRecord(record);
+  return pickFirstPhone(flat, [
+    "contactroles.0.ordercontactrolelocators.1.locator",
+    "ordercontactroles.0.ordercontactrolelocators.1.locator",
+    "contactroles.0.ordercontactrolelocators.0.metadata.businessphone",
+    "ordercontactroles.0.ordercontactrolelocators.0.metadata.businessphone",
+    "businessphone",
+    "phone",
+    "telephone",
+    "mobile"
+  ]);
+}
+
+function getOrderDestinationPhoneFromOrderRecord(record) {
+  const destinationRecord = pickBestOrderDestinationRecord(record);
+  if (!destinationRecord) return "";
+  return getCoreBridgeDestinationPhoneFromRecord(destinationRecord);
 }
 
 function pickDestinationLookupId(record) {
