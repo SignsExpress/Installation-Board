@@ -382,6 +382,8 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
+  const backdropPointerStartedRef = useRef(false);
+
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
     setEditingId("");
     setForm({ ...EMPTY_FORM, date: nextDate });
@@ -390,6 +392,32 @@ export default function App() {
     setOrderLookupQuery("");
     setOrderLookupResults([]);
     setOrderLookupError("");
+  }
+
+  function preserveScrollPosition() {
+    const currentScrollY = window.scrollY;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: currentScrollY, behavior: "auto" });
+    });
+  }
+
+  function openJobModal(nextDate, nextForm, nextEditingId = "") {
+    setEditingId(nextEditingId);
+    setForm(nextForm);
+    setJobModalDate(nextDate);
+    preserveScrollPosition();
+  }
+
+  function handleBackdropPointerDown(event) {
+    backdropPointerStartedRef.current = event.target === event.currentTarget;
+  }
+
+  function handleBackdropClick(event, onClose) {
+    const shouldClose = backdropPointerStartedRef.current && event.target === event.currentTarget;
+    backdropPointerStartedRef.current = false;
+    if (shouldClose) {
+      onClose();
+    }
   }
 
   async function handleLogin(event) {
@@ -449,9 +477,7 @@ export default function App() {
   }
 
   function editJob(job) {
-    setEditingId(job.id);
-    setJobModalDate(job.date);
-    setForm({
+    openJobModal(job.date, {
       id: job.id,
       date: job.date,
       orderReference: job.orderReference || "",
@@ -469,8 +495,7 @@ export default function App() {
       jobType: job.jobType || "Install",
       customJobType: job.customJobType || "",
       notes: job.notes || ""
-    });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    }, job.id);
   }
 
   async function refreshData() {
@@ -1049,13 +1074,11 @@ export default function App() {
                             disabled={isClientMode}
                             onClick={() => {
                               if (isClientMode) return;
-                              setJobModalDate(row.isoDate);
-                              setForm((current) => ({
+                              openJobModal(row.isoDate, {
                                 ...EMPTY_FORM,
                                 date: row.isoDate,
-                                jobType: current.jobType || "Install"
-                              }));
-                              setEditingId("");
+                                jobType: form.jobType || "Install"
+                              });
                             }}
                           >
                             {row.jobs.length === 0 ? <span className="muted">No jobs booked</span> : <span className="lane-add-label">{isClientMode ? "View only" : "Click anywhere here to add another job"}</span>}
@@ -1187,8 +1210,12 @@ export default function App() {
         </div>
       </div>
       {!isClientMode && jobModalDate ? (
-        <div className="modal-backdrop" onClick={() => resetForm()}>
-          <div className="modal job-modal" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal-backdrop"
+          onPointerDown={handleBackdropPointerDown}
+          onClick={(event) => handleBackdropClick(event, () => resetForm())}
+        >
+          <div className="modal job-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <h3>{editingId ? "Edit Job" : "Add Job"}</h3>
@@ -1346,8 +1373,12 @@ export default function App() {
         </div>
       ) : null}
       {!isClientMode && orderLookupOpen ? (
-        <div className="modal-backdrop" onClick={() => setOrderLookupOpen(false)}>
-          <div className="modal order-lookup-modal" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal-backdrop"
+          onPointerDown={handleBackdropPointerDown}
+          onClick={(event) => handleBackdropClick(event, () => setOrderLookupOpen(false))}
+        >
+          <div className="modal order-lookup-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <h3>Find CoreBridge Order</h3>
@@ -1413,8 +1444,12 @@ export default function App() {
         </div>
       ) : null}
       {isClientMode && activeClientJob ? (
-        <div className="modal-backdrop" onClick={() => setActiveClientJob(null)}>
-          <div className="modal client-detail-modal" onClick={(event) => event.stopPropagation()}>
+        <div
+          className="modal-backdrop"
+          onPointerDown={handleBackdropPointerDown}
+          onClick={(event) => handleBackdropClick(event, () => setActiveClientJob(null))}
+        >
+          <div className="modal client-detail-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
             <div className="modal-head">
               <div>
                 <h3>{activeClientJob.customerName}</h3>
