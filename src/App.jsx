@@ -167,11 +167,6 @@ function renderJobCardContent({
         }
       }}
     >
-      {job.isPlaceholder ? (
-        <div className="job-placeholder-watermark">
-          PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER
-        </div>
-      ) : null}
       <div className="job-card-top">
         <div className="job-title-wrap">
           <strong className="job-title-line">
@@ -181,6 +176,7 @@ function renderJobCardContent({
           <p>{job.description || "No description"}</p>
         </div>
         <div className="job-title-meta">
+          {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
           {installerLabels.length ? (
             <div className="job-title-installers">
               {installerLabels.map((installer) => {

@@ -929,6 +929,15 @@ button {
   overflow: hidden;
 }
 
+.job-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: transparent;
+  transition: width 120ms ease;
+}
+
 .job-type-install-card {
   background: #fff5f5;
   border-color: #fca5a5;
@@ -970,8 +979,8 @@ button {
 }
 
 .job-card.is-placeholder {
-  border-color: rgba(239, 68, 68, 0.35);
-  background: linear-gradient(180deg, rgba(255, 250, 250, 0.98) 0%, rgba(254, 242, 242, 0.96) 100%);
+  border-color: rgba(245, 158, 11, 0.38);
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98) 0%, rgba(255, 247, 237, 0.96) 100%);
 }
 
 .job-card.is-placeholder > * {
@@ -979,22 +988,9 @@ button {
   z-index: 1;
 }
 
-.job-placeholder-watermark {
-  position: absolute;
-  inset: -8% -10%;
-  display: block;
-  transform: rotate(-15deg);
-  transform-origin: top left;
-  font-size: clamp(0.9rem, 1.4vw, 1.1rem);
-  font-weight: 800;
-  letter-spacing: 0.16em;
-  color: rgba(185, 28, 28, 0.11);
-  pointer-events: none;
-  z-index: 0;
-  overflow: hidden;
-  line-height: 1.42;
-  text-align: left;
-  word-spacing: 0.18em;
+.job-card.is-placeholder::before {
+  width: 8px;
+  background: linear-gradient(180deg, #f59e0b 0%, #f97316 100%);
 }
 
 .drag-preview {
@@ -1094,6 +1090,21 @@ button {
   font-weight: 700;
   padding: 5px 9px;
   font-size: 0.75rem;
+}
+
+.placeholder-status-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .job-modal {
