@@ -676,6 +676,10 @@ function sanitizeJob(payload) {
     customInstaller: String(payload.customInstaller || "").trim(),
     jobType: String(payload.jobType || "Install").trim(),
     customJobType: String(payload.customJobType || "").trim(),
+    isPlaceholder:
+      payload.isPlaceholder === true ||
+      String(payload.isPlaceholder || "").trim().toLowerCase() === "true" ||
+      String(payload.isPlaceholder || "").trim() === "1",
     notes: String(payload.notes || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()

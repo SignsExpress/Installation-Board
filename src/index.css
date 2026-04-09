@@ -925,6 +925,8 @@ button {
   gap: 8px;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  position: relative;
+  overflow: hidden;
 }
 
 .job-type-install-card {
@@ -965,6 +967,29 @@ button {
 .job-card.is-dragging {
   opacity: 0.45;
   cursor: grabbing;
+}
+
+.job-card.is-placeholder {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: linear-gradient(180deg, rgba(255, 250, 250, 0.98) 0%, rgba(254, 242, 242, 0.96) 100%);
+}
+
+.job-card.is-placeholder > * {
+  position: relative;
+  z-index: 1;
+}
+
+.job-placeholder-watermark {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%) rotate(-18deg);
+  font-size: clamp(1.3rem, 3vw, 2.2rem);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: rgba(185, 28, 28, 0.12);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 0;
 }
 
 .drag-preview {
@@ -1266,6 +1291,18 @@ button {
   line-height: 1.45;
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+}
+
 .detail-card-wide {
   grid-column: 1 / -1;
 }
@@ -1309,6 +1346,11 @@ button {
   font-size: 0.77rem;
   line-height: 1.35;
   padding-top: 2px;
+  color: #b91c1c;
+}
+
+.job-notes.compact b {
+  color: #991b1b;
 }
 
 .job-actions {

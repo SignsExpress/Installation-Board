@@ -53,6 +53,7 @@ const EMPTY_FORM = {
   customInstaller: "",
   jobType: "Install",
   customJobType: "",
+  isPlaceholder: false,
   notes: ""
 };
 
@@ -137,7 +138,7 @@ function renderJobCardContent({
   return (
     <div
       key={job.id}
-      className={`job-card ${meta.colorClass}-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+      className={`job-card ${meta.colorClass}-card ${job.isPlaceholder ? "is-placeholder" : ""} ${draggingJobId === job.id ? "is-dragging" : ""}`}
       draggable={!isClientMode}
       onDragStart={(event) => {
         if (isClientMode) return;
@@ -166,6 +167,7 @@ function renderJobCardContent({
         }
       }}
     >
+      {job.isPlaceholder ? <div className="job-placeholder-watermark">PLACEHOLDER</div> : null}
       <div className="job-card-top">
         <div className="job-title-wrap">
           <strong className="job-title-line">
@@ -919,6 +921,7 @@ export default function App() {
       customInstaller: job.customInstaller || "",
       jobType: job.jobType || "Install",
       customJobType: job.customJobType || "",
+      isPlaceholder: Boolean(job.isPlaceholder),
       notes: job.notes || ""
     }, job.id);
   }
@@ -1036,6 +1039,7 @@ export default function App() {
           customInstaller: form.customInstaller.trim(),
           jobType: form.jobType,
           customJobType: form.customJobType.trim(),
+          isPlaceholder: Boolean(form.isPlaceholder),
           notes: form.notes.trim()
         })
       });
@@ -1777,6 +1781,15 @@ export default function App() {
                 </label>
               ) : null}
 
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.isPlaceholder)}
+                  onChange={(event) => setForm((current) => ({ ...current, isPlaceholder: event.target.checked }))}
+                />
+                <span>Placeholder job</span>
+              </label>
+
               <label>
                 Notes
                 <textarea
@@ -1913,6 +1926,10 @@ export default function App() {
               <div className="detail-card detail-card-wide">
                 <strong>Notes</strong>
                 <p>{activeClientJob.notes || "-"}</p>
+              </div>
+              <div className="detail-card">
+                <strong>Placeholder</strong>
+                <p>{activeClientJob.isPlaceholder ? "Yes" : "No"}</p>
               </div>
             </div>
           </div>
