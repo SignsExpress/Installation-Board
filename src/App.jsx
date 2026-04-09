@@ -1680,17 +1680,13 @@ export default function App() {
           onClick={(event) => handleBackdropClick(event, () => resetForm())}
         >
           <div className="modal job-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <h3>{editingId ? "Edit Job" : "Add Job"}</h3>
-                <p>{jobModalDate}</p>
-              </div>
+            <div className="modal-head job-modal-head">
               <button className="icon-button" type="button" onClick={() => resetForm()}>
                 x
               </button>
             </div>
 
-            <form className="job-form" onSubmit={handleSubmit}>
+            <form className="job-form job-form-scroll" onSubmit={handleSubmit}>
               <label>
                 Date
                 <input

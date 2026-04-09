@@ -1117,7 +1117,8 @@ button {
 .job-modal {
   width: min(720px, 100%);
   max-height: 90vh;
-  overflow: auto;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .client-detail-modal {
@@ -1452,6 +1453,12 @@ button {
   gap: 16px;
 }
 
+.job-modal-head {
+  justify-content: flex-end;
+  gap: 0;
+  margin-bottom: 4px;
+}
+
 .modal-head > div {
   display: grid;
   gap: 8px;
@@ -1461,6 +1468,14 @@ button {
   margin: 0;
   color: #475569;
   font-weight: 500;
+}
+
+.job-form-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  scrollbar-gutter: stable;
 }
 
 .icon-button {
