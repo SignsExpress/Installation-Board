@@ -236,6 +236,8 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
 }
 
 function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePermission }) {
+  const [permissionsOpen, setPermissionsOpen] = useState(false);
+
   function goTo(path) {
     window.location.assign(path);
   }
@@ -249,6 +251,13 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
         <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
+          {currentUser?.canManagePermissions ? (
+            <div className="host-landing-tools">
+              <button className="ghost-button permissions-launch-button" type="button" onClick={() => setPermissionsOpen(true)}>
+                Manage permissions
+              </button>
+            </div>
+          ) : null}
           <div className="host-landing-actions">
             <button
               className={`host-launch-card ${!canAccessInstaller(currentUser) ? "disabled" : ""}`}
@@ -275,16 +284,29 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
             </button>
           </div>
         </section>
-
-        {currentUser?.canManagePermissions ? (
-          <PermissionsPanel
-            currentUser={currentUser}
-            users={users}
-            savingKey={savingKey}
-            onChangePermission={onChangePermission}
-          />
-        ) : null}
       </div>
+
+      {currentUser?.canManagePermissions && permissionsOpen ? (
+        <div className="modal-backdrop" onClick={() => setPermissionsOpen(false)}>
+          <div className="modal permissions-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>Permissions</h3>
+                <p>Set who can use each part of the system.</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setPermissionsOpen(false)}>
+                x
+              </button>
+            </div>
+            <PermissionsPanel
+              currentUser={currentUser}
+              users={users}
+              savingKey={savingKey}
+              onChangePermission={onChangePermission}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

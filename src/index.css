@@ -1334,6 +1334,17 @@ button {
   gap: 18px;
 }
 
+.host-landing-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 14px;
+}
+
+.permissions-launch-button {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .host-launch-card {
   border: 1px solid var(--sx-main-border);
   border-radius: 28px;
@@ -1371,6 +1382,10 @@ button {
 .permissions-panel {
   display: grid;
   gap: 18px;
+}
+
+.permissions-modal {
+  width: min(900px, 100%);
 }
 
 .permissions-head {
@@ -2244,6 +2259,16 @@ button {
 }
 
 @media (max-width: 780px) {
+  .host-landing-tools {
+    justify-content: flex-start;
+  }
+
+  .permissions-modal {
+    width: min(100%, 100%);
+    padding: 18px;
+    border-radius: 24px;
+  }
+
   .host-nav {
     gap: 10px;
     padding: 10px 12px;
