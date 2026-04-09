@@ -1279,6 +1279,15 @@ function buildCoreBridgeDebugFields(record) {
 function getCoreBridgeDestinationAddressFromRecord(record) {
   if (!record || typeof record !== "object") return "";
 
+  const roles = getCoreBridgeRoles(record);
+  const directRoleAddress =
+    roles.find((role) => String(role?.RoleType || "").toLowerCase() === "shipto" && buildAddressFromRole(role)) ||
+    roles.find((role) => buildAddressFromRole(role)) ||
+    null;
+  if (directRoleAddress) {
+    return buildAddressFromRole(directRoleAddress);
+  }
+
   const flat = flattenRecord(record);
   const objectRoleAddress = buildAddressFromRole(pickDestinationCoreBridgeRole(record));
   if (objectRoleAddress) return objectRoleAddress;
