@@ -91,18 +91,22 @@ function getPermissionForApp(user, key) {
 }
 
 function canAccessBoard(user) {
+  if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "board") !== "none";
 }
 
 function canEditBoard(user) {
+  if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "board") === "admin";
 }
 
 function canAccessInstaller(user) {
+  if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "installer") !== "none";
 }
 
 function canEditInstaller(user) {
+  if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "installer") === "admin";
 }
 
@@ -116,6 +120,13 @@ function getHomePathForUser(user) {
 
 function getBoardPathForUser(user) {
   return canEditBoard(user) ? "/board" : "/client/board";
+}
+
+function buildBoardUrl(mode = "rolling", monthId = "") {
+  if (mode === "month" && monthId) {
+    return `/api/board?mode=month&month=${encodeURIComponent(monthId)}`;
+  }
+  return "/api/board";
 }
 
 function MainNavBar({ currentUser, active = "home", onLogout }) {
@@ -375,6 +386,10 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [permissionSavingKey, setPermissionSavingKey] = useState("");
+  const [boardViewMode, setBoardViewMode] = useState("rolling");
+  const [selectedMonthId, setSelectedMonthId] = useState("");
+  const [showPreviousMonths, setShowPreviousMonths] = useState(false);
+  const [showFutureMonths, setShowFutureMonths] = useState(false);
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -390,6 +405,18 @@ export default function App() {
   );
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute);
   const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute);
+
+  function openRollingBoard() {
+    setBoardViewMode("rolling");
+    setSelectedMonthId("");
+    setShowPreviousMonths(false);
+    setShowFutureMonths(false);
+  }
+
+  function openBoardMonth(monthId) {
+    setBoardViewMode("month");
+    setSelectedMonthId(monthId);
+  }
 
   useEffect(() => {
     let active = true;
@@ -432,7 +459,7 @@ export default function App() {
       try {
         setLoading(true);
         const [boardResponse, jobsResponse, holidaysResponse] = await Promise.all([
-          fetch("/api/board"),
+          fetch(buildBoardUrl(boardViewMode, selectedMonthId)),
           fetch("/api/jobs"),
           fetch("/api/holidays")
         ]);
@@ -461,7 +488,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser, showBoard]);
+  }, [currentUser, showBoard, boardViewMode, selectedMonthId]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -497,9 +524,12 @@ export default function App() {
     if (!currentUser || !showBoard) return undefined;
     const stream = new EventSource("/api/events");
 
-    function handleUpdate(event) {
+    async function handleUpdate() {
       try {
-        setBoard(JSON.parse(event.data));
+        const response = await fetch(buildBoardUrl(boardViewMode, selectedMonthId));
+        if (!response.ok) return;
+        const nextBoard = await response.json();
+        setBoard(nextBoard);
       } catch (error) {
         console.error(error);
       }
@@ -515,7 +545,7 @@ export default function App() {
       stream.removeEventListener("board-updated", handleUpdate);
       stream.close();
     };
-  }, [currentUser, showBoard]);
+  }, [currentUser, showBoard, boardViewMode, selectedMonthId]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -1173,7 +1203,49 @@ export default function App() {
             {loading || !board ? (
               <div className="board-loading">Loading the shared installation board...</div>
             ) : (
-              <div className="board">
+              <div className="board board-with-history">
+                <div className="board-history-launch board-history-launch-top">
+                  <div className="board-history-actions">
+                    <button
+                      className={`ghost-button board-history-button ${showPreviousMonths ? "active" : ""}`}
+                      type="button"
+                      onClick={() => {
+                        setShowPreviousMonths((current) => !current);
+                        setShowFutureMonths(false);
+                      }}
+                    >
+                      Previous months
+                    </button>
+                    {boardViewMode === "month" ? (
+                      <button className="ghost-button board-history-button" type="button" onClick={openRollingBoard}>
+                        Back to live board
+                      </button>
+                    ) : null}
+                  </div>
+                  {showPreviousMonths ? (
+                    <div className="board-history-panel">
+                      {board.previousMonths?.map((month) => (
+                        <button
+                          key={month.id}
+                          className={`board-month-chip ${selectedMonthId === month.id ? "active" : ""}`}
+                          type="button"
+                          onClick={() => {
+                            openBoardMonth(month.id);
+                            setShowPreviousMonths(false);
+                          }}
+                        >
+                          {month.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="board-view-summary">
+                  <span className="board-view-pill">{boardViewMode === "month" ? "Archive month" : "Live board"}</span>
+                  <strong>{board.rangeLabel}</strong>
+                </div>
+
                 {board.weeks.map((week) => (
                   <section key={week.id} className="week-block">
                     <header className="week-header">
@@ -1425,6 +1497,38 @@ export default function App() {
                     ))}
                   </section>
                 ))}
+
+                <div className="board-history-launch board-history-launch-bottom">
+                  <div className="board-history-actions">
+                    <button
+                      className={`ghost-button board-history-button ${showFutureMonths ? "active" : ""}`}
+                      type="button"
+                      onClick={() => {
+                        setShowFutureMonths((current) => !current);
+                        setShowPreviousMonths(false);
+                      }}
+                    >
+                      Future months
+                    </button>
+                  </div>
+                  {showFutureMonths ? (
+                    <div className="board-history-panel">
+                      {board.futureMonths?.map((month) => (
+                        <button
+                          key={month.id}
+                          className={`board-month-chip ${selectedMonthId === month.id ? "active" : ""}`}
+                          type="button"
+                          onClick={() => {
+                            openBoardMonth(month.id);
+                            setShowFutureMonths(false);
+                          }}
+                        >
+                          {month.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
             )}
           </section>

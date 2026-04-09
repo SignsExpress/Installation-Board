@@ -174,18 +174,22 @@ function getUserPermission(user, key, fallback = "none") {
 }
 
 function canAccessBoard(user) {
+  if (canManagePermissions(user)) return true;
   return getUserPermission(user, "board", user?.role === "host" ? "admin" : "user") !== "none";
 }
 
 function canEditBoard(user) {
+  if (canManagePermissions(user)) return true;
   return getUserPermission(user, "board", user?.role === "host" ? "admin" : "user") === "admin";
 }
 
 function canAccessInstaller(user) {
+  if (canManagePermissions(user)) return true;
   return getUserPermission(user, "installer", user?.role === "host" ? "admin" : "none") !== "none";
 }
 
 function canEditInstaller(user) {
+  if (canManagePermissions(user)) return true;
   return getUserPermission(user, "installer", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
@@ -411,11 +415,57 @@ function getStartOfWeek(date) {
 }
 
 function getRollingWindow(today = getTodayInLondon()) {
-  const currentWeekStart = getStartOfWeek(today);
   return {
-    start: addDays(currentWeekStart, -7),
-    end: addDays(currentWeekStart, 19)
+    start: addDays(today, -7),
+    end: addDays(today, 21)
   };
+}
+
+function getStartOfMonth(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function getEndOfMonth(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+}
+
+function addMonths(date, months) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+}
+
+function toMonthId(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function parseMonthId(value) {
+  const match = String(value || "").trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || month < 1 || month > 12) return null;
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function buildMonthNavigation(today = getTodayInLondon()) {
+  const currentMonth = getStartOfMonth(today);
+  const previousMonths = [];
+  const futureMonths = [];
+
+  for (let offset = 1; offset <= 6; offset += 1) {
+    const previousDate = addMonths(currentMonth, -offset);
+    previousMonths.push({
+      id: toMonthId(previousDate),
+      label: monthFormatter.format(previousDate)
+    });
+
+    const futureDate = addMonths(currentMonth, offset);
+    futureMonths.push({
+      id: toMonthId(futureDate),
+      label: monthFormatter.format(futureDate)
+    });
+  }
+
+  return { previousMonths, futureMonths };
 }
 
 function getWeekdaysInRange(start, end) {
@@ -522,8 +572,11 @@ function getHolidayMap(start, end) {
   return map;
 }
 
-function buildBoardRows(jobs, staffHolidays, today = getTodayInLondon()) {
-  const { start, end } = getRollingWindow(today);
+function buildBoardRows(jobs, staffHolidays, options = {}) {
+  const today = options.today || getTodayInLondon();
+  const mode = options.mode === "month" ? "month" : "rolling";
+  const start = options.start || (mode === "month" ? getStartOfMonth(today) : getRollingWindow(today).start);
+  const end = options.end || (mode === "month" ? getEndOfMonth(today) : getRollingWindow(today).end);
   const weekdayDates = getWeekdaysInRange(start, end);
   const holidayMap = getHolidayMap(start, end);
   const todayIso = toIsoDate(today);
@@ -578,9 +631,14 @@ function buildBoardRows(jobs, staffHolidays, today = getTodayInLondon()) {
 
   return {
     generatedAt: new Date().toISOString(),
+    mode,
     today: todayIso,
     start: toIsoDate(start),
     end: toIsoDate(end),
+    rangeLabel:
+      mode === "month"
+        ? monthFormatter.format(start)
+        : `${start.getUTCDate()} ${monthFormatter.format(start).split(" ")[0]} to ${end.getUTCDate()} ${monthFormatter.format(end).split(" ")[0]}`,
     weeks
   };
 }
@@ -662,12 +720,32 @@ function broadcast(event, payload) {
   }
 }
 
-async function getBoardPayload() {
+async function getBoardPayload(options = {}) {
   const store = await readStore();
+  const today = getTodayInLondon();
+  const navigation = buildMonthNavigation(today);
+  let boardOptions = { today, mode: "rolling" };
+
+  if (options.mode === "month" && options.monthId) {
+    const monthDate = parseMonthId(options.monthId);
+    if (monthDate) {
+      boardOptions = {
+        today,
+        mode: "month",
+        start: getStartOfMonth(monthDate),
+        end: getEndOfMonth(monthDate)
+      };
+    }
+  }
+
   return {
     jobs: store.jobs,
     holidays: store.holidays,
-    board: buildBoardRows(store.jobs, store.holidays)
+    board: {
+      ...buildBoardRows(store.jobs, store.holidays, boardOptions),
+      ...navigation,
+      selectedMonth: options.mode === "month" ? options.monthId || "" : ""
+    }
   };
 }
 
@@ -2102,7 +2180,12 @@ function createServer() {
 
   app.get("/api/board", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
-    const payload = await getBoardPayload();
+    const mode = String(request.query.mode || "").trim().toLowerCase();
+    const monthId = String(request.query.month || "").trim();
+    const payload = await getBoardPayload({
+      mode: mode === "month" ? "month" : "rolling",
+      monthId
+    });
     response.json(payload.board);
   });
 

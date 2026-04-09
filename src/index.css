@@ -229,6 +229,76 @@ button {
   width: 100%;
 }
 
+.board-with-history {
+  display: grid;
+  gap: 18px;
+}
+
+.board-history-launch {
+  display: grid;
+  gap: 12px;
+}
+
+.board-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.board-history-button.active {
+  background: var(--sx-main-soft);
+  border-color: #c7b7d2;
+  color: var(--sx-main);
+}
+
+.board-history-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--sx-main-border);
+  border-radius: 18px;
+  background: #faf8fb;
+}
+
+.board-month-chip {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+}
+
+.board-month-chip.active {
+  background: var(--sx-main-soft);
+  border-color: #c7b7d2;
+  color: var(--sx-main);
+}
+
+.board-view-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.board-view-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--sx-main-soft);
+  color: var(--sx-main);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .panel {
   padding: 22px;
 }
@@ -2380,6 +2450,21 @@ button {
 
   .job-stack {
     grid-template-columns: 1fr;
+  }
+
+  .board-history-actions,
+  .board-view-summary {
+    justify-content: flex-start;
+  }
+
+  .board-history-panel {
+    padding: 10px;
+  }
+
+  .board-month-chip,
+  .board-history-button {
+    width: 100%;
+    justify-content: center;
   }
 
   .detail-grid {
