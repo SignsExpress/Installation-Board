@@ -981,15 +981,20 @@ button {
 
 .job-placeholder-watermark {
   position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%) rotate(-18deg);
-  font-size: clamp(1.3rem, 3vw, 2.2rem);
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-18deg) scale(1.05);
+  font-size: clamp(0.92rem, 2vw, 1.2rem);
   font-weight: 800;
-  letter-spacing: 0.22em;
-  color: rgba(185, 28, 28, 0.12);
+  letter-spacing: 0.18em;
+  color: rgba(185, 28, 28, 0.075);
   pointer-events: none;
-  white-space: nowrap;
   z-index: 0;
+  overflow: hidden;
+  line-height: 1.9;
+  text-align: center;
 }
 
 .drag-preview {
@@ -1291,16 +1296,28 @@ button {
   line-height: 1.45;
 }
 
-.checkbox-field {
-  display: flex;
+.order-reference-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
   align-items: center;
-  gap: 10px;
-  font-weight: 700;
 }
 
-.checkbox-field input {
-  width: 18px;
-  height: 18px;
+.placeholder-toggle-button {
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 16px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #475569;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.placeholder-toggle-button.active {
+  background: #fff1f2;
+  border-color: #f9a8d4;
+  color: #b91c1c;
 }
 
 .detail-card-wide {
@@ -2541,6 +2558,15 @@ button {
 
   .unscheduled-job-stack {
     grid-template-columns: 1fr;
+  }
+
+  .order-reference-row {
+    grid-template-columns: 1fr;
+  }
+
+  .placeholder-toggle-button {
+    width: 100%;
+    justify-content: center;
   }
 
   .board-history-panel {

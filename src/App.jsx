@@ -167,7 +167,11 @@ function renderJobCardContent({
         }
       }}
     >
-      {job.isPlaceholder ? <div className="job-placeholder-watermark">PLACEHOLDER</div> : null}
+      {job.isPlaceholder ? (
+        <div className="job-placeholder-watermark">
+          PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER PLACEHOLDER
+        </div>
+      ) : null}
       <div className="job-card-top">
         <div className="job-title-wrap">
           <strong className="job-title-line">
@@ -1675,11 +1679,20 @@ export default function App() {
 
               <label>
                 Order reference
-                <input
-                  type="text"
-                  value={form.orderReference}
-                  onChange={(event) => setForm((current) => ({ ...current, orderReference: event.target.value }))}
-                />
+                <div className="order-reference-row">
+                  <input
+                    type="text"
+                    value={form.orderReference}
+                    onChange={(event) => setForm((current) => ({ ...current, orderReference: event.target.value }))}
+                  />
+                  <button
+                    type="button"
+                    className={`placeholder-toggle-button ${form.isPlaceholder ? "active" : ""}`}
+                    onClick={() => setForm((current) => ({ ...current, isPlaceholder: !current.isPlaceholder }))}
+                  >
+                    Add as Placeholder
+                  </button>
+                </div>
               </label>
 
               <label>
@@ -1780,15 +1793,6 @@ export default function App() {
                   />
                 </label>
               ) : null}
-
-              <label className="checkbox-field">
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.isPlaceholder)}
-                  onChange={(event) => setForm((current) => ({ ...current, isPlaceholder: event.target.checked }))}
-                />
-                <span>Placeholder job</span>
-              </label>
 
               <label>
                 Notes
