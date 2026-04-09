@@ -65,6 +65,39 @@ function getLocalTodayIso() {
   }).format(new Date());
 }
 
+function parseIsoDate(isoDate) {
+  const [year, month, day] = String(isoDate || "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function toIsoDate(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function addMonths(date, months) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+}
+
+function getStartOfMonth(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function getEndOfMonth(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+}
+
 function createMessage(text, tone = "info") {
   return { text, tone, id: `${Date.now()}-${Math.random()}` };
 }
@@ -122,9 +155,9 @@ function getBoardPathForUser(user) {
   return canEditBoard(user) ? "/board" : "/client/board";
 }
 
-function buildBoardUrl(mode = "rolling", monthId = "") {
-  if (mode === "month" && monthId) {
-    return `/api/board?mode=month&month=${encodeURIComponent(monthId)}`;
+function buildBoardUrl(startIso = "", endIso = "") {
+  if (startIso && endIso) {
+    return `/api/board?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
   }
   return "/api/board";
 }
@@ -386,10 +419,8 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [permissionSavingKey, setPermissionSavingKey] = useState("");
-  const [boardViewMode, setBoardViewMode] = useState("rolling");
-  const [selectedMonthId, setSelectedMonthId] = useState("");
-  const [showPreviousMonths, setShowPreviousMonths] = useState(false);
-  const [showFutureMonths, setShowFutureMonths] = useState(false);
+  const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
+  const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -406,16 +437,40 @@ export default function App() {
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute);
   const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute);
 
-  function openRollingBoard() {
-    setBoardViewMode("rolling");
-    setSelectedMonthId("");
-    setShowPreviousMonths(false);
-    setShowFutureMonths(false);
-  }
+  const todayIso = board?.today || getLocalTodayIso();
+  const rollingStartIso = useMemo(() => {
+    const today = parseIsoDate(todayIso);
+    return today ? toIsoDate(addDays(today, -7)) : "";
+  }, [todayIso]);
+  const rollingEndIso = useMemo(() => {
+    const today = parseIsoDate(todayIso);
+    return today ? toIsoDate(addDays(today, 21)) : "";
+  }, [todayIso]);
+  const boardRange = useMemo(() => {
+    const today = parseIsoDate(todayIso);
+    if (!today) {
+      return { startIso: "", endIso: "" };
+    }
 
-  function openBoardMonth(monthId) {
-    setBoardViewMode("month");
-    setSelectedMonthId(monthId);
+    const currentMonthStart = getStartOfMonth(today);
+    const start =
+      previousMonthDepth > 0
+        ? getStartOfMonth(addMonths(currentMonthStart, -previousMonthDepth))
+        : parseIsoDate(rollingStartIso);
+    const end =
+      futureMonthDepth > 0
+        ? getEndOfMonth(addMonths(currentMonthStart, futureMonthDepth))
+        : parseIsoDate(rollingEndIso);
+
+    return {
+      startIso: start ? toIsoDate(start) : "",
+      endIso: end ? toIsoDate(end) : ""
+    };
+  }, [futureMonthDepth, previousMonthDepth, rollingEndIso, rollingStartIso, todayIso]);
+
+  function resetBoardWindow() {
+    setPreviousMonthDepth(0);
+    setFutureMonthDepth(0);
   }
 
   useEffect(() => {
@@ -459,7 +514,7 @@ export default function App() {
       try {
         setLoading(true);
         const [boardResponse, jobsResponse, holidaysResponse] = await Promise.all([
-          fetch(buildBoardUrl(boardViewMode, selectedMonthId)),
+          fetch(buildBoardUrl(boardRange.startIso, boardRange.endIso)),
           fetch("/api/jobs"),
           fetch("/api/holidays")
         ]);
@@ -488,7 +543,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser, showBoard, boardViewMode, selectedMonthId]);
+  }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -526,7 +581,7 @@ export default function App() {
 
     async function handleUpdate() {
       try {
-        const response = await fetch(buildBoardUrl(boardViewMode, selectedMonthId));
+        const response = await fetch(buildBoardUrl(boardRange.startIso, boardRange.endIso));
         if (!response.ok) return;
         const nextBoard = await response.json();
         setBoard(nextBoard);
@@ -545,7 +600,7 @@ export default function App() {
       stream.removeEventListener("board-updated", handleUpdate);
       stream.close();
     };
-  }, [currentUser, showBoard, boardViewMode, selectedMonthId]);
+  }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -1207,43 +1262,16 @@ export default function App() {
                 <div className="board-history-launch board-history-launch-top">
                   <div className="board-history-actions">
                     <button
-                      className={`ghost-button board-history-button ${showPreviousMonths ? "active" : ""}`}
+                      className="ghost-button board-history-button"
                       type="button"
-                      onClick={() => {
-                        setShowPreviousMonths((current) => !current);
-                        setShowFutureMonths(false);
-                      }}
+                      onClick={() => setPreviousMonthDepth((current) => Math.min(6, current + 1))}
                     >
                       Previous months
                     </button>
-                    {boardViewMode === "month" ? (
-                      <button className="ghost-button board-history-button" type="button" onClick={openRollingBoard}>
-                        Back to live board
-                      </button>
-                    ) : null}
+                    <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
+                      Current month
+                    </button>
                   </div>
-                  {showPreviousMonths ? (
-                    <div className="board-history-panel">
-                      {board.previousMonths?.map((month) => (
-                        <button
-                          key={month.id}
-                          className={`board-month-chip ${selectedMonthId === month.id ? "active" : ""}`}
-                          type="button"
-                          onClick={() => {
-                            openBoardMonth(month.id);
-                            setShowPreviousMonths(false);
-                          }}
-                        >
-                          {month.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="board-view-summary">
-                  <span className="board-view-pill">{boardViewMode === "month" ? "Archive month" : "Live board"}</span>
-                  <strong>{board.rangeLabel}</strong>
                 </div>
 
                 {board.weeks.map((week) => (
@@ -1501,33 +1529,13 @@ export default function App() {
                 <div className="board-history-launch board-history-launch-bottom">
                   <div className="board-history-actions">
                     <button
-                      className={`ghost-button board-history-button ${showFutureMonths ? "active" : ""}`}
+                      className="ghost-button board-history-button"
                       type="button"
-                      onClick={() => {
-                        setShowFutureMonths((current) => !current);
-                        setShowPreviousMonths(false);
-                      }}
+                      onClick={() => setFutureMonthDepth((current) => Math.min(6, current + 1))}
                     >
                       Future months
                     </button>
                   </div>
-                  {showFutureMonths ? (
-                    <div className="board-history-panel">
-                      {board.futureMonths?.map((month) => (
-                        <button
-                          key={month.id}
-                          className={`board-month-chip ${selectedMonthId === month.id ? "active" : ""}`}
-                          type="button"
-                          onClick={() => {
-                            openBoardMonth(month.id);
-                            setShowFutureMonths(false);
-                          }}
-                        >
-                          {month.label}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
               </div>
             )}

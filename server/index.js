@@ -618,16 +618,21 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
   });
 
   const weeks = [];
-  for (let index = 0; index < rows.length; index += 5) {
-    const slice = rows.slice(index, index + 5);
-    if (slice.length) {
-      weeks.push({
-        id: slice[0].isoDate,
-        label: formatWeekLabel(parseIsoDate(slice[0].isoDate)),
-        rows: slice
+  const weekMap = new Map();
+  rows.forEach((row) => {
+    const rowDate = parseIsoDate(row.isoDate);
+    const weekStart = getStartOfWeek(rowDate);
+    const weekId = toIsoDate(weekStart);
+    if (!weekMap.has(weekId)) {
+      weekMap.set(weekId, {
+        id: weekId,
+        label: formatWeekLabel(weekStart),
+        rows: []
       });
+      weeks.push(weekMap.get(weekId));
     }
-  }
+    weekMap.get(weekId).rows.push(row);
+  });
 
   return {
     generatedAt: new Date().toISOString(),
@@ -726,7 +731,14 @@ async function getBoardPayload(options = {}) {
   const navigation = buildMonthNavigation(today);
   let boardOptions = { today, mode: "rolling" };
 
-  if (options.mode === "month" && options.monthId) {
+  if (options.start && options.end) {
+    boardOptions = {
+      today,
+      mode: "range",
+      start: options.start,
+      end: options.end
+    };
+  } else if (options.mode === "month" && options.monthId) {
     const monthDate = parseMonthId(options.monthId);
     if (monthDate) {
       boardOptions = {
@@ -2182,7 +2194,11 @@ function createServer() {
     if (!requireBoardAccess(request, response)) return;
     const mode = String(request.query.mode || "").trim().toLowerCase();
     const monthId = String(request.query.month || "").trim();
+    const start = parseIsoDate(String(request.query.start || "").trim());
+    const end = parseIsoDate(String(request.query.end || "").trim());
     const payload = await getBoardPayload({
+      start,
+      end,
       mode: mode === "month" ? "month" : "rolling",
       monthId
     });
