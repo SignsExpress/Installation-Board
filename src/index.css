@@ -299,6 +299,41 @@ button {
   font-weight: 700;
 }
 
+.unscheduled-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 8px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fbfafc 0%, #f3eff7 100%);
+}
+
+.unscheduled-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.unscheduled-head p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.unscheduled-job-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.unscheduled-empty {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #cbd5e1;
+  border-radius: 18px;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+}
+
 .panel {
   padding: 22px;
 }
@@ -2455,6 +2490,15 @@ button {
   .board-history-actions,
   .board-view-summary {
     justify-content: flex-start;
+  }
+
+  .unscheduled-head {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .unscheduled-job-stack {
+    grid-template-columns: 1fr;
   }
 
   .board-history-panel {

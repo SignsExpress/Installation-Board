@@ -110,6 +110,133 @@ function toInitials(name) {
     .join("");
 }
 
+function renderJobCardContent({
+  job,
+  isClientMode,
+  draggingJobId,
+  getJobTypeMeta,
+  getJobTypeLabel,
+  getInstallerDisplayList,
+  getInstallerMeta,
+  editJob,
+  handleDelete,
+  setActiveClientJob,
+  buildDragPreview,
+  getTransparentDragImage,
+  clearDragPreview,
+  dragPreviewRef,
+  dragPositionRef,
+  setDraggingJobId,
+  duplicatingJobId,
+  setDuplicatingJobId,
+  setDropDate
+}) {
+  const meta = getJobTypeMeta(job.jobType);
+  const installerLabels = getInstallerDisplayList(job);
+
+  return (
+    <div
+      key={job.id}
+      className={`job-card ${meta.colorClass}-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
+      draggable={!isClientMode}
+      onDragStart={(event) => {
+        if (isClientMode) return;
+        event.dataTransfer.setData("text/plain", job.id);
+        event.dataTransfer.effectAllowed = "move";
+        const preview = buildDragPreview(event.currentTarget);
+        dragPreviewRef.current = preview;
+        dragPositionRef.current = { x: event.clientX, y: event.clientY };
+        preview.style.left = `${event.clientX + 18}px`;
+        preview.style.top = `${event.clientY + 18}px`;
+        preview.style.transform = "rotate(-2deg) translateY(0)";
+        event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+        setDraggingJobId(job.id);
+      }}
+      onDragEnd={() => {
+        if (isClientMode) return;
+        setDraggingJobId("");
+        setDropDate("");
+        clearDragPreview();
+      }}
+      onClick={() => {
+        if (isClientMode) {
+          setActiveClientJob(job);
+        } else {
+          editJob(job);
+        }
+      }}
+    >
+      <div className="job-card-top">
+        <div className="job-title-wrap">
+          <strong className="job-title-line">
+            {job.orderReference ? <span className="job-ref-inline">{job.orderReference}</span> : null}
+            <span className="job-customer-inline">{job.customerName}</span>
+          </strong>
+          <p>{job.description || "No description"}</p>
+        </div>
+        <div className="job-title-meta">
+          {installerLabels.length ? (
+            <div className="job-title-installers">
+              {installerLabels.map((installer) => {
+                const metaInstaller = getInstallerMeta(installer);
+                return (
+                  <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
+                    {installer}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+          <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+        </div>
+      </div>
+      <div className="job-meta-grid">
+        <p><b>Address:</b> {job.address || "-"}</p>
+        <p><b>Contact:</b> {job.contact || "-"}</p>
+        <p><b>Number:</b> {job.number || "-"}</p>
+      </div>
+      <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
+      <div className="job-actions">
+        {!isClientMode ? (
+          <>
+            <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
+              Edit
+            </button>
+            <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
+              Delete
+            </button>
+            <button
+              type="button"
+              className="card-duplicate-handle"
+              draggable
+              onDragStart={(event) => {
+                event.stopPropagation();
+                event.dataTransfer.setData("job-copy", job.id);
+                event.dataTransfer.effectAllowed = "copy";
+                const preview = buildDragPreview(event.currentTarget.closest(".job-card"));
+                dragPreviewRef.current = preview;
+                dragPositionRef.current = { x: event.clientX, y: event.clientY };
+                preview.style.left = `${event.clientX + 18}px`;
+                preview.style.top = `${event.clientY + 18}px`;
+                event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
+                setDuplicatingJobId(job.id);
+              }}
+              onDragEnd={() => {
+                setDuplicatingJobId("");
+                setDropDate("");
+                clearDragPreview();
+              }}
+              title="Drag to copy"
+            >
+              Drag to Copy
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function getPermissionForApp(user, key) {
   const fallback =
     key === "board"
@@ -775,7 +902,7 @@ export default function App() {
   }
 
   function editJob(job) {
-    openJobModal(job.date, {
+    openJobModal(job.date || "Unscheduled", {
       id: job.id,
       date: job.date,
       orderReference: job.orderReference || "",
@@ -885,8 +1012,8 @@ export default function App() {
     event.preventDefault();
     if (isClientMode) return;
 
-    if (!form.date || !form.customerName.trim()) {
-      setMessage(createMessage("Pick a date and enter the customer name.", "error"));
+    if (!form.customerName.trim()) {
+      setMessage(createMessage("Enter the customer name.", "error"));
       return;
     }
 
@@ -1407,117 +1534,29 @@ export default function App() {
 
                           {row.jobs.length > 0 ? (
                             <div className="job-stack">
-                              {row.jobs.map((job) => {
-                                const meta = getJobTypeMeta(job.jobType);
-                                return (
-                                  <div
-                                    key={job.id}
-                                    className={`job-card ${meta.colorClass}-card ${draggingJobId === job.id ? "is-dragging" : ""}`}
-                                    draggable={!isClientMode}
-                                    onDragStart={(event) => {
-                                      if (isClientMode) return;
-                                      event.dataTransfer.setData("text/plain", job.id);
-                                      event.dataTransfer.effectAllowed = "move";
-                                      const preview = buildDragPreview(event.currentTarget);
-                                      dragPreviewRef.current = preview;
-                                      dragPositionRef.current = { x: event.clientX, y: event.clientY };
-                                      preview.style.left = `${event.clientX + 18}px`;
-                                      preview.style.top = `${event.clientY + 18}px`;
-                                      preview.style.transform = "rotate(-2deg) translateY(0)";
-                                      event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                                      setDraggingJobId(job.id);
-                                    }}
-                                    onDragEnd={() => {
-                                      if (isClientMode) return;
-                                      setDraggingJobId("");
-                                      setDropDate("");
-                                      clearDragPreview();
-                                    }}
-                                    onClick={() => {
-                                      if (isClientMode) {
-                                        setActiveClientJob(job);
-                                      } else {
-                                        editJob(job);
-                                      }
-                                    }}
-                                  >
-                                    {(() => {
-                                      const installerLabels = getInstallerDisplayList(job);
-                                      return (
-                                        <>
-                                    <div className="job-card-top">
-                                      <div className="job-title-wrap">
-                                        <strong className="job-title-line">
-                                          {job.orderReference ? <span className="job-ref-inline">{job.orderReference}</span> : null}
-                                          <span className="job-customer-inline">{job.customerName}</span>
-                                        </strong>
-                                        <p>{job.description || "No description"}</p>
-                                      </div>
-                                      <div className="job-title-meta">
-                                        {installerLabels.length ? (
-                                          <div className="job-title-installers">
-                                            {installerLabels.map((installer) => {
-                                              const metaInstaller = getInstallerMeta(installer);
-                                              return (
-                                                <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
-                                                  {installer}
-                                                </span>
-                                              );
-                                            })}
-                                          </div>
-                                        ) : null}
-                                        <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
-                                      </div>
-                                    </div>
-                                    <div className="job-meta-grid">
-                                      <p><b>Address:</b> {job.address || "-"}</p>
-                                      <p><b>Contact:</b> {job.contact || "-"}</p>
-                                      <p><b>Number:</b> {job.number || "-"}</p>
-                                    </div>
-                                    <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
-                                    <div className="job-actions">
-                                      {!isClientMode ? (
-                                        <>
-                                          <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
-                                            Edit
-                                          </button>
-                                          <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
-                                            Delete
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className="card-duplicate-handle"
-                                            draggable
-                                            onDragStart={(event) => {
-                                              event.stopPropagation();
-                                              event.dataTransfer.setData("job-copy", job.id);
-                                              event.dataTransfer.effectAllowed = "copy";
-                                              const preview = buildDragPreview(event.currentTarget.closest(".job-card"));
-                                              dragPreviewRef.current = preview;
-                                              dragPositionRef.current = { x: event.clientX, y: event.clientY };
-                                              preview.style.left = `${event.clientX + 18}px`;
-                                              preview.style.top = `${event.clientY + 18}px`;
-                                              event.dataTransfer.setDragImage(getTransparentDragImage(), 0, 0);
-                                              setDuplicatingJobId(job.id);
-                                            }}
-                                            onDragEnd={() => {
-                                              setDuplicatingJobId("");
-                                              setDropDate("");
-                                              clearDragPreview();
-                                            }}
-                                            title="Drag to copy"
-                                          >
-                                            Drag to Copy
-                                          </button>
-                                        </>
-                                      ) : null}
-                                    </div>
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                );
-                              })}
+                              {row.jobs.map((job) =>
+                                renderJobCardContent({
+                                  job,
+                                  isClientMode,
+                                  draggingJobId,
+                                  getJobTypeMeta,
+                                  getJobTypeLabel,
+                                  getInstallerDisplayList,
+                                  getInstallerMeta,
+                                  editJob,
+                                  handleDelete,
+                                  setActiveClientJob,
+                                  buildDragPreview,
+                                  getTransparentDragImage,
+                                  clearDragPreview,
+                                  dragPreviewRef,
+                                  dragPositionRef,
+                                  setDraggingJobId,
+                                  duplicatingJobId,
+                                  setDuplicatingJobId,
+                                  setDropDate
+                                })
+                              )}
                             </div>
                           ) : null}
                         </div>
@@ -1537,6 +1576,60 @@ export default function App() {
                     </button>
                   </div>
                 </div>
+
+                <section className="unscheduled-section panel">
+                  <div className="unscheduled-head">
+                    <div>
+                      <h3>Unscheduled</h3>
+                      <p>Keep jobs here until you have a firm date, then drag them into the calendar or edit the date.</p>
+                    </div>
+                    {!isClientMode ? (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => {
+                          openJobModal("Unscheduled", {
+                            ...EMPTY_FORM,
+                            date: "",
+                            jobType: form.jobType || "Install"
+                          });
+                        }}
+                      >
+                        Add unscheduled job
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {board.unscheduled?.length ? (
+                    <div className="job-stack unscheduled-job-stack">
+                      {board.unscheduled.map((job) =>
+                        renderJobCardContent({
+                          job,
+                          isClientMode,
+                          draggingJobId,
+                          getJobTypeMeta,
+                          getJobTypeLabel,
+                          getInstallerDisplayList,
+                          getInstallerMeta,
+                          editJob,
+                          handleDelete,
+                          setActiveClientJob,
+                          buildDragPreview,
+                          getTransparentDragImage,
+                          clearDragPreview,
+                          dragPreviewRef,
+                          dragPositionRef,
+                          setDraggingJobId,
+                          duplicatingJobId,
+                          setDuplicatingJobId,
+                          setDropDate
+                        })
+                      )}
+                    </div>
+                  ) : (
+                    <div className="unscheduled-empty">No unscheduled jobs.</div>
+                  )}
+                </section>
               </div>
             )}
           </section>

@@ -582,11 +582,18 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
   const todayIso = toIsoDate(today);
 
   const jobsByDate = jobs.reduce((map, job) => {
+    if (!isValidIsoDate(job.date)) {
+      return map;
+    }
     const existing = map.get(job.date) || [];
     existing.push(job);
     map.set(job.date, existing);
     return map;
   }, new Map());
+
+  const unscheduled = jobs
+    .filter((job) => !isValidIsoDate(job.date))
+    .sort((left, right) => String(left.customerName || "").localeCompare(String(right.customerName || "")));
 
   const staffHolidaysByDate = staffHolidays.reduce((map, entry) => {
     const existing = map.get(entry.date) || [];
@@ -644,7 +651,8 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
       mode === "month"
         ? monthFormatter.format(start)
         : `${start.getUTCDate()} ${monthFormatter.format(start).split(" ")[0]} to ${end.getUTCDate()} ${monthFormatter.format(end).split(" ")[0]}`,
-    weeks
+    weeks,
+    unscheduled
   };
 }
 
@@ -2340,8 +2348,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.post("/api/jobs", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     const nextJob = sanitizeJob(request.body || {});
-    if (!nextJob.customerName || !isValidIsoDate(nextJob.date)) {
-      response.status(400).json({ error: "A valid date and customer name are required." });
+    if (!nextJob.customerName) {
+      response.status(400).json({ error: "Customer name is required." });
+      return;
+    }
+    if (nextJob.date && !isValidIsoDate(nextJob.date)) {
+      response.status(400).json({ error: "If a date is supplied, it must be valid." });
       return;
     }
 
