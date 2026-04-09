@@ -1109,19 +1109,21 @@ export default function App() {
                                         </strong>
                                         <p>{job.description || "No description"}</p>
                                       </div>
-                                      {installerLabels.length ? (
-                                        <div className="job-title-installers">
-                                          {installerLabels.map((installer) => {
-                                            const metaInstaller = getInstallerMeta(installer);
-                                            return (
-                                              <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
-                                                {installer}
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : null}
-                                      <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+                                      <div className="job-title-meta">
+                                        {installerLabels.length ? (
+                                          <div className="job-title-installers">
+                                            {installerLabels.map((installer) => {
+                                              const metaInstaller = getInstallerMeta(installer);
+                                              return (
+                                                <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
+                                                  {installer}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : null}
+                                        <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+                                      </div>
                                     </div>
                                     <div className="job-meta-grid">
                                       <p><b>Address:</b> {job.address || "-"}</p>

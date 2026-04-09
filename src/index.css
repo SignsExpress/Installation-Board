@@ -931,6 +931,15 @@ button {
   white-space: nowrap;
 }
 
+.job-title-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 .job-meta-grid {
   display: grid;
   grid-template-columns: 2fr 1.2fr 1.2fr;
@@ -2202,6 +2211,47 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .job-card-top {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .job-title-wrap {
+    flex: 1 1 100%;
+  }
+
+  .job-title-line {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .job-customer-inline {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .job-title-meta {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px 6px;
+  }
+
+  .job-title-installers {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .job-actions {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .card-duplicate-handle {
+    margin-left: 0;
+  }
+
   .job-stack {
     grid-template-columns: 1fr;
   }
@@ -2293,6 +2343,10 @@ button {
   .client-mode .job-card-top {
     gap: 8px;
     align-items: flex-start;
+  }
+
+  .client-mode .job-title-meta {
+    gap: 6px 5px;
   }
 
   .client-mode .job-card-top p {
