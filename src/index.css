@@ -305,6 +305,13 @@ button {
   margin-top: 8px;
   border-radius: 24px;
   background: linear-gradient(180deg, #fbfafc 0%, #f3eff7 100%);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.unscheduled-section.is-drop-target {
+  border-color: #b39ac1;
+  box-shadow: 0 0 0 4px rgba(95, 60, 116, 0.12);
+  background: linear-gradient(180deg, #faf5ff 0%, #f3e8ff 100%);
 }
 
 .unscheduled-head {

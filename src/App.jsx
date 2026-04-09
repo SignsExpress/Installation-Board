@@ -39,6 +39,7 @@ const HOLIDAY_PERSON_COLORS = {
   "Matt C": "holiday-person-red",
   "Keilan C": "holiday-person-red"
 };
+const UNSCHEDULED_DROP_ZONE = "__unscheduled__";
 
 const EMPTY_FORM = {
   id: "",
@@ -1081,7 +1082,8 @@ export default function App() {
   async function moveJobToDate(jobId, nextDate) {
     if (isClientMode) return;
     const job = jobsById.get(jobId);
-    if (!job || !nextDate || job.date === nextDate) {
+    const normalizedNextDate = nextDate === UNSCHEDULED_DROP_ZONE ? "" : nextDate;
+    if (!job || normalizedNextDate === undefined || normalizedNextDate === null || job.date === normalizedNextDate) {
       setDropDate("");
       setDraggingJobId("");
       return;
@@ -1093,7 +1095,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...job,
-          date: nextDate
+          date: normalizedNextDate
         })
       });
 
@@ -1104,9 +1106,14 @@ export default function App() {
       setJobs(payload.jobs);
       setHolidays(payload.holidays);
       if (editingId === jobId) {
-        setForm((current) => ({ ...current, date: nextDate }));
+        setForm((current) => ({ ...current, date: normalizedNextDate }));
       }
-      setMessage(createMessage(`Job moved to ${nextDate}.`, "success"));
+      setMessage(
+        createMessage(
+          normalizedNextDate ? `Job moved to ${normalizedNextDate}.` : "Job moved to unscheduled.",
+          "success"
+        )
+      );
     } catch (error) {
       console.error(error);
       setMessage(createMessage("Could not move the job.", "error"));
@@ -1119,7 +1126,8 @@ export default function App() {
   async function duplicateJobToDate(jobId, nextDate) {
     if (isClientMode) return;
     const job = jobsById.get(jobId);
-    if (!job || !nextDate) {
+    const normalizedNextDate = nextDate === UNSCHEDULED_DROP_ZONE ? "" : nextDate;
+    if (!job || normalizedNextDate === undefined || normalizedNextDate === null) {
       setDuplicatingJobId("");
       setDropDate("");
       return;
@@ -1132,7 +1140,7 @@ export default function App() {
         body: JSON.stringify({
           ...job,
           id: undefined,
-          date: nextDate
+          date: normalizedNextDate
         })
       });
 
@@ -1142,7 +1150,12 @@ export default function App() {
       setBoard(payload.board);
       setJobs(payload.jobs);
       setHolidays(payload.holidays);
-      setMessage(createMessage(`Job copied to ${nextDate}.`, "success"));
+      setMessage(
+        createMessage(
+          normalizedNextDate ? `Job copied to ${normalizedNextDate}.` : "Job copied to unscheduled.",
+          "success"
+        )
+      );
     } catch (error) {
       console.error(error);
       setMessage(createMessage("Could not duplicate the job.", "error"));
@@ -1581,7 +1594,28 @@ export default function App() {
                   </div>
                 </div>
 
-                <section className="unscheduled-section panel">
+                <section
+                  className={`unscheduled-section panel ${dropDate === UNSCHEDULED_DROP_ZONE ? "is-drop-target" : ""}`}
+                  onDragOver={(event) => {
+                    if (isClientMode) return;
+                    event.preventDefault();
+                    if (draggingJobId || duplicatingJobId) setDropDate(UNSCHEDULED_DROP_ZONE);
+                  }}
+                  onDragLeave={() => {
+                    if (dropDate === UNSCHEDULED_DROP_ZONE) setDropDate("");
+                  }}
+                  onDrop={(event) => {
+                    if (isClientMode) return;
+                    event.preventDefault();
+                    const duplicateJobId = event.dataTransfer.getData("job-copy");
+                    if (duplicateJobId || duplicatingJobId) {
+                      duplicateJobToDate(duplicateJobId || duplicatingJobId, UNSCHEDULED_DROP_ZONE);
+                      return;
+                    }
+                    const jobId = event.dataTransfer.getData("text/plain") || draggingJobId;
+                    moveJobToDate(jobId, UNSCHEDULED_DROP_ZONE);
+                  }}
+                >
                   <div className="unscheduled-head">
                     <div>
                       <h3>Unscheduled</h3>
