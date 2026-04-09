@@ -61,6 +61,21 @@ function normalizePermissions(permissions, role) {
   };
 }
 
+function isOwnerUser(user) {
+  return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
+}
+
+function applyOwnerPermissions(user) {
+  if (!isOwnerUser(user)) return user;
+  return {
+    ...user,
+    permissions: {
+      board: "admin",
+      installer: "admin"
+    }
+  };
+}
+
 function deriveRoleFromPermissions(permissions) {
   if (permissions?.board === "user" && permissions?.installer === "none") {
     return "client";
@@ -96,6 +111,12 @@ function normalizeStore(parsed) {
 
   for (const user of users) {
     user.permissions = normalizePermissions(user.permissions, user.role);
+    if (isOwnerUser(user)) {
+      user.permissions = {
+        board: "admin",
+        installer: "admin"
+      };
+    }
   }
 
   users.sort((left, right) => {
@@ -155,13 +176,14 @@ function verifyPassword(password, user) {
 }
 
 function sanitizeUser(user) {
-  const permissions = normalizePermissions(user.permissions, user.role);
+  const safeUser = applyOwnerPermissions(user);
+  const permissions = normalizePermissions(safeUser.permissions, safeUser.role);
   return {
-    id: user.id,
-    displayName: user.displayName,
+    id: safeUser.id,
+    displayName: safeUser.displayName,
     role: deriveRoleFromPermissions(permissions),
     permissions,
-    hasPassword: Boolean(user.passwordHash)
+    hasPassword: Boolean(safeUser.passwordHash)
   };
 }
 
@@ -192,6 +214,12 @@ async function updateUserPermissions(userId, permissions) {
   }
 
   user.permissions = normalizePermissions(permissions, user.role);
+  if (isOwnerUser(user)) {
+    user.permissions = {
+      board: "admin",
+      installer: "admin"
+    };
+  }
   await writeUsersStore(store);
   return sanitizeUser(user);
 }
