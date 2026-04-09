@@ -146,6 +146,13 @@ function getSessionFromRequest(request) {
   return { sessionId, ...session };
 }
 
+async function getFreshSessionUser(session) {
+  if (!session?.user?.id) return session?.user || null;
+  const store = await readUsersStore();
+  const storedUser = store.users.find((user) => String(user.id || "") === String(session.user.id || ""));
+  return storedUser ? sanitizeUser(storedUser) : session.user;
+}
+
 function clearExpiredSessions() {
   const now = Date.now();
   for (const [sessionId, session] of sessions.entries()) {
@@ -1972,10 +1979,12 @@ function createServer() {
       return;
     }
 
+    const freshSessionUser = await getFreshSessionUser(session);
+
     const store = await readUsersStore();
-    const users = canManagePermissions(session.user)
+    const users = canManagePermissions(freshSessionUser)
       ? store.users
-      : store.users.filter((user) => String(user.id || "") === String(session.user.id || ""));
+      : store.users.filter((user) => String(user.id || "") === String(freshSessionUser.id || ""));
 
     response.json(users.map((user) => ({
       ...sanitizeUser(user),
@@ -1990,12 +1999,22 @@ function createServer() {
       return;
     }
 
-    response.json({
-      user: {
-        ...session.user,
-        canManagePermissions: canManagePermissions(session.user)
-      }
-    });
+    getFreshSessionUser(session)
+      .then((freshUser) => {
+        sessions.set(session.sessionId, {
+          user: freshUser,
+          expiresAt: session.expiresAt
+        });
+        response.json({
+          user: {
+            ...freshUser,
+            canManagePermissions: canManagePermissions(freshUser)
+          }
+        });
+      })
+      .catch((error) => {
+        response.status(500).json({ error: error.message || "Could not load current user." });
+      });
   });
 
   app.post("/api/auth/login", async (request, response) => {
@@ -2056,7 +2075,7 @@ function createServer() {
     }
   });
 
-  app.use("/api", (request, response, next) => {
+  app.use("/api", async (request, response, next) => {
     if (request.path.startsWith("/auth/")) {
       next();
       return;
@@ -2068,7 +2087,12 @@ function createServer() {
       return;
     }
 
-    request.user = session.user;
+    const freshUser = await getFreshSessionUser(session);
+    sessions.set(session.sessionId, {
+      user: freshUser,
+      expiresAt: session.expiresAt
+    });
+    request.user = freshUser;
     next();
   });
 
