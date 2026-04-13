@@ -300,36 +300,38 @@ function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] }, null, 2)}\n`, "utf8");
+    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [] }, null, 2)}\n`, "utf8");
   }
 }
 
 function readHolidaySeed() {
-  if (!fs.existsSync(DEFAULT_HOLIDAY_SEED_FILE)) {
-    return { holidays: [], holidayAllowances: [] };
+    if (!fs.existsSync(DEFAULT_HOLIDAY_SEED_FILE)) {
+    return { holidays: [], holidayAllowances: [], holidayEvents: [] };
   }
 
   try {
     const raw = fs.readFileSync(DEFAULT_HOLIDAY_SEED_FILE, "utf8");
     const parsed = JSON.parse(raw);
-    return {
-      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
-      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : []
-    };
+      return {
+        holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
+      holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : []
+      };
   } catch (error) {
     console.error("Invalid holiday seed JSON, ignoring seed.", error);
-    return { holidays: [], holidayAllowances: [] };
+    return { holidays: [], holidayAllowances: [], holidayEvents: [] };
   }
 }
 
 function mergeHolidaySeed(store) {
   const seed = readHolidaySeed();
-  const nextStore = {
-    jobs: Array.isArray(store.jobs) ? store.jobs : [],
-    holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
-    holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
-    holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : []
-  };
+    const nextStore = {
+      jobs: Array.isArray(store.jobs) ? store.jobs : [],
+      holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
+      holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
+      holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
+      holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : []
+    };
 
   seed.holidays.forEach((holiday) => {
     const normalized = sanitizeStaffHoliday(holiday);
@@ -368,18 +370,19 @@ function applyHolidayResetMigration(store) {
     };
   }
 
-  return {
-    ...store,
-    holidays: [],
-    holidayRequests: [],
-    holidayAllowances: Array.isArray(store.holidayAllowances)
+    return {
+      ...store,
+      holidays: [],
+      holidayRequests: [],
+      holidayAllowances: Array.isArray(store.holidayAllowances)
       ? store.holidayAllowances.map((entry) => ({
           ...entry,
           birthDate: ""
         }))
-      : [],
-    holidayResetVersion: HOLIDAY_RESET_VERSION
-  };
+        : [],
+      holidayEvents: [],
+      holidayResetVersion: HOLIDAY_RESET_VERSION
+    };
 }
 
 function ensureInstallersFile() {
@@ -411,36 +414,39 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      const migrated = applyHolidayResetMigration({
-        jobs: parsed,
-        holidays: [],
-        holidayRequests: [],
-        holidayAllowances: []
-      });
+        const migrated = applyHolidayResetMigration({
+          jobs: parsed,
+          holidays: [],
+          holidayRequests: [],
+        holidayAllowances: [],
+        holidayEvents: []
+        });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
       }
       return mergeHolidaySeed(migrated);
     }
-    const migrated = applyHolidayResetMigration({
-      jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
-      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
-      holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
-      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
-      holidayResetVersion: Number(parsed.holidayResetVersion || 0)
-    });
+      const migrated = applyHolidayResetMigration({
+        jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+        holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+        holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
+        holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
+        holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
+        holidayResetVersion: Number(parsed.holidayResetVersion || 0)
+      });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
       await writeStore(migrated);
     }
     return mergeHolidaySeed(migrated);
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-    const migrated = applyHolidayResetMigration({
-      jobs: [],
-      holidays: [],
-      holidayRequests: [],
-      holidayAllowances: []
-    });
+      const migrated = applyHolidayResetMigration({
+        jobs: [],
+        holidays: [],
+        holidayRequests: [],
+      holidayAllowances: [],
+      holidayEvents: []
+      });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
   }
@@ -464,6 +470,10 @@ async function writeStore(store) {
       holidayAllowances: [...(store.holidayAllowances || [])].sort((left, right) => {
         if (left.yearStart !== right.yearStart) return Number(left.yearStart || 0) - Number(right.yearStart || 0);
         return String(left.person || "").localeCompare(String(right.person || ""));
+      }),
+      holidayEvents: [...(store.holidayEvents || [])].sort((left, right) => {
+        if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+        return String(left.title || "").localeCompare(String(right.title || ""));
       }),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
@@ -948,6 +958,16 @@ function sanitizeHolidayAllowance(payload) {
   };
 }
 
+function sanitizeHolidayEvent(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    date: String(payload.date || "").trim(),
+    title: String(payload.title || "").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function sanitizeInstaller(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -1305,14 +1325,18 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
       : String(entry.person || "").trim().toLowerCase() === String(currentPerson || "").toLowerCase()
   );
 
-  return {
-    holidays: displayYearHolidays,
-    holidayRequests: yearRequests,
-    holidayStaff: HOLIDAY_STAFF,
-    holidayAllowances: allowanceRows,
-    holidayYearStart: yearStart,
-    currentHolidayYearStart: getCurrentHolidayYearStart(),
-    holidayYearLabel: getHolidayYearLabel(yearStart),
+    return {
+      holidays: displayYearHolidays,
+      holidayRequests: yearRequests,
+      holidayStaff: HOLIDAY_STAFF,
+      holidayAllowances: allowanceRows,
+      holidayEvents: (store.holidayEvents || []).filter((event) => {
+        const eventDate = String(event.date || "");
+        return eventDate >= startIso && eventDate <= endIso;
+      }),
+      holidayYearStart: yearStart,
+      currentHolidayYearStart: getCurrentHolidayYearStart(),
+      holidayYearLabel: getHolidayYearLabel(yearStart),
     holidayYearOptions: getHolidayYearOptions(getCurrentHolidayYearStart())
   };
 }
@@ -3159,7 +3183,41 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(payload);
   });
 
-    app.post("/api/holidays", async (request, response) => {
+  app.post("/api/holiday-events", async (request, response) => {
+    if (!requireHolidayAdmin(request, response)) return;
+
+    const nextEvent = sanitizeHolidayEvent(request.body || {});
+    if (!nextEvent.title || !isValidIsoDate(nextEvent.date)) {
+      response.status(400).json({ error: "A valid date and event title are required." });
+      return;
+    }
+
+    const store = await readStore();
+    store.holidayEvents = Array.isArray(store.holidayEvents) ? store.holidayEvents : [];
+    const existingIndex = store.holidayEvents.findIndex((entry) => String(entry.id || "") === String(nextEvent.id || ""));
+
+    if (existingIndex >= 0) {
+      nextEvent.createdAt = store.holidayEvents[existingIndex].createdAt || nextEvent.createdAt;
+      store.holidayEvents[existingIndex] = nextEvent;
+    } else {
+      store.holidayEvents.unshift(nextEvent);
+    }
+
+    await writeStore(store);
+    const payload = await getHolidayPayload(request.user, getHolidayYearStartForIsoDate(nextEvent.date) || getCurrentHolidayYearStart());
+    response.json(payload);
+  });
+
+  app.delete("/api/holiday-events/:id", async (request, response) => {
+    if (!requireHolidayAdmin(request, response)) return;
+    const store = await readStore();
+    store.holidayEvents = (store.holidayEvents || []).filter((entry) => String(entry.id || "") !== String(request.params.id || ""));
+    await writeStore(store);
+    const payload = await getHolidayPayload(request.user, Number(request.query.yearStart || getCurrentHolidayYearStart()));
+    response.json(payload);
+  });
+
+  app.post("/api/holidays", async (request, response) => {
       if (!requireBoardAdmin(request, response)) return;
       const nextHoliday = sanitizeStaffHoliday(request.body || {});
     if (!nextHoliday.person || !isValidIsoDate(nextHoliday.date)) {

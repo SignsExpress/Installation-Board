@@ -1725,6 +1725,28 @@ button {
   gap: 3px;
 }
 
+.holiday-day-event {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 3px 5px;
+  background: #efe8ff;
+  color: #5f3c74;
+  font-size: 0.67rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holiday-day-event:hover {
+  background: #e4d6ff;
+}
+
 .holiday-day-cell.is-editable {
   cursor: pointer;
   transition: background 120ms ease, box-shadow 120ms ease;
