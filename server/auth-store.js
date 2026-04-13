@@ -38,13 +38,15 @@ function getDefaultPermissions(role) {
   if (String(role || "").toLowerCase() === "host") {
     return {
       board: "admin",
-      installer: "admin"
+      installer: "admin",
+      holidays: "admin"
     };
   }
 
   return {
     board: "user",
-    installer: "none"
+    installer: "none",
+    holidays: "user"
   };
 }
 
@@ -57,7 +59,8 @@ function normalizePermissions(permissions, role) {
   const defaults = getDefaultPermissions(role);
   return {
     board: normalizePermissionValue(permissions?.board, defaults.board),
-    installer: normalizePermissionValue(permissions?.installer, defaults.installer)
+    installer: normalizePermissionValue(permissions?.installer, defaults.installer),
+    holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays)
   };
 }
 
@@ -71,13 +74,14 @@ function applyOwnerPermissions(user) {
     ...user,
     permissions: {
       board: "admin",
-      installer: "admin"
+      installer: "admin",
+      holidays: "admin"
     }
   };
 }
 
 function deriveRoleFromPermissions(permissions) {
-  if (permissions?.board === "user" && permissions?.installer === "none") {
+  if (permissions?.board === "user" && permissions?.installer === "none" && permissions?.holidays === "user") {
     return "client";
   }
 
@@ -114,7 +118,8 @@ function normalizeStore(parsed) {
     if (isOwnerUser(user)) {
       user.permissions = {
         board: "admin",
-        installer: "admin"
+        installer: "admin",
+        holidays: "admin"
       };
     }
   }
@@ -217,7 +222,8 @@ async function updateUserPermissions(userId, permissions) {
   if (isOwnerUser(user)) {
     user.permissions = {
       board: "admin",
-      installer: "admin"
+      installer: "admin",
+      holidays: "admin"
     };
   }
   await writeUsersStore(store);

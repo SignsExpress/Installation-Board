@@ -450,8 +450,18 @@ function canEditInstaller(user) {
   return getPermissionForApp(user, "installer") === "admin";
 }
 
+function canAccessHolidays(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "holidays") !== "none";
+}
+
+function canEditHolidays(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "holidays") === "admin";
+}
+
 function usesHostShell(user) {
-  return Boolean(user && (canAccessInstaller(user) || canEditBoard(user) || user.canManagePermissions));
+  return Boolean(user && (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || user.canManagePermissions));
 }
 
 function getHomePathForUser(user) {
@@ -475,6 +485,7 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
   }
 
   const boardAllowed = canAccessBoard(currentUser);
+  const holidaysAllowed = canAccessHolidays(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -504,8 +515,12 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
         </button>
         <button
           type="button"
-          className={`host-nav-link ${active === "holidays" ? "active" : ""}`}
-          onClick={() => goTo(holidaysPath)}
+          className={`host-nav-link ${active === "holidays" ? "active" : ""} ${!holidaysAllowed ? "disabled" : ""}`}
+          onClick={() => {
+            if (!holidaysAllowed) return;
+            goTo(holidaysPath);
+          }}
+          disabled={!holidaysAllowed}
         >
           Holidays
         </button>
@@ -538,12 +553,13 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
     <section className="panel permissions-panel">
       <div className="permissions-head">
         <h3>Permissions</h3>
-        <p>Choose each person&apos;s access level for the Installation Board and Subcontractor Directory.</p>
+        <p>Choose each person&apos;s access level for the Installation Board, Holidays and Subcontractor Directory.</p>
       </div>
       <div className="permissions-grid">
         {visibleUsers.map((user) => {
           const isSelf = user.id === currentUser.id;
           const boardPermission = getPermissionForApp(user, "board");
+          const holidaysPermission = getPermissionForApp(user, "holidays");
           const installerPermission = getPermissionForApp(user, "installer");
 
           return (
@@ -586,6 +602,23 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
                   ))}
                 </div>
               </div>
+
+              <div className="permissions-app-row">
+                <span className="permissions-app-label">Holidays</span>
+                <div className="permission-segment">
+                  {PERMISSION_OPTIONS.map((option) => (
+                    <button
+                      key={`${user.id}-holidays-${option.value}`}
+                      type="button"
+                      className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
+                      disabled={isSelf || savingKey === `${user.id}:holidays`}
+                      onClick={() => onChangePermission(user.id, "holidays", option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </article>
           );
         })}
@@ -618,7 +651,15 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
             </div>
           ) : null}
           <div className="host-landing-actions">
-            <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+            <button
+              className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessHolidays(currentUser)) return;
+                goTo("/holidays");
+              }}
+              disabled={!canAccessHolidays(currentUser)}
+            >
               <strong>Holidays</strong>
             </button>
             <button
@@ -688,7 +729,15 @@ function ClientLandingPage({ currentUser, onLogout }) {
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
-            <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+            <button
+              className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessHolidays(currentUser)) return;
+                goTo("/holidays");
+              }}
+              disabled={!canAccessHolidays(currentUser)}
+            >
               <strong>Holidays</strong>
             </button>
             <button className="host-launch-card disabled" type="button" disabled>
@@ -727,7 +776,7 @@ function HolidaysPage({
   onSubmitHolidayRequest,
   onReviewHolidayRequest
 }) {
-  const canReview = canEditBoard(currentUser);
+  const canReview = canEditHolidays(currentUser);
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
 
@@ -844,14 +893,15 @@ function HolidaysPage({
                 <thead>
                   <tr>
                     <th>Employee</th>
-                    <th>Days pw</th>
-                    <th>Standard</th>
-                    <th>Extra</th>
-                    <th>Pro-rata</th>
-                    <th>Xmas</th>
-                    <th>Bank Hol</th>
-                    <th>Booked</th>
-                    <th>Left</th>
+                    <th>Number Days work pw</th>
+                    <th>Standard Entitlement</th>
+                    <th>Extra Days (Service)</th>
+                    <th>Pro-rata Allowance</th>
+                    <th>Allocated for Xmas</th>
+                    <th>Allocated Bank Holiday</th>
+                    <th>Total Days Booked</th>
+                    <th>Days Left to Book</th>
+                    <th>Unpaid Days Booked</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -894,6 +944,7 @@ function HolidaysPage({
                       <td className={entry.daysLeft < 0 ? "holiday-days-negative" : "holiday-days-positive"}>
                         <strong>{entry.daysLeft}</strong>
                       </td>
+                      <td>{entry.unpaidDaysBooked || 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1069,7 +1120,7 @@ export default function App() {
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
-  const showHolidays = Boolean(currentUser && isHolidaysRoute);
+  const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
@@ -1246,6 +1297,11 @@ export default function App() {
     if (!currentUser) return;
     const nextHomePath = getHomePathForUser(currentUser);
     const nextBoardPath = getBoardPathForUser(currentUser);
+
+    if (isHolidaysRoute && !canAccessHolidays(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
 
     if (isInstallerRoute && !canAccessInstaller(currentUser)) {
       window.location.replace(nextHomePath);
@@ -1446,6 +1502,7 @@ export default function App() {
     const nextPermissions = {
       board: getPermissionForApp(targetUser, "board"),
       installer: getPermissionForApp(targetUser, "installer"),
+      holidays: getPermissionForApp(targetUser, "holidays"),
       [appKey]: value
     };
 
@@ -1613,7 +1670,7 @@ export default function App() {
   }
 
   async function saveHolidayAllowance(person, updates) {
-    if (!canEditBoard(currentUser)) return;
+    if (!canEditHolidays(currentUser)) return;
     const existing = holidayAllowances.find((entry) => entry.person === person);
     const savingField = Object.keys(updates)[0] || "";
     setHolidayAllowanceSavingKey(`${person}:${savingField}`);

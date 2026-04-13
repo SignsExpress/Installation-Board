@@ -206,6 +206,16 @@ function canEditInstaller(user) {
   return getUserPermission(user, "installer", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
+function canAccessHolidays(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "holidays", user?.role === "host" ? "admin" : "user") !== "none";
+}
+
+function canEditHolidays(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "holidays", user?.role === "host" ? "admin" : "user") === "admin";
+}
+
 function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -264,6 +274,18 @@ function requireInstallerAdmin(request, response) {
 function requirePermissionsManager(request, response) {
   if (canManagePermissions(request.user)) return true;
   response.status(403).json({ error: "Permissions manager access required." });
+  return false;
+}
+
+function requireHolidayAccess(request, response) {
+  if (canAccessHolidays(request.user)) return true;
+  response.status(403).json({ error: "Holiday access required." });
+  return false;
+}
+
+function requireHolidayAdmin(request, response) {
+  if (canEditHolidays(request.user)) return true;
+  response.status(403).json({ error: "Holiday admin access required." });
   return false;
 }
 
@@ -982,7 +1004,8 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       fullName: staffEntry.name,
       prorataAllowance,
       bookedDays,
-      daysLeft
+      daysLeft,
+      unpaidDaysBooked: 0
     };
   });
 
@@ -1038,7 +1061,7 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
   const bounds = getHolidayYearBounds(yearStart);
   const startIso = toIsoDate(bounds.start);
   const endIso = toIsoDate(bounds.end);
-  const visibleRequests = canEditBoard(forUser)
+  const visibleRequests = canEditHolidays(forUser)
     ? (store.holidayRequests || [])
     : (store.holidayRequests || []).filter(
         (request) =>
@@ -1057,7 +1080,11 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
     return holidayDate >= startIso && holidayDate <= endIso;
   });
 
-  const allowanceRows = buildHolidayAllowanceSummaries(store, yearStart);
+  const allowanceRows = buildHolidayAllowanceSummaries(store, yearStart).filter((entry) =>
+    canEditHolidays(forUser)
+      ? true
+      : String(entry.person || "").trim().toLowerCase() === String(currentPerson || "").toLowerCase()
+  );
 
   return {
     holidays: yearHolidays,
@@ -2436,7 +2463,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -2467,7 +2494,8 @@ function createServer() {
     try {
       const updatedUser = await updateUserPermissions(request.params.id, {
         board: request.body?.board,
-        installer: request.body?.installer
+        installer: request.body?.installer,
+        holidays: request.body?.holidays
       });
       response.json({ user: updatedUser });
     } catch (error) {
@@ -2751,38 +2779,29 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.get("/api/holidays", async (request, response) => {
-    if (!request.user) {
-      response.status(401).json({ error: "Login required." });
-      return;
-    }
+    if (!requireHolidayAccess(request, response)) return;
     const store = await readStore();
     response.json(store.holidays);
   });
 
   app.get("/api/holiday-requests", async (request, response) => {
-    if (!request.user) {
-      response.status(401).json({ error: "Login required." });
-      return;
-    }
+    if (!requireHolidayAccess(request, response)) return;
     const yearStart = Number(request.query.yearStart || getCurrentHolidayYearStart());
     const payload = await getHolidayPayload(request.user, yearStart);
     response.json(payload);
   });
 
   app.post("/api/holiday-requests", async (request, response) => {
-    if (!request.user) {
-      response.status(401).json({ error: "Login required." });
-      return;
-    }
+    if (!requireHolidayAccess(request, response)) return;
     const personLabel = getHolidayStaffPerson(request.user?.displayName);
-    if (!personLabel && !canEditBoard(request.user)) {
+    if (!personLabel && !canEditHolidays(request.user)) {
       response.status(400).json({ error: "This account is not linked to a holiday calendar code." });
       return;
     }
 
     const nextRequest = sanitizeHolidayRequest({
       ...request.body,
-      person: canEditBoard(request.user) ? request.body?.person || personLabel : personLabel,
+      person: canEditHolidays(request.user) ? request.body?.person || personLabel : personLabel,
       requestedByUserId: request.user?.id || "",
       requestedByName: request.user?.displayName || "",
       status: "pending"
@@ -2811,7 +2830,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     }
 
     const store = await readStore();
-    if (!canEditBoard(request.user)) {
+    if (!canEditHolidays(request.user)) {
       const allowanceSummary = buildHolidayAllowanceSummaries(store, requestYearStart).find(
         (entry) => String(entry.person || "").trim().toLowerCase() === String(nextRequest.person || "").trim().toLowerCase()
       );
@@ -2833,7 +2852,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.patch("/api/holiday-requests/:id", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
+    if (!requireHolidayAdmin(request, response)) return;
     const status = String(request.body?.status || "").trim().toLowerCase();
     if (!["approved", "rejected"].includes(status)) {
       response.status(400).json({ error: "Status must be approved or rejected." });
@@ -2889,7 +2908,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.post("/api/holiday-allowances", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
+    if (!requireHolidayAdmin(request, response)) return;
 
     const nextAllowance = sanitizeHolidayAllowance(request.body || {});
     if (!getHolidayStaffEntry(nextAllowance.person)) {
