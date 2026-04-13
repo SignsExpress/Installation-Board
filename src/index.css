@@ -1614,8 +1614,46 @@ button {
 }
 
 .holiday-calendar-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
   padding-bottom: 6px;
+  display: grid;
+  gap: 10px;
+}
+
+.holiday-calendar-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.holiday-calendar-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.holiday-filter-label {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.holiday-filter-pill {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #d7cbdd;
+  background: #fff;
+  color: #475569;
+  font-weight: 700;
+}
+
+.holiday-filter-pill.active {
+  background: var(--sx-main-soft);
+  border-color: #c7b7d2;
+  color: var(--sx-main);
 }
 
 .holiday-calendar-grid {
@@ -1707,22 +1745,33 @@ button {
 }
 
 .holiday-breakdown-wrap {
-  overflow-x: auto;
+  overflow-x: hidden;
 }
 
 .holiday-breakdown-table {
   width: 100%;
-  min-width: 940px;
   border-collapse: collapse;
-  font-size: 0.94rem;
+  table-layout: fixed;
+  font-size: 0.84rem;
+}
+
+.holiday-col-employee {
+  width: 170px;
+}
+
+.holiday-col-metric {
+  width: calc((100% - 170px) / 10);
 }
 
 .holiday-breakdown-table th,
 .holiday-breakdown-table td {
   border-bottom: 1px solid #e6dcec;
-  padding: 10px 8px;
+  padding: 10px 6px;
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
 }
 
 .holiday-breakdown-table th:first-child,
@@ -1731,15 +1780,34 @@ button {
 }
 
 .holiday-breakdown-table th {
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  line-height: 1.25;
   text-transform: uppercase;
   color: #64748b;
 }
 
+.holiday-person-filter {
+  border: none;
+  background: transparent;
+  color: #0f172a;
+  font-weight: 700;
+  padding: 0;
+  text-align: left;
+}
+
+.holiday-person-filter.active {
+  color: var(--sx-main);
+}
+
+.holiday-person-filter:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .holiday-allowance-input {
-  width: 72px;
-  min-height: 38px;
+  width: min(100%, 70px);
+  min-height: 36px;
   border: 1px solid #d8cfe0;
   border-radius: 12px;
   padding: 0 8px;
@@ -2919,6 +2987,20 @@ button {
   .holidays-toolbar-actions,
   .holiday-year-footer {
     justify-content: flex-start;
+  }
+
+  .holiday-calendar-tools,
+  .holiday-calendar-filter-summary {
+    justify-content: flex-start;
+  }
+
+  .holiday-breakdown-wrap {
+    overflow-x: auto;
+  }
+
+  .holiday-breakdown-table {
+    min-width: 980px;
+    table-layout: auto;
   }
 
   .installer-host-view .toolbar-top-row,

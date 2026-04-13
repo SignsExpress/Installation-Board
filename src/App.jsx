@@ -810,6 +810,29 @@ function HolidaysPage({
   const canReview = canEditHolidays(currentUser);
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
+  const [selectedHolidayPerson, setSelectedHolidayPerson] = useState("");
+  const visibleHolidayAllowances = useMemo(
+    () =>
+      holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
+    [holidayAllowances]
+  );
+  const activeHolidayFilter = selectedHolidayPerson || (canReview ? "" : currentPerson);
+  const filteredHolidayRows = useMemo(
+    () =>
+      holidayRows.map((month) => ({
+        ...month,
+        days: month.days.map((day) => ({
+          ...day,
+          holidays: activeHolidayFilter
+            ? day.holidays.filter(
+                (holiday) =>
+                  String(holiday.person || "").trim().toLowerCase() === activeHolidayFilter.toLowerCase()
+              )
+            : day.holidays
+        }))
+      })),
+    [holidayRows, activeHolidayFilter]
+  );
 
   return (
     <div className="app-shell holidays-shell">
@@ -877,6 +900,38 @@ function HolidaysPage({
           ) : null}
 
           <div className="holiday-calendar-wrap">
+            <div className="holiday-calendar-tools">
+              <div className="holiday-calendar-filter-summary">
+                {activeHolidayFilter ? (
+                  <>
+                    <span className="holiday-filter-label">Showing</span>
+                    <button
+                      type="button"
+                      className="holiday-filter-pill active"
+                      onClick={() => {
+                        if (canReview) {
+                          setSelectedHolidayPerson("");
+                        }
+                      }}
+                      disabled={!canReview}
+                    >
+                      {activeHolidayFilter}
+                    </button>
+                    {canReview ? (
+                      <button
+                        type="button"
+                        className="text-button"
+                        onClick={() => setSelectedHolidayPerson("")}
+                      >
+                        Show everyone
+                      </button>
+                    ) : null}
+                  </>
+                ) : (
+                  <span className="holiday-filter-label">Showing all employees</span>
+                )}
+              </div>
+            </div>
             <div className="holiday-calendar-grid">
               <div className="holiday-calendar-header month-label-cell">Month</div>
               {Array.from({ length: 31 }, (_, index) => (
@@ -885,7 +940,7 @@ function HolidaysPage({
                 </div>
               ))}
 
-              {holidayRows.map((month) => (
+              {filteredHolidayRows.map((month) => (
                 <div key={month.id} className="holiday-calendar-row">
                   <div className="month-label-cell month-row-label">{month.label}</div>
                   {month.days.map((day) => (
@@ -921,6 +976,10 @@ function HolidaysPage({
             </div>
             <div className="holiday-breakdown-wrap">
               <table className="holiday-breakdown-table">
+                <colgroup>
+                  <col className="holiday-col-employee" />
+                  <col span="10" className="holiday-col-metric" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Employee</th>
@@ -936,12 +995,27 @@ function HolidaysPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {holidayAllowances.map((rawEntry) => {
-                    const entry = getHolidayAllowanceSummary(rawEntry);
+                  {visibleHolidayAllowances.map((entry) => {
+                    const isSelected =
+                      String(activeHolidayFilter || "").trim().toLowerCase() ===
+                      String(entry.person || "").trim().toLowerCase();
                     return (
                     <tr key={`${holidayYearStart}-${entry.person}`}>
                       <td>
-                        <strong>{entry.fullName}</strong>
+                        <button
+                          type="button"
+                          className={`holiday-person-filter ${isSelected ? "active" : ""}`}
+                          onClick={() =>
+                            canReview
+                              ? setSelectedHolidayPerson((current) =>
+                                  current.toLowerCase() === String(entry.person || "").trim().toLowerCase() ? "" : entry.person
+                                )
+                              : null
+                          }
+                          disabled={!canReview}
+                        >
+                          {entry.fullName}
+                        </button>
                       </td>
                       {[
                         ["workDaysPerWeek", entry.workDaysPerWeek],
