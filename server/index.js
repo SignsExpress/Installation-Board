@@ -47,6 +47,18 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   timeZone: TIME_ZONE
 });
+const HOLIDAY_STAFF = [
+  { code: "MR", name: "Matt Rutlidge", person: "Matt R" },
+  { code: "DD", name: "Dawn Dewhurst", person: "Dawn D" },
+  { code: "TVB", name: "Tom Van-Boyd", person: "Tom V-B" },
+  { code: "AH", name: "Amber Hardman", person: "Amber H" },
+  { code: "ED", name: "Eddy D'Antonio", person: "Eddy D'A" },
+  { code: "PM", name: "Paul Morris", person: "Paul M" },
+  { code: "KW", name: "Kyle Wright", person: "Kyle W" },
+  { code: "MC", name: "Matt Carroll", person: "Matt C" },
+  { code: "KC", name: "Keilan Curtis", person: "Keilan C" },
+  { code: "TS", name: "Tamas", person: "Tamas" }
+];
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
@@ -197,6 +209,33 @@ function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
 
+function getHolidayStaffCode(displayName) {
+  const normalized = String(displayName || "").trim().toLowerCase();
+  return HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === normalized)?.code || "";
+}
+
+function getHolidayStaffName(codeOrName) {
+  const normalized = String(codeOrName || "").trim().toLowerCase();
+  const match =
+    HOLIDAY_STAFF.find((entry) => entry.code.toLowerCase() === normalized) ||
+    HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === normalized);
+  return match?.name || "";
+}
+
+function getHolidayStaffEntry(codeOrName) {
+  const normalized = String(codeOrName || "").trim().toLowerCase();
+  return (
+    HOLIDAY_STAFF.find((entry) => entry.code.toLowerCase() === normalized) ||
+    HOLIDAY_STAFF.find((entry) => entry.person.toLowerCase() === normalized) ||
+    HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === normalized) ||
+    null
+  );
+}
+
+function getHolidayStaffPerson(displayName) {
+  return HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === String(displayName || "").trim().toLowerCase())?.person || "";
+}
+
 function requireBoardAccess(request, response) {
   if (canAccessBoard(request.user)) return true;
   response.status(403).json({ error: "Board access required." });
@@ -231,7 +270,7 @@ function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [] }, null, 2)}\n`, "utf8");
+    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [] }, null, 2)}\n`, "utf8");
   }
 }
 
@@ -264,15 +303,16 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return { jobs: parsed, holidays: [] };
+      return { jobs: parsed, holidays: [], holidayRequests: [] };
     }
     return {
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
-      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : []
+      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+      holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : []
     };
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-    return { jobs: [], holidays: [] };
+    return { jobs: [], holidays: [], holidayRequests: [] };
   }
 }
 
@@ -285,6 +325,10 @@ async function writeStore(store) {
     }),
     holidays: [...store.holidays].sort((left, right) => {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
+      return String(left.person || "").localeCompare(String(right.person || ""));
+    }),
+    holidayRequests: [...(store.holidayRequests || [])].sort((left, right) => {
+      if (left.startDate !== right.startDate) return String(left.startDate || "").localeCompare(String(right.startDate || ""));
       return String(left.person || "").localeCompare(String(right.person || ""));
     })
   };
@@ -697,6 +741,27 @@ function sanitizeStaffHoliday(payload) {
   };
 }
 
+function sanitizeHolidayRequest(payload) {
+  const normalizedStatus = String(payload.status || "pending").trim().toLowerCase();
+  const status = ["pending", "approved", "rejected"].includes(normalizedStatus) ? normalizedStatus : "pending";
+  const normalizedDuration = String(payload.duration || "Full Day").trim();
+  return {
+    id: String(payload.id || makeId()),
+    person: String(payload.person || "").trim(),
+    requestedByUserId: String(payload.requestedByUserId || "").trim(),
+    requestedByName: String(payload.requestedByName || "").trim(),
+    startDate: String(payload.startDate || "").trim(),
+    endDate: String(payload.endDate || payload.startDate || "").trim(),
+    duration: normalizedDuration || "Full Day",
+    notes: String(payload.notes || "").trim(),
+    status,
+    reviewedAt: String(payload.reviewedAt || "").trim(),
+    reviewedBy: String(payload.reviewedBy || "").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function sanitizeInstaller(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -728,6 +793,27 @@ function sanitizeRequest(payload) {
 
 function isValidIsoDate(isoDate) {
   return /^\d{4}-\d{2}-\d{2}$/.test(isoDate) && Boolean(parseIsoDate(isoDate));
+}
+
+function enumerateIsoDates(startDate, endDate) {
+  const start = parseIsoDate(startDate);
+  const end = parseIsoDate(endDate);
+  if (!start || !end || start > end) return [];
+
+  const dates = [];
+  let cursor = start;
+  while (cursor <= end) {
+    dates.push(toIsoDate(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return dates;
+}
+
+function isWeekdayIsoDate(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return false;
+  const day = parsed.getUTCDay();
+  return day >= 1 && day <= 5;
 }
 
 function broadcast(event, payload) {
@@ -770,6 +856,24 @@ async function getBoardPayload(options = {}) {
       ...navigation,
       selectedMonth: options.mode === "month" ? options.monthId || "" : ""
     }
+  };
+}
+
+async function getHolidayPayload(forUser) {
+  const store = await readStore();
+  const currentPerson = getHolidayStaffPerson(forUser?.displayName);
+  const visibleRequests = canEditBoard(forUser)
+    ? store.holidayRequests || []
+    : (store.holidayRequests || []).filter(
+        (request) =>
+          String(request.requestedByUserId || "") === String(forUser?.id || "") ||
+          String(request.person || "").trim().toLowerCase() === String(currentPerson || "").toLowerCase()
+      );
+
+  return {
+    holidays: store.holidays,
+    holidayRequests: visibleRequests,
+    holidayStaff: HOLIDAY_STAFF
   };
 }
 
@@ -2453,9 +2557,119 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.get("/api/holidays", async (request, response) => {
-    if (!requireBoardAccess(request, response)) return;
+    if (!request.user) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
     const store = await readStore();
     response.json(store.holidays);
+  });
+
+  app.get("/api/holiday-requests", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+    const payload = await getHolidayPayload(request.user);
+    response.json(payload);
+  });
+
+  app.post("/api/holiday-requests", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+    const personLabel = getHolidayStaffPerson(request.user?.displayName);
+    if (!personLabel && !canEditBoard(request.user)) {
+      response.status(400).json({ error: "This account is not linked to a holiday calendar code." });
+      return;
+    }
+
+    const nextRequest = sanitizeHolidayRequest({
+      ...request.body,
+      person: canEditBoard(request.user) ? request.body?.person || personLabel : personLabel,
+      requestedByUserId: request.user?.id || "",
+      requestedByName: request.user?.displayName || "",
+      status: "pending"
+    });
+
+    if (!getHolidayStaffEntry(nextRequest.person)) {
+      response.status(400).json({ error: "A valid employee is required." });
+      return;
+    }
+
+    if (!isValidIsoDate(nextRequest.startDate) || !isValidIsoDate(nextRequest.endDate)) {
+      response.status(400).json({ error: "Valid start and end dates are required." });
+      return;
+    }
+
+    if (parseIsoDate(nextRequest.startDate) > parseIsoDate(nextRequest.endDate)) {
+      response.status(400).json({ error: "End date must be on or after the start date." });
+      return;
+    }
+
+    const store = await readStore();
+    store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
+    store.holidayRequests.unshift(nextRequest);
+    const savedStore = await writeStore(store);
+    const visiblePayload = await getHolidayPayload(request.user);
+    broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
+    response.json(visiblePayload);
+  });
+
+  app.patch("/api/holiday-requests/:id", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const status = String(request.body?.status || "").trim().toLowerCase();
+    if (!["approved", "rejected"].includes(status)) {
+      response.status(400).json({ error: "Status must be approved or rejected." });
+      return;
+    }
+
+    const store = await readStore();
+    store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
+    const requestIndex = store.holidayRequests.findIndex((item) => String(item.id || "") === String(request.params.id || ""));
+    if (requestIndex === -1) {
+      response.status(404).json({ error: "Holiday request not found." });
+      return;
+    }
+
+    const holidayRequest = {
+      ...store.holidayRequests[requestIndex],
+      status,
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: request.user?.displayName || "",
+      updatedAt: new Date().toISOString()
+    };
+    store.holidayRequests[requestIndex] = holidayRequest;
+
+    if (status === "approved") {
+      const requestDates = enumerateIsoDates(holidayRequest.startDate, holidayRequest.endDate).filter(isWeekdayIsoDate);
+      for (const date of requestDates) {
+        const holidayEntry = sanitizeStaffHoliday({
+          id: makeId(),
+          date,
+          person: holidayRequest.person,
+          duration: holidayRequest.duration
+        });
+
+        const existingIndex = store.holidays.findIndex(
+          (entry) => String(entry.date || "") === date && String(entry.person || "").trim().toLowerCase() === String(holidayRequest.person || "").trim().toLowerCase()
+        );
+
+        if (existingIndex >= 0) {
+          holidayEntry.id = store.holidays[existingIndex].id;
+          holidayEntry.createdAt = store.holidays[existingIndex].createdAt || holidayEntry.createdAt;
+          store.holidays[existingIndex] = holidayEntry;
+        } else {
+          store.holidays.unshift(holidayEntry);
+        }
+      }
+    }
+
+    const savedStore = await writeStore(store);
+    const visiblePayload = await getHolidayPayload(request.user);
+    broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
+    response.json(visiblePayload);
   });
 
   app.post("/api/holidays", async (request, response) => {

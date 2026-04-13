@@ -27,18 +27,20 @@ const PERMISSION_OPTIONS = [
   { value: "none", label: "No Access" }
 ];
 
-const STAFF_NAMES = ["Matt R", "Dawn D", "Tom V-B", "Amber H", "Eddy D'A", "Paul M", "Kyle W", "Matt C", "Keilan C"];
-const HOLIDAY_PERSON_COLORS = {
-  "Matt R": "holiday-person-black",
-  "Dawn D": "holiday-person-black",
-  "Tom V-B": "holiday-person-black",
-  "Amber H": "holiday-person-black",
-  "Eddy D'A": "holiday-person-black",
-  "Paul M": "holiday-person-green",
-  "Kyle W": "holiday-person-green",
-  "Matt C": "holiday-person-red",
-  "Keilan C": "holiday-person-red"
-};
+const HOLIDAY_STAFF = [
+  { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black" },
+  { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black" },
+  { code: "TVB", person: "Tom V-B", fullName: "Tom Van-Boyd", colorClass: "holiday-person-black" },
+  { code: "AH", person: "Amber H", fullName: "Amber Hardman", colorClass: "holiday-person-black" },
+  { code: "ED", person: "Eddy D'A", fullName: "Eddy D'Antonio", colorClass: "holiday-person-black" },
+  { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green" },
+  { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green" },
+  { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red" },
+  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red" },
+  { code: "TS", person: "Tamas", fullName: "Tamas", colorClass: "holiday-person-amber" }
+];
+const STAFF_NAMES = HOLIDAY_STAFF.map((entry) => entry.person);
+const HOLIDAY_PERSON_COLORS = Object.fromEntries(HOLIDAY_STAFF.map((entry) => [entry.person, entry.colorClass]));
 const UNSCHEDULED_DROP_ZONE = "__unscheduled__";
 
 const EMPTY_FORM = {
@@ -55,6 +57,14 @@ const EMPTY_FORM = {
   jobType: "Install",
   customJobType: "",
   isPlaceholder: false,
+  notes: ""
+};
+
+const EMPTY_HOLIDAY_REQUEST_FORM = {
+  person: "",
+  startDate: "",
+  endDate: "",
+  duration: "Full Day",
   notes: ""
 };
 
@@ -98,6 +108,156 @@ function getStartOfMonth(date) {
 
 function getEndOfMonth(date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+}
+
+function getHolidayStaffEntry(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return (
+    HOLIDAY_STAFF.find((entry) => entry.fullName.toLowerCase() === normalized) ||
+    HOLIDAY_STAFF.find((entry) => entry.person.toLowerCase() === normalized) ||
+    HOLIDAY_STAFF.find((entry) => entry.code.toLowerCase() === normalized) ||
+    null
+  );
+}
+
+function getHolidayStaffPersonForUser(user) {
+  return getHolidayStaffEntry(user?.displayName)?.person || "";
+}
+
+function getHolidayDisplayToken(person) {
+  const entry = getHolidayStaffEntry(person);
+  if (entry) return entry.code;
+  const value = String(person || "").trim();
+  if (value && !value.includes(" ") && value.length <= 4) return value.toUpperCase();
+  return toInitials(value);
+}
+
+function nthWeekdayOfMonth(year, month, weekday, occurrence) {
+  const first = new Date(Date.UTC(year, month, 1));
+  const firstWeekday = first.getUTCDay();
+  const delta = (weekday - firstWeekday + 7) % 7;
+  return new Date(Date.UTC(year, month, 1 + delta + (occurrence - 1) * 7));
+}
+
+function lastWeekdayOfMonth(year, month, weekday) {
+  const last = new Date(Date.UTC(year, month + 1, 0));
+  const lastWeekday = last.getUTCDay();
+  const delta = (lastWeekday - weekday + 7) % 7;
+  return new Date(Date.UTC(year, month + 1, last.getUTCDate() - delta));
+}
+
+function getEasterSunday(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function applySubstituteHoliday(date) {
+  const weekday = date.getUTCDay();
+  if (weekday === 6) return addDays(date, 2);
+  if (weekday === 0) return addDays(date, 1);
+  return date;
+}
+
+function getUkBankHolidays(year) {
+  const easterSunday = getEasterSunday(year);
+  const goodFriday = addDays(easterSunday, -2);
+  const easterMonday = addDays(easterSunday, 1);
+  const newYearsDay = applySubstituteHoliday(new Date(Date.UTC(year, 0, 1)));
+  const earlyMay = nthWeekdayOfMonth(year, 4, 1, 1);
+  const springBank = lastWeekdayOfMonth(year, 4, 1);
+  const summerBank = lastWeekdayOfMonth(year, 7, 1);
+
+  let christmasDayObserved = new Date(Date.UTC(year, 11, 25));
+  let boxingDayObserved = new Date(Date.UTC(year, 11, 26));
+  const christmasWeekday = christmasDayObserved.getUTCDay();
+  const boxingWeekday = boxingDayObserved.getUTCDay();
+
+  if (christmasWeekday === 6) {
+    christmasDayObserved = new Date(Date.UTC(year, 11, 27));
+    boxingDayObserved = new Date(Date.UTC(year, 11, 28));
+  } else if (christmasWeekday === 0) {
+    christmasDayObserved = new Date(Date.UTC(year, 11, 27));
+    boxingDayObserved = new Date(Date.UTC(year, 11, 26));
+  } else if (boxingWeekday === 6 || boxingWeekday === 0) {
+    boxingDayObserved = new Date(Date.UTC(year, 11, 28));
+  }
+
+  return [
+    { date: toIsoDate(newYearsDay), label: "New Year's Day" },
+    { date: toIsoDate(goodFriday), label: "Good Friday" },
+    { date: toIsoDate(easterMonday), label: "Easter Monday" },
+    { date: toIsoDate(earlyMay), label: "Early May Bank Holiday" },
+    { date: toIsoDate(springBank), label: "Spring Bank Holiday" },
+    { date: toIsoDate(summerBank), label: "Summer Bank Holiday" },
+    { date: toIsoDate(christmasDayObserved), label: "Christmas Day" },
+    { date: toIsoDate(boxingDayObserved), label: "Boxing Day" }
+  ];
+}
+
+function buildHolidayYearRows(holidays, anchorIsoDate) {
+  const anchor = parseIsoDate(anchorIsoDate) || parseIsoDate(getLocalTodayIso());
+  const startMonth = getStartOfMonth(anchor);
+  const holidayMap = new Map();
+  const years = new Set();
+  const rows = [];
+
+  for (let offset = 0; offset < 12; offset += 1) {
+    const monthDate = addMonths(startMonth, offset);
+    rows.push(monthDate);
+    years.add(monthDate.getUTCFullYear());
+  }
+
+  const bankHolidayMap = new Map();
+  years.forEach((year) => {
+    getUkBankHolidays(year).forEach((holiday) => bankHolidayMap.set(holiday.date, holiday.label));
+  });
+
+  holidays.forEach((holiday) => {
+    const bucket = holidayMap.get(holiday.date) || [];
+    bucket.push(holiday);
+    holidayMap.set(holiday.date, bucket);
+  });
+
+  return rows.map((monthDate) => {
+    const year = monthDate.getUTCFullYear();
+    const month = monthDate.getUTCMonth();
+    const monthLabel = monthDate.toLocaleString("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" });
+    const days = Array.from({ length: 31 }, (_, index) => {
+      const dayNumber = index + 1;
+      const candidate = new Date(Date.UTC(year, month, dayNumber));
+      const inMonth = candidate.getUTCMonth() === month;
+      const isoDate = inMonth ? toIsoDate(candidate) : "";
+      const weekday = candidate.getUTCDay();
+      return {
+        key: `${year}-${month + 1}-${dayNumber}`,
+        dayNumber,
+        isoDate,
+        inMonth,
+        weekend: inMonth && (weekday === 0 || weekday === 6),
+        bankHoliday: inMonth ? bankHolidayMap.get(isoDate) || "" : "",
+        holidays: inMonth ? (holidayMap.get(isoDate) || []) : []
+      };
+    });
+
+    return {
+      id: `${year}-${String(month + 1).padStart(2, "0")}`,
+      label: monthLabel,
+      days
+    };
+  });
 }
 
 function createMessage(text, tone = "info") {
@@ -301,6 +461,7 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
+  const holidaysPath = "/holidays";
   const installerPath = "/installer";
 
   return (
@@ -323,6 +484,13 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
           disabled={!boardAllowed}
         >
           Installation Board
+        </button>
+        <button
+          type="button"
+          className={`host-nav-link ${active === "holidays" ? "active" : ""}`}
+          onClick={() => goTo(holidaysPath)}
+        >
+          Holidays
         </button>
         <button
           type="button"
@@ -433,6 +601,9 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
             </div>
           ) : null}
           <div className="host-landing-actions">
+            <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+              <strong>Holidays</strong>
+            </button>
             <button
               className={`host-launch-card ${!canAccessInstaller(currentUser) ? "disabled" : ""}`}
               type="button"
@@ -500,6 +671,9 @@ function ClientLandingPage({ currentUser, onLogout }) {
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
+            <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+              <strong>Holidays</strong>
+            </button>
             <button className="host-launch-card disabled" type="button" disabled>
               <strong>Subcontractor Directory</strong>
             </button>
@@ -514,15 +688,237 @@ function ClientLandingPage({ currentUser, onLogout }) {
   );
 }
 
+function HolidaysPage({
+  currentUser,
+  onLogout,
+  holidays,
+  holidayRequests,
+  holidayStaff,
+  holidayRows,
+  holidayRequestOpen,
+  setHolidayRequestOpen,
+  holidayRequestForm,
+  setHolidayRequestForm,
+  holidayRequestSaving,
+  onSubmitHolidayRequest,
+  onReviewHolidayRequest
+}) {
+  const canReview = canEditBoard(currentUser);
+  const currentPerson = getHolidayStaffPersonForUser(currentUser);
+
+  return (
+    <div className="app-shell holidays-shell">
+      <div className="page holidays-page">
+        <div className="host-landing-brand">
+          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+        </div>
+        <MainNavBar currentUser={currentUser} active="holidays" onLogout={onLogout} />
+
+        <section className="panel holidays-panel">
+          <div className="holidays-toolbar">
+            <div>
+              <h2>Holiday Calendar</h2>
+              <p>Approved holidays appear here and automatically flow onto the Installation Board.</p>
+            </div>
+            <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(true)}>
+              Request holiday
+            </button>
+          </div>
+
+          {holidayRequests.length ? (
+            <section className="holiday-requests-panel">
+              <div className="holiday-requests-head">
+                <h3>{canReview ? "Pending Requests" : "Your Requests"}</h3>
+              </div>
+              <div className="holiday-request-list">
+                {holidayRequests.map((request) => (
+                  <article key={request.id} className={`holiday-request-card status-${request.status || "pending"}`}>
+                    <div className="holiday-request-main">
+                      <strong>{request.person}</strong>
+                      <span>
+                        {request.startDate}
+                        {request.endDate && request.endDate !== request.startDate ? ` to ${request.endDate}` : ""}
+                      </span>
+                      <span>{request.duration || "Full Day"}</span>
+                      {request.notes ? <p>{request.notes}</p> : null}
+                    </div>
+                    <div className="holiday-request-side">
+                      <span className={`holiday-request-status status-${request.status || "pending"}`}>
+                        {request.status || "pending"}
+                      </span>
+                      <small>Requested by {request.requestedByName || request.person}</small>
+                      {canReview && request.status === "pending" ? (
+                        <div className="holiday-request-actions">
+                          <button className="ghost-button" type="button" onClick={() => onReviewHolidayRequest(request.id, "approved")}>
+                            Approve
+                          </button>
+                          <button className="text-button danger" type="button" onClick={() => onReviewHolidayRequest(request.id, "rejected")}>
+                            Reject
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <div className="holiday-calendar-wrap">
+            <div className="holiday-calendar-grid">
+              <div className="holiday-calendar-header month-label-cell">Month</div>
+              {Array.from({ length: 31 }, (_, index) => (
+                <div key={`header-${index + 1}`} className="holiday-calendar-header day-header-cell">
+                  {String(index + 1).padStart(2, "0")}
+                </div>
+              ))}
+
+              {holidayRows.map((month) => (
+                <div key={month.id} className="holiday-calendar-row">
+                  <div className="month-label-cell month-row-label">{month.label}</div>
+                  {month.days.map((day) => (
+                    <div
+                      key={day.key}
+                      className={[
+                        "holiday-day-cell",
+                        !day.inMonth ? "is-empty" : "",
+                        day.weekend ? "is-weekend" : "",
+                        day.bankHoliday ? "is-bank-holiday" : ""
+                      ].join(" ").trim()}
+                      title={day.bankHoliday || day.isoDate || ""}
+                    >
+                      {day.holidays.map((holiday) => (
+                        <span
+                          key={`${day.key}-${holiday.id}`}
+                          className={`holiday-day-token ${HOLIDAY_PERSON_COLORS[holiday.person] || "holiday-person-black"}`}
+                        >
+                          {getHolidayDisplayToken(holiday.person)}
+                          {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {holidayRequestOpen ? (
+        <div className="modal-backdrop" onClick={() => setHolidayRequestOpen(false)}>
+          <div className="modal holiday-request-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h3>Request holiday</h3>
+                <p>Send a request for approval. Approved holidays will show on the board automatically.</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setHolidayRequestOpen(false)}>
+                x
+              </button>
+            </div>
+
+            <form
+              className="job-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onSubmitHolidayRequest();
+              }}
+            >
+              {canReview ? (
+                <label>
+                  Employee
+                  <select
+                    value={holidayRequestForm.person}
+                    onChange={(event) => setHolidayRequestForm((current) => ({ ...current, person: event.target.value }))}
+                  >
+                    <option value="">Select employee</option>
+                    {holidayStaff.map((entry) => (
+                      <option key={entry.person} value={entry.person}>
+                        {entry.code} - {entry.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label>
+                  Employee
+                  <input type="text" value={currentPerson} readOnly />
+                </label>
+              )}
+
+              <div className="split-fields">
+                <label>
+                  Start date
+                  <input
+                    type="date"
+                    value={holidayRequestForm.startDate}
+                    onChange={(event) => setHolidayRequestForm((current) => ({ ...current, startDate: event.target.value }))}
+                  />
+                </label>
+
+                <label>
+                  End date
+                  <input
+                    type="date"
+                    value={holidayRequestForm.endDate}
+                    onChange={(event) => setHolidayRequestForm((current) => ({ ...current, endDate: event.target.value }))}
+                  />
+                </label>
+              </div>
+
+              <label>
+                Duration
+                <select
+                  value={holidayRequestForm.duration}
+                  onChange={(event) => setHolidayRequestForm((current) => ({ ...current, duration: event.target.value }))}
+                >
+                  <option value="Full Day">Full Day</option>
+                  <option value="Morning">Morning</option>
+                  <option value="Afternoon">Afternoon</option>
+                </select>
+              </label>
+
+              <label>
+                Notes
+                <textarea
+                  rows="4"
+                  value={holidayRequestForm.notes}
+                  onChange={(event) => setHolidayRequestForm((current) => ({ ...current, notes: event.target.value }))}
+                />
+              </label>
+
+              <div className="form-actions">
+                <button className="primary-button" type="submit" disabled={holidayRequestSaving}>
+                  {holidayRequestSaving ? "Sending..." : "Send request"}
+                </button>
+                <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const isClientRoute = pathname.startsWith("/client");
   const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
+  const isHolidaysRoute = pathname.startsWith("/holidays");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
+  const [holidayRequests, setHolidayRequests] = useState([]);
+  const [holidayStaff, setHolidayStaff] = useState(HOLIDAY_STAFF);
+  const [holidayRequestOpen, setHolidayRequestOpen] = useState(false);
+  const [holidayRequestForm, setHolidayRequestForm] = useState(EMPTY_HOLIDAY_REQUEST_FORM);
+  const [holidayRequestSaving, setHolidayRequestSaving] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -559,13 +955,14 @@ export default function App() {
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
+  const showHolidays = Boolean(currentUser && isHolidaysRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isHolidaysRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute && !isHolidaysRoute);
 
   const todayIso = board?.today || getLocalTodayIso();
   const rollingStartIso = useMemo(() => {
@@ -676,6 +1073,60 @@ export default function App() {
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
 
   useEffect(() => {
+    if (!currentUser || !showHolidays) return undefined;
+    const stream = new EventSource("/api/events");
+
+    async function handleUpdate() {
+      try {
+        await refreshHolidayData();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    stream.addEventListener("board-updated", handleUpdate);
+    stream.onerror = () => {
+      stream.close();
+    };
+
+    return () => {
+      stream.removeEventListener("board-updated", handleUpdate);
+      stream.close();
+    };
+  }, [currentUser, showHolidays]);
+
+  useEffect(() => {
+    if (!currentUser || !showHolidays) return undefined;
+    let active = true;
+
+    async function loadHolidayData() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/holiday-requests");
+        if (!response.ok) {
+          throw new Error("Could not load holiday calendar.");
+        }
+
+        const payload = await response.json();
+        if (!active) return;
+        setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+        setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+        setHolidayStaff(Array.isArray(payload.holidayStaff) && payload.holidayStaff.length ? payload.holidayStaff : HOLIDAY_STAFF);
+      } catch (error) {
+        console.error(error);
+        if (active) setMessage(createMessage("Could not load holiday calendar.", "error"));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadHolidayData();
+    return () => {
+      active = false;
+    };
+  }, [currentUser, showHolidays]);
+
+  useEffect(() => {
     if (!currentUser) return;
     const nextHomePath = getHomePathForUser(currentUser);
     const nextBoardPath = getBoardPathForUser(currentUser);
@@ -695,7 +1146,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -703,7 +1154,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isHolidaysRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -784,6 +1235,8 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
+  const holidayRows = useMemo(() => buildHolidayYearRows(holidays, board?.today || getLocalTodayIso()), [board?.today, holidays]);
+
   const backdropPointerStartedRef = useRef(false);
 
   function resetForm(nextDate = board?.today || getLocalTodayIso()) {
@@ -862,6 +1315,7 @@ export default function App() {
       setBoard(null);
       setJobs([]);
       setHolidays([]);
+      setHolidayRequests([]);
       setLoginPassword("");
       setLoginError("");
       window.location.replace(isClientRoute ? "/client" : "/");
@@ -935,6 +1389,15 @@ export default function App() {
     setHolidays(Array.isArray(nextHolidays) ? nextHolidays : []);
   }
 
+  async function refreshHolidayData() {
+    const response = await fetch("/api/holiday-requests");
+    if (!response.ok) throw new Error("Could not refresh holiday calendar.");
+    const payload = await response.json();
+    setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+    setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+    setHolidayStaff(Array.isArray(payload.holidayStaff) && payload.holidayStaff.length ? payload.holidayStaff : HOLIDAY_STAFF);
+  }
+
   async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
     if (isClientMode) return;
 
@@ -966,6 +1429,63 @@ export default function App() {
       setOrderLookupError(error.message || "Could not load CoreBridge orders.");
     } finally {
       setOrderLookupLoading(false);
+    }
+  }
+
+  async function submitHolidayRequest() {
+    const person = canEditBoard(currentUser)
+      ? holidayRequestForm.person
+      : getHolidayStaffPersonForUser(currentUser);
+
+    if (!person || !holidayRequestForm.startDate || !holidayRequestForm.endDate) {
+      setMessage(createMessage("Choose a person plus start and end dates.", "error"));
+      return;
+    }
+
+    setHolidayRequestSaving(true);
+
+    try {
+      const response = await fetch("/api/holiday-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          person,
+          startDate: holidayRequestForm.startDate,
+          endDate: holidayRequestForm.endDate,
+          duration: holidayRequestForm.duration,
+          notes: holidayRequestForm.notes
+        })
+      });
+      if (!response.ok) throw new Error("Could not send holiday request.");
+      const payload = await response.json();
+      setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setHolidayRequestForm(EMPTY_HOLIDAY_REQUEST_FORM);
+      setHolidayRequestOpen(false);
+      setMessage(createMessage("Holiday request sent.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not send holiday request.", "error"));
+    } finally {
+      setHolidayRequestSaving(false);
+    }
+  }
+
+  async function reviewHolidayRequest(requestId, status) {
+    try {
+      const response = await fetch(`/api/holiday-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (!response.ok) throw new Error("Could not update holiday request.");
+      const payload = await response.json();
+      setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setMessage(createMessage(`Holiday request ${status}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Could not update holiday request.", "error"));
     }
   }
 
@@ -1388,6 +1908,26 @@ export default function App() {
     return <ClientLandingPage currentUser={currentUser} onLogout={handleLogout} />;
   }
 
+  if (showHolidays) {
+    return (
+      <HolidaysPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        holidays={holidays}
+        holidayRequests={holidayRequests}
+        holidayStaff={holidayStaff}
+        holidayRows={holidayRows}
+        holidayRequestOpen={holidayRequestOpen}
+        setHolidayRequestOpen={setHolidayRequestOpen}
+        holidayRequestForm={holidayRequestForm}
+        setHolidayRequestForm={setHolidayRequestForm}
+        holidayRequestSaving={holidayRequestSaving}
+        onSubmitHolidayRequest={submitHolidayRequest}
+        onReviewHolidayRequest={reviewHolidayRequest}
+      />
+    );
+  }
+
   if (showInstallerDirectory) {
     return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;
   }
@@ -1471,7 +2011,7 @@ export default function App() {
                             <div className="mobile-holiday-inline">
                               {row.staffHolidays.map((holiday) => (
                                 <span key={`mobile-${holiday.id}`} className={`mobile-holiday-chip ${getHolidayPersonColor(holiday.person)}`}>
-                                  {toInitials(holiday.person)}
+                                  {getHolidayDisplayToken(holiday.person)}
                                   {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
                                 </span>
                               ))}
@@ -1496,7 +2036,7 @@ export default function App() {
                                       handleHolidayChipClick(row.isoDate, holiday.person, false);
                                     }}
                                   >
-                                    {toInitials(holiday.person)}{durationLabel}
+                                    {getHolidayDisplayToken(holiday.person)}{durationLabel}
                                   </button>
                                 );
                               })}
@@ -1512,7 +2052,7 @@ export default function App() {
                                     : existing?.duration === "Afternoon"
                                       ? ".PM"
                                       : "";
-                                const initials = toInitials(name);
+                                const initials = getHolidayDisplayToken(name);
                                 return (
                                   <button
                                     key={`${row.isoDate}-${name}`}
