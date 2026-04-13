@@ -363,6 +363,26 @@ function formatDateTime(value) {
   }).format(parsed);
 }
 
+function formatJobDate(value) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) return String(value || "");
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "Europe/London"
+  }).format(parsed);
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2643,20 +2663,191 @@ export default function App() {
     if (!job?.id) return;
     setClientExporting(true);
     try {
-      const response = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/export`);
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error || "Could not export the job.");
+      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      if (!printWindow) {
+        throw new Error("Please allow pop-ups so the PDF export can open.");
       }
-      const blob = await response.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = `${job.orderReference || job.customerName || "job-export"}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(blobUrl);
+
+      const uploadedBy = [...new Set((job.photos || []).map((photo) => String(photo.uploadedByName || "").trim()).filter(Boolean))].join(", ") || "-";
+      const installers = getInstallerDisplayList(job).join(", ") || "-";
+      const firstPagePhotos = (job.photos || []).slice(0, 4);
+      const remainingPhotoPages = [];
+      for (let index = 4; index < (job.photos || []).length; index += 4) {
+        remainingPhotoPages.push((job.photos || []).slice(index, index + 4));
+      }
+
+      const renderPhotoTile = (photo, index) => `
+        <figure class="photo-tile">
+          <div class="photo-frame">
+            <img src="${escapeHtml(photo.url || buildJobPhotoUrl(job.id, photo.id))}" alt="Job photo ${index + 1}" />
+          </div>
+        </figure>
+      `;
+
+      const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(job.orderReference || job.customerName || "Job Export")}</title>
+    <style>
+      @font-face {
+        font-family: 'Faricy';
+        src: url('${window.location.origin}/fonts/FARICYNEW-MEDIUM.TTF') format('truetype');
+        font-weight: 500;
+      }
+      @font-face {
+        font-family: 'Faricy';
+        src: url('${window.location.origin}/fonts/FARICYNEW-BOLD.TTF') format('truetype');
+        font-weight: 700;
+      }
+      :root {
+        color-scheme: light;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: 'Faricy', Arial, sans-serif;
+        color: #1f2937;
+        background: white;
+      }
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        padding: 14mm;
+        page-break-after: always;
+      }
+      .page:last-child { page-break-after: auto; }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 16mm;
+        margin-bottom: 8mm;
+      }
+      .header-copy h1 {
+        margin: 0 0 2mm;
+        font-size: 22px;
+        line-height: 1.05;
+      }
+      .header-copy p {
+        margin: 0;
+        font-size: 12px;
+      }
+      .brand {
+        width: 52mm;
+        flex: 0 0 auto;
+      }
+      .brand img {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 4mm 8mm;
+        margin-bottom: 8mm;
+      }
+      .summary-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 4mm;
+        padding: 3.2mm 3.6mm;
+        min-height: 16mm;
+      }
+      .summary-item.wide {
+        grid-column: 1 / -1;
+      }
+      .summary-item strong {
+        display: block;
+        margin-bottom: 1.2mm;
+        color: #475569;
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .summary-item span {
+        font-size: 12px;
+        line-height: 1.35;
+      }
+      .photo-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6mm;
+      }
+      .photo-tile {
+        margin: 0;
+      }
+      .photo-frame {
+        border: 1px solid #dbe2ea;
+        border-radius: 4mm;
+        overflow: hidden;
+        aspect-ratio: 1 / 1;
+        background: #f8fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .photo-frame img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      @media print {
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      }
+    </style>
+  </head>
+  <body>
+    <section class="page">
+      <div class="header">
+        <div class="header-copy">
+          <h1>${escapeHtml(job.customerName || "Job Export")}</h1>
+          <p>${escapeHtml(job.description || "")}</p>
+        </div>
+        <div class="brand">
+          <img src="${window.location.origin}/branding/signs-express-logo.svg" alt="Signs Express logo" />
+        </div>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-item"><strong>Order Ref</strong><span>${escapeHtml(job.orderReference || "-")}</span></div>
+        <div class="summary-item"><strong>Completion Date</strong><span>${escapeHtml(formatJobDate(job.date) || "-")}</span></div>
+        <div class="summary-item"><strong>Job Type</strong><span>${escapeHtml(getJobTypeLabel(job))}</span></div>
+        <div class="summary-item"><strong>Installers</strong><span>${escapeHtml(installers)}</span></div>
+        <div class="summary-item"><strong>Contact</strong><span>${escapeHtml(job.contact || "-")}</span></div>
+        <div class="summary-item"><strong>Number</strong><span>${escapeHtml(job.number || "-")}</span></div>
+        <div class="summary-item wide"><strong>Address</strong><span>${escapeHtml(job.address || "-")}</span></div>
+        <div class="summary-item wide"><strong>Photos Uploaded By</strong><span>${escapeHtml(uploadedBy)}</span></div>
+      </div>
+      ${firstPagePhotos.length ? `<div class="photo-grid">${firstPagePhotos.map(renderPhotoTile).join("")}</div>` : ""}
+    </section>
+    ${remainingPhotoPages.map((pagePhotos) => `
+      <section class="page">
+        <div class="photo-grid">${pagePhotos.map(renderPhotoTile).join("")}</div>
+      </section>
+    `).join("")}
+    <script>
+      const images = Array.from(document.images);
+      Promise.all(images.map((image) => image.complete ? Promise.resolve() : new Promise((resolve) => {
+        image.addEventListener('load', resolve, { once: true });
+        image.addEventListener('error', resolve, { once: true });
+      }))).then(() => {
+        setTimeout(() => {
+          window.focus();
+          window.print();
+        }, 250);
+      });
+    </script>
+  </body>
+</html>`;
+
+      printWindow.document.open();
+      printWindow.document.write(html);
+      printWindow.document.close();
     } catch (error) {
       console.error(error);
       setMessage(createMessage(error.message || "Could not export the job.", "error"));
