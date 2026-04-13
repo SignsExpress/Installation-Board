@@ -1859,6 +1859,10 @@ button {
   background: #fff;
 }
 
+.holiday-birthday-input {
+  width: min(100%, 140px);
+}
+
 .holiday-days-positive {
   color: #166534;
 }

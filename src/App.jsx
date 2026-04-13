@@ -175,7 +175,8 @@ function formatHolidayBirthday(value) {
   if (!parsed) return "-";
   return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
-    month: "short",
+    month: "2-digit",
+    year: "numeric",
     timeZone: "UTC"
   });
 }
@@ -1046,7 +1047,18 @@ function HolidaysPage({
                         </button>
                       </td>
                       <td>
-                        <span className="holiday-birthday-label">{formatHolidayBirthday(entry.birthdayDate)}</span>
+                        {canReview ? (
+                          <input
+                            className="holiday-allowance-input holiday-birthday-input"
+                            type="date"
+                            value={entry.birthDate || ""}
+                            disabled={holidayAllowanceSavingKey === `${entry.person}:birthDate`}
+                            onChange={(event) => onChangeHolidayAllowanceDraft(entry.person, { birthDate: event.target.value })}
+                            onBlur={(event) => onSaveHolidayAllowance(entry.person, { birthDate: event.target.value })}
+                          />
+                        ) : (
+                          <span className="holiday-birthday-label">{formatHolidayBirthday(entry.birthDate)}</span>
+                        )}
                       </td>
                       {[
                         ["workDaysPerWeek", entry.workDaysPerWeek],

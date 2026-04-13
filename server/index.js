@@ -707,7 +707,12 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
   const weekdayDates = getWeekdaysInRange(start, end);
   const holidayMap = getHolidayMap(start, end);
   const todayIso = toIsoDate(today);
-  const displayStaffHolidays = getDisplayStaffHolidays(staffHolidays || [], toIsoDate(start), toIsoDate(end));
+  const displayStaffHolidays = getDisplayStaffHolidays(
+    staffHolidays || [],
+    toIsoDate(start),
+    toIsoDate(end),
+    Array.isArray(options.birthdayEntries) ? options.birthdayEntries : []
+  );
 
   const jobsByDate = jobs.reduce((map, job) => {
     if (!isValidIsoDate(job.date)) {
@@ -782,6 +787,28 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     weeks,
     unscheduled
   };
+}
+
+function buildBirthdayEntriesForRange(store, startIso, endIso) {
+  const startYear = getHolidayYearStartForIsoDate(startIso) || getCurrentHolidayYearStart();
+  const endYear = getHolidayYearStartForIsoDate(endIso) || startYear;
+  const entries = [];
+
+  for (let yearStart = startYear; yearStart <= endYear; yearStart += 1) {
+    const allowanceRows = buildBaseHolidayAllowanceRows(store, yearStart);
+    entries.push(...buildBirthdayHolidayEntries(allowanceRows, yearStart));
+  }
+
+  return entries;
+}
+
+function buildBoardRowsFromStore(store, options = {}) {
+  const today = options.today || getTodayInLondon();
+  const mode = options.mode === "month" ? "month" : options.mode === "range" ? "range" : "rolling";
+  const rangeStart = options.start || (mode === "month" ? getStartOfMonth(today) : getRollingWindow(today).start);
+  const rangeEnd = options.end || (mode === "month" ? getEndOfMonth(today) : getRollingWindow(today).end);
+  const birthdayEntries = buildBirthdayEntriesForRange(store, toIsoDate(rangeStart), toIsoDate(rangeEnd));
+  return buildBoardRows(store.jobs, store.holidays, { ...options, today, mode, start: rangeStart, end: rangeEnd, birthdayEntries });
 }
 
 function sanitizeJob(payload) {
@@ -860,7 +887,7 @@ function sanitizeHolidayAllowance(payload) {
     workDaysPerWeek: toNumber(payload.workDaysPerWeek),
     standardEntitlement: toNumber(payload.standardEntitlement),
     extraServiceDays: toNumber(payload.extraServiceDays),
-    birthdayDate: String(payload.birthdayDate || "").trim(),
+    birthDate: String(payload.birthDate || "").trim(),
     christmasDays: toNumber(payload.christmasDays),
     bankHolidayDays: toNumber(payload.bankHolidayDays),
     unpaidDaysBooked: toNumber(payload.unpaidDaysBooked),
@@ -981,14 +1008,14 @@ function getObservedBirthdayIsoDate(staffEntry, yearStart = getCurrentHolidayYea
   return birthdayIso;
 }
 
-function buildBirthdayHolidayEntries(yearStart = getCurrentHolidayYearStart()) {
-  return HOLIDAY_STAFF.map((staffEntry) => {
-    const observedDate = getObservedBirthdayIsoDate(staffEntry, yearStart);
+function buildBirthdayHolidayEntries(allowanceRows = [], yearStart = getCurrentHolidayYearStart()) {
+  return allowanceRows.map((allowanceEntry) => {
+    const observedDate = getObservedBirthdayIsoDate({ birthDate: allowanceEntry.birthDate }, yearStart);
     if (!observedDate) return null;
     return sanitizeStaffHoliday({
-      id: `birthday-${yearStart}-${staffEntry.code.toLowerCase()}`,
+      id: `birthday-${yearStart}-${String(allowanceEntry.code || allowanceEntry.person || "").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       date: observedDate,
-      person: staffEntry.person,
+      person: allowanceEntry.person,
       duration: "Full Day",
       type: "birthday"
     });
@@ -999,17 +1026,39 @@ function getHolidayType(entry) {
   return String(entry?.type || "holiday").trim().toLowerCase();
 }
 
-function getDisplayStaffHolidays(staffHolidays, startIso, endIso) {
+function buildBaseHolidayAllowanceRows(store, yearStart = getCurrentHolidayYearStart()) {
+  return HOLIDAY_STAFF.map((staffEntry) => {
+    const existing = (store.holidayAllowances || []).find(
+      (entry) =>
+        Number(entry.yearStart || 0) === yearStart &&
+        String(entry.person || "").trim().toLowerCase() === staffEntry.person.toLowerCase()
+    );
+
+    const normalized = sanitizeHolidayAllowance({
+      yearStart,
+      person: staffEntry.person,
+      birthDate: staffEntry.birthDate || "",
+      ...(existing || {})
+    });
+
+    return {
+      ...normalized,
+      code: staffEntry.code,
+      fullName: staffEntry.name
+    };
+  });
+}
+
+function getDisplayStaffHolidays(staffHolidays, startIso, endIso, birthdayEntries = []) {
   const startYear = getHolidayYearStartForIsoDate(startIso) || getCurrentHolidayYearStart();
   const endYear = getHolidayYearStartForIsoDate(endIso) || startYear;
-  const birthdayEntries = [];
-
-  for (let yearStart = startYear; yearStart <= endYear; yearStart += 1) {
-    birthdayEntries.push(...buildBirthdayHolidayEntries(yearStart));
-  }
+  const scopedBirthdayEntries = birthdayEntries.filter((entry) => {
+    const yearStart = getHolidayYearStartForIsoDate(entry.date);
+    return yearStart >= startYear && yearStart <= endYear;
+  });
 
   const birthdayMap = new Map(
-    birthdayEntries.map((entry) => [
+    scopedBirthdayEntries.map((entry) => [
       `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`,
       entry
     ])
@@ -1034,7 +1083,7 @@ function getDisplayStaffHolidays(staffHolidays, startIso, endIso) {
     normalized.map((entry) => `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`)
   );
 
-  birthdayEntries.forEach((entry) => {
+  scopedBirthdayEntries.forEach((entry) => {
     const key = `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`;
     if (!existingKeys.has(key) && entry.date >= startIso && entry.date <= endIso) {
       normalized.push(entry);
@@ -1091,7 +1140,9 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
   const bounds = getHolidayYearBounds(yearStart);
   const startIso = toIsoDate(bounds.start);
   const endIso = toIsoDate(bounds.end);
-  const displayHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso);
+  const allowanceRows = buildBaseHolidayAllowanceRows(store, yearStart);
+  const birthdayEntries = buildBirthdayHolidayEntries(allowanceRows, yearStart);
+  const displayHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso, birthdayEntries);
   const approvedCounts = new Map();
 
   displayHolidays.forEach((holiday) => {
@@ -1105,24 +1156,11 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
     );
   });
 
-  const allowanceRows = HOLIDAY_STAFF.map((staffEntry) => {
-    const existing = (store.holidayAllowances || []).find(
-      (entry) =>
-        Number(entry.yearStart || 0) === yearStart &&
-        String(entry.person || "").trim().toLowerCase() === staffEntry.person.toLowerCase()
-    );
-
-    const normalized = sanitizeHolidayAllowance({
-      yearStart,
-      person: staffEntry.person,
-      birthdayDate: getObservedBirthdayIsoDate(staffEntry, yearStart),
-      ...(existing || {})
-    });
-
+  return allowanceRows.map((normalized) => {
     const prorataAllowance =
       normalized.standardEntitlement +
       normalized.extraServiceDays;
-    const bookedDays = approvedCounts.get(staffEntry.person) || 0;
+    const bookedDays = approvedCounts.get(normalized.person) || 0;
     const daysLeft =
       prorataAllowance -
       normalized.christmasDays -
@@ -1131,16 +1169,12 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
 
     return {
       ...normalized,
-      code: staffEntry.code,
-      fullName: staffEntry.name,
-      birthDate: staffEntry.birthDate || "",
+      observedBirthdayDate: getObservedBirthdayIsoDate({ birthDate: normalized.birthDate }, yearStart),
       prorataAllowance,
       bookedDays,
       daysLeft
     };
   });
-
-  return allowanceRows;
 }
 
 function broadcast(event, payload) {
@@ -1179,7 +1213,7 @@ async function getBoardPayload(options = {}) {
     jobs: store.jobs,
     holidays: store.holidays,
     board: {
-      ...buildBoardRows(store.jobs, store.holidays, boardOptions),
+      ...buildBoardRowsFromStore(store, boardOptions),
       ...navigation,
       selectedMonth: options.mode === "month" ? options.monthId || "" : ""
     }
@@ -1210,7 +1244,8 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
     const holidayDate = String(holiday.date || "");
     return holidayDate >= startIso && holidayDate <= endIso;
   });
-  const displayYearHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso);
+  const birthdayEntries = buildBirthdayHolidayEntries(buildBaseHolidayAllowanceRows(store, yearStart), yearStart);
+  const displayYearHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso, birthdayEntries);
 
   const allowanceRows = buildHolidayAllowanceSummaries(store, yearStart).filter((entry) =>
     canEditHolidays(forUser)
@@ -2832,7 +2867,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const payload = {
       jobs: savedStore.jobs,
       holidays: savedStore.holidays,
-      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+      board: buildBoardRowsFromStore(savedStore)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
@@ -2846,7 +2881,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const payload = {
       jobs: savedStore.jobs,
       holidays: savedStore.holidays,
-      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+      board: buildBoardRowsFromStore(savedStore)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
@@ -2979,7 +3014,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     store.holidayRequests.unshift(nextRequest);
     const savedStore = await writeStore(store);
     const visiblePayload = await getHolidayPayload(request.user, requestYearStart);
-    broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
+    broadcast("board-updated", buildBoardRowsFromStore(savedStore));
     response.json(visiblePayload);
   });
 
@@ -3035,7 +3070,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const savedStore = await writeStore(store);
     const payloadYearStart = getHolidayYearStartForIsoDate(holidayRequest.startDate) || getCurrentHolidayYearStart();
     const visiblePayload = await getHolidayPayload(request.user, payloadYearStart);
-    broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
+    broadcast("board-updated", buildBoardRowsFromStore(savedStore));
     response.json(visiblePayload);
   });
 
@@ -3090,7 +3125,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const payload = {
       jobs: savedStore.jobs,
       holidays: savedStore.holidays,
-      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+      board: buildBoardRowsFromStore(savedStore)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
@@ -3104,7 +3139,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const payload = {
       jobs: savedStore.jobs,
       holidays: savedStore.holidays,
-      board: buildBoardRows(savedStore.jobs, savedStore.holidays)
+      board: buildBoardRowsFromStore(savedStore)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
