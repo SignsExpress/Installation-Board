@@ -1988,14 +1988,62 @@ button {
   border-radius: 22px;
   padding: 16px 18px;
   background: linear-gradient(180deg, rgba(252, 251, 253, 0.96) 0%, rgba(245, 239, 248, 0.92) 100%);
-  display: grid;
-  gap: 6px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   text-align: left;
 }
 
 .landing-notification-card.unread {
   border-color: rgba(116, 70, 137, 0.45);
   box-shadow: 0 0 0 1px rgba(116, 70, 137, 0.08);
+}
+
+.landing-notification-card.read {
+  opacity: 0.72;
+  background: linear-gradient(180deg, rgba(250, 250, 252, 0.96) 0%, rgba(243, 245, 248, 0.92) 100%);
+}
+
+.landing-notification-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.landing-notification-section {
+  display: grid;
+  gap: 10px;
+}
+
+.landing-notification-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.landing-notification-main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+  min-width: 0;
+}
+
+.landing-notification-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.landing-notification-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sx-main);
+  margin-top: 5px;
+  flex: 0 0 auto;
 }
 
 .landing-notification-card strong {

@@ -692,8 +692,11 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
   );
 }
 
-function NotificationsPanel({ notifications, onOpenNotification, onMarkAllNotificationsRead }) {
-  const unreadCount = notifications.filter((entry) => !entry.read).length;
+function NotificationsPanel({ notifications, onOpenNotification, onMarkNotificationRead, onMarkAllNotificationsRead }) {
+  const [showReadNotifications, setShowReadNotifications] = useState(false);
+  const unreadNotifications = notifications.filter((entry) => !entry.read);
+  const readNotifications = notifications.filter((entry) => entry.read);
+  const unreadCount = unreadNotifications.length;
 
   return (
     <section className="panel landing-notifications-panel">
@@ -709,18 +712,73 @@ function NotificationsPanel({ notifications, onOpenNotification, onMarkAllNotifi
         ) : null}
       </div>
       {notifications.length ? (
-        <div className="landing-notification-list">
-          {notifications.slice(0, 8).map((notification) => (
-            <button
-              key={notification.id}
-              type="button"
-              className={`landing-notification-card ${notification.read ? "" : "unread"}`.trim()}
-              onClick={() => onOpenNotification(notification)}
-            >
-              <strong>{notification.title}</strong>
-              <span>{notification.message}</span>
-            </button>
-          ))}
+        <div className="landing-notification-stack">
+          {unreadNotifications.length ? (
+            <div className="landing-notification-section">
+              <div className="landing-notification-section-head">
+                <strong>New</strong>
+              </div>
+              <div className="landing-notification-list">
+                {unreadNotifications.slice(0, 8).map((notification) => (
+                  <article
+                    key={notification.id}
+                    className="landing-notification-card unread"
+                  >
+                    <button
+                      type="button"
+                      className="landing-notification-main"
+                      onClick={() => onOpenNotification(notification)}
+                    >
+                      <span className="landing-notification-dot" />
+                      <div className="landing-notification-copy">
+                        <strong>{notification.title}</strong>
+                        <span>{notification.message}</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => onMarkNotificationRead(notification.id)}
+                    >
+                      Mark read
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {readNotifications.length ? (
+            <div className="landing-notification-section">
+              <div className="landing-notification-section-head">
+                <strong>Earlier</strong>
+                <button
+                  className="text-button"
+                  type="button"
+                  onClick={() => setShowReadNotifications((current) => !current)}
+                >
+                  {showReadNotifications ? "Hide" : `Show ${Math.min(readNotifications.length, 8)}`}
+                </button>
+              </div>
+              {showReadNotifications ? (
+                <div className="landing-notification-list">
+                  {readNotifications.slice(0, 8).map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      className="landing-notification-card read"
+                      onClick={() => onOpenNotification(notification)}
+                    >
+                      <div className="landing-notification-copy">
+                        <strong>{notification.title}</strong>
+                        <span>{notification.message}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="landing-notification-empty">No notifications yet.</div>
@@ -802,6 +860,7 @@ function HostLandingPage({
         <NotificationsPanel
           notifications={notifications}
           onOpenNotification={onOpenNotification}
+          onMarkNotificationRead={onMarkNotificationRead}
           onMarkAllNotificationsRead={onMarkAllNotificationsRead}
         />
       </div>
@@ -870,6 +929,7 @@ function ClientLandingPage({ currentUser, onLogout, notifications, onOpenNotific
         <NotificationsPanel
           notifications={notifications}
           onOpenNotification={onOpenNotification}
+          onMarkNotificationRead={onMarkNotificationRead}
           onMarkAllNotificationsRead={onMarkAllNotificationsRead}
         />
       </div>
@@ -1948,18 +2008,35 @@ export default function App() {
   }
 
   async function markNotificationRead(notificationId) {
-    const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
-      method: "PATCH"
-    });
-    if (!response.ok) {
-      throw new Error("Could not update notification.");
+    setNotifications((current) =>
+      current.map((entry) =>
+        entry.id === notificationId
+          ? {
+              ...entry,
+              read: true
+            }
+          : entry
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+        method: "PATCH"
+      });
+      if (!response.ok) {
+        throw new Error("Could not update notification.");
+      }
+      const payload = await response.json();
+      setNotifications(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      await refreshNotifications();
+      throw error;
     }
-    const payload = await response.json();
-    setNotifications(Array.isArray(payload) ? payload : []);
   }
 
   async function markAllNotificationsRead() {
     try {
+      setNotifications((current) => current.map((entry) => ({ ...entry, read: true })));
       const response = await fetch("/api/notifications/read-all", { method: "POST" });
       if (!response.ok) {
         throw new Error("Could not update notifications.");
@@ -1967,6 +2044,7 @@ export default function App() {
       const payload = await response.json();
       setNotifications(Array.isArray(payload) ? payload : []);
     } catch (error) {
+      await refreshNotifications();
       console.error(error);
       setMessage(createMessage(error.message || "Could not update notifications.", "error"));
     }
