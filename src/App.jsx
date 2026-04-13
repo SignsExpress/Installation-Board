@@ -3734,136 +3734,136 @@ export default function App() {
                 x
               </button>
             </div>
-            <div className="detail-grid">
-              <div className="detail-card">
-                <strong>Order Ref</strong>
-                <p>{activeClientJob.orderReference || "-"}</p>
-              </div>
-              <div className="detail-card">
-                <strong>Job Type</strong>
-                <p>{getJobTypeLabel(activeClientJob)}</p>
-              </div>
-              <div className="detail-card detail-card-wide">
-                <strong>Installers</strong>
-                <p>{getInstallerDisplayList(activeClientJob).join(", ") || "-"}</p>
-              </div>
-              <div className="detail-card">
-                <strong>Contact</strong>
-                <p>{activeClientJob.contact || "-"}</p>
-              </div>
-              <div className="detail-card">
-                <strong>Number</strong>
-                <p>{activeClientJob.number || "-"}</p>
-              </div>
-              <div className="detail-card detail-card-wide">
-                <strong>Address</strong>
-                <p>{activeClientJob.address || "-"}</p>
-              </div>
-              <div className="detail-card detail-card-wide">
-                <strong>Notes</strong>
-                <p>{activeClientJob.notes || "-"}</p>
-              </div>
-              <div className="detail-card">
-                <strong>Placeholder</strong>
-                <p>{activeClientJob.isPlaceholder ? "Yes" : "No"}</p>
-              </div>
-              <div className="detail-card">
-                <strong>Status</strong>
-                <p>{activeClientJob.isCompleted ? "Completed" : "Open"}</p>
-              </div>
-              {activeClientJob.completedAt ? (
-                <div className="detail-card">
-                  <strong>Completed At</strong>
-                  <p>{formatDateTime(activeClientJob.completedAt)}</p>
-                </div>
-              ) : null}
-              {activeClientJob.completedByName ? (
-                <div className="detail-card">
-                  <strong>Completed By</strong>
-                  <p>{activeClientJob.completedByName}</p>
-                </div>
-              ) : null}
-              <div className="detail-card detail-card-wide">
-                <strong>Photos</strong>
+            <div className="client-detail-scroll">
+              <div className="client-job-summary">
+                {activeClientJob.orderReference ? <span className="job-summary-pill">{activeClientJob.orderReference}</span> : null}
+                <span className={`job-summary-pill ${activeClientJob.isCompleted ? "is-complete" : ""}`}>
+                  {activeClientJob.isCompleted ? "Completed" : getJobTypeLabel(activeClientJob)}
+                </span>
+                {activeClientJob.isPlaceholder ? <span className="job-summary-pill is-placeholder">Placeholder</span> : null}
                 {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
-                  <div className="job-photo-grid">
-                    {activeClientJob.photos.map((photo) => (
-                      <a
-                        key={photo.id}
-                        className="job-photo-link"
-                        href={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <img
-                          src={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
-                          alt={photo.fileName || "Job photo"}
-                          loading="lazy"
-                        />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p>No photos uploaded yet.</p>
-                )}
+                  <span className="job-summary-pill is-photos">{activeClientJob.photos.length} photo{activeClientJob.photos.length === 1 ? "" : "s"}</span>
+                ) : null}
               </div>
-            </div>
-            <div className="client-job-actions">
-              {!activeClientJob.isCompleted ? (
-                <>
-                  {!clientCompletePrompt ? (
-                    <button
-                      className="primary-button"
-                      type="button"
-                      onClick={() => setClientCompletePrompt(true)}
-                      disabled={clientPhotoUploading || clientExporting}
-                    >
-                      Mark as Complete
-                    </button>
-                  ) : (
-                    <div className="client-complete-prompt">
-                      <span>Would you like to upload job photos?</span>
-                      <div className="client-complete-prompt-actions">
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => markClientJobComplete(activeClientJob)}
-                          disabled={clientPhotoUploading}
+              <div className="detail-grid client-detail-grid">
+                <div className="detail-card">
+                  <strong>Contact</strong>
+                  <p>{activeClientJob.contact || "-"}</p>
+                </div>
+                <div className="detail-card">
+                  <strong>Number</strong>
+                  <p>{activeClientJob.number || "-"}</p>
+                </div>
+                <div className="detail-card">
+                  <strong>Installers</strong>
+                  <p>{getInstallerDisplayList(activeClientJob).join(", ") || "-"}</p>
+                </div>
+                <div className="detail-card">
+                  <strong>Placeholder</strong>
+                  <p>{activeClientJob.isPlaceholder ? "Yes" : "No"}</p>
+                </div>
+                {activeClientJob.completedAt ? (
+                  <div className="detail-card">
+                    <strong>Completed At</strong>
+                    <p>{formatDateTime(activeClientJob.completedAt)}</p>
+                  </div>
+                ) : null}
+                {activeClientJob.completedByName ? (
+                  <div className="detail-card">
+                    <strong>Completed By</strong>
+                    <p>{activeClientJob.completedByName}</p>
+                  </div>
+                ) : null}
+                <div className="detail-card detail-card-wide">
+                  <strong>Address</strong>
+                  <p>{activeClientJob.address || "-"}</p>
+                </div>
+                <div className="detail-card detail-card-wide">
+                  <strong>Notes</strong>
+                  <p>{activeClientJob.notes || "-"}</p>
+                </div>
+                <div className="detail-card detail-card-wide">
+                  <strong>Photos</strong>
+                  {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
+                    <div className="job-photo-grid">
+                      {activeClientJob.photos.map((photo) => (
+                        <a
+                          key={photo.id}
+                          className="job-photo-link"
+                          href={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => event.stopPropagation()}
                         >
-                          No
-                        </button>
-                        <button
-                          className="primary-button"
-                          type="button"
-                          onClick={() => clientPhotoInputRef.current?.click()}
-                          disabled={clientPhotoUploading}
-                        >
-                          {clientPhotoUploading ? "Uploading..." : "Yes"}
-                        </button>
-                      </div>
+                          <img
+                            src={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                            alt={photo.fileName || "Job photo"}
+                            loading="lazy"
+                          />
+                        </a>
+                      ))}
                     </div>
+                  ) : (
+                    <p>No photos uploaded yet.</p>
                   )}
-                </>
-              ) : (
+                </div>
+              </div>
+              <div className="client-job-actions">
+                {!activeClientJob.isCompleted ? (
+                  <>
+                    {!clientCompletePrompt ? (
+                      <button
+                        className="primary-button"
+                        type="button"
+                        onClick={() => setClientCompletePrompt(true)}
+                        disabled={clientPhotoUploading || clientExporting}
+                      >
+                        Mark as Complete
+                      </button>
+                    ) : (
+                      <div className="client-complete-prompt">
+                        <span>Would you like to upload job photos?</span>
+                        <div className="client-complete-prompt-actions">
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => markClientJobComplete(activeClientJob)}
+                            disabled={clientPhotoUploading}
+                          >
+                            No
+                          </button>
+                          <button
+                            className="primary-button"
+                            type="button"
+                            onClick={() => clientPhotoInputRef.current?.click()}
+                            disabled={clientPhotoUploading}
+                          >
+                            {clientPhotoUploading ? "Uploading..." : "Yes"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => clientPhotoInputRef.current?.click()}
+                    disabled={clientPhotoUploading}
+                  >
+                    {clientPhotoUploading ? "Uploading..." : "Upload photos"}
+                  </button>
+                )}
+
                 <button
                   className="ghost-button"
                   type="button"
-                  onClick={() => clientPhotoInputRef.current?.click()}
-                  disabled={clientPhotoUploading}
+                  onClick={() => exportClientJob(activeClientJob)}
+                  disabled={clientExporting || clientPhotoUploading}
                 >
-                  {clientPhotoUploading ? "Uploading..." : "Upload photos"}
+                  {clientExporting ? "Exporting..." : "Export"}
                 </button>
-              )}
-
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => exportClientJob(activeClientJob)}
-                disabled={clientExporting || clientPhotoUploading}
-              >
-                {clientExporting ? "Exporting..." : "Export"}
-              </button>
+              </div>
             </div>
             <input
               ref={clientPhotoInputRef}
