@@ -1776,6 +1776,10 @@ export default function App() {
   );
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isHolidaysRoute);
   const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute && !isHolidaysRoute);
+  const activeAdminJob = useMemo(() => {
+    if (!editingId) return null;
+    return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
+  }, [editingId, jobs]);
 
   const todayIso = board?.today || getLocalTodayIso();
   const rollingStartIso = useMemo(() => {
@@ -2097,11 +2101,6 @@ export default function App() {
   const jobsById = useMemo(() => {
     return new Map(jobs.map((job) => [job.id, job]));
   }, [jobs]);
-
-  const activeAdminJob = useMemo(() => {
-    if (!editingId) return null;
-    return jobsById.get(editingId) || null;
-  }, [editingId, jobsById]);
 
   const holidaysById = useMemo(() => {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
