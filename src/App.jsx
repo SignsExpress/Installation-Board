@@ -611,14 +611,56 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
   );
 }
 
-function PermissionsPanel({ currentUser, users, savingKey, onChangePermission }) {
+function PermissionsPanel({
+  currentUser,
+  users,
+  savingKey,
+  onChangePermission,
+  onCreateUser,
+  onResetPassword,
+  onDeleteUser
+}) {
+  const [createForm, setCreateForm] = useState({ displayName: "", role: "client", password: "" });
+  const [passwordDrafts, setPasswordDrafts] = useState({});
   const visibleUsers = [...users].sort((left, right) => left.displayName.localeCompare(right.displayName));
 
   return (
     <section className="panel permissions-panel">
       <div className="permissions-head">
         <h3>Permissions</h3>
-        <p>Choose each person&apos;s access level for the Installation Board, Holidays and Subcontractor Directory.</p>
+        <p>Manage access, add users, update passwords and remove accounts.</p>
+      </div>
+      <div className="permissions-admin-tools">
+        <input
+          type="text"
+          placeholder="Full name"
+          value={createForm.displayName}
+          onChange={(event) => setCreateForm((current) => ({ ...current, displayName: event.target.value }))}
+        />
+        <select
+          value={createForm.role}
+          onChange={(event) => setCreateForm((current) => ({ ...current, role: event.target.value }))}
+        >
+          <option value="client">Client</option>
+          <option value="host">Host</option>
+        </select>
+        <input
+          type="password"
+          placeholder="Temporary password"
+          value={createForm.password}
+          onChange={(event) => setCreateForm((current) => ({ ...current, password: event.target.value }))}
+        />
+        <button
+          className="primary-button"
+          type="button"
+          onClick={async () => {
+            await onCreateUser(createForm);
+            setCreateForm({ displayName: "", role: "client", password: "" });
+          }}
+          disabled={!createForm.displayName.trim() || !createForm.password}
+        >
+          Add user
+        </button>
       </div>
       <div className="permissions-grid">
         {visibleUsers.map((user) => {
@@ -630,59 +672,98 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
           return (
             <article key={user.id} className="permissions-user-card">
               <div className="permissions-user-head">
-                <strong>{user.displayName}</strong>
+                <div className="permissions-user-identity">
+                  <strong>{user.displayName}</strong>
+                  <span className="permissions-user-meta">{user.role === "host" ? "Host" : "Client"}</span>
+                </div>
                 {isSelf ? <span className="permissions-owner-pill">Owner</span> : null}
               </div>
 
-              <div className="permissions-app-row">
-                <span className="permissions-app-label">Installation Board</span>
-                <div className="permission-segment">
-                  {PERMISSION_OPTIONS.map((option) => (
-                    <button
-                      key={`${user.id}-board-${option.value}`}
-                      type="button"
-                      className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
-                      disabled={isSelf || savingKey === `${user.id}:board`}
-                      onClick={() => onChangePermission(user.id, "board", option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+              <div className="permissions-main-grid">
+                <div className="permissions-app-row">
+                  <span className="permissions-app-label">Installation Board</span>
+                  <div className="permission-segment">
+                    {PERMISSION_OPTIONS.map((option) => (
+                      <button
+                        key={`${user.id}-board-${option.value}`}
+                        type="button"
+                        className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
+                        disabled={isSelf || savingKey === `${user.id}:board`}
+                        onClick={() => onChangePermission(user.id, "board", option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="permissions-app-row">
+                  <span className="permissions-app-label">Subcontractor Directory</span>
+                  <div className="permission-segment">
+                    {PERMISSION_OPTIONS.map((option) => (
+                      <button
+                        key={`${user.id}-installer-${option.value}`}
+                        type="button"
+                        className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
+                        disabled={isSelf || savingKey === `${user.id}:installer`}
+                        onClick={() => onChangePermission(user.id, "installer", option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="permissions-app-row">
+                  <span className="permissions-app-label">Holidays</span>
+                  <div className="permission-segment">
+                    {PERMISSION_OPTIONS.map((option) => (
+                      <button
+                        key={`${user.id}-holidays-${option.value}`}
+                        type="button"
+                        className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
+                        disabled={isSelf || savingKey === `${user.id}:holidays`}
+                        onClick={() => onChangePermission(user.id, "holidays", option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              <div className="permissions-app-row">
-                <span className="permissions-app-label">Subcontractor Directory</span>
-                <div className="permission-segment">
-                  {PERMISSION_OPTIONS.map((option) => (
-                    <button
-                      key={`${user.id}-installer-${option.value}`}
-                      type="button"
-                      className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
-                      disabled={isSelf || savingKey === `${user.id}:installer`}
-                      onClick={() => onChangePermission(user.id, "installer", option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="permissions-app-row">
-                <span className="permissions-app-label">Holidays</span>
-                <div className="permission-segment">
-                  {PERMISSION_OPTIONS.map((option) => (
-                    <button
-                      key={`${user.id}-holidays-${option.value}`}
-                      type="button"
-                      className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
-                      disabled={isSelf || savingKey === `${user.id}:holidays`}
-                      onClick={() => onChangePermission(user.id, "holidays", option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
+              <div className="permissions-user-actions">
+                <input
+                  type="password"
+                  className="permissions-password-input"
+                  placeholder={user.hasPassword ? "New password" : "Set password"}
+                  value={passwordDrafts[user.id] || ""}
+                  onChange={(event) =>
+                    setPasswordDrafts((current) => ({
+                      ...current,
+                      [user.id]: event.target.value
+                    }))
+                  }
+                />
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={async () => {
+                    await onResetPassword(user.id, passwordDrafts[user.id] || "");
+                    setPasswordDrafts((current) => ({ ...current, [user.id]: "" }));
+                  }}
+                  disabled={!passwordDrafts[user.id]}
+                >
+                  Update password
+                </button>
+                <button
+                  className="text-button danger"
+                  type="button"
+                  onClick={() => onDeleteUser(user)}
+                  disabled={isSelf}
+                >
+                  Delete user
+                </button>
               </div>
             </article>
           );
@@ -799,6 +880,9 @@ function HostLandingPage({
   users,
   savingKey,
   onChangePermission,
+  onCreateUser,
+  onResetPassword,
+  onDeleteUser,
   notifications,
   onOpenNotification,
   onMarkNotificationRead,
@@ -896,6 +980,9 @@ function HostLandingPage({
               users={users}
               savingKey={savingKey}
               onChangePermission={onChangePermission}
+              onCreateUser={onCreateUser}
+              onResetPassword={onResetPassword}
+              onDeleteUser={onDeleteUser}
             />
           </div>
         </div>
@@ -2027,6 +2114,78 @@ export default function App() {
     }
   }
 
+  async function handleCreateUser({ displayName, role, password }) {
+    setPermissionSavingKey("create-user");
+    try {
+      const response = await fetch("/api/auth/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ displayName, role, password })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not create user.");
+      }
+
+      setLoginUsers((current) => [...current, payload.user].sort((left, right) => left.displayName.localeCompare(right.displayName)));
+      setMessage(createMessage(`Added ${payload.user.displayName}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not create user.", "error"));
+      throw error;
+    } finally {
+      setPermissionSavingKey("");
+    }
+  }
+
+  async function handleResetUserPassword(userId, password) {
+    setPermissionSavingKey(`${userId}:password`);
+    try {
+      const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not update password.");
+      }
+
+      setLoginUsers((current) =>
+        current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
+      );
+      setMessage(createMessage(`Updated ${payload.user.displayName}'s password.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update password.", "error"));
+      throw error;
+    } finally {
+      setPermissionSavingKey("");
+    }
+  }
+
+  async function handleDeleteUser(user) {
+    if (!window.confirm(`Delete ${user.displayName}?`)) return;
+    setPermissionSavingKey(`${user.id}:delete`);
+    try {
+      const response = await fetch(`/api/auth/users/${encodeURIComponent(user.id)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not delete user.");
+      }
+
+      setLoginUsers((current) => current.filter((entry) => entry.id !== user.id));
+      setMessage(createMessage(`Deleted ${user.displayName}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not delete user.", "error"));
+    } finally {
+      setPermissionSavingKey("");
+    }
+  }
+
   async function markNotificationRead(notificationId) {
     setNotifications((current) =>
       current.map((entry) =>
@@ -2764,6 +2923,9 @@ export default function App() {
         users={loginUsers}
         savingKey={permissionSavingKey}
         onChangePermission={handlePermissionChange}
+        onCreateUser={handleCreateUser}
+        onResetPassword={handleResetUserPassword}
+        onDeleteUser={handleDeleteUser}
         notifications={notifications}
         onOpenNotification={openNotification}
         onMarkNotificationRead={markNotificationRead}

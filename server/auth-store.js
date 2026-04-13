@@ -192,6 +192,44 @@ function sanitizeUser(user) {
   };
 }
 
+async function createUser({ displayName, role = "client", password = "" }) {
+  const nextDisplayName = String(displayName || "").trim();
+  if (!nextDisplayName) {
+    throw new Error("Display name is required.");
+  }
+
+  const normalizedRole = String(role || "client").trim().toLowerCase() === "host" ? "host" : "client";
+  const store = await readUsersStore();
+  const exists = store.users.some(
+    (entry) => String(entry.displayName || "").trim().toLowerCase() === nextDisplayName.toLowerCase()
+  );
+
+  if (exists) {
+    throw new Error(`A user named "${nextDisplayName}" already exists.`);
+  }
+
+  const nextUser = {
+    id: makeId(),
+    displayName: nextDisplayName,
+    role: normalizedRole,
+    permissions: getDefaultPermissions(normalizedRole),
+    passwordSalt: "",
+    passwordHash: "",
+    passwordUpdatedAt: ""
+  };
+
+  if (String(password || "").trim()) {
+    const { passwordSalt, passwordHash } = hashPassword(password);
+    nextUser.passwordSalt = passwordSalt;
+    nextUser.passwordHash = passwordHash;
+    nextUser.passwordUpdatedAt = new Date().toISOString();
+  }
+
+  store.users.push(nextUser);
+  await writeUsersStore(store);
+  return sanitizeUser(nextUser);
+}
+
 async function setUserPassword(displayName, password) {
   const store = await readUsersStore();
   const user = store.users.find(
@@ -200,6 +238,34 @@ async function setUserPassword(displayName, password) {
 
   if (!user) {
     throw new Error(`No user found for "${displayName}".`);
+  }
+
+  const { passwordSalt, passwordHash } = hashPassword(password);
+  user.passwordSalt = passwordSalt;
+  user.passwordHash = passwordHash;
+  user.passwordUpdatedAt = new Date().toISOString();
+  await writeUsersStore(store);
+  return sanitizeUser(user);
+}
+
+async function setUserPasswordById(userId, password) {
+  const store = await readUsersStore();
+  const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
+
+  if (!user) {
+    throw new Error(`No user found for id "${userId}".`);
+  }
+
+  if (isOwnerUser(user) && !String(password || "").trim()) {
+    throw new Error("Owner account password cannot be cleared.");
+  }
+
+  if (!String(password || "").trim()) {
+    user.passwordSalt = "";
+    user.passwordHash = "";
+    user.passwordUpdatedAt = "";
+    await writeUsersStore(store);
+    return sanitizeUser(user);
   }
 
   const { passwordSalt, passwordHash } = hashPassword(password);
@@ -226,6 +292,23 @@ async function updateUserPermissions(userId, permissions) {
       holidays: "admin"
     };
   }
+  await writeUsersStore(store);
+  return sanitizeUser(user);
+}
+
+async function deleteUser(userId) {
+  const store = await readUsersStore();
+  const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
+
+  if (!user) {
+    throw new Error(`No user found for id "${userId}".`);
+  }
+
+  if (isOwnerUser(user)) {
+    throw new Error("The owner account cannot be deleted.");
+  }
+
+  store.users = store.users.filter((entry) => String(entry.id || "") !== String(userId || ""));
   await writeUsersStore(store);
   return sanitizeUser(user);
 }
@@ -269,6 +352,8 @@ async function bootstrapPasswordsFromEnv() {
 
 module.exports = {
   bootstrapPasswordsFromEnv,
+  createUser,
+  deleteUser,
   SEEDED_USERS,
   ensureUsersFile,
   getUsersFile,
@@ -276,6 +361,7 @@ module.exports = {
   readUsersStore,
   sanitizeUser,
   setUserPassword,
+  setUserPasswordById,
   updateUserPermissions,
   verifyPassword,
   writeUsersStore

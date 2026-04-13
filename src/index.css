@@ -2111,7 +2111,7 @@ button {
 
 .permissions-panel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .permissions-modal {
@@ -2130,16 +2130,27 @@ button {
 
 .permissions-grid {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+}
+
+.permissions-admin-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 140px minmax(0, 1.2fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(199, 183, 210, 0.45);
+  border-radius: 20px;
+  background: #faf8fb;
 }
 
 .permissions-user-card {
   border: 1px solid rgba(199, 183, 210, 0.5);
-  border-radius: 24px;
-  padding: 18px;
+  border-radius: 20px;
+  padding: 16px;
   background: linear-gradient(180deg, rgba(252, 251, 253, 0.95) 0%, rgba(245, 239, 248, 0.9) 100%);
   display: grid;
-  gap: 14px;
+  gap: 12px;
 }
 
 .permissions-user-head {
@@ -2147,6 +2158,17 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.permissions-user-identity {
+  display: grid;
+  gap: 3px;
+}
+
+.permissions-user-meta {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .permissions-owner-pill {
@@ -2160,7 +2182,12 @@ button {
 
 .permissions-app-row {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+}
+
+.permissions-main-grid {
+  display: grid;
+  gap: 10px;
 }
 
 .permissions-app-label {
@@ -2189,6 +2216,17 @@ button {
   background: var(--sx-main-soft);
   border-color: #c7b7d2;
   color: var(--sx-main);
+}
+
+.permissions-user-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.permissions-password-input {
+  min-width: 0;
 }
 
 .installer-layout {
@@ -2997,6 +3035,11 @@ button {
     width: min(100%, 100%);
     padding: 18px;
     border-radius: 24px;
+  }
+
+  .permissions-admin-tools,
+  .permissions-user-actions {
+    grid-template-columns: 1fr;
   }
 
   .host-nav {
