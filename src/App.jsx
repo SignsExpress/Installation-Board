@@ -838,7 +838,7 @@ function HolidaysPage({
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
     [holidayAllowances]
   );
-  const activeHolidayFilter = selectedHolidayPerson || (canReview ? "" : currentPerson);
+  const activeHolidayFilter = canReview ? selectedHolidayPerson : "";
   const filteredHolidayRows = useMemo(
     () =>
       holidayRows.map((month) => ({
@@ -950,7 +950,9 @@ function HolidaysPage({
                     ) : null}
                   </>
                 ) : (
-                  <span className="holiday-filter-label">Showing all employees</span>
+                  <span className="holiday-filter-label">
+                    {canReview ? "Showing all employees" : "Showing all employees on the calendar"}
+                  </span>
                 )}
               </div>
             </div>
@@ -1019,8 +1021,8 @@ function HolidaysPage({
 
           <section className="holiday-breakdown-panel">
             <div className="holiday-requests-head">
-              <h3>Holiday Breakdown {holidayYearLabel}</h3>
-            </div>
+                <h3>{canReview ? `Holiday Breakdown ${holidayYearLabel}` : `Your Holiday Breakdown ${holidayYearLabel}`}</h3>
+              </div>
             <div className="holiday-breakdown-wrap">
               <table className="holiday-breakdown-table">
                 <colgroup>
