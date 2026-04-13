@@ -1036,6 +1036,19 @@ function wrapPdfText(value, maxLength = 78) {
   return lines;
 }
 
+function formatDateTimeForPdf(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value || "");
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TIME_ZONE
+  }).format(parsed);
+}
+
 function parseJpegDimensions(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
     return { width: 0, height: 0 };
@@ -1073,7 +1086,8 @@ function buildPdfDocument(job, photoAssets = []) {
   const pageWidth = 595.28;
   const pageHeight = 841.89;
   const margin = 48;
-  const lineHeight = 18;
+  const lineHeight = 13;
+  const brandRight = pageWidth - margin;
   const objects = [];
 
   function addObject(body) {
@@ -1104,34 +1118,45 @@ function buildPdfDocument(job, photoAssets = []) {
   const fontBoldId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
 
   const pageIds = [];
+  const uploadedBy = [...new Set(photoAssets.map((asset) => String(asset.uploadedByName || "").trim()).filter(Boolean))].join(", ") || "-";
+  const completionDate = job.completedAt ? formatDateTimeForPdf(job.completedAt) : "-";
   const detailLines = [
-    { text: job.customerName || "Job Export", font: "bold", size: 22, gap: 10 },
-    ...(job.description ? [{ text: job.description, font: "regular", size: 13, gap: 18 }] : []),
-    { text: `Order Ref: ${job.orderReference || "-"}`, font: "regular", size: 12, gap: 0 },
-    { text: `Date: ${job.date || "Unscheduled"}`, font: "regular", size: 12, gap: 0 },
-    { text: `Job Type: ${job.jobType === "Other" ? job.customJobType || "Other" : job.jobType || "-"}`, font: "regular", size: 12, gap: 0 },
+    { text: job.customerName || "Job Export", font: "bold", size: 16, gap: 4 },
+    ...(job.description ? [{ text: job.description, font: "regular", size: 10, gap: 10 }] : []),
+    { text: `Order Ref: ${job.orderReference || "-"}`, font: "regular", size: 9, gap: 0 },
+    { text: `Completion Date: ${completionDate}`, font: "regular", size: 9, gap: 0 },
+    { text: `Job Type: ${job.jobType === "Other" ? job.customJobType || "Other" : job.jobType || "-"}`, font: "regular", size: 9, gap: 0 },
     {
       text: `Installers: ${[
         ...(Array.isArray(job.installers) ? job.installers.filter((entry) => entry !== "Custom") : []),
         ...(job.installers?.includes?.("Custom") && job.customInstaller ? [job.customInstaller] : [])
       ].join(", ") || "-"}`,
       font: "regular",
-      size: 12,
+      size: 9,
       gap: 0
     },
-    { text: `Contact: ${job.contact || "-"}`, font: "regular", size: 12, gap: 0 },
-    { text: `Number: ${job.number || "-"}`, font: "regular", size: 12, gap: 0 },
-    { text: `Address: ${job.address || "-"}`, font: "regular", size: 12, gap: 0 },
-    { text: `Completed: ${job.isCompleted ? "Yes" : "No"}`, font: "regular", size: 12, gap: 0 },
-    ...(job.completedAt ? [{ text: `Completed At: ${job.completedAt}`, font: "regular", size: 12, gap: 0 }] : []),
-    ...(job.completedByName ? [{ text: `Completed By: ${job.completedByName}`, font: "regular", size: 12, gap: 0 }] : []),
-    { text: `Photos: ${photoAssets.length}`, font: "regular", size: 12, gap: 0 }
+    { text: `Contact: ${job.contact || "-"}`, font: "regular", size: 9, gap: 0 },
+    { text: `Number: ${job.number || "-"}`, font: "regular", size: 9, gap: 0 },
+    { text: `Address: ${job.address || "-"}`, font: "regular", size: 9, gap: 0 },
+    { text: `Photos Uploaded By: ${uploadedBy}`, font: "regular", size: 9, gap: 0 },
+    { text: `Photos: ${photoAssets.length}`, font: "regular", size: 9, gap: 0 }
   ];
 
-  let y = pageHeight - margin;
+  let y = pageHeight - margin - 8;
   const detailCommands = [];
+  detailCommands.push("BT");
+  detailCommands.push("/F2 12 Tf");
+  detailCommands.push(`${brandRight - 108} ${pageHeight - margin + 2} Td`);
+  detailCommands.push("(SIGNS EXPRESS) Tj");
+  detailCommands.push("ET");
+  detailCommands.push("BT");
+  detailCommands.push("/F1 6 Tf");
+  detailCommands.push(`${brandRight - 118} ${pageHeight - margin - 10} Td`);
+  detailCommands.push("(CENTRAL LANCASHIRE AND SOUTHPORT) Tj");
+  detailCommands.push("ET");
+
   detailLines.forEach((line) => {
-    wrapPdfText(line.text, 78).forEach((segment, index) => {
+    wrapPdfText(line.text, 92).forEach((segment) => {
       detailCommands.push("BT");
       detailCommands.push(`/${line.font === "bold" ? "F2" : "F1"} ${line.size} Tf`);
       detailCommands.push(`${margin} ${y} Td`);
@@ -1142,50 +1167,88 @@ function buildPdfDocument(job, photoAssets = []) {
     y -= line.gap || 8;
   });
 
-  const detailContentId = addObject(makeStream(detailCommands.join("\n")));
-  const detailPageId = addObject(
-    `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${detailContentId} 0 R >>`
-  );
-  pageIds.push(detailPageId);
-
-  photoAssets.forEach((asset, index) => {
-    const imageId = addObject(
+  const firstPageImageIds = photoAssets.slice(0, 4).map((asset) =>
+    addObject(
       makeBinaryStream(
         `/Type /XObject /Subtype /Image /Width ${asset.width || 1} /Height ${asset.height || 1} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,
         asset.buffer
       )
-    );
+    )
+  );
 
-    const maxWidth = pageWidth - margin * 2;
-    const maxHeight = pageHeight - margin * 2 - 60;
+  const firstPageSlots = [
+    { x: margin, y: 290, width: 230, height: 180 },
+    { x: pageWidth - margin - 230, y: 290, width: 230, height: 180 },
+    { x: margin, y: 70, width: 230, height: 180 },
+    { x: pageWidth - margin - 230, y: 70, width: 230, height: 180 }
+  ];
+
+  firstPageImageIds.forEach((imageId, index) => {
+    const asset = photoAssets[index];
+    const slot = firstPageSlots[index];
+    if (!asset || !slot) return;
     const ratio = Math.min(
-      maxWidth / Math.max(1, asset.width || 1),
-      maxHeight / Math.max(1, asset.height || 1),
+      slot.width / Math.max(1, asset.width || 1),
+      slot.height / Math.max(1, asset.height || 1),
       1
     );
     const drawWidth = Math.max(1, Math.round((asset.width || 1) * ratio));
     const drawHeight = Math.max(1, Math.round((asset.height || 1) * ratio));
-    const drawX = (pageWidth - drawWidth) / 2;
-    const drawY = margin + 20;
+    const drawX = slot.x + (slot.width - drawWidth) / 2;
+    const drawY = slot.y + (slot.height - drawHeight) / 2;
+    detailCommands.push("q");
+    detailCommands.push(`${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm`);
+    detailCommands.push(`/Im${index + 1} Do`);
+    detailCommands.push("Q");
+  });
 
-    const photoCommands = [
-      "BT",
-      `/F2 18 Tf`,
-      `${margin} ${pageHeight - margin} Td`,
-      `(${escapePdfText(`Job Photo ${index + 1} of ${photoAssets.length}`)}) Tj`,
-      "ET",
-      "q",
-      `${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm`,
-      "/Im1 Do",
-      "Q"
+  const detailContentId = addObject(makeStream(detailCommands.join("\n")));
+  const detailPageId = addObject(
+    `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> /XObject << ${firstPageImageIds.map((id, index) => `/Im${index + 1} ${id} 0 R`).join(" ")} >> >> /Contents ${detailContentId} 0 R >>`
+  );
+  pageIds.push(detailPageId);
+
+  const remainingPhotos = photoAssets.slice(4);
+  for (let pageIndex = 0; pageIndex < remainingPhotos.length; pageIndex += 4) {
+    const pagePhotos = remainingPhotos.slice(pageIndex, pageIndex + 4);
+    const imageIds = pagePhotos.map((asset) =>
+      addObject(
+        makeBinaryStream(
+          `/Type /XObject /Subtype /Image /Width ${asset.width || 1} /Height ${asset.height || 1} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,
+          asset.buffer
+        )
+      )
+    );
+    const slots = [
+      { x: margin, y: 430, width: 230, height: 160 },
+      { x: pageWidth - margin - 230, y: 430, width: 230, height: 160 },
+      { x: margin, y: 160, width: 230, height: 160 },
+      { x: pageWidth - margin - 230, y: 160, width: 230, height: 160 }
     ];
-
+    const photoCommands = [];
+    imageIds.forEach((imageId, index) => {
+      const asset = pagePhotos[index];
+      const slot = slots[index];
+      const ratio = Math.min(
+        slot.width / Math.max(1, asset.width || 1),
+        slot.height / Math.max(1, asset.height || 1),
+        1
+      );
+      const drawWidth = Math.max(1, Math.round((asset.width || 1) * ratio));
+      const drawHeight = Math.max(1, Math.round((asset.height || 1) * ratio));
+      const drawX = slot.x + (slot.width - drawWidth) / 2;
+      const drawY = slot.y + (slot.height - drawHeight) / 2;
+      photoCommands.push("q");
+      photoCommands.push(`${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm`);
+      photoCommands.push(`/Im${index + 1} Do`);
+      photoCommands.push("Q");
+    });
     const photoContentId = addObject(makeStream(photoCommands.join("\n")));
     const photoPageId = addObject(
-      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> /XObject << /Im1 ${imageId} 0 R >> >> /Contents ${photoContentId} 0 R >>`
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /XObject << ${imageIds.map((id, index) => `/Im${index + 1} ${id} 0 R`).join(" ")} >> >> /Contents ${photoContentId} 0 R >>`
     );
     pageIds.push(photoPageId);
-  });
+  }
 
   objects[pagesId - 1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
 
@@ -3542,6 +3605,48 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
     response.setHeader("Content-Type", photo.contentType || "image/jpeg");
     response.sendFile(filePath);
+  });
+
+  app.delete("/api/jobs/:jobId/photos/:photoId", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((entry) => String(entry.id || "") === String(request.params.jobId || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const photo = existing.photos.find((entry) => String(entry.id || "") === String(request.params.photoId || ""));
+    if (!photo) {
+      response.status(404).json({ error: "Photo not found." });
+      return;
+    }
+
+    try {
+      if (photo.storageName) {
+        await fsp.unlink(path.join(getJobUploadsDir(), photo.storageName));
+      }
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    const nextJob = sanitizeJob({
+      ...existing,
+      photos: existing.photos.filter((entry) => String(entry.id || "") !== String(request.params.photoId || ""))
+    });
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
   });
 
   app.get("/api/jobs/:id/export", async (request, response) => {

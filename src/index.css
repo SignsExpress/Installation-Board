@@ -1471,26 +1471,47 @@ button {
 
 .job-photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
   margin-top: 10px;
+}
+
+.job-photo-tile {
+  display: grid;
+  gap: 6px;
 }
 
 .job-photo-link {
   display: block;
-  border-radius: 16px;
+  border-radius: 14px;
   overflow: hidden;
   border: 1px solid #dbe2ea;
   background: #fff;
-  min-height: 110px;
+  min-height: 88px;
 }
 
 .job-photo-link img {
   width: 100%;
   height: 100%;
-  min-height: 110px;
+  min-height: 88px;
   object-fit: cover;
   display: block;
+}
+
+.job-photo-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.job-photo-meta small {
+  color: #64748b;
+  font-size: 0.72rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visually-hidden {

@@ -2665,6 +2665,25 @@ export default function App() {
     }
   }
 
+  async function deleteClientJobPhoto(job, photoId) {
+    if (!job?.id || !photoId) return;
+    try {
+      const response = await fetch(
+        `/api/jobs/${encodeURIComponent(job.id)}/photos/${encodeURIComponent(photoId)}`,
+        { method: "DELETE" }
+      );
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not delete the photo.");
+      }
+      applyBoardPayloadToState(payload, job.id);
+      setMessage(createMessage("Photo removed.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not delete the photo.", "error"));
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (isClientMode) return;
@@ -3787,20 +3806,34 @@ export default function App() {
                   {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
                     <div className="job-photo-grid">
                       {activeClientJob.photos.map((photo) => (
-                        <a
-                          key={photo.id}
-                          className="job-photo-link"
-                          href={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <img
-                            src={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
-                            alt={photo.fileName || "Job photo"}
-                            loading="lazy"
-                          />
-                        </a>
+                        <div key={photo.id} className="job-photo-tile">
+                          <a
+                            className="job-photo-link"
+                            href={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <img
+                              src={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                              alt={photo.fileName || "Job photo"}
+                              loading="lazy"
+                            />
+                          </a>
+                          <div className="job-photo-meta">
+                            <small>{photo.uploadedByName || "Uploaded photo"}</small>
+                            <button
+                              className="text-button danger"
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                deleteClientJobPhoto(activeClientJob, photo.id);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     </div>
                   ) : (
