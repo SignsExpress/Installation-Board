@@ -967,31 +967,44 @@ function HolidaysPage({
                 <div key={month.id} className="holiday-calendar-row">
                   <div className="month-label-cell month-row-label">{month.label}</div>
                   {month.days.map((day) => (
-                    <div
-                      key={day.key}
-                      className={[
-                        "holiday-day-cell",
-                        !day.inMonth ? "is-empty" : "",
-                        day.weekend ? "is-weekend" : "",
-                        day.bankHoliday ? "is-bank-holiday" : "",
-                        canReview && activeHolidayFilter && day.inMonth && !day.weekend && !day.bankHoliday ? "is-editable" : ""
-                      ].join(" ").trim()}
-                      title={day.bankHoliday || day.isoDate || ""}
-                      onClick={() => {
-                        if (!canReview || !activeHolidayFilter || !day.inMonth || day.weekend || day.bankHoliday) return;
-                        onToggleHolidayDate(day.isoDate, activeHolidayFilter);
-                      }}
-                    >
-                      {day.holidays.map((holiday) => (
-                        <span
-                          key={`${day.key}-${holiday.id}`}
-                          className={`holiday-day-token ${HOLIDAY_PERSON_COLORS[holiday.person] || "holiday-person-black"} ${isBirthdayHoliday(holiday) ? "holiday-birthday-token" : ""}`}
+                    (() => {
+                      const matchingHoliday = activeHolidayFilter
+                        ? day.holidays.find(
+                            (holiday) =>
+                              String(holiday.person || "").trim().toLowerCase() ===
+                              String(activeHolidayFilter || "").trim().toLowerCase()
+                          )
+                        : null;
+
+                      return (
+                        <div
+                          key={day.key}
+                          className={[
+                            "holiday-day-cell",
+                            !day.inMonth ? "is-empty" : "",
+                            day.weekend ? "is-weekend" : "",
+                            day.bankHoliday ? "is-bank-holiday" : "",
+                            canReview && activeHolidayFilter && day.inMonth && !day.weekend && !day.bankHoliday ? "is-editable" : ""
+                          ].join(" ").trim()}
+                          title={day.bankHoliday || day.isoDate || ""}
+                          onClick={() => {
+                            if (!canReview || !activeHolidayFilter || !day.inMonth || day.weekend || day.bankHoliday) return;
+                            if (matchingHoliday && isBirthdayHoliday(matchingHoliday)) return;
+                            onToggleHolidayDate(day.isoDate, activeHolidayFilter);
+                          }}
                         >
-                          {getHolidayDisplayToken(holiday.person)}
-                          {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
-                        </span>
-                      ))}
-                    </div>
+                          {day.holidays.map((holiday) => (
+                            <span
+                              key={`${day.key}-${holiday.id}`}
+                              className={`holiday-day-token ${HOLIDAY_PERSON_COLORS[holiday.person] || "holiday-person-black"} ${isBirthdayHoliday(holiday) ? "holiday-birthday-token" : ""}`}
+                            >
+                              {getHolidayDisplayToken(holiday.person)}
+                              {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()
                   ))}
                 </div>
               ))}
