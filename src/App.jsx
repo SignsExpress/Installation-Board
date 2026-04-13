@@ -2672,8 +2672,8 @@ export default function App() {
       const installers = getInstallerDisplayList(job).join(", ") || "-";
       const firstPagePhotos = (job.photos || []).slice(0, 2);
       const remainingPhotoPages = [];
-      for (let index = 2; index < (job.photos || []).length; index += 4) {
-        remainingPhotoPages.push((job.photos || []).slice(index, index + 4));
+      for (let index = 2; index < (job.photos || []).length; index += 6) {
+        remainingPhotoPages.push((job.photos || []).slice(index, index + 6));
       }
 
       const renderPhotoTile = (photo, index, extraClass = "") => `
@@ -2777,6 +2777,10 @@ export default function App() {
       .photo-grid.first-page {
         margin-top: 4mm;
       }
+      .photo-grid.extra-page {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 5mm;
+      }
       .photo-tile {
         margin: 0;
       }
@@ -2833,7 +2837,7 @@ export default function App() {
     </section>
     ${remainingPhotoPages.map((pagePhotos) => `
       <section class="page">
-        <div class="photo-grid">${pagePhotos.map((photo, index) => renderPhotoTile(photo, index)).join("")}</div>
+        <div class="photo-grid extra-page">${pagePhotos.map((photo, index) => renderPhotoTile(photo, index)).join("")}</div>
       </section>
     `).join("")}
     <script>
