@@ -2630,6 +2630,18 @@ export default function App() {
     return payload;
   }
 
+  async function undoCompleteJob(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/uncomplete`, {
+      method: "POST"
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not undo the completed status.");
+    }
+    applyBoardPayloadToState(payload, jobId);
+    return payload;
+  }
+
   async function uploadJobPhotos(jobId, files) {
     for (const file of files) {
       const prepared = await compressPhotoForUpload(file);
@@ -2707,6 +2719,30 @@ export default function App() {
       if (adminPhotoInputRef.current) {
         adminPhotoInputRef.current.value = "";
       }
+    }
+  }
+
+  async function undoClientJobComplete(job) {
+    if (!job?.id) return;
+    try {
+      await undoCompleteJob(job.id);
+      setClientCompletePrompt(false);
+      setMessage(createMessage("Job marked as not complete.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not undo completion.", "error"));
+    }
+  }
+
+  async function undoAdminJobComplete(job) {
+    if (!job?.id) return;
+    try {
+      await undoCompleteJob(job.id);
+      setAdminCompletePrompt(false);
+      setMessage(createMessage("Job marked as not complete.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not undo completion.", "error"));
     }
   }
 
@@ -4012,14 +4048,24 @@ export default function App() {
                         )}
                       </>
                     ) : (
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={() => adminPhotoInputRef.current?.click()}
-                        disabled={adminPhotoUploading}
-                      >
-                        {adminPhotoUploading ? "Uploading..." : "Upload photos"}
-                      </button>
+                      <>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => adminPhotoInputRef.current?.click()}
+                          disabled={adminPhotoUploading}
+                        >
+                          {adminPhotoUploading ? "Uploading..." : "Upload photos"}
+                        </button>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => undoAdminJobComplete(activeAdminJob)}
+                          disabled={adminPhotoUploading || adminExporting}
+                        >
+                          Undo complete
+                        </button>
+                      </>
                     )}
 
                     <button
@@ -4270,14 +4316,24 @@ export default function App() {
                     )}
                   </>
                 ) : (
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => clientPhotoInputRef.current?.click()}
-                    disabled={clientPhotoUploading}
-                  >
-                    {clientPhotoUploading ? "Uploading..." : "Upload photos"}
-                  </button>
+                  <>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => clientPhotoInputRef.current?.click()}
+                      disabled={clientPhotoUploading}
+                    >
+                      {clientPhotoUploading ? "Uploading..." : "Upload photos"}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => undoClientJobComplete(activeClientJob)}
+                      disabled={clientPhotoUploading || clientExporting}
+                    >
+                      Undo complete
+                    </button>
+                  </>
                 )}
 
                 <button
