@@ -115,6 +115,9 @@ button {
   gap: 16px;
   padding: 10px 18px;
   border-radius: 20px;
+  position: sticky;
+  top: 12px;
+  z-index: 40;
 }
 
 .host-nav-links,
@@ -127,13 +130,20 @@ button {
 
 .host-nav-link,
 .host-nav-logout {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 50px;
+  padding: 8px 14px;
   border-radius: 999px;
   border: 1px solid #d7cbdd;
   background: #fff;
   color: #334155;
   font-weight: 700;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+  text-align: center;
 }
 
 .host-nav-link.active {
@@ -152,6 +162,196 @@ button {
 .host-nav-user {
   color: #475569;
   font-size: 0.95rem;
+}
+
+.host-nav-link-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.host-nav-link-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.host-nav-link-label {
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.host-nav-notifications-wrap {
+  position: relative;
+}
+
+.host-nav-notifications-button .host-nav-link-icon {
+  position: relative;
+}
+
+.host-nav-badge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.25);
+}
+
+.host-nav-notifications-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 620px);
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(199, 183, 210, 0.55);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(14px);
+  display: grid;
+  gap: 12px;
+}
+
+.host-nav-notifications-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.host-nav-notifications-head strong,
+.host-nav-notifications-head span {
+  display: block;
+}
+
+.host-nav-notifications-head span {
+  color: #64748b;
+  font-size: 0.86rem;
+  margin-top: 4px;
+}
+
+.host-nav-notifications-list {
+  display: grid;
+  gap: 10px;
+}
+
+.host-nav-notification-card {
+  border: 1px solid rgba(199, 183, 210, 0.45);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(252, 251, 253, 0.98) 0%, rgba(245, 239, 248, 0.94) 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 12px;
+}
+
+.host-nav-notification-card.unread {
+  border-color: rgba(116, 70, 137, 0.5);
+  box-shadow: 0 0 0 1px rgba(116, 70, 137, 0.08);
+}
+
+.host-nav-notification-card.read {
+  opacity: 0.78;
+}
+
+.host-nav-notification-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  text-align: left;
+}
+
+.host-nav-notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.host-nav-notification-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+
+.notification-type-holiday {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.notification-type-board {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.notification-type-message {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.notification-type-update {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
+.host-nav-notification-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.host-nav-notification-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.host-nav-notification-copy strong {
+  font-size: 0.94rem;
+  color: #0f172a;
+}
+
+.host-nav-notification-copy span {
+  color: #475569;
+  line-height: 1.4;
+  font-size: 0.88rem;
+}
+
+.host-nav-notification-copy small {
+  color: #7c3aed;
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.host-nav-notification-status {
+  color: #be123c;
+  font-weight: 700;
+  font-size: 0.74rem;
+  flex: 0 0 auto;
+}
+
+.host-nav-notification-empty {
+  color: #64748b;
+  padding: 8px 4px 2px;
 }
 
 .host-nav-user strong {
@@ -3228,6 +3428,7 @@ button {
     gap: 10px;
     padding: 10px 12px;
     border-radius: 18px;
+    top: 8px;
   }
 
   .host-nav-links,
@@ -3237,14 +3438,38 @@ button {
 
   .host-nav-link,
   .host-nav-logout {
-    min-height: 34px;
-    padding: 0 12px;
-    font-size: 0.92rem;
+    min-height: 42px;
+    padding: 6px 10px;
+  }
+
+  .host-nav-link-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .host-nav-link-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .host-nav-link-label {
+    font-size: 0.68rem;
   }
 
   .host-nav-user {
-    font-size: 0.9rem;
+    font-size: 0.82rem;
     line-height: 1.25;
+  }
+
+  .host-nav-notifications-dropdown {
+    right: -6px;
+    width: min(360px, calc(100vw - 28px));
+    max-height: 60vh;
+    padding: 12px;
+  }
+
+  .host-nav-notification-card {
+    grid-template-columns: 1fr;
   }
 
   .app-shell {

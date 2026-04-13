@@ -630,6 +630,71 @@ function getBoardPathForUser(user) {
   return canEditBoard(user) ? "/board" : "/client/board";
 }
 
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 11.5 12 5l8 6.5v7a1.5 1.5 0 0 1-1.5 1.5h-4.25V14h-4.5v6H5.5A1.5 1.5 0 0 1 4 18.5z" />
+    </svg>
+  );
+}
+
+function BoardIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 5h14a1 1 0 0 1 1 1v12.5A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5V6a1 1 0 0 1 1-1Zm1.5 3v9h11V8Zm0-1.5h11V6.5h-11Z" />
+    </svg>
+  );
+}
+
+function HolidayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 3h2v2h6V3h2v2h1.5A1.5 1.5 0 0 1 20 6.5v12A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5H7Zm11 6.5h-12v8.5h12Zm-9.5 2h3v3h-3Z" />
+    </svg>
+  );
+}
+
+function InstallerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 4h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-4l-2 2-2-2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm1.5 4v2h9V8Zm0 4v2h6v-2Z" />
+    </svg>
+  );
+}
+
+function NotificationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4a4 4 0 0 1 4 4v1.35c0 .83.27 1.63.78 2.29l1.28 1.69c.68.9.04 2.17-1.09 2.17H6.03c-1.13 0-1.77-1.27-1.09-2.17l1.28-1.69A3.75 3.75 0 0 0 7 9.35V8a5 5 0 0 1 5-5Zm0 16a2.75 2.75 0 0 0 2.58-1.8h-5.16A2.75 2.75 0 0 0 12 20Z" />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M10 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H10v-2H7V6h3Zm6.3 3.8-1.4 1.4 1.8 1.8H10v2h6.7l-1.8 1.8 1.4 1.4L20.5 12z" />
+    </svg>
+  );
+}
+
+function getNotificationCategory(notification) {
+  const title = String(notification?.title || "").toLowerCase();
+  const message = String(notification?.message || "").toLowerCase();
+  const link = String(notification?.link || "").toLowerCase();
+
+  if (link.includes("/holidays") || title.includes("holiday") || message.includes("holiday")) {
+    return { label: "Holiday", icon: HolidayIcon, className: "notification-type-holiday" };
+  }
+  if (link.includes("/board") || title.includes("job") || message.includes("job")) {
+    return { label: "Board", icon: BoardIcon, className: "notification-type-board" };
+  }
+  if (title.includes("message") || message.includes("message")) {
+    return { label: "Message", icon: NotificationIcon, className: "notification-type-message" };
+  }
+  return { label: "Update", icon: NotificationIcon, className: "notification-type-update" };
+}
+
 function buildBoardUrl(startIso = "", endIso = "") {
   if (startIso && endIso) {
     return `/api/board?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
@@ -637,7 +702,17 @@ function buildBoardUrl(startIso = "", endIso = "") {
   return "/api/board";
 }
 
-function MainNavBar({ currentUser, active = "home", onLogout }) {
+function MainNavBar({
+  currentUser,
+  active = "home",
+  onLogout,
+  notifications = [],
+  onOpenNotification,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead
+}) {
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
   function goTo(path) {
     window.location.assign(path);
   }
@@ -649,6 +724,17 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
   const boardPath = getBoardPathForUser(currentUser);
   const holidaysPath = "/holidays";
   const installerPath = "/installer";
+  const unreadNotifications = notifications.filter((entry) => !entry.read);
+  const recentNotifications = notifications.slice(0, 10);
+
+  useEffect(() => {
+    function handleWindowClick() {
+      setNotificationsOpen(false);
+    }
+    if (!notificationsOpen) return undefined;
+    window.addEventListener("click", handleWindowClick);
+    return () => window.removeEventListener("click", handleWindowClick);
+  }, [notificationsOpen]);
 
   return (
     <nav className="panel host-nav">
@@ -658,7 +744,8 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
           className={`host-nav-link ${active === "home" ? "active" : ""}`}
           onClick={() => goTo(homePath)}
         >
-          Home
+          <span className="host-nav-link-icon"><HomeIcon /></span>
+          <span className="host-nav-link-label">Home</span>
         </button>
         <button
           type="button"
@@ -669,7 +756,8 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
           }}
           disabled={!boardAllowed}
         >
-          Installation Board
+          <span className="host-nav-link-icon"><BoardIcon /></span>
+          <span className="host-nav-link-label">Installation Board</span>
         </button>
         <button
           type="button"
@@ -680,7 +768,8 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
           }}
           disabled={!holidaysAllowed}
         >
-          Holidays
+          <span className="host-nav-link-icon"><HolidayIcon /></span>
+          <span className="host-nav-link-label">Holidays</span>
         </button>
         <button
           type="button"
@@ -691,13 +780,90 @@ function MainNavBar({ currentUser, active = "home", onLogout }) {
           }}
           disabled={!installerAllowed}
         >
-          Subcontractor Directory
+          <span className="host-nav-link-icon"><InstallerIcon /></span>
+          <span className="host-nav-link-label">Subcontractor Directory</span>
         </button>
       </div>
       <div className="host-nav-meta">
+        <div className="host-nav-notifications-wrap">
+          <button
+            className={`host-nav-link host-nav-notifications-button ${notificationsOpen ? "active" : ""}`}
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setNotificationsOpen((current) => !current);
+            }}
+          >
+            <span className="host-nav-link-icon">
+              <NotificationIcon />
+              {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
+            </span>
+            <span className="host-nav-link-label">Notifications</span>
+          </button>
+          {notificationsOpen ? (
+            <div className="host-nav-notifications-dropdown" onClick={(event) => event.stopPropagation()}>
+              <div className="host-nav-notifications-head">
+                <div>
+                  <strong>Notifications</strong>
+                  <span>{unreadNotifications.length ? `${unreadNotifications.length} new` : "You're all caught up"}</span>
+                </div>
+                {notifications.length ? (
+                  <button className="text-button" type="button" onClick={onMarkAllNotificationsRead}>
+                    Mark all read
+                  </button>
+                ) : null}
+              </div>
+              <div className="host-nav-notifications-list">
+                {recentNotifications.length ? recentNotifications.map((notification) => {
+                  const category = getNotificationCategory(notification);
+                  const CategoryIcon = category.icon;
+                  return (
+                    <article
+                      key={notification.id}
+                      className={`host-nav-notification-card ${notification.read ? "read" : "unread"}`}
+                    >
+                      <button
+                        type="button"
+                        className="host-nav-notification-main"
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          onOpenNotification?.(notification);
+                        }}
+                      >
+                        <span className={`host-nav-notification-icon ${category.className}`}>
+                          <CategoryIcon />
+                        </span>
+                        <div className="host-nav-notification-copy">
+                          <div className="host-nav-notification-topline">
+                            <strong>{notification.title}</strong>
+                            {!notification.read ? <span className="host-nav-notification-status">New</span> : null}
+                          </div>
+                          <span>{notification.message}</span>
+                          <small>{category.label}</small>
+                        </div>
+                      </button>
+                      {!notification.read ? (
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => onMarkNotificationRead?.(notification.id)}
+                        >
+                          Mark read
+                        </button>
+                      ) : null}
+                    </article>
+                  );
+                }) : (
+                  <div className="host-nav-notification-empty">No notifications yet.</div>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
         <button className="host-nav-logout" type="button" onClick={onLogout}>
-          Log out
+          <span className="host-nav-link-icon"><LogoutIcon /></span>
+          <span className="host-nav-link-label">Log out</span>
         </button>
       </div>
     </nav>
@@ -994,7 +1160,15 @@ function HostLandingPage({
         <div className="host-landing-brand">
           <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
         </div>
-        <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
+        <MainNavBar
+          currentUser={currentUser}
+          active="home"
+          onLogout={onLogout}
+          notifications={notifications}
+          onOpenNotification={onOpenNotification}
+          onMarkNotificationRead={onMarkNotificationRead}
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+        />
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
@@ -1048,12 +1222,6 @@ function HostLandingPage({
           </div>
         </section>
 
-        <NotificationsPanel
-          notifications={notifications}
-          onOpenNotification={onOpenNotification}
-          onMarkNotificationRead={onMarkNotificationRead}
-          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
-        />
       </div>
 
       {currentUser?.canManagePermissions && permissionsOpen ? (
@@ -1104,7 +1272,15 @@ function ClientLandingPage({
         <div className="host-landing-brand">
           <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
         </div>
-        <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
+        <MainNavBar
+          currentUser={currentUser}
+          active="home"
+          onLogout={onLogout}
+          notifications={notifications}
+          onOpenNotification={onOpenNotification}
+          onMarkNotificationRead={onMarkNotificationRead}
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+        />
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
@@ -1134,12 +1310,6 @@ function ClientLandingPage({
           </div>
         </section>
 
-        <NotificationsPanel
-          notifications={notifications}
-          onOpenNotification={onOpenNotification}
-          onMarkNotificationRead={onMarkNotificationRead}
-          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
-        />
       </div>
     </div>
   );
@@ -1148,6 +1318,10 @@ function ClientLandingPage({
 function HolidaysPage({
   currentUser,
   onLogout,
+  notifications,
+  onOpenNotification,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead,
   holidays,
   holidayRequests,
   holidayStaff,
@@ -1207,7 +1381,15 @@ function HolidaysPage({
   return (
     <div className="app-shell holidays-shell">
       <div className="page holidays-page">
-        <MainNavBar currentUser={currentUser} active="holidays" onLogout={onLogout} />
+        <MainNavBar
+          currentUser={currentUser}
+          active="holidays"
+          onLogout={onLogout}
+          notifications={notifications}
+          onOpenNotification={onOpenNotification}
+          onMarkNotificationRead={onMarkNotificationRead}
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+        />
 
         <section className="panel holidays-panel">
           <div className="holidays-toolbar">
@@ -3454,6 +3636,10 @@ export default function App() {
       <HolidaysPage
         currentUser={currentUser}
         onLogout={handleLogout}
+        notifications={notifications}
+        onOpenNotification={openNotification}
+        onMarkNotificationRead={markNotificationRead}
+        onMarkAllNotificationsRead={markAllNotificationsRead}
         holidays={holidays}
         holidayRequests={holidayRequests}
         holidayStaff={holidayStaff}
@@ -3493,7 +3679,15 @@ export default function App() {
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
-        <MainNavBar currentUser={currentUser} active="board" onLogout={handleLogout} />
+        <MainNavBar
+          currentUser={currentUser}
+          active="board"
+          onLogout={handleLogout}
+          notifications={notifications}
+          onOpenNotification={openNotification}
+          onMarkNotificationRead={markNotificationRead}
+          onMarkAllNotificationsRead={markAllNotificationsRead}
+        />
 
         <div className="layout">
           <section className="panel board-panel board-panel-full">
