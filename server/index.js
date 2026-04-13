@@ -247,6 +247,12 @@ function getHolidayStaffPerson(displayName) {
   return HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === String(displayName || "").trim().toLowerCase())?.person || "";
 }
 
+function getHolidayStaffIdentityKey(value) {
+  const match = getHolidayStaffEntry(value);
+  if (match?.code) return match.code.toLowerCase();
+  return String(value || "").trim().toLowerCase();
+}
+
 function requireBoardAccess(request, response) {
   if (canAccessBoard(request.user)) return true;
   response.status(403).json({ error: "Board access required." });
@@ -1059,19 +1065,19 @@ function getDisplayStaffHolidays(staffHolidays, startIso, endIso, birthdayEntrie
 
   const birthdayMap = new Map(
     scopedBirthdayEntries.map((entry) => [
-      `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`,
-      entry
-    ])
+        `${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`,
+        entry
+      ])
   );
 
   const normalized = (staffHolidays || [])
     .map((entry) => sanitizeStaffHoliday(entry))
     .filter((entry) => entry.date >= startIso && entry.date <= endIso)
-    .map((entry) => {
-      const key = `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`;
-      if (birthdayMap.has(key)) {
-        return {
-          ...entry,
+      .map((entry) => {
+        const key = `${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`;
+        if (birthdayMap.has(key)) {
+          return {
+            ...entry,
           id: birthdayMap.get(key).id,
           type: "birthday"
         };
@@ -1080,14 +1086,14 @@ function getDisplayStaffHolidays(staffHolidays, startIso, endIso, birthdayEntrie
     });
 
   const existingKeys = new Set(
-    normalized.map((entry) => `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`)
+      normalized.map((entry) => `${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`)
   );
 
   scopedBirthdayEntries.forEach((entry) => {
-    const key = `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`;
-    if (!existingKeys.has(key) && entry.date >= startIso && entry.date <= endIso) {
-      normalized.push(entry);
-    }
+      const key = `${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`;
+      if (!existingKeys.has(key) && entry.date >= startIso && entry.date <= endIso) {
+        normalized.push(entry);
+      }
   });
 
   return normalized.sort((left, right) => {
@@ -2999,8 +3005,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const store = await readStore();
     if (!canEditHolidays(request.user)) {
       const allowanceSummary = buildHolidayAllowanceSummaries(store, requestYearStart).find(
-        (entry) => String(entry.person || "").trim().toLowerCase() === String(nextRequest.person || "").trim().toLowerCase()
-      );
+          (entry) => getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(nextRequest.person)
+        );
       const requestedDays = calculateHolidayDays(nextRequest.startDate, nextRequest.endDate, nextRequest.duration);
       if (allowanceSummary && requestedDays > allowanceSummary.daysLeft) {
         response.status(400).json({
@@ -3053,9 +3059,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
           duration: holidayRequest.duration
         });
 
-        const existingIndex = store.holidays.findIndex(
-          (entry) => String(entry.date || "") === date && String(entry.person || "").trim().toLowerCase() === String(holidayRequest.person || "").trim().toLowerCase()
-        );
+          const existingIndex = store.holidays.findIndex(
+            (entry) =>
+              String(entry.date || "") === date &&
+              getHolidayType(entry) !== "birthday" &&
+              getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(holidayRequest.person)
+          );
 
         if (existingIndex >= 0) {
           holidayEntry.id = store.holidays[existingIndex].id;
@@ -3104,28 +3113,41 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(payload);
   });
 
-  app.post("/api/holidays", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
-    const nextHoliday = sanitizeStaffHoliday(request.body || {});
+    app.post("/api/holidays", async (request, response) => {
+      if (!requireBoardAdmin(request, response)) return;
+      const nextHoliday = sanitizeStaffHoliday(request.body || {});
     if (!nextHoliday.person || !isValidIsoDate(nextHoliday.date)) {
       response.status(400).json({ error: "A valid date and person are required." });
       return;
     }
 
-    const store = await readStore();
-    const index = store.holidays.findIndex((item) => {
-      if (item.id === nextHoliday.id) return true;
-      return (
-        getHolidayType(item) !== "birthday" &&
-        getHolidayType(nextHoliday) !== "birthday" &&
-        String(item.date || "") === String(nextHoliday.date || "") &&
-        String(item.person || "").trim().toLowerCase() === String(nextHoliday.person || "").trim().toLowerCase()
-      );
-    });
-    if (index >= 0) {
-      nextHoliday.createdAt = store.holidays[index].createdAt || nextHoliday.createdAt;
-      nextHoliday.id = store.holidays[index].id || nextHoliday.id;
-      store.holidays[index] = nextHoliday;
+      const store = await readStore();
+      const nextIdentity = getHolidayStaffIdentityKey(nextHoliday.person);
+      const matchingIndexes = store.holidays.reduce((indexes, item, index) => {
+        if (item.id === nextHoliday.id) {
+          indexes.push(index);
+        return indexes;
+      }
+
+        if (
+          getHolidayType(item) !== "birthday" &&
+          getHolidayType(nextHoliday) !== "birthday" &&
+          String(item.date || "") === String(nextHoliday.date || "") &&
+          getHolidayStaffIdentityKey(item.person) === nextIdentity
+        ) {
+          indexes.push(index);
+        }
+
+      return indexes;
+    }, []);
+
+    if (matchingIndexes.length > 0) {
+      const canonicalIndex = matchingIndexes[0];
+      const canonicalEntry = store.holidays[canonicalIndex];
+      nextHoliday.createdAt = canonicalEntry.createdAt || nextHoliday.createdAt;
+      nextHoliday.id = canonicalEntry.id || nextHoliday.id;
+      store.holidays = store.holidays.filter((_, index) => !matchingIndexes.includes(index));
+      store.holidays.unshift(nextHoliday);
     } else {
       store.holidays.unshift(nextHoliday);
     }
@@ -3140,11 +3162,26 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(payload);
   });
 
-  app.delete("/api/holidays/:id", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
-    const store = await readStore();
-    store.holidays = store.holidays.filter((item) => item.id !== request.params.id);
-    const savedStore = await writeStore(store);
+    app.delete("/api/holidays/:id", async (request, response) => {
+      if (!requireBoardAdmin(request, response)) return;
+      const store = await readStore();
+      const deleteDate = String(request.query?.date || "").trim();
+      const deletePerson = String(request.query?.person || "").trim();
+      const deleteIdentity = deletePerson ? getHolidayStaffIdentityKey(deletePerson) : "";
+      store.holidays = store.holidays.filter((item) => {
+        if (item.id === request.params.id) return false;
+        if (
+          deleteDate &&
+          deleteIdentity &&
+          getHolidayType(item) !== "birthday" &&
+          String(item.date || "") === deleteDate &&
+          getHolidayStaffIdentityKey(item.person) === deleteIdentity
+        ) {
+          return false;
+        }
+        return true;
+      });
+      const savedStore = await writeStore(store);
     const payload = {
       jobs: savedStore.jobs,
       holidays: savedStore.holidays,

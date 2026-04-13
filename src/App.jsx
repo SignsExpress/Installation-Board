@@ -124,6 +124,12 @@ function getHolidayStaffPersonForUser(user) {
   return getHolidayStaffEntry(user?.displayName)?.person || "";
 }
 
+function getHolidayStaffIdentityKey(value) {
+  const match = getHolidayStaffEntry(value);
+  if (match?.code) return match.code.toLowerCase();
+  return String(value || "").trim().toLowerCase();
+}
+
 function getHolidayDisplayToken(person) {
   const entry = getHolidayStaffEntry(person);
   if (entry) return entry.code;
@@ -842,7 +848,7 @@ function HolidaysPage({
           holidays: activeHolidayFilter
             ? day.holidays.filter(
                 (holiday) =>
-                  String(holiday.person || "").trim().toLowerCase() === activeHolidayFilter.toLowerCase()
+                  getHolidayStaffIdentityKey(holiday.person) === getHolidayStaffIdentityKey(activeHolidayFilter)
               )
             : day.holidays
         }))
@@ -967,14 +973,14 @@ function HolidaysPage({
                 <div key={month.id} className="holiday-calendar-row">
                   <div className="month-label-cell month-row-label">{month.label}</div>
                   {month.days.map((day) => (
-                    (() => {
-                      const matchingHoliday = activeHolidayFilter
-                        ? day.holidays.find(
-                            (holiday) =>
-                              String(holiday.person || "").trim().toLowerCase() ===
-                              String(activeHolidayFilter || "").trim().toLowerCase()
-                          )
-                        : null;
+                      (() => {
+                        const matchingHoliday = activeHolidayFilter
+                          ? day.holidays.find(
+                              (holiday) =>
+                                getHolidayStaffIdentityKey(holiday.person) ===
+                                getHolidayStaffIdentityKey(activeHolidayFilter)
+                            )
+                          : null;
 
                       return (
                         <div
@@ -2217,10 +2223,14 @@ export default function App() {
     }
   }
 
-  async function deleteHoliday(holidayId) {
+  async function deleteHoliday(holidayId, options = {}) {
     if (isClientMode) return;
     try {
-      const response = await fetch(`/api/holidays/${holidayId}`, { method: "DELETE" });
+      const params = new URLSearchParams();
+      if (options.date) params.set("date", options.date);
+      if (options.person) params.set("person", options.person);
+      const url = params.toString() ? `/api/holidays/${holidayId}?${params.toString()}` : `/api/holidays/${holidayId}`;
+      const response = await fetch(url, { method: "DELETE" });
       if (!response.ok) throw new Error("Could not delete holiday.");
 
       const payload = await response.json();
@@ -2239,11 +2249,11 @@ export default function App() {
 
   async function cycleHoliday(date, person) {
     if (isClientMode) return;
-    const normalizedPerson = String(person || "").trim().toLowerCase();
+    const normalizedPerson = getHolidayStaffIdentityKey(person);
     const matchingEntries = holidays.filter(
       (item) =>
         String(item.date || "") === String(date || "") &&
-        String(item.person || "").trim().toLowerCase() === normalizedPerson
+        getHolidayStaffIdentityKey(item.person) === normalizedPerson
     );
     const existing =
       matchingEntries.find((item) => !isBirthdayHoliday(item)) ||
@@ -2267,7 +2277,7 @@ export default function App() {
       return;
     }
 
-    await deleteHoliday(existing.id);
+    await deleteHoliday(existing.id, { date, person });
   }
 
   async function handleHolidayChipClick(date, person, closePicker = false) {
