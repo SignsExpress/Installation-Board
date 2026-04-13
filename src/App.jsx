@@ -154,7 +154,7 @@ function getHolidayAllowanceSummary(entry) {
   const unpaidDaysBooked = toAllowanceNumber(entry.unpaidDaysBooked);
   const workDaysPerWeek = toAllowanceNumber(entry.workDaysPerWeek);
   const prorataAllowance = standardEntitlement + extraServiceDays;
-  const daysLeft = prorataAllowance - bookedDays;
+  const daysLeft = prorataAllowance - christmasDays - bankHolidayDays - bookedDays;
 
   return {
     ...entry,

@@ -993,7 +993,11 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       normalized.standardEntitlement +
       normalized.extraServiceDays;
     const bookedDays = approvedCounts.get(staffEntry.person) || 0;
-    const daysLeft = prorataAllowance - bookedDays;
+    const daysLeft =
+      prorataAllowance -
+      normalized.christmasDays -
+      normalized.bankHolidayDays -
+      bookedDays;
 
     return {
       ...normalized,
