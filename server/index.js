@@ -20,6 +20,7 @@ const DIST_DIR = path.join(__dirname, "..", "dist");
 const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers-live.json");
 const DEFAULT_REQUESTS_FILE = path.join(__dirname, "..", "data", "requests.json");
+const DEFAULT_HOLIDAY_SEED_FILE = path.join(__dirname, "..", "data", "holiday-seed.json");
 const LEGACY_INSTALLER_DIRECTORY = "/var/data/sx-installer-directory";
 const LEGACY_INSTALLERS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "installers.json");
 const LEGACY_REQUESTS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "requests.json");
@@ -274,6 +275,61 @@ function ensureStoreFile() {
   }
 }
 
+function readHolidaySeed() {
+  if (!fs.existsSync(DEFAULT_HOLIDAY_SEED_FILE)) {
+    return { holidays: [], holidayAllowances: [] };
+  }
+
+  try {
+    const raw = fs.readFileSync(DEFAULT_HOLIDAY_SEED_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : []
+    };
+  } catch (error) {
+    console.error("Invalid holiday seed JSON, ignoring seed.", error);
+    return { holidays: [], holidayAllowances: [] };
+  }
+}
+
+function mergeHolidaySeed(store) {
+  const seed = readHolidaySeed();
+  const nextStore = {
+    jobs: Array.isArray(store.jobs) ? store.jobs : [],
+    holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
+    holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
+    holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : []
+  };
+
+  seed.holidays.forEach((holiday) => {
+    const normalized = sanitizeStaffHoliday(holiday);
+    const exists = nextStore.holidays.some(
+      (entry) =>
+        String(entry.date || "") === normalized.date &&
+        String(entry.person || "").trim().toLowerCase() === String(normalized.person || "").trim().toLowerCase() &&
+        String(entry.duration || "Full Day").trim().toLowerCase() === String(normalized.duration || "Full Day").trim().toLowerCase()
+    );
+    if (!exists) {
+      nextStore.holidays.push(normalized);
+    }
+  });
+
+  seed.holidayAllowances.forEach((allowance) => {
+    const normalized = sanitizeHolidayAllowance(allowance);
+    const exists = nextStore.holidayAllowances.some(
+      (entry) =>
+        Number(entry.yearStart || 0) === Number(normalized.yearStart || 0) &&
+        String(entry.person || "").trim().toLowerCase() === String(normalized.person || "").trim().toLowerCase()
+    );
+    if (!exists) {
+      nextStore.holidayAllowances.push(normalized);
+    }
+  });
+
+  return nextStore;
+}
+
 function ensureInstallersFile() {
   const file = getInstallersFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -303,17 +359,17 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return { jobs: parsed, holidays: [], holidayRequests: [], holidayAllowances: [] };
+      return mergeHolidaySeed({ jobs: parsed, holidays: [], holidayRequests: [], holidayAllowances: [] });
     }
-    return {
+    return mergeHolidaySeed({
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
       holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
       holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
       holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : []
-    };
+    });
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-    return { jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] };
+    return mergeHolidaySeed({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] });
   }
 }
 
