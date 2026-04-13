@@ -1739,6 +1739,9 @@ export default function App() {
   const [clientCompletePrompt, setClientCompletePrompt] = useState(false);
   const [clientPhotoUploading, setClientPhotoUploading] = useState(false);
   const [clientExporting, setClientExporting] = useState(false);
+  const [adminCompletePrompt, setAdminCompletePrompt] = useState(false);
+  const [adminPhotoUploading, setAdminPhotoUploading] = useState(false);
+  const [adminExporting, setAdminExporting] = useState(false);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupQuery, setOrderLookupQuery] = useState("");
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
@@ -1759,6 +1762,7 @@ export default function App() {
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
   const clientPhotoInputRef = useRef(null);
+  const adminPhotoInputRef = useRef(null);
   const boardEditable = canEditBoard(currentUser);
   const installerEditable = canEditInstaller(currentUser);
   const hostShellMode = usesHostShell(currentUser);
@@ -1917,6 +1921,15 @@ export default function App() {
       clientPhotoInputRef.current.value = "";
     }
   }, [activeClientJob?.id]);
+
+  useEffect(() => {
+    setAdminCompletePrompt(false);
+    setAdminPhotoUploading(false);
+    setAdminExporting(false);
+    if (adminPhotoInputRef.current) {
+      adminPhotoInputRef.current.value = "";
+    }
+  }, [activeAdminJob?.id, jobModalDate]);
 
   useEffect(() => {
     if (!currentUser || !showHolidays) return undefined;
@@ -2084,6 +2097,11 @@ export default function App() {
   const jobsById = useMemo(() => {
     return new Map(jobs.map((job) => [job.id, job]));
   }, [jobs]);
+
+  const activeAdminJob = useMemo(() => {
+    if (!editingId) return null;
+    return jobsById.get(editingId) || null;
+  }, [editingId, jobsById]);
 
   const holidaysById = useMemo(() => {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
@@ -2601,7 +2619,7 @@ export default function App() {
     }
   }
 
-  async function completeClientJob(jobId) {
+  async function completeJob(jobId) {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/complete`, {
       method: "POST"
     });
@@ -2613,7 +2631,7 @@ export default function App() {
     return payload;
   }
 
-  async function uploadClientJobPhotos(jobId, files) {
+  async function uploadJobPhotos(jobId, files) {
     for (const file of files) {
       const prepared = await compressPhotoForUpload(file);
       const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/photos`, {
@@ -2637,9 +2655,11 @@ export default function App() {
     }
 
     try {
-      await completeClientJob(job.id);
+      if (!job.isCompleted) {
+        await completeJob(job.id);
+      }
       if (files.length) {
-        await uploadClientJobPhotos(job.id, files);
+        await uploadJobPhotos(job.id, files);
       }
       setClientCompletePrompt(false);
       setMessage(
@@ -2659,9 +2679,41 @@ export default function App() {
     }
   }
 
-  async function exportClientJob(job) {
+  async function markAdminJobComplete(job, uploadFiles = []) {
     if (!job?.id) return;
-    setClientExporting(true);
+    const files = Array.from(uploadFiles || []);
+    if (files.length) {
+      setAdminPhotoUploading(true);
+    }
+
+    try {
+      if (!job.isCompleted) {
+        await completeJob(job.id);
+      }
+      if (files.length) {
+        await uploadJobPhotos(job.id, files);
+      }
+      setAdminCompletePrompt(false);
+      setMessage(
+        createMessage(
+          files.length ? "Job marked complete and photos uploaded." : "Job marked complete.",
+          "success"
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not complete the job.", "error"));
+    } finally {
+      setAdminPhotoUploading(false);
+      if (adminPhotoInputRef.current) {
+        adminPhotoInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function exportJob(job, setExportingState) {
+    if (!job?.id) return;
+    setExportingState(true);
     try {
       const printWindow = window.open("", "_blank");
       if (!printWindow) {
@@ -2865,11 +2917,11 @@ export default function App() {
       console.error(error);
       setMessage(createMessage(error.message || "Could not export the job.", "error"));
     } finally {
-      setClientExporting(false);
+      setExportingState(false);
     }
   }
 
-  async function deleteClientJobPhoto(job, photoId) {
+  async function deleteJobPhoto(job, photoId) {
     if (!job?.id || !photoId) return;
     try {
       const response = await fetch(
@@ -3858,6 +3910,131 @@ export default function App() {
                 />
               </label>
 
+              {activeAdminJob ? (
+                <>
+                  <div className="client-job-summary admin-job-summary">
+                    {activeAdminJob.orderReference ? <span className="job-summary-pill">{activeAdminJob.orderReference}</span> : null}
+                    <span className={`job-summary-pill ${activeAdminJob.isCompleted ? "is-complete" : ""}`}>
+                      {activeAdminJob.isCompleted ? "Completed" : getJobTypeLabel(activeAdminJob)}
+                    </span>
+                    {activeAdminJob.isPlaceholder ? <span className="job-summary-pill is-placeholder">Placeholder</span> : null}
+                    {Array.isArray(activeAdminJob.photos) && activeAdminJob.photos.length ? (
+                      <span className="job-summary-pill is-photos">{activeAdminJob.photos.length} photo{activeAdminJob.photos.length === 1 ? "" : "s"}</span>
+                    ) : null}
+                  </div>
+
+                  <div className="detail-grid client-detail-grid admin-job-detail-grid">
+                    {activeAdminJob.completedAt ? (
+                      <div className="detail-card">
+                        <strong>Completed At</strong>
+                        <p>{formatDateTime(activeAdminJob.completedAt)}</p>
+                      </div>
+                    ) : null}
+                    {activeAdminJob.completedByName ? (
+                      <div className="detail-card">
+                        <strong>Completed By</strong>
+                        <p>{activeAdminJob.completedByName}</p>
+                      </div>
+                    ) : null}
+                    <div className="detail-card detail-card-wide">
+                      <strong>Photos</strong>
+                      {Array.isArray(activeAdminJob.photos) && activeAdminJob.photos.length ? (
+                        <div className="job-photo-grid">
+                          {activeAdminJob.photos.map((photo) => (
+                            <div key={photo.id} className="job-photo-tile">
+                              <a
+                                className="job-photo-link"
+                                href={photo.url || buildJobPhotoUrl(activeAdminJob.id, photo.id)}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <img
+                                  src={photo.url || buildJobPhotoUrl(activeAdminJob.id, photo.id)}
+                                  alt={photo.fileName || "Job photo"}
+                                  loading="lazy"
+                                />
+                              </a>
+                              <div className="job-photo-meta">
+                                <small>{photo.uploadedByName || "Uploaded photo"}</small>
+                                <button
+                                  className="text-button danger"
+                                  type="button"
+                                  onClick={() => {
+                                    deleteJobPhoto(activeAdminJob, photo.id);
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p>No photos uploaded yet.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="client-job-actions admin-job-actions">
+                    {!activeAdminJob.isCompleted ? (
+                      <>
+                        {!adminCompletePrompt ? (
+                          <button
+                            className="primary-button"
+                            type="button"
+                            onClick={() => setAdminCompletePrompt(true)}
+                            disabled={adminPhotoUploading || adminExporting}
+                          >
+                            Mark as Complete
+                          </button>
+                        ) : (
+                          <div className="client-complete-prompt">
+                            <span>Would you like to upload job photos?</span>
+                            <div className="client-complete-prompt-actions">
+                              <button
+                                className="ghost-button"
+                                type="button"
+                                onClick={() => markAdminJobComplete(activeAdminJob)}
+                                disabled={adminPhotoUploading}
+                              >
+                                No
+                              </button>
+                              <button
+                                className="primary-button"
+                                type="button"
+                                onClick={() => adminPhotoInputRef.current?.click()}
+                                disabled={adminPhotoUploading}
+                              >
+                                {adminPhotoUploading ? "Uploading..." : "Yes"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => adminPhotoInputRef.current?.click()}
+                        disabled={adminPhotoUploading}
+                      >
+                        {adminPhotoUploading ? "Uploading..." : "Upload photos"}
+                      </button>
+                    )}
+
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => exportJob(activeAdminJob, setAdminExporting)}
+                      disabled={adminExporting || adminPhotoUploading}
+                    >
+                      {adminExporting ? "Exporting..." : "Export"}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={saving}>
                   {saving ? "Saving..." : editingId ? "Update job" : "Add job"}
@@ -3867,6 +4044,18 @@ export default function App() {
                 </button>
               </div>
             </form>
+            <input
+              ref={adminPhotoInputRef}
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={async (event) => {
+                const files = Array.from(event.target.files || []);
+                if (!files.length || !activeAdminJob) return;
+                await markAdminJobComplete(activeAdminJob, files);
+              }}
+            />
           </div>
         </div>
       ) : null}
@@ -4031,7 +4220,7 @@ export default function App() {
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                deleteClientJobPhoto(activeClientJob, photo.id);
+                                deleteJobPhoto(activeClientJob, photo.id);
                               }}
                             >
                               Delete
@@ -4095,7 +4284,7 @@ export default function App() {
                 <button
                   className="ghost-button"
                   type="button"
-                  onClick={() => exportClientJob(activeClientJob)}
+                  onClick={() => exportJob(activeClientJob, setClientExporting)}
                   disabled={clientExporting || clientPhotoUploading}
                 >
                   {clientExporting ? "Exporting..." : "Export"}
