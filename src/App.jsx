@@ -787,6 +787,12 @@ function NotificationsPanel({ notifications, onOpenNotification, onMarkNotificat
   );
 }
 
+function countUnreadNotificationsForLink(notifications, link) {
+  return notifications.filter(
+    (entry) => !entry.read && String(entry.link || "").trim().toLowerCase() === String(link || "").trim().toLowerCase()
+  ).length;
+}
+
 function HostLandingPage({
   currentUser,
   onLogout,
@@ -799,6 +805,7 @@ function HostLandingPage({
   onMarkAllNotificationsRead
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const holidaysNotificationCount = countUnreadNotificationsForLink(notifications, "/holidays");
 
   function goTo(path) {
     window.location.assign(path);
@@ -813,13 +820,6 @@ function HostLandingPage({
         <MainNavBar currentUser={currentUser} active="home" onLogout={onLogout} />
 
         <section className="panel host-landing-panel">
-          {currentUser?.canManagePermissions ? (
-            <div className="host-landing-tools">
-              <button className="ghost-button permissions-launch-button" type="button" onClick={() => setPermissionsOpen(true)}>
-                Manage permissions
-              </button>
-            </div>
-          ) : null}
           <div className="host-landing-actions">
             <button
               className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
@@ -830,6 +830,7 @@ function HostLandingPage({
               }}
               disabled={!canAccessHolidays(currentUser)}
             >
+              {holidaysNotificationCount ? <span className="launch-card-badge">{holidaysNotificationCount}</span> : null}
               <strong>Holidays</strong>
             </button>
             <button
@@ -854,6 +855,18 @@ function HostLandingPage({
               disabled={!canAccessBoard(currentUser)}
             >
               <strong>Installation Board</strong>
+            </button>
+
+            <button
+              className={`host-launch-card ${!currentUser?.canManagePermissions ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!currentUser?.canManagePermissions) return;
+                setPermissionsOpen(true);
+              }}
+              disabled={!currentUser?.canManagePermissions}
+            >
+              <strong>Manage Permissions</strong>
             </button>
           </div>
         </section>
@@ -899,6 +912,8 @@ function ClientLandingPage({
   onMarkNotificationRead,
   onMarkAllNotificationsRead
 }) {
+  const holidaysNotificationCount = countUnreadNotificationsForLink(notifications, "/holidays");
+
   function goTo(path) {
     window.location.assign(path);
   }
@@ -922,6 +937,7 @@ function ClientLandingPage({
               }}
               disabled={!canAccessHolidays(currentUser)}
             >
+              {holidaysNotificationCount ? <span className="launch-card-badge">{holidaysNotificationCount}</span> : null}
               <strong>Holidays</strong>
             </button>
             <button className="host-launch-card disabled" type="button" disabled>
@@ -930,6 +946,10 @@ function ClientLandingPage({
 
             <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
               <strong>Installation Board</strong>
+            </button>
+
+            <button className="host-launch-card disabled" type="button" disabled>
+              <strong>Manage Permissions</strong>
             </button>
           </div>
         </section>
