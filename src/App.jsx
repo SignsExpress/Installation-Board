@@ -2072,7 +2072,7 @@ export default function App() {
   }
 
   async function submitHolidayRequest() {
-    const person = canEditBoard(currentUser)
+    const person = canEditHolidays(currentUser)
       ? holidayRequestForm.person
       : getHolidayStaffPersonForUser(currentUser);
 
