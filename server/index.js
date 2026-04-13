@@ -1049,6 +1049,17 @@ function formatDateTimeForPdf(value) {
   }).format(parsed);
 }
 
+function formatJobDateForPdf(value) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) return String(value || "");
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: TIME_ZONE
+  }).format(parsed);
+}
+
 function parseJpegDimensions(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
     return { width: 0, height: 0 };
@@ -1119,7 +1130,7 @@ function buildPdfDocument(job, photoAssets = []) {
 
   const pageIds = [];
   const uploadedBy = [...new Set(photoAssets.map((asset) => String(asset.uploadedByName || "").trim()).filter(Boolean))].join(", ") || "-";
-  const completionDate = job.completedAt ? formatDateTimeForPdf(job.completedAt) : "-";
+  const completionDate = job.date ? formatJobDateForPdf(job.date) : "-";
   const detailLines = [
     { text: job.customerName || "Job Export", font: "bold", size: 16, gap: 4 },
     ...(job.description ? [{ text: job.description, font: "regular", size: 10, gap: 10 }] : []),
@@ -1146,12 +1157,12 @@ function buildPdfDocument(job, photoAssets = []) {
   const detailCommands = [];
   detailCommands.push("BT");
   detailCommands.push("/F2 12 Tf");
-  detailCommands.push(`${brandRight - 108} ${pageHeight - margin + 2} Td`);
-  detailCommands.push("(SIGNS EXPRESS) Tj");
+  detailCommands.push(`${brandRight - 118} ${pageHeight - margin + 4} Td`);
+  detailCommands.push("(SX SIGNS EXPRESS) Tj");
   detailCommands.push("ET");
   detailCommands.push("BT");
   detailCommands.push("/F1 6 Tf");
-  detailCommands.push(`${brandRight - 118} ${pageHeight - margin - 10} Td`);
+  detailCommands.push(`${brandRight - 121} ${pageHeight - margin - 8} Td`);
   detailCommands.push("(CENTRAL LANCASHIRE AND SOUTHPORT) Tj");
   detailCommands.push("ET");
 
