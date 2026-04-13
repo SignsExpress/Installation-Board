@@ -248,6 +248,18 @@ function getHolidayStaffPerson(displayName) {
   return HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === String(displayName || "").trim().toLowerCase())?.person || "";
 }
 
+function formatHolidayRequestDateRange(startDate, endDate) {
+  const start = String(startDate || "").trim();
+  const end = String(endDate || startDate || "").trim();
+  if (!start) return "";
+  return end && end !== start ? `${start} to ${end}` : start;
+}
+
+function getHolidayNotificationRecipients(users, excludedUserIds = []) {
+  const excluded = new Set(excludedUserIds.map((value) => String(value || "")));
+  return users.filter((user) => canEditHolidays(sanitizeUser(user)) && !excluded.has(String(user.id || "")));
+}
+
 function getHolidayStaffIdentityKey(value) {
   const match = getHolidayStaffEntry(value);
   if (match?.code) return match.code.toLowerCase();
@@ -300,7 +312,11 @@ function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [] }, null, 2)}\n`, "utf8");
+    fs.writeFileSync(
+      file,
+      `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [] }, null, 2)}\n`,
+      "utf8"
+    );
   }
 }
 
@@ -330,7 +346,8 @@ function mergeHolidaySeed(store) {
       holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
       holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
       holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
-      holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : []
+      holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
+      notifications: Array.isArray(store.notifications) ? [...store.notifications] : []
     };
 
   seed.holidays.forEach((holiday) => {
@@ -381,6 +398,7 @@ function applyHolidayResetMigration(store) {
         }))
         : [],
       holidayEvents: [],
+      notifications: Array.isArray(store.notifications) ? store.notifications : [],
       holidayResetVersion: HOLIDAY_RESET_VERSION
     };
 }
@@ -419,7 +437,8 @@ async function readStore() {
           holidays: [],
           holidayRequests: [],
         holidayAllowances: [],
-        holidayEvents: []
+        holidayEvents: [],
+        notifications: []
         });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -432,6 +451,7 @@ async function readStore() {
         holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
         holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
         holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
+        notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
         holidayResetVersion: Number(parsed.holidayResetVersion || 0)
       });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -445,7 +465,8 @@ async function readStore() {
         holidays: [],
         holidayRequests: [],
       holidayAllowances: [],
-      holidayEvents: []
+      holidayEvents: [],
+      notifications: []
       });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -475,6 +496,9 @@ async function writeStore(store) {
         if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
         return String(left.title || "").localeCompare(String(right.title || ""));
       }),
+      notifications: [...(store.notifications || [])].sort((left, right) =>
+        String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
+      ),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
   await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
@@ -988,6 +1012,27 @@ function sanitizeHolidayEvent(payload) {
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
+}
+
+function sanitizeNotification(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    userId: String(payload.userId || "").trim(),
+    title: String(payload.title || "").trim(),
+    message: String(payload.message || "").trim(),
+    link: String(payload.link || "").trim(),
+    type: String(payload.type || "general").trim().toLowerCase(),
+    read: Boolean(payload.read),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function createNotification(payload) {
+  return sanitizeNotification({
+    ...payload,
+    read: false
+  });
 }
 
 function sanitizeInstaller(payload) {
@@ -3056,6 +3101,54 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(payload);
   });
 
+  app.get("/api/notifications", async (request, response) => {
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    const notifications = (store.notifications || []).filter(
+      (entry) => String(entry.userId || "") === userId
+    );
+    response.json(notifications);
+  });
+
+  app.patch("/api/notifications/:id/read", async (request, response) => {
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    const notificationIndex = (store.notifications || []).findIndex(
+      (entry) =>
+        String(entry.id || "") === String(request.params.id || "") &&
+        String(entry.userId || "") === userId
+    );
+
+    if (notificationIndex === -1) {
+      response.status(404).json({ error: "Notification not found." });
+      return;
+    }
+
+    store.notifications[notificationIndex] = sanitizeNotification({
+      ...store.notifications[notificationIndex],
+      read: true
+    });
+
+    const savedStore = await writeStore(store);
+    response.json(
+      savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
+    );
+  });
+
+  app.post("/api/notifications/read-all", async (request, response) => {
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    store.notifications = (store.notifications || []).map((entry) =>
+      String(entry.userId || "") === userId
+        ? sanitizeNotification({ ...entry, read: true })
+        : entry
+    );
+    const savedStore = await writeStore(store);
+    response.json(
+      savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
+    );
+  });
+
   app.post("/api/holiday-requests", async (request, response) => {
     if (!requireHolidayAccess(request, response)) return;
     const personLabel = getHolidayStaffPerson(request.user?.displayName);
@@ -3109,7 +3202,24 @@ app.get("/api/corebridge/orders", async (request, response) => {
     }
 
     store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
+    store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
     store.holidayRequests.unshift(nextRequest);
+
+    const usersStore = await readUsersStore();
+    const recipientUsers = getHolidayNotificationRecipients(usersStore.users || [], [request.user?.id || ""]);
+    const requestDateRange = formatHolidayRequestDateRange(nextRequest.startDate, nextRequest.endDate);
+    recipientUsers.forEach((user) => {
+      store.notifications.unshift(
+        createNotification({
+          userId: user.id,
+          type: "holiday-request",
+          title: "Holiday request received",
+          message: `${nextRequest.requestedByName || nextRequest.person} requested ${requestDateRange}${nextRequest.notes ? ` (${nextRequest.notes})` : ""}.`,
+          link: "/holidays"
+        })
+      );
+    });
+
     const savedStore = await writeStore(store);
     const visiblePayload = await getHolidayPayload(request.user, requestYearStart);
     broadcast("board-updated", buildBoardRowsFromStore(savedStore));
@@ -3126,6 +3236,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
     const store = await readStore();
     store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
+    store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
     const requestIndex = store.holidayRequests.findIndex((item) => String(item.id || "") === String(request.params.id || ""));
     if (requestIndex === -1) {
       response.status(404).json({ error: "Holiday request not found." });
@@ -3166,6 +3277,19 @@ app.get("/api/corebridge/orders", async (request, response) => {
           store.holidays.unshift(holidayEntry);
         }
       }
+    }
+
+    if (holidayRequest.requestedByUserId) {
+      const requestDateRange = formatHolidayRequestDateRange(holidayRequest.startDate, holidayRequest.endDate);
+      store.notifications.unshift(
+        createNotification({
+          userId: holidayRequest.requestedByUserId,
+          type: status === "approved" ? "holiday-approved" : "holiday-declined",
+          title: status === "approved" ? "Holiday approved" : "Holiday declined",
+          message: `${requestDateRange} for ${holidayRequest.person} was ${status} by ${request.user?.displayName || "admin"}.`,
+          link: "/holidays"
+        })
+      );
     }
 
     const savedStore = await writeStore(store);

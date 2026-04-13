@@ -692,7 +692,53 @@ function PermissionsPanel({ currentUser, users, savingKey, onChangePermission })
   );
 }
 
-function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePermission }) {
+function NotificationsPanel({ notifications, onOpenNotification, onMarkAllNotificationsRead }) {
+  const unreadCount = notifications.filter((entry) => !entry.read).length;
+
+  return (
+    <section className="panel landing-notifications-panel">
+      <div className="landing-notifications-head">
+        <div>
+          <h3>Notifications</h3>
+          <p>{unreadCount ? `${unreadCount} unread` : "You're all caught up."}</p>
+        </div>
+        {notifications.length ? (
+          <button className="ghost-button" type="button" onClick={onMarkAllNotificationsRead}>
+            Mark all read
+          </button>
+        ) : null}
+      </div>
+      {notifications.length ? (
+        <div className="landing-notification-list">
+          {notifications.slice(0, 8).map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              className={`landing-notification-card ${notification.read ? "" : "unread"}`.trim()}
+              onClick={() => onOpenNotification(notification)}
+            >
+              <strong>{notification.title}</strong>
+              <span>{notification.message}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="landing-notification-empty">No notifications yet.</div>
+      )}
+    </section>
+  );
+}
+
+function HostLandingPage({
+  currentUser,
+  onLogout,
+  users,
+  savingKey,
+  onChangePermission,
+  notifications,
+  onOpenNotification,
+  onMarkAllNotificationsRead
+}) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
 
   function goTo(path) {
@@ -752,6 +798,12 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
             </button>
           </div>
         </section>
+
+        <NotificationsPanel
+          notifications={notifications}
+          onOpenNotification={onOpenNotification}
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+        />
       </div>
 
       {currentUser?.canManagePermissions && permissionsOpen ? (
@@ -779,7 +831,7 @@ function HostLandingPage({ currentUser, onLogout, users, savingKey, onChangePerm
   );
 }
 
-function ClientLandingPage({ currentUser, onLogout }) {
+function ClientLandingPage({ currentUser, onLogout, notifications, onOpenNotification, onMarkAllNotificationsRead }) {
   function goTo(path) {
     window.location.assign(path);
   }
@@ -814,6 +866,12 @@ function ClientLandingPage({ currentUser, onLogout }) {
             </button>
           </div>
         </section>
+
+        <NotificationsPanel
+          notifications={notifications}
+          onOpenNotification={onOpenNotification}
+          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
+        />
       </div>
     </div>
   );
@@ -860,7 +918,7 @@ function HolidaysPage({
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
     [holidayAllowances]
   );
-  const activeHolidayFilter = canReview ? selectedHolidayPerson : "";
+  const activeHolidayFilter = selectedHolidayPerson;
   const filteredHolidayRows = useMemo(
     () =>
       holidayRows.map((month) => ({
@@ -952,24 +1010,17 @@ function HolidaysPage({
                     <button
                       type="button"
                       className="holiday-filter-pill active"
-                      onClick={() => {
-                        if (canReview) {
-                          setSelectedHolidayPerson("");
-                        }
-                      }}
-                      disabled={!canReview}
+                      onClick={() => setSelectedHolidayPerson("")}
                     >
                       {activeHolidayFilter}
                     </button>
-                    {canReview ? (
-                      <button
-                        type="button"
-                        className="text-button"
-                        onClick={() => setSelectedHolidayPerson("")}
-                      >
-                        Show everyone
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      className="text-button"
+                      onClick={() => setSelectedHolidayPerson("")}
+                    >
+                      Show everyone
+                    </button>
                   </>
                 ) : (
                   <span className="holiday-filter-label">
@@ -1107,13 +1158,10 @@ function HolidaysPage({
                           type="button"
                           className={`holiday-person-filter ${isSelected ? "active" : ""}`}
                           onClick={() =>
-                            canReview
-                              ? setSelectedHolidayPerson((current) =>
-                                  current.toLowerCase() === String(entry.person || "").trim().toLowerCase() ? "" : entry.person
-                                )
-                              : null
+                            setSelectedHolidayPerson((current) =>
+                              current.toLowerCase() === String(entry.person || "").trim().toLowerCase() ? "" : entry.person
+                            )
                           }
-                          disabled={!canReview}
                         >
                           {entry.fullName}
                         </button>
@@ -1444,6 +1492,7 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [permissionSavingKey, setPermissionSavingKey] = useState("");
+  const [notifications, setNotifications] = useState([]);
   const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const dragPreviewRef = useRef(null);
@@ -1531,6 +1580,34 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) {
+      setNotifications([]);
+      return undefined;
+    }
+
+    let active = true;
+
+    async function loadNotifications() {
+      try {
+        const response = await fetch("/api/notifications");
+        if (!response.ok) {
+          throw new Error("Could not load notifications.");
+        }
+        const payload = await response.json();
+        if (!active) return;
+        setNotifications(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    loadNotifications();
+    return () => {
+      active = false;
+    };
+  }, [currentUser]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -1870,6 +1947,45 @@ export default function App() {
     }
   }
 
+  async function markNotificationRead(notificationId) {
+    const response = await fetch(`/api/notifications/${encodeURIComponent(notificationId)}/read`, {
+      method: "PATCH"
+    });
+    if (!response.ok) {
+      throw new Error("Could not update notification.");
+    }
+    const payload = await response.json();
+    setNotifications(Array.isArray(payload) ? payload : []);
+  }
+
+  async function markAllNotificationsRead() {
+    try {
+      const response = await fetch("/api/notifications/read-all", { method: "POST" });
+      if (!response.ok) {
+        throw new Error("Could not update notifications.");
+      }
+      const payload = await response.json();
+      setNotifications(Array.isArray(payload) ? payload : []);
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update notifications.", "error"));
+    }
+  }
+
+  async function openNotification(notification) {
+    try {
+      if (!notification?.read) {
+        await markNotificationRead(notification.id);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+
+    if (notification?.link) {
+      window.location.assign(notification.link);
+    }
+  }
+
   function editJob(job) {
     openJobModal(job.date || "Unscheduled", {
       id: job.id,
@@ -1913,6 +2029,13 @@ export default function App() {
       setHolidayYearStart(Number(payload.holidayYearStart || holidayYearStart));
       setCurrentHolidayYearStart(Number(payload.currentHolidayYearStart || getCurrentHolidayYearStart()));
     }
+
+  async function refreshNotifications() {
+    const response = await fetch("/api/notifications");
+    if (!response.ok) throw new Error("Could not refresh notifications.");
+    const payload = await response.json();
+    setNotifications(Array.isArray(payload) ? payload : []);
+  }
 
   async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
     if (isClientMode) return;
@@ -1981,6 +2104,7 @@ export default function App() {
         setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
         setHolidayRequestForm(EMPTY_HOLIDAY_REQUEST_FORM);
         setHolidayRequestOpen(false);
+        await refreshNotifications();
         setMessage(createMessage("Holiday request sent.", "success"));
     } catch (error) {
       console.error(error);
@@ -2003,6 +2127,7 @@ export default function App() {
         setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
         setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
         setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
+        await refreshNotifications();
         setMessage(createMessage(`Holiday request ${status}.`, "success"));
     } catch (error) {
       console.error(error);
@@ -2541,12 +2666,23 @@ export default function App() {
         users={loginUsers}
         savingKey={permissionSavingKey}
         onChangePermission={handlePermissionChange}
+        notifications={notifications}
+        onOpenNotification={openNotification}
+        onMarkAllNotificationsRead={markAllNotificationsRead}
       />
     );
   }
 
   if (showClientLanding) {
-    return <ClientLandingPage currentUser={currentUser} onLogout={handleLogout} />;
+    return (
+      <ClientLandingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        onOpenNotification={openNotification}
+        onMarkAllNotificationsRead={markAllNotificationsRead}
+      />
+    );
   }
 
   if (showHolidays) {

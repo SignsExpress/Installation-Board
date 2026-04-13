@@ -1955,6 +1955,63 @@ button {
   margin-bottom: 14px;
 }
 
+.landing-notifications-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.landing-notifications-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.landing-notifications-head h3,
+.landing-notifications-head p {
+  margin: 0;
+}
+
+.landing-notifications-head p {
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.landing-notification-list {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-notification-card {
+  width: 100%;
+  border: 1px solid rgba(199, 183, 210, 0.5);
+  border-radius: 22px;
+  padding: 16px 18px;
+  background: linear-gradient(180deg, rgba(252, 251, 253, 0.96) 0%, rgba(245, 239, 248, 0.92) 100%);
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+
+.landing-notification-card.unread {
+  border-color: rgba(116, 70, 137, 0.45);
+  box-shadow: 0 0 0 1px rgba(116, 70, 137, 0.08);
+}
+
+.landing-notification-card strong {
+  font-size: 1rem;
+}
+
+.landing-notification-card span {
+  color: #475569;
+  line-height: 1.45;
+}
+
+.landing-notification-empty {
+  color: #64748b;
+  padding: 4px 2px 2px;
+}
+
 .permissions-launch-button {
   min-height: 38px;
   padding: 0 14px;
