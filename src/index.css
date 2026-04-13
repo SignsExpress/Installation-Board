@@ -1153,6 +1153,36 @@ button {
   white-space: nowrap;
 }
 
+.job-complete-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.job-photo-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.job-card.is-complete {
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.18);
+}
+
 .job-modal {
   width: min(720px, 100%);
   max-height: 90vh;
@@ -1352,6 +1382,73 @@ button {
   margin: 0;
   color: #334155;
   line-height: 1.45;
+}
+
+.client-job-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.client-complete-prompt {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 320px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid #dbe2ea;
+  background: #f8fafc;
+}
+
+.client-complete-prompt span {
+  color: #334155;
+  font-weight: 700;
+}
+
+.client-complete-prompt-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.job-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.job-photo-link {
+  display: block;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid #dbe2ea;
+  background: #fff;
+  min-height: 110px;
+}
+
+.job-photo-link img {
+  width: 100%;
+  height: 100%;
+  min-height: 110px;
+  object-fit: cover;
+  display: block;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .order-reference-row {
@@ -3412,5 +3509,23 @@ button {
     min-height: 20px;
     padding: 2px 6px;
     font-size: 0.66rem;
+  }
+
+  .client-job-actions {
+    align-items: stretch;
+  }
+
+  .client-job-actions > button,
+  .client-complete-prompt-actions > button {
+    width: 100%;
+  }
+
+  .client-complete-prompt {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .client-complete-prompt-actions {
+    width: 100%;
   }
 }

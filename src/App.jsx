@@ -346,6 +346,77 @@ function createMessage(text, tone = "info") {
   return { text, tone, id: `${Date.now()}-${Math.random()}` };
 }
 
+function buildJobPhotoUrl(jobId, photoId) {
+  return `/api/jobs/${encodeURIComponent(jobId)}/photos/${encodeURIComponent(photoId)}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(parsed);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Could not read the selected photo."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageFromDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not load the selected photo."));
+    image.src = dataUrl;
+  });
+}
+
+async function compressPhotoForUpload(file) {
+  const originalDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageFromDataUrl(originalDataUrl);
+  const maxDimension = 1600;
+  const scale = Math.min(1, maxDimension / Math.max(image.width || 1, image.height || 1));
+  const width = Math.max(1, Math.round((image.width || 1) * scale));
+  const height = Math.max(1, Math.round((image.height || 1) * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not prepare the selected photo.");
+  }
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  const blob = await new Promise((resolve, reject) => {
+    canvas.toBlob((nextBlob) => {
+      if (nextBlob) resolve(nextBlob);
+      else reject(new Error("Could not compress the selected photo."));
+    }, "image/jpeg", 0.72);
+  });
+
+  const dataUrl = await readFileAsDataUrl(blob);
+  const baseName = String(file.name || "job-photo").replace(/\.[^.]+$/, "") || "job-photo";
+  return {
+    fileName: `${baseName}.jpg`,
+    dataUrl,
+    width,
+    height,
+    size: blob.size
+  };
+}
+
 function toInitials(name) {
   return String(name || "")
     .split(/\s+/)
@@ -381,7 +452,7 @@ function renderJobCardContent({
   return (
     <div
       key={job.id}
-      className={`job-card ${meta.colorClass}-card ${job.isPlaceholder ? "is-placeholder" : ""} ${draggingJobId === job.id ? "is-dragging" : ""}`}
+      className={`job-card ${meta.colorClass}-card ${job.isPlaceholder ? "is-placeholder" : ""} ${job.isCompleted ? "is-complete" : ""} ${draggingJobId === job.id ? "is-dragging" : ""}`}
       draggable={!isClientMode}
       onDragStart={(event) => {
         if (isClientMode) return;
@@ -420,6 +491,8 @@ function renderJobCardContent({
         </div>
         <div className="job-title-meta">
           {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
+          {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
+          {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
           {installerLabels.length ? (
             <div className="job-title-installers">
               {installerLabels.map((installer) => {
@@ -1643,6 +1716,9 @@ export default function App() {
   const [activeHolidayId, setActiveHolidayId] = useState("");
   const [jobModalDate, setJobModalDate] = useState("");
   const [activeClientJob, setActiveClientJob] = useState(null);
+  const [clientCompletePrompt, setClientCompletePrompt] = useState(false);
+  const [clientPhotoUploading, setClientPhotoUploading] = useState(false);
+  const [clientExporting, setClientExporting] = useState(false);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupQuery, setOrderLookupQuery] = useState("");
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
@@ -1662,6 +1738,7 @@ export default function App() {
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
+  const clientPhotoInputRef = useRef(null);
   const boardEditable = canEditBoard(currentUser);
   const installerEditable = canEditInstaller(currentUser);
   const hostShellMode = usesHostShell(currentUser);
@@ -1811,6 +1888,15 @@ export default function App() {
       active = false;
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    setClientCompletePrompt(false);
+    setClientPhotoUploading(false);
+    setClientExporting(false);
+    if (clientPhotoInputRef.current) {
+      clientPhotoInputRef.current.value = "";
+    }
+  }, [activeClientJob?.id]);
 
   useEffect(() => {
     if (!currentUser || !showHolidays) return undefined;
@@ -2477,6 +2563,108 @@ export default function App() {
     setMessage(createMessage("Order details copied into the job form.", "success"));
   }
 
+  function applyBoardPayloadToState(payload, fallbackJobId = "") {
+    if (payload?.board) setBoard(payload.board);
+    if (Array.isArray(payload?.jobs)) setJobs(payload.jobs);
+    if (Array.isArray(payload?.holidays)) setHolidays(payload.holidays);
+
+    if (payload?.job) {
+      setActiveClientJob(payload.job);
+      return;
+    }
+
+    if (fallbackJobId && Array.isArray(payload?.jobs)) {
+      const matched = payload.jobs.find((job) => String(job.id || "") === String(fallbackJobId));
+      if (matched) {
+        setActiveClientJob(matched);
+      }
+    }
+  }
+
+  async function completeClientJob(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/complete`, {
+      method: "POST"
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not mark the job as complete.");
+    }
+    applyBoardPayloadToState(payload, jobId);
+    return payload;
+  }
+
+  async function uploadClientJobPhotos(jobId, files) {
+    for (const file of files) {
+      const prepared = await compressPhotoForUpload(file);
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/photos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(prepared)
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || `Could not upload ${file.name}.`);
+      }
+      applyBoardPayloadToState(payload, jobId);
+    }
+  }
+
+  async function markClientJobComplete(job, uploadFiles = []) {
+    if (!job?.id) return;
+    const files = Array.from(uploadFiles || []);
+    if (files.length) {
+      setClientPhotoUploading(true);
+    }
+
+    try {
+      await completeClientJob(job.id);
+      if (files.length) {
+        await uploadClientJobPhotos(job.id, files);
+      }
+      setClientCompletePrompt(false);
+      setMessage(
+        createMessage(
+          files.length ? "Job marked complete and photos uploaded." : "Job marked complete.",
+          "success"
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not complete the job.", "error"));
+    } finally {
+      setClientPhotoUploading(false);
+      if (clientPhotoInputRef.current) {
+        clientPhotoInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function exportClientJob(job) {
+    if (!job?.id) return;
+    setClientExporting(true);
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/export`);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || "Could not export the job.");
+      }
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = `${job.orderReference || job.customerName || "job-export"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not export the job.", "error"));
+    } finally {
+      setClientExporting(false);
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (isClientMode) return;
@@ -2489,10 +2677,12 @@ export default function App() {
     setSaving(true);
 
     try {
+      const existingJob = editingId ? jobsById.get(editingId) : null;
       const response = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ...existingJob,
           id: editingId || form.id || undefined,
           date: form.date,
           orderReference: form.orderReference.trim(),
@@ -2605,7 +2795,12 @@ export default function App() {
         body: JSON.stringify({
           ...job,
           id: undefined,
-          date: normalizedNextDate
+          date: normalizedNextDate,
+          isCompleted: false,
+          completedAt: "",
+          completedByUserId: "",
+          completedByName: "",
+          photos: []
         })
       });
 
@@ -3572,7 +3767,116 @@ export default function App() {
                 <strong>Placeholder</strong>
                 <p>{activeClientJob.isPlaceholder ? "Yes" : "No"}</p>
               </div>
+              <div className="detail-card">
+                <strong>Status</strong>
+                <p>{activeClientJob.isCompleted ? "Completed" : "Open"}</p>
+              </div>
+              {activeClientJob.completedAt ? (
+                <div className="detail-card">
+                  <strong>Completed At</strong>
+                  <p>{formatDateTime(activeClientJob.completedAt)}</p>
+                </div>
+              ) : null}
+              {activeClientJob.completedByName ? (
+                <div className="detail-card">
+                  <strong>Completed By</strong>
+                  <p>{activeClientJob.completedByName}</p>
+                </div>
+              ) : null}
+              <div className="detail-card detail-card-wide">
+                <strong>Photos</strong>
+                {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
+                  <div className="job-photo-grid">
+                    {activeClientJob.photos.map((photo) => (
+                      <a
+                        key={photo.id}
+                        className="job-photo-link"
+                        href={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <img
+                          src={photo.url || buildJobPhotoUrl(activeClientJob.id, photo.id)}
+                          alt={photo.fileName || "Job photo"}
+                          loading="lazy"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p>No photos uploaded yet.</p>
+                )}
+              </div>
             </div>
+            <div className="client-job-actions">
+              {!activeClientJob.isCompleted ? (
+                <>
+                  {!clientCompletePrompt ? (
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => setClientCompletePrompt(true)}
+                      disabled={clientPhotoUploading || clientExporting}
+                    >
+                      Mark as Complete
+                    </button>
+                  ) : (
+                    <div className="client-complete-prompt">
+                      <span>Would you like to upload job photos?</span>
+                      <div className="client-complete-prompt-actions">
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => markClientJobComplete(activeClientJob)}
+                          disabled={clientPhotoUploading}
+                        >
+                          No
+                        </button>
+                        <button
+                          className="primary-button"
+                          type="button"
+                          onClick={() => clientPhotoInputRef.current?.click()}
+                          disabled={clientPhotoUploading}
+                        >
+                          {clientPhotoUploading ? "Uploading..." : "Yes"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <button
+                  className="ghost-button"
+                  type="button"
+                  onClick={() => clientPhotoInputRef.current?.click()}
+                  disabled={clientPhotoUploading}
+                >
+                  {clientPhotoUploading ? "Uploading..." : "Upload photos"}
+                </button>
+              )}
+
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => exportClientJob(activeClientJob)}
+                disabled={clientExporting || clientPhotoUploading}
+              >
+                {clientExporting ? "Exporting..." : "Export"}
+              </button>
+            </div>
+            <input
+              ref={clientPhotoInputRef}
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={async (event) => {
+                const files = Array.from(event.target.files || []);
+                if (!files.length) return;
+                await markClientJobComplete(activeClientJob, files);
+              }}
+            />
           </div>
         </div>
       ) : null}

@@ -101,6 +101,16 @@ function getRequestsFile() {
   return DEFAULT_REQUESTS_FILE;
 }
 
+function getJobUploadsDir() {
+  return path.join(path.dirname(getDataFile()), "job-photos");
+}
+
+async function ensureJobUploadsDir() {
+  const directory = getJobUploadsDir();
+  await fsp.mkdir(directory, { recursive: true });
+  return directory;
+}
+
 function parseCookies(headerValue) {
   return String(headerValue || "")
     .split(";")
@@ -976,12 +986,237 @@ function buildBoardRowsFromStore(store, options = {}) {
   });
 }
 
+function sanitizeJobPhoto(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    storageName: String(payload.storageName || "").trim(),
+    fileName: String(payload.fileName || "job-photo.jpg").trim() || "job-photo.jpg",
+    contentType: String(payload.contentType || "image/jpeg").trim() || "image/jpeg",
+    size: Math.max(0, Number(payload.size) || 0),
+    width: Math.max(0, Number(payload.width) || 0),
+    height: Math.max(0, Number(payload.height) || 0),
+    uploadedAt: String(payload.uploadedAt || new Date().toISOString()),
+    uploadedByName: String(payload.uploadedByName || "").trim()
+  };
+}
+
+function toPublicJob(job) {
+  const normalized = sanitizeJob(job);
+  return {
+    ...normalized,
+    photos: normalized.photos.map((photo) => ({
+      ...photo,
+      url: `/api/jobs/${encodeURIComponent(normalized.id)}/photos/${encodeURIComponent(photo.id)}`
+    }))
+  };
+}
+
+function escapePdfText(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function wrapPdfText(value, maxLength = 78) {
+  const words = String(value || "").split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines = [];
+  let current = "";
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
+
+function parseJpegDimensions(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) {
+    return { width: 0, height: 0 };
+  }
+
+  let offset = 2;
+  while (offset < buffer.length) {
+    while (offset < buffer.length && buffer[offset] !== 0xff) offset += 1;
+    while (offset < buffer.length && buffer[offset] === 0xff) offset += 1;
+    if (offset >= buffer.length) break;
+    const marker = buffer[offset];
+    offset += 1;
+
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (offset + 1 >= buffer.length) break;
+
+    const segmentLength = buffer.readUInt16BE(offset);
+    if (segmentLength < 2 || offset + segmentLength > buffer.length) break;
+
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      if (offset + 7 >= buffer.length) break;
+      return {
+        height: buffer.readUInt16BE(offset + 3),
+        width: buffer.readUInt16BE(offset + 5)
+      };
+    }
+
+    offset += segmentLength;
+  }
+
+  return { width: 0, height: 0 };
+}
+
+function buildPdfDocument(job, photoAssets = []) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 48;
+  const lineHeight = 18;
+  const objects = [];
+
+  function addObject(body) {
+    objects.push(body);
+    return objects.length;
+  }
+
+  function makeStream(bodyText) {
+    const content = Buffer.from(String(bodyText || ""), "utf8");
+    return Buffer.concat([
+      Buffer.from(`<< /Length ${content.length} >>\nstream\n`, "utf8"),
+      content,
+      Buffer.from("\nendstream", "utf8")
+    ]);
+  }
+
+  function makeBinaryStream(dict, bodyBuffer) {
+    return Buffer.concat([
+      Buffer.from(`<< ${dict} /Length ${bodyBuffer.length} >>\nstream\n`, "utf8"),
+      bodyBuffer,
+      Buffer.from("\nendstream", "utf8")
+    ]);
+  }
+
+  const pagesId = addObject("");
+  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  const fontRegularId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const fontBoldId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+
+  const pageIds = [];
+  const detailLines = [
+    { text: job.customerName || "Job Export", font: "bold", size: 22, gap: 10 },
+    ...(job.description ? [{ text: job.description, font: "regular", size: 13, gap: 18 }] : []),
+    { text: `Order Ref: ${job.orderReference || "-"}`, font: "regular", size: 12, gap: 0 },
+    { text: `Date: ${job.date || "Unscheduled"}`, font: "regular", size: 12, gap: 0 },
+    { text: `Job Type: ${job.jobType === "Other" ? job.customJobType || "Other" : job.jobType || "-"}`, font: "regular", size: 12, gap: 0 },
+    {
+      text: `Installers: ${[
+        ...(Array.isArray(job.installers) ? job.installers.filter((entry) => entry !== "Custom") : []),
+        ...(job.installers?.includes?.("Custom") && job.customInstaller ? [job.customInstaller] : [])
+      ].join(", ") || "-"}`,
+      font: "regular",
+      size: 12,
+      gap: 0
+    },
+    { text: `Contact: ${job.contact || "-"}`, font: "regular", size: 12, gap: 0 },
+    { text: `Number: ${job.number || "-"}`, font: "regular", size: 12, gap: 0 },
+    { text: `Address: ${job.address || "-"}`, font: "regular", size: 12, gap: 0 },
+    { text: `Completed: ${job.isCompleted ? "Yes" : "No"}`, font: "regular", size: 12, gap: 0 },
+    ...(job.completedAt ? [{ text: `Completed At: ${job.completedAt}`, font: "regular", size: 12, gap: 0 }] : []),
+    ...(job.completedByName ? [{ text: `Completed By: ${job.completedByName}`, font: "regular", size: 12, gap: 0 }] : []),
+    { text: `Photos: ${photoAssets.length}`, font: "regular", size: 12, gap: 0 }
+  ];
+
+  let y = pageHeight - margin;
+  const detailCommands = [];
+  detailLines.forEach((line) => {
+    wrapPdfText(line.text, 78).forEach((segment, index) => {
+      detailCommands.push("BT");
+      detailCommands.push(`/${line.font === "bold" ? "F2" : "F1"} ${line.size} Tf`);
+      detailCommands.push(`${margin} ${y} Td`);
+      detailCommands.push(`(${escapePdfText(segment)}) Tj`);
+      detailCommands.push("ET");
+      y -= lineHeight;
+    });
+    y -= line.gap || 8;
+  });
+
+  const detailContentId = addObject(makeStream(detailCommands.join("\n")));
+  const detailPageId = addObject(
+    `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${detailContentId} 0 R >>`
+  );
+  pageIds.push(detailPageId);
+
+  photoAssets.forEach((asset, index) => {
+    const imageId = addObject(
+      makeBinaryStream(
+        `/Type /XObject /Subtype /Image /Width ${asset.width || 1} /Height ${asset.height || 1} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,
+        asset.buffer
+      )
+    );
+
+    const maxWidth = pageWidth - margin * 2;
+    const maxHeight = pageHeight - margin * 2 - 60;
+    const ratio = Math.min(
+      maxWidth / Math.max(1, asset.width || 1),
+      maxHeight / Math.max(1, asset.height || 1),
+      1
+    );
+    const drawWidth = Math.max(1, Math.round((asset.width || 1) * ratio));
+    const drawHeight = Math.max(1, Math.round((asset.height || 1) * ratio));
+    const drawX = (pageWidth - drawWidth) / 2;
+    const drawY = margin + 20;
+
+    const photoCommands = [
+      "BT",
+      `/F2 18 Tf`,
+      `${margin} ${pageHeight - margin} Td`,
+      `(${escapePdfText(`Job Photo ${index + 1} of ${photoAssets.length}`)}) Tj`,
+      "ET",
+      "q",
+      `${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm`,
+      "/Im1 Do",
+      "Q"
+    ];
+
+    const photoContentId = addObject(makeStream(photoCommands.join("\n")));
+    const photoPageId = addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> /XObject << /Im1 ${imageId} 0 R >> >> /Contents ${photoContentId} 0 R >>`
+    );
+    pageIds.push(photoPageId);
+  });
+
+  objects[pagesId - 1] = `<< /Type /Pages /Count ${pageIds.length} /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] >>`;
+
+  let pdf = Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", "binary");
+  const offsets = [0];
+
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    const header = Buffer.from(`${index + 1} 0 obj\n`, "utf8");
+    const body = Buffer.isBuffer(object) ? object : Buffer.from(String(object || ""), "utf8");
+    const footer = Buffer.from("\nendobj\n", "utf8");
+    pdf = Buffer.concat([pdf, header, body, footer]);
+  });
+
+  const xrefOffset = pdf.length;
+  let xref = `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    xref += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  const trailer = `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  pdf = Buffer.concat([pdf, Buffer.from(xref + trailer, "utf8")]);
+  return pdf;
+}
+
 function sanitizeJob(payload) {
   const rawInstallers = Array.isArray(payload.installers)
     ? payload.installers.map(String)
     : typeof payload.installers === "string" && payload.installers.trim()
       ? payload.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
       : [];
+  const rawPhotos = Array.isArray(payload.photos) ? payload.photos.map(sanitizeJobPhoto) : [];
 
   return {
     id: String(payload.id || makeId()),
@@ -1000,10 +1235,42 @@ function sanitizeJob(payload) {
       payload.isPlaceholder === true ||
       String(payload.isPlaceholder || "").trim().toLowerCase() === "true" ||
       String(payload.isPlaceholder || "").trim() === "1",
+    isCompleted:
+      payload.isCompleted === true ||
+      String(payload.isCompleted || "").trim().toLowerCase() === "true" ||
+      String(payload.isCompleted || "").trim() === "1",
+    completedAt: String(payload.completedAt || "").trim(),
+    completedByUserId: String(payload.completedByUserId || "").trim(),
+    completedByName: String(payload.completedByName || "").trim(),
+    photos: rawPhotos,
     notes: String(payload.notes || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
+}
+
+function toPublicJobs(jobs = []) {
+  return jobs.map((job) => toPublicJob(job));
+}
+
+async function deleteJobPhotoFiles(job) {
+  const photos = Array.isArray(job?.photos) ? job.photos : [];
+  if (!photos.length) return;
+  const uploadDir = getJobUploadsDir();
+  await Promise.all(
+    photos
+      .map((photo) => String(photo?.storageName || "").trim())
+      .filter(Boolean)
+      .map(async (storageName) => {
+        try {
+          await fsp.unlink(path.join(uploadDir, storageName));
+        } catch (error) {
+          if (error?.code !== "ENOENT") {
+            console.error(`Could not remove photo file ${storageName}.`, error);
+          }
+        }
+      })
+  );
 }
 
 function sanitizeStaffHoliday(payload) {
@@ -2761,7 +3028,7 @@ function createServer() {
   const app = express();
 
   app.use(cors());
-  app.use(express.json({ limit: "1mb" }));
+  app.use(express.json({ limit: "15mb" }));
   app.use(express.static(PUBLIC_DIR));
   app.use((request, response, next) => {
     clearExpiredSessions();
@@ -2994,7 +3261,7 @@ function createServer() {
   app.get("/api/jobs", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     const store = await readStore();
-    response.json(store.jobs);
+    response.json(toPublicJobs(store.jobs));
   });
 
   app.get("/api/installers", async (request, response) => {
@@ -3146,21 +3413,181 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
     const savedStore = await writeStore(store);
     const payload = {
-      jobs: savedStore.jobs,
+      jobs: toPublicJobs(savedStore.jobs),
       holidays: savedStore.holidays,
-      board: buildBoardRowsFromStore(savedStore)
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
   });
 
+  app.post("/api/jobs/:id/complete", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const nextJob = sanitizeJob({
+      ...existing,
+      isCompleted: true,
+      completedAt: existing.completedAt || new Date().toISOString(),
+      completedByUserId: request.user?.id || existing.completedByUserId,
+      completedByName: request.user?.displayName || existing.completedByName
+    });
+
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.post("/api/jobs/:id/photos", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const dataUrl = String(request.body?.dataUrl || "").trim();
+    const fileName = String(request.body?.fileName || "job-photo.jpg").trim() || "job-photo.jpg";
+    const match = dataUrl.match(/^data:(image\/jpeg|image\/jpg);base64,(.+)$/i);
+    if (!match) {
+      response.status(400).json({ error: "Photos must be uploaded as JPEG images." });
+      return;
+    }
+
+    let buffer;
+    try {
+      buffer = Buffer.from(match[2], "base64");
+    } catch (error) {
+      response.status(400).json({ error: "Invalid image data." });
+      return;
+    }
+
+    if (!buffer.length) {
+      response.status(400).json({ error: "Image data is empty." });
+      return;
+    }
+
+    const photoId = makeId();
+    const storageName = `${String(request.params.id || "").trim()}-${photoId}.jpg`;
+    const uploadDir = await ensureJobUploadsDir();
+    await fsp.writeFile(path.join(uploadDir, storageName), buffer);
+    const dimensions = parseJpegDimensions(buffer);
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const photos = Array.isArray(existing.photos) ? existing.photos.map(sanitizeJobPhoto) : [];
+    photos.unshift(
+      sanitizeJobPhoto({
+        id: photoId,
+        storageName,
+        fileName,
+        contentType: "image/jpeg",
+        size: buffer.length,
+        width: Number(request.body?.width) || dimensions.width,
+        height: Number(request.body?.height) || dimensions.height,
+        uploadedByName: request.user?.displayName || ""
+      })
+    );
+
+    const nextJob = sanitizeJob({
+      ...existing,
+      photos
+    });
+
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.get("/api/jobs/:jobId/photos/:photoId", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    const job = store.jobs.find((entry) => String(entry.id || "") === String(request.params.jobId || ""));
+    const photo = Array.isArray(job?.photos)
+      ? job.photos.map(sanitizeJobPhoto).find((entry) => String(entry.id || "") === String(request.params.photoId || ""))
+      : null;
+
+    if (!job || !photo?.storageName) {
+      response.status(404).json({ error: "Photo not found." });
+      return;
+    }
+
+    const filePath = path.join(getJobUploadsDir(), photo.storageName);
+    if (!fs.existsSync(filePath)) {
+      response.status(404).json({ error: "Photo file not found." });
+      return;
+    }
+
+    response.setHeader("Content-Type", photo.contentType || "image/jpeg");
+    response.sendFile(filePath);
+  });
+
+  app.get("/api/jobs/:id/export", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    const job = store.jobs.find((entry) => String(entry.id || "") === String(request.params.id || ""));
+    if (!job) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const normalizedJob = sanitizeJob(job);
+    const photoAssets = [];
+    for (const photo of normalizedJob.photos) {
+      const filePath = path.join(getJobUploadsDir(), photo.storageName);
+      if (!photo.storageName || !fs.existsSync(filePath)) continue;
+      const buffer = await fsp.readFile(filePath);
+      const dimensions = parseJpegDimensions(buffer);
+      photoAssets.push({
+        ...photo,
+        buffer,
+        width: photo.width || dimensions.width || 1,
+        height: photo.height || dimensions.height || 1
+      });
+    }
+
+    const pdfBuffer = buildPdfDocument(normalizedJob, photoAssets);
+    const safeName = String(normalizedJob.orderReference || normalizedJob.customerName || "job-export")
+      .replace(/[^a-z0-9_-]+/gi, "-")
+      .replace(/^-+|-+$/g, "") || "job-export";
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Disposition", `attachment; filename=\"${safeName}.pdf\"`);
+    response.send(pdfBuffer);
+  });
+
   app.delete("/api/jobs/:id", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     const store = await readStore();
+    const removedJob = store.jobs.find((job) => String(job.id || "") === String(request.params.id || ""));
     store.jobs = store.jobs.filter((job) => job.id !== request.params.id);
+    if (removedJob) {
+      await deleteJobPhotoFiles(removedJob);
+    }
     const savedStore = await writeStore(store);
     const payload = {
-      jobs: savedStore.jobs,
+      jobs: toPublicJobs(savedStore.jobs),
       holidays: savedStore.holidays,
       board: buildBoardRowsFromStore(savedStore)
     };
