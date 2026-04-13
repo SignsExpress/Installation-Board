@@ -140,6 +140,36 @@ function normalizeHolidayStaffEntries(entries) {
   }));
 }
 
+function toAllowanceNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function getHolidayAllowanceSummary(entry) {
+  const standardEntitlement = toAllowanceNumber(entry.standardEntitlement);
+  const extraServiceDays = toAllowanceNumber(entry.extraServiceDays);
+  const christmasDays = toAllowanceNumber(entry.christmasDays);
+  const bankHolidayDays = toAllowanceNumber(entry.bankHolidayDays);
+  const bookedDays = toAllowanceNumber(entry.bookedDays);
+  const unpaidDaysBooked = toAllowanceNumber(entry.unpaidDaysBooked);
+  const workDaysPerWeek = toAllowanceNumber(entry.workDaysPerWeek);
+  const prorataAllowance = standardEntitlement + extraServiceDays;
+  const daysLeft = prorataAllowance - bookedDays;
+
+  return {
+    ...entry,
+    workDaysPerWeek,
+    standardEntitlement,
+    extraServiceDays,
+    christmasDays,
+    bankHolidayDays,
+    bookedDays,
+    unpaidDaysBooked,
+    prorataAllowance,
+    daysLeft
+  };
+}
+
 function getCurrentHolidayYearStart(anchorIsoDate = getLocalTodayIso()) {
   const anchor = parseIsoDate(anchorIsoDate) || parseIsoDate(getLocalTodayIso());
   if (!anchor) return new Date().getUTCFullYear();
@@ -772,6 +802,7 @@ function HolidaysPage({
   setHolidayRequestForm,
   holidayRequestSaving,
   holidayAllowanceSavingKey,
+  onChangeHolidayAllowanceDraft,
   onSaveHolidayAllowance,
   onSubmitHolidayRequest,
   onReviewHolidayRequest
@@ -905,7 +936,9 @@ function HolidaysPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {holidayAllowances.map((entry) => (
+                  {holidayAllowances.map((rawEntry) => {
+                    const entry = getHolidayAllowanceSummary(rawEntry);
+                    return (
                     <tr key={`${holidayYearStart}-${entry.person}`}>
                       <td>
                         <strong>{entry.fullName}</strong>
@@ -922,8 +955,9 @@ function HolidaysPage({
                               type="number"
                               min="0"
                               step="0.5"
-                              defaultValue={value}
+                              value={value}
                               disabled={holidayAllowanceSavingKey === `${entry.person}:${field}`}
+                              onChange={(event) => onChangeHolidayAllowanceDraft(entry.person, { [field]: event.target.value })}
                               onBlur={(event) => onSaveHolidayAllowance(entry.person, { [field]: event.target.value })}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
@@ -949,8 +983,9 @@ function HolidaysPage({
                               type="number"
                               min="0"
                               step="0.5"
-                              defaultValue={value}
+                              value={value}
                               disabled={holidayAllowanceSavingKey === `${entry.person}:${field}`}
+                              onChange={(event) => onChangeHolidayAllowanceDraft(entry.person, { [field]: event.target.value })}
                               onBlur={(event) => onSaveHolidayAllowance(entry.person, { [field]: event.target.value })}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") {
@@ -975,8 +1010,9 @@ function HolidaysPage({
                             type="number"
                             min="0"
                             step="0.5"
-                            defaultValue={entry.unpaidDaysBooked || 0}
+                            value={entry.unpaidDaysBooked || 0}
                             disabled={holidayAllowanceSavingKey === `${entry.person}:unpaidDaysBooked`}
+                            onChange={(event) => onChangeHolidayAllowanceDraft(entry.person, { unpaidDaysBooked: event.target.value })}
                             onBlur={(event) => onSaveHolidayAllowance(entry.person, { unpaidDaysBooked: event.target.value })}
                             onKeyDown={(event) => {
                               if (event.key === "Enter") {
@@ -990,7 +1026,7 @@ function HolidaysPage({
                         )}
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
@@ -1744,6 +1780,19 @@ export default function App() {
     }
   }
 
+  function changeHolidayAllowanceDraft(person, updates) {
+    setHolidayAllowances((current) =>
+      current.map((entry) =>
+        entry.person === person
+          ? {
+              ...entry,
+              ...updates
+            }
+          : entry
+      )
+    );
+  }
+
   async function openOrderLookup() {
     setOrderLookupOpen(true);
     setOrderLookupError("");
@@ -2179,14 +2228,15 @@ export default function App() {
       setHolidayYearStart={setHolidayYearStart}
       holidayRequestOpen={holidayRequestOpen}
       setHolidayRequestOpen={setHolidayRequestOpen}
-      holidayRequestForm={holidayRequestForm}
-      setHolidayRequestForm={setHolidayRequestForm}
-      holidayRequestSaving={holidayRequestSaving}
-      holidayAllowanceSavingKey={holidayAllowanceSavingKey}
-      onSaveHolidayAllowance={saveHolidayAllowance}
-      onSubmitHolidayRequest={submitHolidayRequest}
-      onReviewHolidayRequest={reviewHolidayRequest}
-    />
+        holidayRequestForm={holidayRequestForm}
+        setHolidayRequestForm={setHolidayRequestForm}
+        holidayRequestSaving={holidayRequestSaving}
+        holidayAllowanceSavingKey={holidayAllowanceSavingKey}
+        onChangeHolidayAllowanceDraft={changeHolidayAllowanceDraft}
+        onSaveHolidayAllowance={saveHolidayAllowance}
+        onSubmitHolidayRequest={submitHolidayRequest}
+        onReviewHolidayRequest={reviewHolidayRequest}
+      />
   );
   }
 
