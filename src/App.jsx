@@ -2737,6 +2737,15 @@ export default function App() {
                             </div>
                           ) : null}
                           {!isClientMode && row.bankHoliday ? <span className="date-holiday-chip date-bank-holiday">{row.bankHoliday}</span> : null}
+                          {Array.isArray(row.holidayEvents) && row.holidayEvents.length ? (
+                            <div className="date-calendar-events">
+                              {row.holidayEvents.map((event) => (
+                                <span key={`board-event-${event.id}`} className="date-calendar-event-chip">
+                                  {event.title}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="jobs-cell">

@@ -775,6 +775,10 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     toIsoDate(end),
     Array.isArray(options.birthdayEntries) ? options.birthdayEntries : []
   );
+  const displayHolidayEvents = (options.holidayEvents || []).filter((event) => {
+    const eventDate = String(event?.date || "");
+    return eventDate >= toIsoDate(start) && eventDate <= toIsoDate(end);
+  });
 
   const jobsByDate = jobs.reduce((map, job) => {
     if (!isValidIsoDate(job.date)) {
@@ -796,26 +800,36 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     map.set(entry.date, existing);
     return map;
   }, new Map());
+  const holidayEventsByDate = displayHolidayEvents.reduce((map, entry) => {
+    const existing = map.get(entry.date) || [];
+    existing.push(entry);
+    map.set(entry.date, existing);
+    return map;
+  }, new Map());
 
   const rows = weekdayDates.map((date) => {
     const isoDate = toIsoDate(date);
     const sameDayJobs = (jobsByDate.get(isoDate) || []).sort((left, right) =>
       String(left.customerName || "").localeCompare(String(right.customerName || ""))
     );
-    const sameDayStaffHolidays = (staffHolidaysByDate.get(isoDate) || []).sort((left, right) =>
-      String(left.person || "").localeCompare(String(right.person || ""))
-    );
+      const sameDayStaffHolidays = (staffHolidaysByDate.get(isoDate) || []).sort((left, right) =>
+        String(left.person || "").localeCompare(String(right.person || ""))
+      );
+      const sameDayHolidayEvents = (holidayEventsByDate.get(isoDate) || []).sort((left, right) =>
+        String(left.title || "").localeCompare(String(right.title || ""))
+      );
 
-    return {
-      isoDate,
+      return {
+        isoDate,
       dayLabel: weekdayFormatter.format(date).toUpperCase(),
       dayNumber: String(date.getUTCDate()).padStart(2, "0"),
       fullDateLabel: longDateFormatter.format(date),
-      bankHoliday: holidayMap.get(isoDate) || "",
-      staffHolidays: sameDayStaffHolidays,
-      isToday: isoDate === todayIso,
-      isPast: isoDate < todayIso,
-      jobs: sameDayJobs
+        bankHoliday: holidayMap.get(isoDate) || "",
+        staffHolidays: sameDayStaffHolidays,
+        holidayEvents: sameDayHolidayEvents,
+        isToday: isoDate === todayIso,
+        isPast: isoDate < todayIso,
+        jobs: sameDayJobs
     };
   });
 
@@ -870,7 +884,15 @@ function buildBoardRowsFromStore(store, options = {}) {
   const rangeStart = options.start || (mode === "month" ? getStartOfMonth(today) : getRollingWindow(today).start);
   const rangeEnd = options.end || (mode === "month" ? getEndOfMonth(today) : getRollingWindow(today).end);
   const birthdayEntries = buildBirthdayEntriesForRange(store, toIsoDate(rangeStart), toIsoDate(rangeEnd));
-  return buildBoardRows(store.jobs, store.holidays, { ...options, today, mode, start: rangeStart, end: rangeEnd, birthdayEntries });
+  return buildBoardRows(store.jobs, store.holidays, {
+    ...options,
+    today,
+    mode,
+    start: rangeStart,
+    end: rangeEnd,
+    birthdayEntries,
+    holidayEvents: store.holidayEvents || []
+  });
 }
 
 function sanitizeJob(payload) {
