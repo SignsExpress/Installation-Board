@@ -966,20 +966,23 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       ...(existing || {})
     });
 
-    const totalAllowance =
+    const prorataAllowance =
       normalized.standardEntitlement +
-      normalized.extraServiceDays +
-      normalized.christmasDays +
-      normalized.bankHolidayDays;
+      normalized.extraServiceDays;
     const bookedDays = approvedCounts.get(staffEntry.person) || 0;
+    const daysLeft =
+      prorataAllowance -
+      normalized.christmasDays -
+      normalized.bankHolidayDays -
+      bookedDays;
 
     return {
       ...normalized,
       code: staffEntry.code,
       fullName: staffEntry.name,
-      totalAllowance,
+      prorataAllowance,
       bookedDays,
-      daysLeft: totalAllowance - bookedDays
+      daysLeft
     };
   });
 

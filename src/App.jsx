@@ -847,9 +847,9 @@ function HolidaysPage({
                     <th>Days pw</th>
                     <th>Standard</th>
                     <th>Extra</th>
+                    <th>Pro-rata</th>
                     <th>Xmas</th>
                     <th>Bank Hol</th>
-                    <th>Total</th>
                     <th>Booked</th>
                     <th>Left</th>
                   </tr>
@@ -889,7 +889,7 @@ function HolidaysPage({
                           )}
                         </td>
                       ))}
-                      <td><strong>{entry.totalAllowance}</strong></td>
+                      <td><strong>{entry.prorataAllowance}</strong></td>
                       <td>{entry.bookedDays}</td>
                       <td className={entry.daysLeft < 0 ? "holiday-days-negative" : "holiday-days-positive"}>
                         <strong>{entry.daysLeft}</strong>
