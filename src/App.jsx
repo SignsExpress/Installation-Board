@@ -2670,14 +2670,14 @@ export default function App() {
 
       const uploadedBy = [...new Set((job.photos || []).map((photo) => String(photo.uploadedByName || "").trim()).filter(Boolean))].join(", ") || "-";
       const installers = getInstallerDisplayList(job).join(", ") || "-";
-      const firstPagePhotos = (job.photos || []).slice(0, 4);
+      const firstPagePhotos = (job.photos || []).slice(0, 2);
       const remainingPhotoPages = [];
-      for (let index = 4; index < (job.photos || []).length; index += 4) {
+      for (let index = 2; index < (job.photos || []).length; index += 4) {
         remainingPhotoPages.push((job.photos || []).slice(index, index + 4));
       }
 
-      const renderPhotoTile = (photo, index) => `
-        <figure class="photo-tile">
+      const renderPhotoTile = (photo, index, extraClass = "") => `
+        <figure class="photo-tile ${extraClass}">
           <div class="photo-frame">
             <img src="${escapeHtml(photo.url || buildJobPhotoUrl(job.id, photo.id))}" alt="Job photo ${index + 1}" />
           </div>
@@ -2774,8 +2774,14 @@ export default function App() {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 6mm;
       }
+      .photo-grid.first-page {
+        margin-top: 4mm;
+      }
       .photo-tile {
         margin: 0;
+      }
+      .photo-tile.first-page-photo .photo-frame {
+        aspect-ratio: 1 / 1;
       }
       .photo-frame {
         border: 1px solid #dbe2ea;
@@ -2823,11 +2829,11 @@ export default function App() {
         <div class="summary-item wide"><strong>Address</strong><span>${escapeHtml(job.address || "-")}</span></div>
         <div class="summary-item wide"><strong>Photos Uploaded By</strong><span>${escapeHtml(uploadedBy)}</span></div>
       </div>
-      ${firstPagePhotos.length ? `<div class="photo-grid">${firstPagePhotos.map(renderPhotoTile).join("")}</div>` : ""}
+      ${firstPagePhotos.length ? `<div class="photo-grid first-page">${firstPagePhotos.map((photo, index) => renderPhotoTile(photo, index, "first-page-photo")).join("")}</div>` : ""}
     </section>
     ${remainingPhotoPages.map((pagePhotos) => `
       <section class="page">
-        <div class="photo-grid">${pagePhotos.map(renderPhotoTile).join("")}</div>
+        <div class="photo-grid">${pagePhotos.map((photo, index) => renderPhotoTile(photo, index)).join("")}</div>
       </section>
     `).join("")}
     <script>

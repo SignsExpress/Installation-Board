@@ -1471,7 +1471,7 @@ button {
 
 .job-photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -1512,6 +1512,10 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.job-photo-meta .text-button {
+  flex: 0 0 auto;
 }
 
 .visually-hidden {
@@ -3588,6 +3592,10 @@ button {
 
   .client-job-actions {
     align-items: stretch;
+  }
+
+  .job-photo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .client-job-actions > button,
