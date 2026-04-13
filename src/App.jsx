@@ -1036,7 +1036,6 @@ function HolidaysPage({
           <div className="holidays-toolbar">
             <div>
               <h2>Holiday Calendar {holidayYearLabel}</h2>
-              <p>Fixed holiday year from 1 February to 31 January. Approved holidays appear here and flow onto the Installation Board.</p>
             </div>
             <div className="holidays-toolbar-actions">
               {showingFutureYear ? (
@@ -1117,13 +1116,6 @@ function HolidaysPage({
                 )}
               </div>
             </div>
-            {canReview ? (
-              <div className="holiday-calendar-help">
-                {activeHolidayFilter
-                  ? `Click working dates to add, switch to AM/PM, or remove holidays for ${activeHolidayFilter}.`
-                  : "Select an employee name below, then click working dates on the calendar to edit their holiday."}
-              </div>
-            ) : null}
             <div className="holiday-calendar-grid">
               <div className="holiday-calendar-header month-label-cell">Month</div>
               {Array.from({ length: 31 }, (_, index) => (

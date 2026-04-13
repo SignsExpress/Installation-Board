@@ -1648,10 +1648,11 @@ button {
 }
 
 .holiday-calendar-wrap {
-  overflow-x: hidden;
+  overflow-x: auto;
   padding-bottom: 6px;
   display: grid;
   gap: 10px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .holiday-calendar-tools {
@@ -3182,6 +3183,7 @@ button {
 
   .holiday-calendar-wrap {
     margin: 0 -4px;
+    padding-bottom: 2px;
   }
 
   .holiday-request-modal {
@@ -3196,6 +3198,16 @@ button {
   .holiday-calendar-tools,
   .holiday-calendar-filter-summary {
     justify-content: flex-start;
+  }
+
+  .holidays-toolbar {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .holidays-toolbar-actions {
+    flex-wrap: wrap;
+    gap: 10px;
   }
 
   .holiday-breakdown-wrap {
@@ -3222,6 +3234,60 @@ button {
 }
 
 @media (max-width: 780px) {
+  .holidays-toolbar h2 {
+    font-size: 1.45rem;
+  }
+
+  .holidays-toolbar-actions .ghost-button {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  .holiday-calendar-filter-summary {
+    gap: 8px;
+  }
+
+  .holiday-filter-label {
+    font-size: 0.82rem;
+  }
+
+  .holiday-calendar-grid {
+    grid-template-columns: 88px repeat(31, 28px);
+    min-width: 956px;
+  }
+
+  .holiday-calendar-header {
+    min-height: 38px;
+    font-size: 0.76rem;
+  }
+
+  .month-label-cell {
+    padding: 8px 6px;
+  }
+
+  .month-row-label {
+    font-size: 0.8rem;
+  }
+
+  .holiday-day-cell {
+    min-height: 60px;
+    padding: 4px 2px;
+    gap: 2px;
+  }
+
+  .holiday-day-token {
+    min-height: 16px;
+    border-radius: 5px;
+    padding: 0 3px;
+    font-size: 0.58rem;
+  }
+
+  .holiday-day-event {
+    border-radius: 5px;
+    padding: 2px 4px;
+    font-size: 0.56rem;
+  }
+
   .client-mode .hero {
     padding: 14px 18px;
   }
