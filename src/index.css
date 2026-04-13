@@ -1646,6 +1646,12 @@ button {
   gap: 10px;
 }
 
+.holiday-calendar-help {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .holiday-filter-label {
   color: #64748b;
   font-size: 0.9rem;
@@ -1717,6 +1723,16 @@ button {
   display: grid;
   align-content: start;
   gap: 3px;
+}
+
+.holiday-day-cell.is-editable {
+  cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.holiday-day-cell.is-editable:hover {
+  background: #f8f4fb;
+  box-shadow: inset 0 0 0 1px rgba(95, 60, 116, 0.16);
 }
 
 .holiday-day-cell.is-empty {

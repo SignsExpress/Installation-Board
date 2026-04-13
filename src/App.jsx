@@ -818,6 +818,7 @@ function HolidaysPage({
   holidayAllowanceSavingKey,
   onChangeHolidayAllowanceDraft,
   onSaveHolidayAllowance,
+  onToggleHolidayDate,
   onSubmitHolidayRequest,
   onReviewHolidayRequest
 }) {
@@ -946,6 +947,13 @@ function HolidaysPage({
                 )}
               </div>
             </div>
+            {canReview ? (
+              <div className="holiday-calendar-help">
+                {activeHolidayFilter
+                  ? `Click working dates to add, switch to AM/PM, or remove holidays for ${activeHolidayFilter}.`
+                  : "Select an employee name below, then click working dates on the calendar to edit their holiday."}
+              </div>
+            ) : null}
             <div className="holiday-calendar-grid">
               <div className="holiday-calendar-header month-label-cell">Month</div>
               {Array.from({ length: 31 }, (_, index) => (
@@ -964,9 +972,14 @@ function HolidaysPage({
                         "holiday-day-cell",
                         !day.inMonth ? "is-empty" : "",
                         day.weekend ? "is-weekend" : "",
-                        day.bankHoliday ? "is-bank-holiday" : ""
+                        day.bankHoliday ? "is-bank-holiday" : "",
+                        canReview && activeHolidayFilter && day.inMonth && !day.weekend && !day.bankHoliday ? "is-editable" : ""
                       ].join(" ").trim()}
                       title={day.bankHoliday || day.isoDate || ""}
+                      onClick={() => {
+                        if (!canReview || !activeHolidayFilter || !day.inMonth || day.weekend || day.bankHoliday) return;
+                        onToggleHolidayDate(day.isoDate, activeHolidayFilter);
+                      }}
                     >
                       {day.holidays.map((holiday) => (
                         <span
@@ -2169,6 +2182,9 @@ export default function App() {
       setBoard(payload.board);
       setJobs(payload.jobs);
       setHolidays(payload.holidays);
+      if (showHolidays) {
+        await refreshHolidayData();
+      }
       setMessage(createMessage("Holiday updated.", "success"));
     } catch (error) {
       console.error(error);
@@ -2186,6 +2202,9 @@ export default function App() {
       setBoard(payload.board);
       setJobs(payload.jobs);
       setHolidays(payload.holidays);
+      if (showHolidays) {
+        await refreshHolidayData();
+      }
       setMessage(createMessage("Holiday removed.", "success"));
     } catch (error) {
       console.error(error);
@@ -2329,6 +2348,7 @@ export default function App() {
         holidayAllowanceSavingKey={holidayAllowanceSavingKey}
         onChangeHolidayAllowanceDraft={changeHolidayAllowanceDraft}
         onSaveHolidayAllowance={saveHolidayAllowance}
+        onToggleHolidayDate={cycleHoliday}
         onSubmitHolidayRequest={submitHolidayRequest}
         onReviewHolidayRequest={reviewHolidayRequest}
       />
