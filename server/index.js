@@ -3113,9 +3113,18 @@ app.get("/api/corebridge/orders", async (request, response) => {
     }
 
     const store = await readStore();
-    const index = store.holidays.findIndex((item) => item.id === nextHoliday.id);
+    const index = store.holidays.findIndex((item) => {
+      if (item.id === nextHoliday.id) return true;
+      return (
+        getHolidayType(item) !== "birthday" &&
+        getHolidayType(nextHoliday) !== "birthday" &&
+        String(item.date || "") === String(nextHoliday.date || "") &&
+        String(item.person || "").trim().toLowerCase() === String(nextHoliday.person || "").trim().toLowerCase()
+      );
+    });
     if (index >= 0) {
       nextHoliday.createdAt = store.holidays[index].createdAt || nextHoliday.createdAt;
+      nextHoliday.id = store.holidays[index].id || nextHoliday.id;
       store.holidays[index] = nextHoliday;
     } else {
       store.holidays.unshift(nextHoliday);

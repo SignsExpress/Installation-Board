@@ -2239,10 +2239,19 @@ export default function App() {
 
   async function cycleHoliday(date, person) {
     if (isClientMode) return;
-    const existing = holidays.find((item) => item.date === date && item.person === person);
-    if (existing && isBirthdayHoliday(existing)) {
-      return;
-    }
+    const normalizedPerson = String(person || "").trim().toLowerCase();
+    const matchingEntries = holidays.filter(
+      (item) =>
+        String(item.date || "") === String(date || "") &&
+        String(item.person || "").trim().toLowerCase() === normalizedPerson
+    );
+    const existing =
+      matchingEntries.find((item) => !isBirthdayHoliday(item)) ||
+      matchingEntries[0] ||
+      null;
+
+    if (existing && isBirthdayHoliday(existing)) return;
+
     if (!existing) {
       await saveHoliday(date, person, "Full Day");
       return;
