@@ -1114,9 +1114,6 @@ function HolidaysPage({
   return (
     <div className="app-shell holidays-shell">
       <div className="page holidays-page">
-        <div className="host-landing-brand">
-          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-        </div>
         <MainNavBar currentUser={currentUser} active="holidays" onLogout={onLogout} />
 
         <section className="panel holidays-panel">
