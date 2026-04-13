@@ -28,15 +28,15 @@ const PERMISSION_OPTIONS = [
 ];
 
 const HOLIDAY_STAFF = [
-  { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black" },
-  { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black" },
-  { code: "TVB", person: "Tom V-B", fullName: "Tom Van-Boyd", colorClass: "holiday-person-black" },
-  { code: "AH", person: "Amber H", fullName: "Amber Hardman", colorClass: "holiday-person-black" },
-  { code: "ED", person: "Eddy D'A", fullName: "Eddy D'Antonio", colorClass: "holiday-person-black" },
-  { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green" },
-  { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green" },
-  { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red" },
-  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red" },
+  { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black", birthDate: "1989-05-04" },
+  { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black", birthDate: "1971-10-09" },
+  { code: "TVB", person: "Tom V-B", fullName: "Tom Van-Boyd", colorClass: "holiday-person-black", birthDate: "1993-07-27" },
+  { code: "AH", person: "Amber H", fullName: "Amber Hardman", colorClass: "holiday-person-black", birthDate: "2002-08-08" },
+  { code: "ED", person: "Eddy D'A", fullName: "Eddy D'Antonio", colorClass: "holiday-person-black", birthDate: "1997-02-06" },
+  { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green", birthDate: "1983-03-11" },
+  { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green", birthDate: "2004-12-12" },
+  { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red", birthDate: "1992-11-22" },
+  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "1998-10-24" },
   { code: "TS", person: "Tamas", fullName: "Tamas", colorClass: "holiday-person-amber" }
 ];
 const STAFF_NAMES = HOLIDAY_STAFF.map((entry) => entry.person);
@@ -168,6 +168,20 @@ function getHolidayAllowanceSummary(entry) {
     prorataAllowance,
     daysLeft
   };
+}
+
+function formatHolidayBirthday(value) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) return "-";
+  return parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    timeZone: "UTC"
+  });
+}
+
+function isBirthdayHoliday(entry) {
+  return String(entry?.type || "").trim().toLowerCase() === "birthday";
 }
 
 function getCurrentHolidayYearStart(anchorIsoDate = getLocalTodayIso()) {
@@ -957,7 +971,7 @@ function HolidaysPage({
                       {day.holidays.map((holiday) => (
                         <span
                           key={`${day.key}-${holiday.id}`}
-                          className={`holiday-day-token ${HOLIDAY_PERSON_COLORS[holiday.person] || "holiday-person-black"}`}
+                          className={`holiday-day-token ${HOLIDAY_PERSON_COLORS[holiday.person] || "holiday-person-black"} ${isBirthdayHoliday(holiday) ? "holiday-birthday-token" : ""}`}
                         >
                           {getHolidayDisplayToken(holiday.person)}
                           {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
@@ -978,11 +992,12 @@ function HolidaysPage({
               <table className="holiday-breakdown-table">
                 <colgroup>
                   <col className="holiday-col-employee" />
-                  <col span="10" className="holiday-col-metric" />
+                  <col span="11" className="holiday-col-metric" />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Employee</th>
+                    <th>Birthday</th>
                     <th>Number Days work pw</th>
                     <th>Standard Entitlement (21 + 8BH)</th>
                     <th>Extra Days (Service)</th>
@@ -1016,6 +1031,9 @@ function HolidaysPage({
                         >
                           {entry.fullName}
                         </button>
+                      </td>
+                      <td>
+                        <span className="holiday-birthday-label">{formatHolidayBirthday(entry.birthdayDate)}</span>
                       </td>
                       {[
                         ["workDaysPerWeek", entry.workDaysPerWeek],
@@ -2178,6 +2196,9 @@ export default function App() {
   async function cycleHoliday(date, person) {
     if (isClientMode) return;
     const existing = holidays.find((item) => item.date === date && item.person === person);
+    if (existing && isBirthdayHoliday(existing)) {
+      return;
+    }
     if (!existing) {
       await saveHoliday(date, person, "Full Day");
       return;
@@ -2396,7 +2417,10 @@ export default function App() {
                           {isClientMode && row.staffHolidays.length ? (
                             <div className="mobile-holiday-inline">
                               {row.staffHolidays.map((holiday) => (
-                                <span key={`mobile-${holiday.id}`} className={`mobile-holiday-chip ${getHolidayPersonColor(holiday.person)}`}>
+                                <span
+                                  key={`mobile-${holiday.id}`}
+                                  className={`mobile-holiday-chip ${getHolidayPersonColor(holiday.person)} ${isBirthdayHoliday(holiday) ? "holiday-birthday-token" : ""}`}
+                                >
                                   {getHolidayDisplayToken(holiday.person)}
                                   {holiday.duration === "Morning" ? " AM" : holiday.duration === "Afternoon" ? " PM" : ""}
                                 </span>
@@ -2416,11 +2440,14 @@ export default function App() {
                                   <button
                                     key={`summary-${holiday.id}`}
                                     type="button"
-                                    className={`date-holiday-chip ${getHolidayPersonColor(holiday.person)} active`}
+                                    className={`date-holiday-chip ${getHolidayPersonColor(holiday.person)} ${isBirthdayHoliday(holiday) ? "holiday-birthday-token" : ""} active`}
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      handleHolidayChipClick(row.isoDate, holiday.person, false);
+                                      if (!isBirthdayHoliday(holiday)) {
+                                        handleHolidayChipClick(row.isoDate, holiday.person, false);
+                                      }
                                     }}
+                                    disabled={isBirthdayHoliday(holiday)}
                                   >
                                     {getHolidayDisplayToken(holiday.person)}{durationLabel}
                                   </button>
@@ -2443,11 +2470,14 @@ export default function App() {
                                   <button
                                     key={`${row.isoDate}-${name}`}
                                     type="button"
-                                    className={`date-holiday-chip ${getHolidayPersonColor(name)} ${existing ? "active" : ""}`}
+                                    className={`date-holiday-chip ${getHolidayPersonColor(name)} ${existing ? "active" : ""} ${isBirthdayHoliday(existing) ? "holiday-birthday-token" : ""}`}
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      handleHolidayChipClick(row.isoDate, name, true);
+                                      if (!isBirthdayHoliday(existing)) {
+                                        handleHolidayChipClick(row.isoDate, name, true);
+                                      }
                                     }}
+                                    disabled={isBirthdayHoliday(existing)}
                                   >
                                     {initials}{durationLabel}
                                   </button>

@@ -49,15 +49,15 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE
 });
 const HOLIDAY_STAFF = [
-  { code: "MR", name: "Matt Rutlidge", person: "Matt R" },
-  { code: "DD", name: "Dawn Dewhurst", person: "Dawn D" },
-  { code: "TVB", name: "Tom Van-Boyd", person: "Tom V-B" },
-  { code: "AH", name: "Amber Hardman", person: "Amber H" },
-  { code: "ED", name: "Eddy D'Antonio", person: "Eddy D'A" },
-  { code: "PM", name: "Paul Morris", person: "Paul M" },
-  { code: "KW", name: "Kyle Wright", person: "Kyle W" },
-  { code: "MC", name: "Matt Carroll", person: "Matt C" },
-  { code: "KC", name: "Keilan Curtis", person: "Keilan C" },
+  { code: "MR", name: "Matt Rutlidge", person: "Matt R", birthDate: "1989-05-04" },
+  { code: "DD", name: "Dawn Dewhurst", person: "Dawn D", birthDate: "1971-10-09" },
+  { code: "TVB", name: "Tom Van-Boyd", person: "Tom V-B", birthDate: "1993-07-27" },
+  { code: "AH", name: "Amber Hardman", person: "Amber H", birthDate: "2002-08-08" },
+  { code: "ED", name: "Eddy D'Antonio", person: "Eddy D'A", birthDate: "1997-02-06" },
+  { code: "PM", name: "Paul Morris", person: "Paul M", birthDate: "1983-03-11" },
+  { code: "KW", name: "Kyle Wright", person: "Kyle W", birthDate: "2004-12-12" },
+  { code: "MC", name: "Matt Carroll", person: "Matt C", birthDate: "1992-11-22" },
+  { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "1998-10-24" },
   { code: "TS", name: "Tamas", person: "Tamas" }
 ];
 
@@ -707,6 +707,7 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
   const weekdayDates = getWeekdaysInRange(start, end);
   const holidayMap = getHolidayMap(start, end);
   const todayIso = toIsoDate(today);
+  const displayStaffHolidays = getDisplayStaffHolidays(staffHolidays || [], toIsoDate(start), toIsoDate(end));
 
   const jobsByDate = jobs.reduce((map, job) => {
     if (!isValidIsoDate(job.date)) {
@@ -722,7 +723,7 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     .filter((job) => !isValidIsoDate(job.date))
     .sort((left, right) => String(left.customerName || "").localeCompare(String(right.customerName || "")));
 
-  const staffHolidaysByDate = staffHolidays.reduce((map, entry) => {
+  const staffHolidaysByDate = displayStaffHolidays.reduce((map, entry) => {
     const existing = map.get(entry.date) || [];
     existing.push(entry);
     map.set(entry.date, existing);
@@ -819,6 +820,7 @@ function sanitizeStaffHoliday(payload) {
     date: String(payload.date || "").trim(),
     person: String(payload.person || "").trim(),
     duration: String(payload.duration || "Full Day").trim(),
+    type: String(payload.type || "holiday").trim().toLowerCase() || "holiday",
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -858,6 +860,7 @@ function sanitizeHolidayAllowance(payload) {
     workDaysPerWeek: toNumber(payload.workDaysPerWeek),
     standardEntitlement: toNumber(payload.standardEntitlement),
     extraServiceDays: toNumber(payload.extraServiceDays),
+    birthdayDate: String(payload.birthdayDate || "").trim(),
     christmasDays: toNumber(payload.christmasDays),
     bankHolidayDays: toNumber(payload.bankHolidayDays),
     unpaidDaysBooked: toNumber(payload.unpaidDaysBooked),
@@ -920,6 +923,130 @@ function isWeekdayIsoDate(isoDate) {
   return day >= 1 && day <= 5;
 }
 
+function isBankHolidayIsoDate(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return false;
+  return getUkBankHolidays(parsed.getUTCFullYear()).some((holiday) => holiday.date === isoDate);
+}
+
+function findNearestWorkingIsoDate(isoDate, preferredDirection = 0) {
+  const base = parseIsoDate(isoDate);
+  if (!base) return "";
+
+  const directionalOffsets =
+    preferredDirection < 0
+      ? [-1, 1]
+      : preferredDirection > 0
+        ? [1, -1]
+        : [-1, 1];
+
+  for (let distance = 1; distance <= 7; distance += 1) {
+    for (const direction of directionalOffsets) {
+      const candidate = addDays(base, distance * direction);
+      const candidateIso = toIsoDate(candidate);
+      if (isWeekdayIsoDate(candidateIso) && !isBankHolidayIsoDate(candidateIso)) {
+        return candidateIso;
+      }
+    }
+  }
+
+  return "";
+}
+
+function getObservedBirthdayIsoDate(staffEntry, yearStart = getCurrentHolidayYearStart()) {
+  const birthDate = String(staffEntry?.birthDate || "").trim();
+  if (!birthDate || !/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return "";
+  const [, monthString, dayString] = birthDate.split("-");
+  const month = Number(monthString);
+  const day = Number(dayString);
+  if (!month || !day) return "";
+
+  const occurrenceYear = month >= 2 ? yearStart : yearStart + 1;
+  const birthday = new Date(Date.UTC(occurrenceYear, month - 1, day));
+  const birthdayIso = toIsoDate(birthday);
+  const weekday = birthday.getUTCDay();
+
+  if (weekday === 6) {
+    return findNearestWorkingIsoDate(birthdayIso, -1) || birthdayIso;
+  }
+
+  if (weekday === 0) {
+    return findNearestWorkingIsoDate(birthdayIso, 1) || birthdayIso;
+  }
+
+  if (isBankHolidayIsoDate(birthdayIso)) {
+    return findNearestWorkingIsoDate(birthdayIso, 0) || birthdayIso;
+  }
+
+  return birthdayIso;
+}
+
+function buildBirthdayHolidayEntries(yearStart = getCurrentHolidayYearStart()) {
+  return HOLIDAY_STAFF.map((staffEntry) => {
+    const observedDate = getObservedBirthdayIsoDate(staffEntry, yearStart);
+    if (!observedDate) return null;
+    return sanitizeStaffHoliday({
+      id: `birthday-${yearStart}-${staffEntry.code.toLowerCase()}`,
+      date: observedDate,
+      person: staffEntry.person,
+      duration: "Full Day",
+      type: "birthday"
+    });
+  }).filter(Boolean);
+}
+
+function getHolidayType(entry) {
+  return String(entry?.type || "holiday").trim().toLowerCase();
+}
+
+function getDisplayStaffHolidays(staffHolidays, startIso, endIso) {
+  const startYear = getHolidayYearStartForIsoDate(startIso) || getCurrentHolidayYearStart();
+  const endYear = getHolidayYearStartForIsoDate(endIso) || startYear;
+  const birthdayEntries = [];
+
+  for (let yearStart = startYear; yearStart <= endYear; yearStart += 1) {
+    birthdayEntries.push(...buildBirthdayHolidayEntries(yearStart));
+  }
+
+  const birthdayMap = new Map(
+    birthdayEntries.map((entry) => [
+      `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`,
+      entry
+    ])
+  );
+
+  const normalized = (staffHolidays || [])
+    .map((entry) => sanitizeStaffHoliday(entry))
+    .filter((entry) => entry.date >= startIso && entry.date <= endIso)
+    .map((entry) => {
+      const key = `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`;
+      if (birthdayMap.has(key)) {
+        return {
+          ...entry,
+          id: birthdayMap.get(key).id,
+          type: "birthday"
+        };
+      }
+      return entry;
+    });
+
+  const existingKeys = new Set(
+    normalized.map((entry) => `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`)
+  );
+
+  birthdayEntries.forEach((entry) => {
+    const key = `${String(entry.person || "").trim().toLowerCase()}::${entry.date}`;
+    if (!existingKeys.has(key) && entry.date >= startIso && entry.date <= endIso) {
+      normalized.push(entry);
+    }
+  });
+
+  return normalized.sort((left, right) => {
+    if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+    return String(left.person || "").localeCompare(String(right.person || ""));
+  });
+}
+
 function getCurrentHolidayYearStart(today = getTodayInLondon()) {
   const year = today.getUTCFullYear();
   return today.getUTCMonth() >= 1 ? year : year - 1;
@@ -964,10 +1091,12 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
   const bounds = getHolidayYearBounds(yearStart);
   const startIso = toIsoDate(bounds.start);
   const endIso = toIsoDate(bounds.end);
+  const displayHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso);
   const approvedCounts = new Map();
 
-  (store.holidays || []).forEach((holiday) => {
+  displayHolidays.forEach((holiday) => {
     if (!holiday?.date || holiday.date < startIso || holiday.date > endIso) return;
+    if (getHolidayType(holiday) === "birthday") return;
     const person = String(holiday.person || "").trim();
     const current = approvedCounts.get(person) || 0;
     approvedCounts.set(
@@ -986,6 +1115,7 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
     const normalized = sanitizeHolidayAllowance({
       yearStart,
       person: staffEntry.person,
+      birthdayDate: getObservedBirthdayIsoDate(staffEntry, yearStart),
       ...(existing || {})
     });
 
@@ -1003,6 +1133,7 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       ...normalized,
       code: staffEntry.code,
       fullName: staffEntry.name,
+      birthDate: staffEntry.birthDate || "",
       prorataAllowance,
       bookedDays,
       daysLeft
@@ -1079,6 +1210,7 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
     const holidayDate = String(holiday.date || "");
     return holidayDate >= startIso && holidayDate <= endIso;
   });
+  const displayYearHolidays = getDisplayStaffHolidays(store.holidays || [], startIso, endIso);
 
   const allowanceRows = buildHolidayAllowanceSummaries(store, yearStart).filter((entry) =>
     canEditHolidays(forUser)
@@ -1087,7 +1219,7 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
   );
 
   return {
-    holidays: yearHolidays,
+    holidays: displayYearHolidays,
     holidayRequests: yearRequests,
     holidayStaff: HOLIDAY_STAFF,
     holidayAllowances: allowanceRows,

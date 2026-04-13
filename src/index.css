@@ -837,6 +837,14 @@ button {
   color: #b45309;
 }
 
+.holiday-birthday-token {
+  background: #fde047;
+  color: #713f12;
+  border-color: rgba(202, 138, 4, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(202, 138, 4, 0.18);
+  opacity: 1;
+}
+
 .jobs-lane-button {
   width: 100%;
   border: 1px dashed #cbd5e1;
@@ -910,6 +918,10 @@ button {
 .date-holiday-chip.active {
   opacity: 1;
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.14);
+}
+
+.date-holiday-chip.holiday-birthday-token:disabled {
+  cursor: default;
 }
 
 .date-bank-holiday {
@@ -1729,6 +1741,20 @@ button {
   font-size: 0.7rem;
   font-weight: 800;
   line-height: 1;
+}
+
+.holiday-birthday-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .holiday-request-modal {
