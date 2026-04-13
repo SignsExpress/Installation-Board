@@ -132,6 +132,24 @@ function getHolidayDisplayToken(person) {
   return toInitials(value);
 }
 
+function normalizeHolidayStaffEntries(entries) {
+  if (!Array.isArray(entries) || !entries.length) return HOLIDAY_STAFF;
+  return entries.map((entry) => ({
+    ...entry,
+    fullName: entry.fullName || entry.name || entry.person || ""
+  }));
+}
+
+function getCurrentHolidayYearStart(anchorIsoDate = getLocalTodayIso()) {
+  const anchor = parseIsoDate(anchorIsoDate) || parseIsoDate(getLocalTodayIso());
+  if (!anchor) return new Date().getUTCFullYear();
+  return anchor.getUTCMonth() >= 1 ? anchor.getUTCFullYear() : anchor.getUTCFullYear() - 1;
+}
+
+function getHolidayYearLabel(yearStart) {
+  return `${yearStart}-${String(yearStart + 1).slice(-2)}`;
+}
+
 function nthWeekdayOfMonth(year, month, weekday, occurrence) {
   const first = new Date(Date.UTC(year, month, 1));
   const firstWeekday = first.getUTCDay();
@@ -207,9 +225,8 @@ function getUkBankHolidays(year) {
   ];
 }
 
-function buildHolidayYearRows(holidays, anchorIsoDate) {
-  const anchor = parseIsoDate(anchorIsoDate) || parseIsoDate(getLocalTodayIso());
-  const startMonth = getStartOfMonth(anchor);
+function buildHolidayYearRows(holidays, yearStart) {
+  const startMonth = new Date(Date.UTC(yearStart, 1, 1));
   const holidayMap = new Map();
   const years = new Set();
   const rows = [];
@@ -694,17 +711,25 @@ function HolidaysPage({
   holidays,
   holidayRequests,
   holidayStaff,
+  holidayAllowances,
   holidayRows,
+  holidayYearStart,
+  holidayYearLabel,
+  currentHolidayYearStart,
+  setHolidayYearStart,
   holidayRequestOpen,
   setHolidayRequestOpen,
   holidayRequestForm,
   setHolidayRequestForm,
   holidayRequestSaving,
+  holidayAllowanceSavingKey,
+  onSaveHolidayAllowance,
   onSubmitHolidayRequest,
   onReviewHolidayRequest
 }) {
   const canReview = canEditBoard(currentUser);
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
+  const showingFutureYear = holidayYearStart > currentHolidayYearStart;
 
   return (
     <div className="app-shell holidays-shell">
@@ -717,12 +742,19 @@ function HolidaysPage({
         <section className="panel holidays-panel">
           <div className="holidays-toolbar">
             <div>
-              <h2>Holiday Calendar</h2>
-              <p>Approved holidays appear here and automatically flow onto the Installation Board.</p>
+              <h2>Holiday Calendar {holidayYearLabel}</h2>
+              <p>Fixed holiday year from 1 February to 31 January. Approved holidays appear here and flow onto the Installation Board.</p>
             </div>
-            <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(true)}>
-              Request holiday
-            </button>
+            <div className="holidays-toolbar-actions">
+              {showingFutureYear ? (
+                <button className="ghost-button" type="button" onClick={() => setHolidayYearStart(currentHolidayYearStart)}>
+                  Current year
+                </button>
+              ) : null}
+              <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(true)}>
+                Request holiday
+              </button>
+            </div>
           </div>
 
           {holidayRequests.length ? (
@@ -802,6 +834,78 @@ function HolidaysPage({
               ))}
             </div>
           </div>
+
+          <section className="holiday-breakdown-panel">
+            <div className="holiday-requests-head">
+              <h3>Holiday Breakdown {holidayYearLabel}</h3>
+            </div>
+            <div className="holiday-breakdown-wrap">
+              <table className="holiday-breakdown-table">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Days pw</th>
+                    <th>Standard</th>
+                    <th>Extra</th>
+                    <th>Xmas</th>
+                    <th>Bank Hol</th>
+                    <th>Total</th>
+                    <th>Booked</th>
+                    <th>Left</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holidayAllowances.map((entry) => (
+                    <tr key={`${holidayYearStart}-${entry.person}`}>
+                      <td>
+                        <strong>{entry.fullName}</strong>
+                      </td>
+                      {[
+                        ["workDaysPerWeek", entry.workDaysPerWeek],
+                        ["standardEntitlement", entry.standardEntitlement],
+                        ["extraServiceDays", entry.extraServiceDays],
+                        ["christmasDays", entry.christmasDays],
+                        ["bankHolidayDays", entry.bankHolidayDays]
+                      ].map(([field, value]) => (
+                        <td key={`${entry.person}-${field}`}>
+                          {canReview ? (
+                            <input
+                              className="holiday-allowance-input"
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              defaultValue={value}
+                              disabled={holidayAllowanceSavingKey === `${entry.person}:${field}`}
+                              onBlur={(event) => onSaveHolidayAllowance(entry.person, { [field]: event.target.value })}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span>{value}</span>
+                          )}
+                        </td>
+                      ))}
+                      <td><strong>{entry.totalAllowance}</strong></td>
+                      <td>{entry.bookedDays}</td>
+                      <td className={entry.daysLeft < 0 ? "holiday-days-negative" : "holiday-days-positive"}>
+                        <strong>{entry.daysLeft}</strong>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div className="holiday-year-footer">
+            <button className="ghost-button" type="button" onClick={() => setHolidayYearStart((current) => current + 1)}>
+              {holidayYearStart + 1} Holidays
+            </button>
+          </div>
         </section>
       </div>
 
@@ -853,7 +957,13 @@ function HolidaysPage({
                   <input
                     type="date"
                     value={holidayRequestForm.startDate}
-                    onChange={(event) => setHolidayRequestForm((current) => ({ ...current, startDate: event.target.value }))}
+                    onChange={(event) =>
+                      setHolidayRequestForm((current) => ({
+                        ...current,
+                        startDate: event.target.value,
+                        endDate: current.endDate || event.target.value
+                      }))
+                    }
                   />
                 </label>
 
@@ -916,9 +1026,13 @@ export default function App() {
   const [holidays, setHolidays] = useState([]);
   const [holidayRequests, setHolidayRequests] = useState([]);
   const [holidayStaff, setHolidayStaff] = useState(HOLIDAY_STAFF);
+  const [holidayAllowances, setHolidayAllowances] = useState([]);
+  const [holidayAllowanceSavingKey, setHolidayAllowanceSavingKey] = useState("");
   const [holidayRequestOpen, setHolidayRequestOpen] = useState(false);
   const [holidayRequestForm, setHolidayRequestForm] = useState(EMPTY_HOLIDAY_REQUEST_FORM);
   const [holidayRequestSaving, setHolidayRequestSaving] = useState(false);
+  const [holidayYearStart, setHolidayYearStart] = useState(getCurrentHolidayYearStart());
+  const [currentHolidayYearStart, setCurrentHolidayYearStart] = useState(getCurrentHolidayYearStart());
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1102,7 +1216,7 @@ export default function App() {
     async function loadHolidayData() {
       try {
         setLoading(true);
-        const response = await fetch("/api/holiday-requests");
+        const response = await fetch(`/api/holiday-requests?yearStart=${encodeURIComponent(holidayYearStart)}`);
         if (!response.ok) {
           throw new Error("Could not load holiday calendar.");
         }
@@ -1111,7 +1225,9 @@ export default function App() {
         if (!active) return;
         setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
         setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
-        setHolidayStaff(Array.isArray(payload.holidayStaff) && payload.holidayStaff.length ? payload.holidayStaff : HOLIDAY_STAFF);
+        setHolidayStaff(normalizeHolidayStaffEntries(payload.holidayStaff));
+        setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
+        setCurrentHolidayYearStart(Number(payload.currentHolidayYearStart || getCurrentHolidayYearStart()));
       } catch (error) {
         console.error(error);
         if (active) setMessage(createMessage("Could not load holiday calendar.", "error"));
@@ -1124,7 +1240,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser, showHolidays]);
+  }, [currentUser, showHolidays, holidayYearStart]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1235,7 +1351,8 @@ export default function App() {
     return new Map(holidays.map((holiday) => [holiday.id, holiday]));
   }, [holidays]);
 
-  const holidayRows = useMemo(() => buildHolidayYearRows(holidays, board?.today || getLocalTodayIso()), [board?.today, holidays]);
+  const holidayYearLabel = useMemo(() => getHolidayYearLabel(holidayYearStart), [holidayYearStart]);
+  const holidayRows = useMemo(() => buildHolidayYearRows(holidays, holidayYearStart), [holidayYearStart, holidays]);
 
   const backdropPointerStartedRef = useRef(false);
 
@@ -1390,12 +1507,15 @@ export default function App() {
   }
 
   async function refreshHolidayData() {
-    const response = await fetch("/api/holiday-requests");
+    const response = await fetch(`/api/holiday-requests?yearStart=${encodeURIComponent(holidayYearStart)}`);
     if (!response.ok) throw new Error("Could not refresh holiday calendar.");
     const payload = await response.json();
     setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
     setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
-    setHolidayStaff(Array.isArray(payload.holidayStaff) && payload.holidayStaff.length ? payload.holidayStaff : HOLIDAY_STAFF);
+    setHolidayStaff(normalizeHolidayStaffEntries(payload.holidayStaff));
+    setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
+    setHolidayYearStart(Number(payload.holidayYearStart || holidayYearStart));
+    setCurrentHolidayYearStart(Number(payload.currentHolidayYearStart || getCurrentHolidayYearStart()));
   }
 
   async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
@@ -1450,22 +1570,24 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           person,
+          holidayYearStart,
           startDate: holidayRequestForm.startDate,
           endDate: holidayRequestForm.endDate,
           duration: holidayRequestForm.duration,
           notes: holidayRequestForm.notes
         })
       });
-      if (!response.ok) throw new Error("Could not send holiday request.");
       const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not send holiday request.");
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayRequestForm(EMPTY_HOLIDAY_REQUEST_FORM);
       setHolidayRequestOpen(false);
       setMessage(createMessage("Holiday request sent.", "success"));
     } catch (error) {
       console.error(error);
-      setMessage(createMessage("Could not send holiday request.", "error"));
+      setMessage(createMessage(error.message || "Could not send holiday request.", "error"));
     } finally {
       setHolidayRequestSaving(false);
     }
@@ -1478,14 +1600,46 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status })
       });
-      if (!response.ok) throw new Error("Could not update holiday request.");
       const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not update holiday request.");
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setMessage(createMessage(`Holiday request ${status}.`, "success"));
     } catch (error) {
       console.error(error);
-      setMessage(createMessage("Could not update holiday request.", "error"));
+      setMessage(createMessage(error.message || "Could not update holiday request.", "error"));
+    }
+  }
+
+  async function saveHolidayAllowance(person, updates) {
+    if (!canEditBoard(currentUser)) return;
+    const existing = holidayAllowances.find((entry) => entry.person === person);
+    const savingField = Object.keys(updates)[0] || "";
+    setHolidayAllowanceSavingKey(`${person}:${savingField}`);
+
+    try {
+      const response = await fetch("/api/holiday-allowances", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...existing,
+          person,
+          yearStart: holidayYearStart,
+          ...updates
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not save holiday allowance.");
+      setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
+      setMessage(createMessage(`Updated ${person}'s holiday allowance.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not save holiday allowance.", "error"));
+    } finally {
+      setHolidayAllowanceSavingKey("");
     }
   }
 
@@ -1913,19 +2067,26 @@ export default function App() {
       <HolidaysPage
         currentUser={currentUser}
         onLogout={handleLogout}
-        holidays={holidays}
-        holidayRequests={holidayRequests}
-        holidayStaff={holidayStaff}
-        holidayRows={holidayRows}
-        holidayRequestOpen={holidayRequestOpen}
-        setHolidayRequestOpen={setHolidayRequestOpen}
-        holidayRequestForm={holidayRequestForm}
-        setHolidayRequestForm={setHolidayRequestForm}
-        holidayRequestSaving={holidayRequestSaving}
-        onSubmitHolidayRequest={submitHolidayRequest}
-        onReviewHolidayRequest={reviewHolidayRequest}
-      />
-    );
+      holidays={holidays}
+      holidayRequests={holidayRequests}
+      holidayStaff={holidayStaff}
+      holidayAllowances={holidayAllowances}
+      holidayRows={holidayRows}
+      holidayYearStart={holidayYearStart}
+      holidayYearLabel={holidayYearLabel}
+      currentHolidayYearStart={currentHolidayYearStart}
+      setHolidayYearStart={setHolidayYearStart}
+      holidayRequestOpen={holidayRequestOpen}
+      setHolidayRequestOpen={setHolidayRequestOpen}
+      holidayRequestForm={holidayRequestForm}
+      setHolidayRequestForm={setHolidayRequestForm}
+      holidayRequestSaving={holidayRequestSaving}
+      holidayAllowanceSavingKey={holidayAllowanceSavingKey}
+      onSaveHolidayAllowance={saveHolidayAllowance}
+      onSubmitHolidayRequest={submitHolidayRequest}
+      onReviewHolidayRequest={reviewHolidayRequest}
+    />
+  );
   }
 
   if (showInstallerDirectory) {

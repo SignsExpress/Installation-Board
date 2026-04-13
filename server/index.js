@@ -270,7 +270,7 @@ function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [] }, null, 2)}\n`, "utf8");
+    fs.writeFileSync(file, `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] }, null, 2)}\n`, "utf8");
   }
 }
 
@@ -303,16 +303,17 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return { jobs: parsed, holidays: [], holidayRequests: [] };
+      return { jobs: parsed, holidays: [], holidayRequests: [], holidayAllowances: [] };
     }
     return {
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
       holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
-      holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : []
+      holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
+      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : []
     };
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-    return { jobs: [], holidays: [], holidayRequests: [] };
+    return { jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] };
   }
 }
 
@@ -329,6 +330,10 @@ async function writeStore(store) {
     }),
     holidayRequests: [...(store.holidayRequests || [])].sort((left, right) => {
       if (left.startDate !== right.startDate) return String(left.startDate || "").localeCompare(String(right.startDate || ""));
+      return String(left.person || "").localeCompare(String(right.person || ""));
+    }),
+    holidayAllowances: [...(store.holidayAllowances || [])].sort((left, right) => {
+      if (left.yearStart !== right.yearStart) return Number(left.yearStart || 0) - Number(right.yearStart || 0);
       return String(left.person || "").localeCompare(String(right.person || ""));
     })
   };
@@ -762,6 +767,26 @@ function sanitizeHolidayRequest(payload) {
   };
 }
 
+function sanitizeHolidayAllowance(payload) {
+  function toNumber(value) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+
+  return {
+    id: String(payload.id || makeId()),
+    yearStart: Number(payload.yearStart || getCurrentHolidayYearStart()),
+    person: String(payload.person || "").trim(),
+    workDaysPerWeek: toNumber(payload.workDaysPerWeek),
+    standardEntitlement: toNumber(payload.standardEntitlement),
+    extraServiceDays: toNumber(payload.extraServiceDays),
+    christmasDays: toNumber(payload.christmasDays),
+    bankHolidayDays: toNumber(payload.bankHolidayDays),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function sanitizeInstaller(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -816,6 +841,95 @@ function isWeekdayIsoDate(isoDate) {
   return day >= 1 && day <= 5;
 }
 
+function getCurrentHolidayYearStart(today = getTodayInLondon()) {
+  const year = today.getUTCFullYear();
+  return today.getUTCMonth() >= 1 ? year : year - 1;
+}
+
+function getHolidayYearBounds(yearStart = getCurrentHolidayYearStart()) {
+  return {
+    yearStart,
+    start: new Date(Date.UTC(yearStart, 1, 1)),
+    end: new Date(Date.UTC(yearStart + 1, 0, 31))
+  };
+}
+
+function getHolidayYearLabel(yearStart = getCurrentHolidayYearStart()) {
+  const endYear = String(yearStart + 1).slice(-2);
+  return `${yearStart}-${endYear}`;
+}
+
+function getHolidayYearStartForIsoDate(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return null;
+  return parsed.getUTCMonth() >= 1 ? parsed.getUTCFullYear() : parsed.getUTCFullYear() - 1;
+}
+
+function getHolidayYearOptions(currentYearStart = getCurrentHolidayYearStart(), yearsAhead = 3) {
+  return Array.from({ length: yearsAhead + 1 }, (_, index) => {
+    const yearStart = currentYearStart + index;
+    return {
+      yearStart,
+      label: getHolidayYearLabel(yearStart)
+    };
+  });
+}
+
+function calculateHolidayDays(startDate, endDate, duration = "Full Day") {
+  const weekdays = enumerateIsoDates(startDate, endDate).filter(isWeekdayIsoDate);
+  const factor = duration === "Morning" || duration === "Afternoon" ? 0.5 : 1;
+  return weekdays.length * factor;
+}
+
+function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYearStart()) {
+  const bounds = getHolidayYearBounds(yearStart);
+  const startIso = toIsoDate(bounds.start);
+  const endIso = toIsoDate(bounds.end);
+  const approvedCounts = new Map();
+
+  (store.holidays || []).forEach((holiday) => {
+    if (!holiday?.date || holiday.date < startIso || holiday.date > endIso) return;
+    const person = String(holiday.person || "").trim();
+    const current = approvedCounts.get(person) || 0;
+    approvedCounts.set(
+      person,
+      current + (holiday.duration === "Morning" || holiday.duration === "Afternoon" ? 0.5 : 1)
+    );
+  });
+
+  const allowanceRows = HOLIDAY_STAFF.map((staffEntry) => {
+    const existing = (store.holidayAllowances || []).find(
+      (entry) =>
+        Number(entry.yearStart || 0) === yearStart &&
+        String(entry.person || "").trim().toLowerCase() === staffEntry.person.toLowerCase()
+    );
+
+    const normalized = sanitizeHolidayAllowance({
+      yearStart,
+      person: staffEntry.person,
+      ...(existing || {})
+    });
+
+    const totalAllowance =
+      normalized.standardEntitlement +
+      normalized.extraServiceDays +
+      normalized.christmasDays +
+      normalized.bankHolidayDays;
+    const bookedDays = approvedCounts.get(staffEntry.person) || 0;
+
+    return {
+      ...normalized,
+      code: staffEntry.code,
+      fullName: staffEntry.name,
+      totalAllowance,
+      bookedDays,
+      daysLeft: totalAllowance - bookedDays
+    };
+  });
+
+  return allowanceRows;
+}
+
 function broadcast(event, payload) {
   const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const client of streamClients) {
@@ -859,21 +973,42 @@ async function getBoardPayload(options = {}) {
   };
 }
 
-async function getHolidayPayload(forUser) {
+async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart()) {
   const store = await readStore();
   const currentPerson = getHolidayStaffPerson(forUser?.displayName);
+  const bounds = getHolidayYearBounds(yearStart);
+  const startIso = toIsoDate(bounds.start);
+  const endIso = toIsoDate(bounds.end);
   const visibleRequests = canEditBoard(forUser)
-    ? store.holidayRequests || []
+    ? (store.holidayRequests || [])
     : (store.holidayRequests || []).filter(
         (request) =>
           String(request.requestedByUserId || "") === String(forUser?.id || "") ||
           String(request.person || "").trim().toLowerCase() === String(currentPerson || "").toLowerCase()
       );
 
+  const yearRequests = visibleRequests.filter((request) => {
+    const requestStart = String(request.startDate || "");
+    const requestEnd = String(request.endDate || request.startDate || "");
+    return requestStart <= endIso && requestEnd >= startIso;
+  });
+
+  const yearHolidays = (store.holidays || []).filter((holiday) => {
+    const holidayDate = String(holiday.date || "");
+    return holidayDate >= startIso && holidayDate <= endIso;
+  });
+
+  const allowanceRows = buildHolidayAllowanceSummaries(store, yearStart);
+
   return {
-    holidays: store.holidays,
-    holidayRequests: visibleRequests,
-    holidayStaff: HOLIDAY_STAFF
+    holidays: yearHolidays,
+    holidayRequests: yearRequests,
+    holidayStaff: HOLIDAY_STAFF,
+    holidayAllowances: allowanceRows,
+    holidayYearStart: yearStart,
+    currentHolidayYearStart: getCurrentHolidayYearStart(),
+    holidayYearLabel: getHolidayYearLabel(yearStart),
+    holidayYearOptions: getHolidayYearOptions(getCurrentHolidayYearStart())
   };
 }
 
@@ -2570,7 +2705,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.status(401).json({ error: "Login required." });
       return;
     }
-    const payload = await getHolidayPayload(request.user);
+    const yearStart = Number(request.query.yearStart || getCurrentHolidayYearStart());
+    const payload = await getHolidayPayload(request.user, yearStart);
     response.json(payload);
   });
 
@@ -2608,11 +2744,31 @@ app.get("/api/corebridge/orders", async (request, response) => {
       return;
     }
 
+    const requestYearStart = getHolidayYearStartForIsoDate(nextRequest.startDate);
+    const requestEndYearStart = getHolidayYearStartForIsoDate(nextRequest.endDate);
+    if (!requestYearStart || requestYearStart !== requestEndYearStart) {
+      response.status(400).json({ error: "Holiday requests must fit within a single holiday year." });
+      return;
+    }
+
     const store = await readStore();
+    if (!canEditBoard(request.user)) {
+      const allowanceSummary = buildHolidayAllowanceSummaries(store, requestYearStart).find(
+        (entry) => String(entry.person || "").trim().toLowerCase() === String(nextRequest.person || "").trim().toLowerCase()
+      );
+      const requestedDays = calculateHolidayDays(nextRequest.startDate, nextRequest.endDate, nextRequest.duration);
+      if (allowanceSummary && requestedDays > allowanceSummary.daysLeft) {
+        response.status(400).json({
+          error: `Only ${allowanceSummary.daysLeft} holiday days remain in ${getHolidayYearLabel(requestYearStart)}.`
+        });
+        return;
+      }
+    }
+
     store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
     store.holidayRequests.unshift(nextRequest);
     const savedStore = await writeStore(store);
-    const visiblePayload = await getHolidayPayload(request.user);
+    const visiblePayload = await getHolidayPayload(request.user, requestYearStart);
     broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
     response.json(visiblePayload);
   });
@@ -2667,9 +2823,40 @@ app.get("/api/corebridge/orders", async (request, response) => {
     }
 
     const savedStore = await writeStore(store);
-    const visiblePayload = await getHolidayPayload(request.user);
+    const payloadYearStart = getHolidayYearStartForIsoDate(holidayRequest.startDate) || getCurrentHolidayYearStart();
+    const visiblePayload = await getHolidayPayload(request.user, payloadYearStart);
     broadcast("board-updated", buildBoardRows(savedStore.jobs, savedStore.holidays));
     response.json(visiblePayload);
+  });
+
+  app.post("/api/holiday-allowances", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+
+    const nextAllowance = sanitizeHolidayAllowance(request.body || {});
+    if (!getHolidayStaffEntry(nextAllowance.person)) {
+      response.status(400).json({ error: "A valid employee is required." });
+      return;
+    }
+
+    const store = await readStore();
+    store.holidayAllowances = Array.isArray(store.holidayAllowances) ? store.holidayAllowances : [];
+    const existingIndex = store.holidayAllowances.findIndex(
+      (entry) =>
+        Number(entry.yearStart || 0) === Number(nextAllowance.yearStart || 0) &&
+        String(entry.person || "").trim().toLowerCase() === String(nextAllowance.person || "").trim().toLowerCase()
+    );
+
+    if (existingIndex >= 0) {
+      nextAllowance.id = store.holidayAllowances[existingIndex].id;
+      nextAllowance.createdAt = store.holidayAllowances[existingIndex].createdAt || nextAllowance.createdAt;
+      store.holidayAllowances[existingIndex] = nextAllowance;
+    } else {
+      store.holidayAllowances.unshift(nextAllowance);
+    }
+
+    await writeStore(store);
+    const payload = await getHolidayPayload(request.user, nextAllowance.yearStart);
+    response.json(payload);
   });
 
   app.post("/api/holidays", async (request, response) => {
