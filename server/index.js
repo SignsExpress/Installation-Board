@@ -49,17 +49,18 @@ const dayFormatter = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE
 });
 const HOLIDAY_STAFF = [
-  { code: "MR", name: "Matt Rutlidge", person: "Matt R", birthDate: "1989-05-04" },
-  { code: "DD", name: "Dawn Dewhurst", person: "Dawn D", birthDate: "1971-10-09" },
-  { code: "TVB", name: "Tom Van-Boyd", person: "Tom V-B", birthDate: "1993-07-27" },
-  { code: "AH", name: "Amber Hardman", person: "Amber H", birthDate: "2002-08-08" },
-  { code: "ED", name: "Eddy D'Antonio", person: "Eddy D'A", birthDate: "1997-02-06" },
-  { code: "PM", name: "Paul Morris", person: "Paul M", birthDate: "1983-03-11" },
-  { code: "KW", name: "Kyle Wright", person: "Kyle W", birthDate: "2004-12-12" },
-  { code: "MC", name: "Matt Carroll", person: "Matt C", birthDate: "1992-11-22" },
-  { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "1998-10-24" },
+  { code: "MR", name: "Matt Rutlidge", person: "Matt R", birthDate: "" },
+  { code: "DD", name: "Dawn Dewhurst", person: "Dawn D", birthDate: "" },
+  { code: "TVB", name: "Tom Van-Boyd", person: "Tom V-B", birthDate: "" },
+  { code: "AH", name: "Amber Hardman", person: "Amber H", birthDate: "" },
+  { code: "ED", name: "Eddy D'Antonio", person: "Eddy D'A", birthDate: "" },
+  { code: "PM", name: "Paul Morris", person: "Paul M", birthDate: "" },
+  { code: "KW", name: "Kyle Wright", person: "Kyle W", birthDate: "" },
+  { code: "MC", name: "Matt Carroll", person: "Matt C", birthDate: "" },
+  { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" },
   { code: "TS", name: "Tamas", person: "Tamas" }
 ];
+const HOLIDAY_RESET_VERSION = 1;
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
@@ -358,6 +359,29 @@ function mergeHolidaySeed(store) {
   return nextStore;
 }
 
+function applyHolidayResetMigration(store) {
+  const currentVersion = Number(store?.holidayResetVersion || 0);
+  if (currentVersion >= HOLIDAY_RESET_VERSION) {
+    return {
+      ...store,
+      holidayResetVersion: currentVersion
+    };
+  }
+
+  return {
+    ...store,
+    holidays: [],
+    holidayRequests: [],
+    holidayAllowances: Array.isArray(store.holidayAllowances)
+      ? store.holidayAllowances.map((entry) => ({
+          ...entry,
+          birthDate: ""
+        }))
+      : [],
+    holidayResetVersion: HOLIDAY_RESET_VERSION
+  };
+}
+
 function ensureInstallersFile() {
   const file = getInstallersFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -387,17 +411,38 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return mergeHolidaySeed({ jobs: parsed, holidays: [], holidayRequests: [], holidayAllowances: [] });
+      const migrated = applyHolidayResetMigration({
+        jobs: parsed,
+        holidays: [],
+        holidayRequests: [],
+        holidayAllowances: []
+      });
+      if (Number(migrated.holidayResetVersion || 0) !== 0) {
+        await writeStore(migrated);
+      }
+      return mergeHolidaySeed(migrated);
     }
-    return mergeHolidaySeed({
+    const migrated = applyHolidayResetMigration({
       jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
       holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
       holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
-      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : []
+      holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
+      holidayResetVersion: Number(parsed.holidayResetVersion || 0)
     });
+    if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
+      await writeStore(migrated);
+    }
+    return mergeHolidaySeed(migrated);
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-    return mergeHolidaySeed({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [] });
+    const migrated = applyHolidayResetMigration({
+      jobs: [],
+      holidays: [],
+      holidayRequests: [],
+      holidayAllowances: []
+    });
+    await writeStore(migrated);
+    return mergeHolidaySeed(migrated);
   }
 }
 
@@ -416,11 +461,12 @@ async function writeStore(store) {
       if (left.startDate !== right.startDate) return String(left.startDate || "").localeCompare(String(right.startDate || ""));
       return String(left.person || "").localeCompare(String(right.person || ""));
     }),
-    holidayAllowances: [...(store.holidayAllowances || [])].sort((left, right) => {
-      if (left.yearStart !== right.yearStart) return Number(left.yearStart || 0) - Number(right.yearStart || 0);
-      return String(left.person || "").localeCompare(String(right.person || ""));
-    })
-  };
+      holidayAllowances: [...(store.holidayAllowances || [])].sort((left, right) => {
+        if (left.yearStart !== right.yearStart) return Number(left.yearStart || 0) - Number(right.yearStart || 0);
+        return String(left.person || "").localeCompare(String(right.person || ""));
+      }),
+      holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
+    };
   await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
   return nextStore;
 }

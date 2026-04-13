@@ -28,15 +28,15 @@ const PERMISSION_OPTIONS = [
 ];
 
 const HOLIDAY_STAFF = [
-  { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black", birthDate: "1989-05-04" },
-  { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black", birthDate: "1971-10-09" },
-  { code: "TVB", person: "Tom V-B", fullName: "Tom Van-Boyd", colorClass: "holiday-person-black", birthDate: "1993-07-27" },
-  { code: "AH", person: "Amber H", fullName: "Amber Hardman", colorClass: "holiday-person-black", birthDate: "2002-08-08" },
-  { code: "ED", person: "Eddy D'A", fullName: "Eddy D'Antonio", colorClass: "holiday-person-black", birthDate: "1997-02-06" },
-  { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green", birthDate: "1983-03-11" },
-  { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green", birthDate: "2004-12-12" },
-  { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red", birthDate: "1992-11-22" },
-  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "1998-10-24" },
+  { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black", birthDate: "" },
+  { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black", birthDate: "" },
+  { code: "TVB", person: "Tom V-B", fullName: "Tom Van-Boyd", colorClass: "holiday-person-black", birthDate: "" },
+  { code: "AH", person: "Amber H", fullName: "Amber Hardman", colorClass: "holiday-person-black", birthDate: "" },
+  { code: "ED", person: "Eddy D'A", fullName: "Eddy D'Antonio", colorClass: "holiday-person-black", birthDate: "" },
+  { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green", birthDate: "" },
+  { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green", birthDate: "" },
+  { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red", birthDate: "" },
+  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "" },
   { code: "TS", person: "Tamas", fullName: "Tamas", colorClass: "holiday-person-amber" }
 ];
 const STAFF_NAMES = HOLIDAY_STAFF.map((entry) => entry.person);
