@@ -795,6 +795,7 @@ function HostLandingPage({
   onChangePermission,
   notifications,
   onOpenNotification,
+  onMarkNotificationRead,
   onMarkAllNotificationsRead
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -890,7 +891,14 @@ function HostLandingPage({
   );
 }
 
-function ClientLandingPage({ currentUser, onLogout, notifications, onOpenNotification, onMarkAllNotificationsRead }) {
+function ClientLandingPage({
+  currentUser,
+  onLogout,
+  notifications,
+  onOpenNotification,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead
+}) {
   function goTo(path) {
     window.location.assign(path);
   }
@@ -2746,6 +2754,7 @@ export default function App() {
         onChangePermission={handlePermissionChange}
         notifications={notifications}
         onOpenNotification={openNotification}
+        onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
       />
     );
@@ -2758,6 +2767,7 @@ export default function App() {
         onLogout={handleLogout}
         notifications={notifications}
         onOpenNotification={openNotification}
+        onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
       />
     );
