@@ -2663,7 +2663,7 @@ export default function App() {
     if (!job?.id) return;
     setClientExporting(true);
     try {
-      const printWindow = window.open("", "_blank", "noopener,noreferrer");
+      const printWindow = window.open("", "_blank");
       if (!printWindow) {
         throw new Error("Please allow pop-ups so the PDF export can open.");
       }
@@ -2839,6 +2839,9 @@ export default function App() {
         setTimeout(() => {
           window.focus();
           window.print();
+          setTimeout(() => {
+            window.close();
+          }, 300);
         }, 250);
       });
     </script>
