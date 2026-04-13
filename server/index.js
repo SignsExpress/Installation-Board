@@ -860,6 +860,7 @@ function sanitizeHolidayAllowance(payload) {
     extraServiceDays: toNumber(payload.extraServiceDays),
     christmasDays: toNumber(payload.christmasDays),
     bankHolidayDays: toNumber(payload.bankHolidayDays),
+    unpaidDaysBooked: toNumber(payload.unpaidDaysBooked),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -992,11 +993,7 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       normalized.standardEntitlement +
       normalized.extraServiceDays;
     const bookedDays = approvedCounts.get(staffEntry.person) || 0;
-    const daysLeft =
-      prorataAllowance -
-      normalized.christmasDays -
-      normalized.bankHolidayDays -
-      bookedDays;
+    const daysLeft = prorataAllowance - bookedDays;
 
     return {
       ...normalized,
@@ -1004,8 +1001,7 @@ function buildHolidayAllowanceSummaries(store, yearStart = getCurrentHolidayYear
       fullName: staffEntry.name,
       prorataAllowance,
       bookedDays,
-      daysLeft,
-      unpaidDaysBooked: 0
+      daysLeft
     };
   });
 

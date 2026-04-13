@@ -894,7 +894,7 @@ function HolidaysPage({
                   <tr>
                     <th>Employee</th>
                     <th>Number Days work pw</th>
-                    <th>Standard Entitlement</th>
+                    <th>Standard Entitlement (21 + 8BH)</th>
                     <th>Extra Days (Service)</th>
                     <th>Pro-rata Allowance</th>
                     <th>Allocated for Xmas</th>
@@ -913,7 +913,32 @@ function HolidaysPage({
                       {[
                         ["workDaysPerWeek", entry.workDaysPerWeek],
                         ["standardEntitlement", entry.standardEntitlement],
-                        ["extraServiceDays", entry.extraServiceDays],
+                        ["extraServiceDays", entry.extraServiceDays]
+                      ].map(([field, value]) => (
+                        <td key={`${entry.person}-${field}`}>
+                          {canReview ? (
+                            <input
+                              className="holiday-allowance-input"
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              defaultValue={value}
+                              disabled={holidayAllowanceSavingKey === `${entry.person}:${field}`}
+                              onBlur={(event) => onSaveHolidayAllowance(entry.person, { [field]: event.target.value })}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  event.currentTarget.blur();
+                                }
+                              }}
+                            />
+                          ) : (
+                            <span>{value}</span>
+                          )}
+                        </td>
+                      ))}
+                      <td><strong>{entry.prorataAllowance}</strong></td>
+                      {[
                         ["christmasDays", entry.christmasDays],
                         ["bankHolidayDays", entry.bankHolidayDays]
                       ].map(([field, value]) => (
@@ -939,12 +964,31 @@ function HolidaysPage({
                           )}
                         </td>
                       ))}
-                      <td><strong>{entry.prorataAllowance}</strong></td>
                       <td>{entry.bookedDays}</td>
                       <td className={entry.daysLeft < 0 ? "holiday-days-negative" : "holiday-days-positive"}>
                         <strong>{entry.daysLeft}</strong>
                       </td>
-                      <td>{entry.unpaidDaysBooked || 0}</td>
+                      <td>
+                        {canReview ? (
+                          <input
+                            className="holiday-allowance-input"
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            defaultValue={entry.unpaidDaysBooked || 0}
+                            disabled={holidayAllowanceSavingKey === `${entry.person}:unpaidDaysBooked`}
+                            onBlur={(event) => onSaveHolidayAllowance(entry.person, { unpaidDaysBooked: event.target.value })}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                event.currentTarget.blur();
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span>{entry.unpaidDaysBooked || 0}</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
