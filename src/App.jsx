@@ -188,7 +188,7 @@ function formatHolidayBirthday(value) {
   return parsed.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "2-digit",
-    year: "numeric",
+    year: "2-digit",
     timeZone: "UTC"
   });
 }
@@ -356,10 +356,11 @@ function formatDateTime(value) {
   if (Number.isNaN(parsed.getTime())) return String(value);
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
-    month: "short",
-    year: "numeric",
+    month: "2-digit",
+    year: "2-digit",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    hour12: false
   }).format(parsed);
 }
 
@@ -368,10 +369,17 @@ function formatJobDate(value) {
   if (!parsed) return String(value || "");
   return new Intl.DateTimeFormat("en-GB", {
     day: "2-digit",
-    month: "short",
-    year: "numeric",
+    month: "2-digit",
+    year: "2-digit",
     timeZone: "Europe/London"
   }).format(parsed);
+}
+
+function formatHolidayRequestDateRange(startDate, endDate) {
+  const start = formatJobDate(startDate);
+  const end = formatJobDate(endDate || startDate);
+  if (!start) return "";
+  return end && end !== start ? `${start} to ${end}` : start;
 }
 
 function escapeHtml(value) {
@@ -1255,7 +1263,8 @@ function HolidaysPage({
   onSubmitHolidayEvent,
   onDeleteHolidayEvent,
   onSubmitHolidayRequest,
-  onReviewHolidayRequest
+  onReviewHolidayRequest,
+  onCancelHolidayRequest
 }) {
   const canReview = canEditHolidays(currentUser);
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
@@ -1321,10 +1330,7 @@ function HolidaysPage({
                   <article key={request.id} className={`holiday-request-card status-${request.status || "pending"}`}>
                     <div className="holiday-request-main">
                       <strong>{request.person}</strong>
-                      <span>
-                        {request.startDate}
-                        {request.endDate && request.endDate !== request.startDate ? ` to ${request.endDate}` : ""}
-                      </span>
+                      <span>{formatHolidayRequestDateRange(request.startDate, request.endDate)}</span>
                       <span>{request.duration || "Full Day"}</span>
                       {request.notes ? <p>{request.notes}</p> : null}
                     </div>
@@ -1340,6 +1346,13 @@ function HolidaysPage({
                           </button>
                           <button className="text-button danger" type="button" onClick={() => onReviewHolidayRequest(request.id, "rejected")}>
                             Reject
+                          </button>
+                        </div>
+                      ) : null}
+                      {!canReview && request.status === "approved" ? (
+                        <div className="holiday-request-actions">
+                          <button className="text-button danger" type="button" onClick={() => onCancelHolidayRequest(request.id)}>
+                            Cancel holiday
                           </button>
                         </div>
                       ) : null}
@@ -2710,6 +2723,25 @@ export default function App() {
     }
   }
 
+  async function cancelHolidayRequest(requestId) {
+    try {
+      const response = await fetch(`/api/holiday-requests/${requestId}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not cancel holiday.");
+      setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
+      setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
+      await refreshNotifications();
+      setMessage(createMessage("Holiday cancelled.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not cancel holiday.", "error"));
+    }
+  }
+
   async function completeJob(jobId) {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/complete`, {
       method: "POST"
@@ -3579,12 +3611,13 @@ export default function App() {
         onSaveHolidayAllowance={saveHolidayAllowance}
         onToggleHolidayDate={cycleHoliday}
         onSubmitHolidayEvent={submitHolidayEvent}
-        onDeleteHolidayEvent={deleteHolidayEvent}
-        onSubmitHolidayRequest={submitHolidayRequest}
-        onReviewHolidayRequest={reviewHolidayRequest}
-      />
-  );
-  }
+          onDeleteHolidayEvent={deleteHolidayEvent}
+          onSubmitHolidayRequest={submitHolidayRequest}
+          onReviewHolidayRequest={reviewHolidayRequest}
+          onCancelHolidayRequest={cancelHolidayRequest}
+        />
+      );
+    }
 
   if (showInstallerDirectory) {
     return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;

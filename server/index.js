@@ -4010,6 +4010,42 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(visiblePayload);
   });
 
+  app.delete("/api/holiday-requests/:id", async (request, response) => {
+    if (!requireHolidayAccess(request, response)) return;
+
+    const store = await readStore();
+    store.holidayRequests = Array.isArray(store.holidayRequests) ? store.holidayRequests : [];
+    const requestIndex = store.holidayRequests.findIndex((item) => String(item.id || "") === String(request.params.id || ""));
+    if (requestIndex === -1) {
+      response.status(404).json({ error: "Holiday request not found." });
+      return;
+    }
+
+    const holidayRequest = store.holidayRequests[requestIndex];
+    const ownsRequest = String(holidayRequest.requestedByUserId || "") === String(request.user?.id || "");
+    if (!canEditHolidays(request.user) && !ownsRequest) {
+      response.status(403).json({ error: "You can only cancel your own holiday requests." });
+      return;
+    }
+
+    if (String(holidayRequest.status || "").toLowerCase() === "approved") {
+      const requestDates = enumerateIsoDates(holidayRequest.startDate, holidayRequest.endDate).filter(isWeekdayIsoDate);
+      store.holidays = (store.holidays || []).filter((entry) => {
+        if (getHolidayType(entry) === "birthday") return true;
+        const samePerson = getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(holidayRequest.person);
+        const sameDate = requestDates.includes(String(entry.date || ""));
+        return !(samePerson && sameDate);
+      });
+    }
+
+    store.holidayRequests.splice(requestIndex, 1);
+    const savedStore = await writeStore(store);
+    const payloadYearStart = getHolidayYearStartForIsoDate(holidayRequest.startDate) || getCurrentHolidayYearStart();
+    const visiblePayload = await getHolidayPayload(request.user, payloadYearStart);
+    broadcast("board-updated", buildBoardRowsFromStore(savedStore));
+    response.json(visiblePayload);
+  });
+
   app.post("/api/holiday-allowances", async (request, response) => {
     if (!requireHolidayAdmin(request, response)) return;
 
