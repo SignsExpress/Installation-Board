@@ -2351,20 +2351,20 @@ button {
 .notification-feed-card {
   border: 1px solid rgba(199, 183, 210, 0.45);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(252, 251, 253, 0.98) 0%, rgba(245, 239, 248, 0.94) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(249, 246, 251, 0.96) 100%);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  padding: 16px;
+  padding: 14px 16px;
 }
 
 .notification-feed-card.unread {
   border-color: rgba(116, 70, 137, 0.5);
-  box-shadow: 0 0 0 1px rgba(116, 70, 137, 0.08);
+  box-shadow: 0 0 0 1px rgba(116, 70, 137, 0.08), 0 12px 24px rgba(116, 70, 137, 0.06);
 }
 
 .notification-feed-card.read {
-  opacity: 0.78;
+  opacity: 0.9;
 }
 
 .notification-feed-main {
@@ -2394,27 +2394,36 @@ button {
 .notification-feed-copy {
   min-width: 0;
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .notification-feed-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.notification-feed-heading {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
 }
 
 .notification-feed-copy strong {
   font-size: 1rem;
   color: #0f172a;
+  line-height: 1.2;
 }
 
 .notification-feed-copy span {
-  color: #475569;
-  line-height: 1.45;
+  color: #334155;
+  line-height: 1.5;
+  font-size: 0.96rem;
 }
 
-.notification-feed-copy small {
+.notification-feed-copy small,
+.notification-feed-meta {
   color: #7c3aed;
   font-weight: 700;
   font-size: 0.74rem;
@@ -2422,11 +2431,25 @@ button {
   text-transform: uppercase;
 }
 
+.notification-feed-state {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
 .notification-feed-status {
   color: #be123c;
   font-size: 0.76rem;
   font-weight: 700;
   flex: 0 0 auto;
+}
+
+.notification-feed-time {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .notification-feed-actions {

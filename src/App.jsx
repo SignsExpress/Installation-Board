@@ -387,6 +387,29 @@ function formatHolidayRequestDateRange(startDate, endDate) {
   return end && end !== start ? `${start} to ${end}` : start;
 }
 
+function formatNotificationDate(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(parsed);
+}
+
+function formatNotificationMessage(message) {
+  const raw = String(message || "").trim();
+  if (!raw) return "";
+
+  return raw
+    .replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, year, month, day) => `${day}/${month}/${String(year).slice(-2)}`)
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1029,31 +1052,38 @@ function NotificationsPage({
 
           {filteredNotifications.length ? (
             <div className="notifications-feed">
-              {filteredNotifications.map((notification) => {
-                const category = getNotificationCategory(notification);
-                const CategoryIcon = category.icon;
-                return (
-                  <article
-                    key={notification.id}
-                    className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
-                  >
+                {filteredNotifications.map((notification) => {
+                  const category = getNotificationCategory(notification);
+                  const CategoryIcon = category.icon;
+                  const formattedMessage = formatNotificationMessage(notification.message);
+                  const formattedTimestamp = formatNotificationDate(notification.createdAt);
+                  return (
+                    <article
+                      key={notification.id}
+                      className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
+                    >
                     <button
                       type="button"
                       className="notification-feed-main"
                       onClick={() => onOpenNotification(notification)}
                     >
-                      <span className={`notification-feed-icon ${category.className}`}>
-                        <CategoryIcon />
-                      </span>
-                      <div className="notification-feed-copy">
-                        <div className="notification-feed-top">
-                          <strong>{notification.title}</strong>
-                          {!notification.read ? <span className="notification-feed-status">New</span> : null}
+                        <span className={`notification-feed-icon ${category.className}`}>
+                          <CategoryIcon />
+                        </span>
+                        <div className="notification-feed-copy">
+                          <div className="notification-feed-top">
+                            <div className="notification-feed-heading">
+                              <strong>{notification.title}</strong>
+                              <small className="notification-feed-meta">{category.label}</small>
+                            </div>
+                            <div className="notification-feed-state">
+                              {!notification.read ? <span className="notification-feed-status">New</span> : null}
+                              {formattedTimestamp ? <span className="notification-feed-time">{formattedTimestamp}</span> : null}
+                            </div>
+                          </div>
+                          <span>{formattedMessage || notification.message}</span>
                         </div>
-                        <span>{notification.message}</span>
-                        <small>{category.label}</small>
-                      </div>
-                    </button>
+                      </button>
                     <div className="notification-feed-actions">
                       {!notification.read ? (
                         <button
