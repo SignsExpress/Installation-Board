@@ -87,7 +87,7 @@ button {
 }
 
 .app-shell:has(.host-nav-shell) {
-  padding-top: 92px;
+  padding-top: 110px;
 }
 
 .app-shell:has(.auth-panel) {
@@ -3352,7 +3352,7 @@ button {
 
 @media (max-width: 780px) {
   .app-shell:has(.host-nav-shell) {
-    padding-top: 118px;
+    padding-top: 134px;
   }
 
   .host-landing-tools {
