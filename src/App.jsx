@@ -1279,15 +1279,14 @@ function HolidaysPage({
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
   const [selectedHolidayPerson, setSelectedHolidayPerson] = useState("");
-  const cancellableRequests = useMemo(
-    () =>
-      holidayRequests.filter(
-        (request) =>
-          String(request.status || "").toLowerCase() === "approved" &&
-          String(request.action || "book").toLowerCase() !== "cancel"
-      ),
-    [holidayRequests]
-  );
+  const cancellableHolidayEntries = useMemo(() => {
+    if (canReview || !currentPerson) return [];
+    return holidays.filter(
+      (holiday) =>
+        !isBirthdayHoliday(holiday) &&
+        getHolidayStaffIdentityKey(holiday.person) === getHolidayStaffIdentityKey(currentPerson)
+    );
+  }, [canReview, currentPerson, holidays]);
   const visibleHolidayAllowances = useMemo(
     () =>
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
@@ -1340,7 +1339,7 @@ function HolidaysPage({
                     className="ghost-button"
                     type="button"
                     onClick={() => setHolidayCancelOpen(true)}
-                    disabled={!cancellableRequests.length}
+                    disabled={!cancellableHolidayEntries.length}
                   >
                     Cancel holiday
                   </button>
@@ -1782,10 +1781,10 @@ function HolidaysPage({
                     value={holidayCancelForm.requestId}
                     onChange={(event) => setHolidayCancelForm((current) => ({ ...current, requestId: event.target.value }))}
                   >
-                    <option value="">Select approved holiday</option>
-                    {cancellableRequests.map((request) => (
-                      <option key={request.id} value={request.id}>
-                        {formatHolidayRequestDateRange(request.startDate, request.endDate)} - {request.duration || "Full Day"}
+                    <option value="">Select booked holiday</option>
+                    {cancellableHolidayEntries.map((holiday) => (
+                      <option key={holiday.id} value={holiday.id}>
+                        {formatJobDate(holiday.date)} - {holiday.duration || "Full Day"}
                       </option>
                     ))}
                   </select>
@@ -1801,7 +1800,7 @@ function HolidaysPage({
                 </label>
 
                 <div className="form-actions">
-                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableRequests.length}>
+                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableHolidayEntries.length}>
                     {holidayRequestSaving ? "Sending..." : "Send cancellation request"}
                   </button>
                   <button className="ghost-button" type="button" onClick={() => setHolidayCancelOpen(false)}>
@@ -2805,9 +2804,9 @@ export default function App() {
   }
 
   async function cancelHolidayRequest() {
-    const targetRequest = holidayRequests.find((request) => request.id === holidayCancelForm.requestId);
-    if (!targetRequest) {
-      setMessage(createMessage("Choose an approved holiday to cancel.", "error"));
+    const targetHoliday = holidays.find((holiday) => holiday.id === holidayCancelForm.requestId);
+    if (!targetHoliday) {
+      setMessage(createMessage("Choose a booked holiday to cancel.", "error"));
       return;
     }
 
@@ -2817,14 +2816,14 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          person: targetRequest.person,
+          person: targetHoliday.person,
           holidayYearStart,
-          startDate: targetRequest.startDate,
-          endDate: targetRequest.endDate,
-          duration: targetRequest.duration,
+          startDate: targetHoliday.date,
+          endDate: targetHoliday.date,
+          duration: targetHoliday.duration,
           notes: holidayCancelForm.notes,
           action: "cancel",
-          targetRequestId: targetRequest.id
+          targetRequestId: ""
         })
       });
       const payload = await response.json();
