@@ -144,6 +144,9 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOn
     window.location.assign(path);
   }
 
+  const boardPath = currentUser?.permissions?.board === "admin" ? "/board" : "/client/board";
+  const holidaysAllowed = currentUser?.permissions?.holidays && currentUser.permissions.holidays !== "none";
+
   function resetForm() {
     setForm(DEFAULT_INSTALLER_FORM);
     setEditingId(null);
@@ -307,29 +310,46 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOn
   return (
     <div className="app-shell installer-host-view">
       <div className="page">
-        <nav className="panel host-nav">
-          <div className="host-nav-links">
-            <button type="button" className="host-nav-link" onClick={() => navigate("/")}>
-              Home
-            </button>
-            <button
-              type="button"
-              className="host-nav-link"
-              onClick={() => navigate(currentUser?.permissions?.board === "admin" ? "/board" : "/client/board")}
-            >
-              Installation Board
-            </button>
-            <button type="button" className="host-nav-link active" onClick={() => navigate("/installer")}>
-              Subcontractor Directory
-            </button>
-          </div>
-          <div className="host-nav-meta">
-            <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
-            <button className="host-nav-logout" type="button" onClick={onLogout}>
-              Log out
-            </button>
-          </div>
-        </nav>
+        <header className="host-nav-shell">
+          <nav className="host-nav">
+            <div className="host-nav-inner">
+              <button type="button" className="host-nav-brand" onClick={() => navigate("/")} aria-label="Go to home">
+                <img src="/branding/signs-express-logo.svg" alt="Signs Express" className="host-nav-brand-logo" />
+              </button>
+              <div className="host-nav-links">
+                <button type="button" className="host-nav-link" onClick={() => navigate("/")}>
+                  <span className="host-nav-link-label">Home</span>
+                </button>
+                <button type="button" className="host-nav-link" onClick={() => navigate(boardPath)}>
+                  <span className="host-nav-link-label">Installation Board</span>
+                </button>
+                <button
+                  type="button"
+                  className={cls("host-nav-link", holidaysAllowed ? "" : "disabled")}
+                  onClick={() => {
+                    if (!holidaysAllowed) return;
+                    navigate("/holidays");
+                  }}
+                  disabled={!holidaysAllowed}
+                >
+                  <span className="host-nav-link-label">Holidays</span>
+                </button>
+                <button type="button" className="host-nav-link active" onClick={() => navigate("/installer")}>
+                  <span className="host-nav-link-label">Subcontractor Directory</span>
+                </button>
+                <button type="button" className="host-nav-link" onClick={() => navigate("/notifications")}>
+                  <span className="host-nav-link-label">Notifications</span>
+                </button>
+              </div>
+              <div className="host-nav-meta">
+                <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
+                <button className="host-nav-logout" type="button" onClick={onLogout}>
+                  <span className="host-nav-link-label">Log out</span>
+                </button>
+              </div>
+            </div>
+          </nav>
+        </header>
 
         <div className="workspace-grid">
           <section className="card card-large map-panel-card">
