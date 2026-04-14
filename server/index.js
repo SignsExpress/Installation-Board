@@ -3590,23 +3590,23 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
     const usersStore = await readUsersStore();
     if (!existingJob && nextJob.date) {
-      const jobLabel = getJobNotificationLabel(nextJob);
+      const jobSummary = getJobNotificationSummary(nextJob);
       const bookedDate = formatBoardNotificationDate(nextJob.date);
       pushBoardNotification(store, usersStore.users || [], () => ({
         type: "job-added",
         title: "Job added to board",
-        message: `${jobLabel} was added for ${bookedDate} by ${request.user?.displayName || "a user"}.`
+        message: `${jobSummary} was added to the installation board for ${bookedDate} by ${request.user?.displayName || "a user"}.`
       }));
     } else if (existingJob && existingJob.date !== nextJob.date && nextJob.date) {
-      const jobLabel = getJobNotificationLabel(nextJob);
+      const jobSummary = getJobNotificationSummary(nextJob);
       const fromLabel = existingJob.date ? formatBoardNotificationDate(existingJob.date) : "Unscheduled";
       const toLabel = formatBoardNotificationDate(nextJob.date);
       pushBoardNotification(store, usersStore.users || [], () => ({
         type: "job-moved",
         title: existingJob.date ? "Job moved on board" : "Job added to board",
         message: existingJob.date
-          ? `${jobLabel} moved from ${fromLabel} to ${toLabel} by ${request.user?.displayName || "a user"}.`
-          : `${jobLabel} was added for ${toLabel} by ${request.user?.displayName || "a user"}.`
+          ? `${jobSummary} moved from ${fromLabel} to ${toLabel} by ${request.user?.displayName || "a user"}.`
+          : `${jobSummary} was added to the installation board for ${toLabel} by ${request.user?.displayName || "a user"}.`
       }));
     }
 
