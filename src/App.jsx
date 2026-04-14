@@ -1102,55 +1102,59 @@ function NotificationsPage({
           </div>
 
           {filteredNotifications.length ? (
-            <div className="notifications-feed">
-                {filteredNotifications.map((notification) => {
-                  const category = getNotificationCategory(notification);
-                  const CategoryIcon = category.icon;
-                  const formattedMessage = formatNotificationMessage(notification.message);
-                  const formattedTimestamp = formatNotificationDate(notification.createdAt);
-                  return (
-                    <article
-                      key={notification.id}
-                      className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
-                    >
-                    <button
-                      type="button"
-                      className="notification-feed-main"
-                      onClick={() => onOpenNotification(notification)}
-                    >
-                        <span className={`notification-feed-icon ${category.className}`}>
-                          <CategoryIcon />
-                        </span>
-                        <div className="notification-feed-copy">
-                          <div className="notification-feed-top">
-                            <div className="notification-feed-heading">
-                              <strong>{notification.title}</strong>
-                              <small className="notification-feed-meta">{category.label}</small>
-                            </div>
-                            <div className="notification-feed-state">
-                              {!notification.read ? <span className="notification-feed-status">New</span> : null}
-                              {formattedTimestamp ? <span className="notification-feed-time">{formattedTimestamp}</span> : null}
-                            </div>
-                          </div>
-                          <span>{formattedMessage || notification.message}</span>
-                        </div>
-                      </button>
-                    <div className="notification-feed-actions">
-                      {!notification.read ? (
+                <div className="notifications-feed">
+                  {filteredNotifications.map((notification) => {
+                    const category = getNotificationCategory(notification);
+                    const CategoryIcon = category.icon;
+                    const formattedMessage = formatNotificationMessage(notification.message);
+                    const formattedTimestamp = formatNotificationDate(notification.createdAt);
+                    return (
+                      <article
+                        key={notification.id}
+                        className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
+                      >
                         <button
                           type="button"
-                          className="text-button"
-                          onClick={() => onMarkNotificationRead(notification.id)}
+                          className="notification-feed-main"
+                          onClick={() => onOpenNotification(notification)}
                         >
-                          Mark read
+                          <span className={`notification-feed-icon ${category.className}`}>
+                            <CategoryIcon />
+                          </span>
+                          <div className="notification-feed-copy">
+                            <div className="notification-feed-top">
+                              <div className="notification-feed-title-row">
+                                <strong>{notification.title}</strong>
+                                {formattedTimestamp ? (
+                                  <time className="notification-feed-time" dateTime={notification.createdAt}>
+                                    {formattedTimestamp}
+                                  </time>
+                                ) : null}
+                              </div>
+                              <div className="notification-feed-meta-row">
+                                <span className={`notification-feed-tag ${category.className}`}>{category.label}</span>
+                                {!notification.read ? <span className="notification-feed-status">Unread</span> : null}
+                              </div>
+                            </div>
+                            <p className="notification-feed-message">{formattedMessage || notification.message}</p>
+                          </div>
                         </button>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
+                        <div className="notification-feed-actions">
+                          {!notification.read ? (
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() => onMarkNotificationRead(notification.id)}
+                            >
+                              Mark read
+                            </button>
+                          ) : null}
+                        </div>
+                      </article>
+                    );
+                  })}
+              </div>
+            ) : (
             <div className="notifications-empty">No notifications in this view.</div>
           )}
         </section>
