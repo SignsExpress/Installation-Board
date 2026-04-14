@@ -1926,6 +1926,7 @@ function HolidaysPage({
 
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
+  const search = typeof window !== "undefined" ? window.location.search : "";
   const isClientRoute = pathname.startsWith("/client");
   const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
@@ -1986,11 +1987,16 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
+  const boardNotificationJobId = useMemo(() => {
+    const params = new URLSearchParams(search);
+    return params.get("job") || "";
+  }, [search]);
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
   const clientPhotoInputRef = useRef(null);
   const adminPhotoInputRef = useRef(null);
+  const openedNotificationJobIdRef = useRef("");
   const boardEditable = canEditBoard(currentUser);
   const installerEditable = canEditInstaller(currentUser);
   const hostShellMode = usesHostShell(currentUser);
@@ -2145,6 +2151,27 @@ export default function App() {
       active = false;
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    if (!showBoard || !boardNotificationJobId || !Array.isArray(jobs) || !jobs.length) return;
+    if (openedNotificationJobIdRef.current === String(boardNotificationJobId)) return;
+
+    const matchedJob = jobs.find((job) => String(job.id || "") === String(boardNotificationJobId));
+    if (!matchedJob) return;
+
+    openedNotificationJobIdRef.current = String(boardNotificationJobId);
+    if (isClientMode) {
+      setActiveClientJob(matchedJob);
+    } else {
+      editJob(matchedJob);
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    params.delete("job");
+    const nextSearch = params.toString();
+    const nextUrl = `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}${window.location.hash || ""}`;
+    window.history.replaceState({}, "", nextUrl);
+  }, [boardNotificationJobId, isClientMode, jobs, showBoard]);
 
   useEffect(() => {
     setClientCompletePrompt(false);

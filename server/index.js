@@ -350,8 +350,11 @@ function getBoardNotificationRecipients(users) {
   return users.filter((user) => canAccessBoard(sanitizeUser(user)));
 }
 
-function getBoardLinkForUser(user) {
-  return canEditBoard(sanitizeUser(user)) ? "/board" : "/client/board";
+function getBoardLinkForUser(user, jobId = "") {
+  const basePath = canEditBoard(sanitizeUser(user)) ? "/board" : "/client/board";
+  if (!jobId) return basePath;
+  const params = new URLSearchParams({ job: String(jobId) });
+  return `${basePath}?${params.toString()}`;
 }
 
 function formatBoardNotificationDate(isoDate) {
@@ -381,11 +384,12 @@ function getJobNotificationSummary(job) {
 function pushBoardNotification(store, users, buildPayload) {
   store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
   getBoardNotificationRecipients(users).forEach((user) => {
+    const payload = buildPayload(user) || {};
     store.notifications.unshift(
       createNotification({
         userId: user.id,
-        link: getBoardLinkForUser(user),
-        ...buildPayload(user)
+        link: getBoardLinkForUser(user, payload.jobId),
+        ...payload
       })
     );
   });
@@ -3591,20 +3595,22 @@ app.get("/api/corebridge/orders", async (request, response) => {
     if (!existingJob && nextJob.date) {
       const jobSummary = getJobNotificationSummary(nextJob);
       const bookedDate = formatBoardNotificationDate(nextJob.date);
-      pushBoardNotification(store, usersStore.users || [], () => ({
-        type: "job-added",
-        title: "Job added to board",
-        message: `${jobSummary} was added to the installation board for ${bookedDate} by ${request.user?.displayName || "a user"}.`
-      }));
+        pushBoardNotification(store, usersStore.users || [], () => ({
+          jobId: nextJob.id,
+          type: "job-added",
+          title: "Job added to board",
+          message: `${jobSummary} was added to the installation board for ${bookedDate} by ${request.user?.displayName || "a user"}.`
+        }));
     } else if (existingJob && existingJob.date !== nextJob.date && nextJob.date) {
       const jobSummary = getJobNotificationSummary(nextJob);
       const fromLabel = existingJob.date ? formatBoardNotificationDate(existingJob.date) : "Unscheduled";
       const toLabel = formatBoardNotificationDate(nextJob.date);
-      pushBoardNotification(store, usersStore.users || [], () => ({
-        type: "job-moved",
-        title: existingJob.date ? "Job moved on board" : "Job added to board",
-        message: existingJob.date
-          ? `${jobSummary} moved from ${fromLabel} to ${toLabel} by ${request.user?.displayName || "a user"}.`
+        pushBoardNotification(store, usersStore.users || [], () => ({
+          jobId: nextJob.id,
+          type: "job-moved",
+          title: existingJob.date ? "Job moved on board" : "Job added to board",
+          message: existingJob.date
+            ? `${jobSummary} moved from ${fromLabel} to ${toLabel} by ${request.user?.displayName || "a user"}.`
           : `${jobSummary} was added to the installation board for ${toLabel} by ${request.user?.displayName || "a user"}.`
       }));
     }
@@ -3649,11 +3655,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
           : photoCount === 1
             ? "1 photo was uploaded."
             : `${photoCount} photos were uploaded.`;
-      pushBoardNotification(store, usersStore.users || [], () => ({
-        type: "job-completed",
-        title: "Job marked complete",
-        message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
-      }));
+        pushBoardNotification(store, usersStore.users || [], () => ({
+          jobId: nextJob.id,
+          type: "job-completed",
+          title: "Job marked complete",
+          message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
+        }));
     }
     const savedStore = await writeStore(store);
     const payload = {
