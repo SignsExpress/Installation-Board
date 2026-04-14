@@ -370,6 +370,15 @@ function getJobNotificationLabel(job) {
   return String(job?.orderReference || "").trim() || String(job?.customerName || "").trim() || "Job";
 }
 
+function getJobNotificationSummary(job) {
+  const parts = [
+    String(job?.orderReference || "").trim(),
+    String(job?.customerName || "").trim(),
+    String(job?.description || "").trim()
+  ].filter(Boolean);
+  return parts.join(" - ") || getJobNotificationLabel(job);
+}
+
 function pushBoardNotification(store, users, buildPayload) {
   store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
   getBoardNotificationRecipients(users).forEach((user) => {
@@ -3633,11 +3642,18 @@ app.get("/api/corebridge/orders", async (request, response) => {
     store.jobs[index] = nextJob;
     if (!existing.isCompleted) {
       const usersStore = await readUsersStore();
-      const jobLabel = getJobNotificationLabel(nextJob);
+      const jobSummary = getJobNotificationSummary(nextJob);
+      const photoCount = Array.isArray(nextJob.photos) ? nextJob.photos.length : 0;
+      const photoSummary =
+        photoCount === 0
+          ? "No photos were uploaded."
+          : photoCount === 1
+            ? "1 photo was uploaded."
+            : `${photoCount} photos were uploaded.`;
       pushBoardNotification(store, usersStore.users || [], () => ({
         type: "job-completed",
         title: "Job marked complete",
-        message: `${jobLabel} was marked complete by ${request.user?.displayName || "a user"}.`
+        message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
       }));
     }
     const savedStore = await writeStore(store);
