@@ -410,6 +410,57 @@ function formatNotificationMessage(message) {
     .trim();
 }
 
+function getNextWeekdayIsoDate(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return "";
+  let cursor = addDays(parsed, 1);
+  while (cursor.getUTCDay() === 0 || cursor.getUTCDay() === 6) {
+    cursor = addDays(cursor, 1);
+  }
+  return toIsoDate(cursor);
+}
+
+function buildCancellableHolidayGroups(holidays, person) {
+  const personKey = getHolidayStaffIdentityKey(person);
+  const filtered = [...holidays]
+    .filter(
+      (holiday) =>
+        !isBirthdayHoliday(holiday) &&
+        getHolidayStaffIdentityKey(holiday.person) === personKey
+    )
+    .sort((left, right) => {
+      if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+      return String(left.duration || "").localeCompare(String(right.duration || ""));
+    });
+
+  const groups = [];
+  for (const holiday of filtered) {
+    const currentDate = String(holiday.date || "");
+    const currentDuration = String(holiday.duration || "Full Day");
+    const previous = groups[groups.length - 1];
+    if (
+      previous &&
+      previous.duration === currentDuration &&
+      getNextWeekdayIsoDate(previous.endDate) === currentDate
+    ) {
+      previous.endDate = currentDate;
+      previous.holidayIds.push(holiday.id);
+      continue;
+    }
+
+    groups.push({
+      id: `${currentDate}:${currentDuration}`,
+      person: holiday.person,
+      startDate: currentDate,
+      endDate: currentDate,
+      duration: currentDuration,
+      holidayIds: [holiday.id]
+    });
+  }
+
+  return groups;
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1317,6 +1368,10 @@ function HolidaysPage({
         getHolidayStaffIdentityKey(holiday.person) === getHolidayStaffIdentityKey(currentPerson)
     );
   }, [canReview, currentPerson, holidays]);
+  const cancellableHolidayGroups = useMemo(
+    () => buildCancellableHolidayGroups(cancellableHolidayEntries, currentPerson),
+    [cancellableHolidayEntries, currentPerson]
+  );
   const visibleHolidayAllowances = useMemo(
     () =>
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
@@ -1369,7 +1424,7 @@ function HolidaysPage({
                     className="ghost-button"
                     type="button"
                     onClick={() => setHolidayCancelOpen(true)}
-                    disabled={!cancellableHolidayEntries.length}
+                    disabled={!cancellableHolidayGroups.length}
                   >
                     Cancel holiday
                   </button>
@@ -1811,10 +1866,10 @@ function HolidaysPage({
                     value={holidayCancelForm.requestId}
                     onChange={(event) => setHolidayCancelForm((current) => ({ ...current, requestId: event.target.value }))}
                   >
-                    <option value="">Select booked holiday</option>
-                    {cancellableHolidayEntries.map((holiday) => (
-                      <option key={holiday.id} value={holiday.id}>
-                        {formatJobDate(holiday.date)} - {holiday.duration || "Full Day"}
+                    <option value="">Select booked holiday range</option>
+                    {cancellableHolidayGroups.map((holidayGroup) => (
+                      <option key={holidayGroup.id} value={holidayGroup.id}>
+                        {formatHolidayRequestDateRange(holidayGroup.startDate, holidayGroup.endDate)} - {holidayGroup.duration || "Full Day"}
                       </option>
                     ))}
                   </select>
@@ -1830,7 +1885,7 @@ function HolidaysPage({
                 </label>
 
                 <div className="form-actions">
-                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableHolidayEntries.length}>
+                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableHolidayGroups.length}>
                     {holidayRequestSaving ? "Sending..." : "Send cancellation request"}
                   </button>
                   <button className="ghost-button" type="button" onClick={() => setHolidayCancelOpen(false)}>
@@ -2834,9 +2889,9 @@ export default function App() {
   }
 
   async function cancelHolidayRequest() {
-    const targetHoliday = holidays.find((holiday) => holiday.id === holidayCancelForm.requestId);
-    if (!targetHoliday) {
-      setMessage(createMessage("Choose a booked holiday to cancel.", "error"));
+    const targetHolidayGroup = cancellableHolidayGroups.find((group) => group.id === holidayCancelForm.requestId);
+    if (!targetHolidayGroup) {
+      setMessage(createMessage("Choose a booked holiday range to cancel.", "error"));
       return;
     }
 
@@ -2846,11 +2901,11 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          person: targetHoliday.person,
+          person: targetHolidayGroup.person,
           holidayYearStart,
-          startDate: targetHoliday.date,
-          endDate: targetHoliday.date,
-          duration: targetHoliday.duration,
+          startDate: targetHolidayGroup.startDate,
+          endDate: targetHolidayGroup.endDate,
+          duration: targetHolidayGroup.duration,
           notes: holidayCancelForm.notes,
           action: "cancel",
           targetRequestId: ""
