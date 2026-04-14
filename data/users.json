@@ -65,14 +65,6 @@
       "passwordUpdatedAt": "2026-04-08T10:50:16.483Z"
     },
     {
-      "id": "079bf341-1dab-48c2-b1bb-c01d0482b526",
-      "displayName": "Tamas",
-      "role": "host",
-      "passwordSalt": "9dcc8c3557acdad9c9a331bd8a6cc7b0",
-      "passwordHash": "fda69b2d747fac5bbba4a79bad56094bc8c4f76fd7bd3aac3055b092414192cbf104096156ce0fa284a85a8b847491a8f6734ec12cddf7d0e0eecf71f4a5abb0",
-      "passwordUpdatedAt": "2026-04-08T10:50:16.998Z"
-    },
-    {
       "id": "cc608046-275d-486b-af86-4190cf151e2a",
       "displayName": "Tom Van-Boyd",
       "role": "host",

@@ -8,7 +8,6 @@ const PERMISSION_VALUES = ["admin", "user", "none"];
 const SEEDED_USERS = [
   { displayName: "Matt Rutlidge", role: "host" },
   { displayName: "Tom Van-Boyd", role: "host" },
-  { displayName: "Tamas", role: "host" },
   { displayName: "Amber Hardman", role: "client" },
   { displayName: "Eddy D'Antonio", role: "client" },
   { displayName: "Kyle Wright", role: "client" },

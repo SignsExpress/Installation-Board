@@ -36,8 +36,7 @@ const HOLIDAY_STAFF = [
   { code: "PM", person: "Paul M", fullName: "Paul Morris", colorClass: "holiday-person-green", birthDate: "" },
   { code: "KW", person: "Kyle W", fullName: "Kyle Wright", colorClass: "holiday-person-green", birthDate: "" },
   { code: "MC", person: "Matt C", fullName: "Matt Carroll", colorClass: "holiday-person-red", birthDate: "" },
-  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "" },
-  { code: "TS", person: "Tamas", fullName: "Tamas", colorClass: "holiday-person-amber" }
+  { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "" }
 ];
 const HOLIDAY_PERSON_COLORS = Object.fromEntries(HOLIDAY_STAFF.map((entry) => [entry.person, entry.colorClass]));
 const UNSCHEDULED_DROP_ZONE = "__unscheduled__";

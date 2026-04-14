@@ -60,8 +60,7 @@ const HOLIDAY_STAFF = [
   { code: "PM", name: "Paul Morris", person: "Paul M", birthDate: "" },
   { code: "KW", name: "Kyle Wright", person: "Kyle W", birthDate: "" },
   { code: "MC", name: "Matt Carroll", person: "Matt C", birthDate: "" },
-  { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" },
-  { code: "TS", name: "Tamas", person: "Tamas" }
+  { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" }
 ];
 const HOLIDAY_RESET_VERSION = 1;
 
