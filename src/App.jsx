@@ -68,6 +68,11 @@ const EMPTY_HOLIDAY_REQUEST_FORM = {
   notes: ""
 };
 
+const EMPTY_HOLIDAY_CANCEL_FORM = {
+  requestId: "",
+  notes: ""
+};
+
 const EMPTY_HOLIDAY_EVENT_FORM = {
   id: "",
   date: "",
@@ -1251,6 +1256,10 @@ function HolidaysPage({
   holidayRequestForm,
   setHolidayRequestForm,
   holidayRequestSaving,
+  holidayCancelOpen,
+  setHolidayCancelOpen,
+  holidayCancelForm,
+  setHolidayCancelForm,
   holidayEventOpen,
   setHolidayEventOpen,
   holidayEventForm,
@@ -1270,6 +1279,15 @@ function HolidaysPage({
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
   const [selectedHolidayPerson, setSelectedHolidayPerson] = useState("");
+  const cancellableRequests = useMemo(
+    () =>
+      holidayRequests.filter(
+        (request) =>
+          String(request.status || "").toLowerCase() === "approved" &&
+          String(request.action || "book").toLowerCase() !== "cancel"
+      ),
+    [holidayRequests]
+  );
   const visibleHolidayAllowances = useMemo(
     () =>
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
@@ -1313,12 +1331,22 @@ function HolidaysPage({
                 <button className="ghost-button" type="button" onClick={() => setHolidayYearStart(currentHolidayYearStart)}>
                   Current year
                 </button>
-              ) : null}
-              <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(true)}>
-                Request holiday
-              </button>
+                ) : null}
+                <button className="ghost-button" type="button" onClick={() => setHolidayRequestOpen(true)}>
+                  Request holiday
+                </button>
+                {!canReview ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setHolidayCancelOpen(true)}
+                    disabled={!cancellableRequests.length}
+                  >
+                    Cancel holiday
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
 
           {holidayRequests.length ? (
             <section className="holiday-requests-panel">
@@ -1332,6 +1360,7 @@ function HolidaysPage({
                       <strong>{request.person}</strong>
                       <span>{formatHolidayRequestDateRange(request.startDate, request.endDate)}</span>
                       <span>{request.duration || "Full Day"}</span>
+                      <span>{String(request.action || "book").toLowerCase() === "cancel" ? "Cancellation request" : "Holiday request"}</span>
                       {request.notes ? <p>{request.notes}</p> : null}
                     </div>
                     <div className="holiday-request-side">
@@ -1346,13 +1375,6 @@ function HolidaysPage({
                           </button>
                           <button className="text-button danger" type="button" onClick={() => onReviewHolidayRequest(request.id, "rejected")}>
                             Reject
-                          </button>
-                        </div>
-                      ) : null}
-                      {!canReview && request.status === "approved" ? (
-                        <div className="holiday-request-actions">
-                          <button className="text-button danger" type="button" onClick={() => onCancelHolidayRequest(request.id)}>
-                            Cancel holiday
                           </button>
                         </div>
                       ) : null}
@@ -1732,9 +1754,66 @@ function HolidaysPage({
             </form>
           </div>
           </div>
+          ) : null}
+
+        {holidayCancelOpen ? (
+          <div className="modal-backdrop" onClick={() => setHolidayCancelOpen(false)}>
+            <div className="modal holiday-request-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>Cancel holiday</h3>
+                  <p>Send a cancellation request for approval. Nothing will be removed until an admin approves it.</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setHolidayCancelOpen(false)}>
+                  x
+                </button>
+              </div>
+
+              <form
+                className="job-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  onCancelHolidayRequest();
+                }}
+              >
+                <label>
+                  Approved holiday
+                  <select
+                    value={holidayCancelForm.requestId}
+                    onChange={(event) => setHolidayCancelForm((current) => ({ ...current, requestId: event.target.value }))}
+                  >
+                    <option value="">Select approved holiday</option>
+                    {cancellableRequests.map((request) => (
+                      <option key={request.id} value={request.id}>
+                        {formatHolidayRequestDateRange(request.startDate, request.endDate)} - {request.duration || "Full Day"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label>
+                  Notes
+                  <textarea
+                    rows="4"
+                    value={holidayCancelForm.notes}
+                    onChange={(event) => setHolidayCancelForm((current) => ({ ...current, notes: event.target.value }))}
+                  />
+                </label>
+
+                <div className="form-actions">
+                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableRequests.length}>
+                    {holidayRequestSaving ? "Sending..." : "Send cancellation request"}
+                  </button>
+                  <button className="ghost-button" type="button" onClick={() => setHolidayCancelOpen(false)}>
+                    Close
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         ) : null}
 
-        {holidayEventOpen ? (
+          {holidayEventOpen ? (
           <div className="modal-backdrop" onClick={() => setHolidayEventOpen(false)}>
             <div className="modal holiday-request-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-head">
@@ -1817,6 +1896,8 @@ export default function App() {
   const [holidayRequestOpen, setHolidayRequestOpen] = useState(false);
   const [holidayRequestForm, setHolidayRequestForm] = useState(EMPTY_HOLIDAY_REQUEST_FORM);
   const [holidayRequestSaving, setHolidayRequestSaving] = useState(false);
+  const [holidayCancelOpen, setHolidayCancelOpen] = useState(false);
+  const [holidayCancelForm, setHolidayCancelForm] = useState(EMPTY_HOLIDAY_CANCEL_FORM);
   const [holidayEventOpen, setHolidayEventOpen] = useState(false);
   const [holidayEventForm, setHolidayEventForm] = useState(EMPTY_HOLIDAY_EVENT_FORM);
   const [holidayEventSaving, setHolidayEventSaving] = useState(false);
@@ -2723,22 +2804,44 @@ export default function App() {
     }
   }
 
-  async function cancelHolidayRequest(requestId) {
+  async function cancelHolidayRequest() {
+    const targetRequest = holidayRequests.find((request) => request.id === holidayCancelForm.requestId);
+    if (!targetRequest) {
+      setMessage(createMessage("Choose an approved holiday to cancel.", "error"));
+      return;
+    }
+
+    setHolidayRequestSaving(true);
     try {
-      const response = await fetch(`/api/holiday-requests/${requestId}`, {
-        method: "DELETE"
+      const response = await fetch("/api/holiday-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          person: targetRequest.person,
+          holidayYearStart,
+          startDate: targetRequest.startDate,
+          endDate: targetRequest.endDate,
+          duration: targetRequest.duration,
+          notes: holidayCancelForm.notes,
+          action: "cancel",
+          targetRequestId: targetRequest.id
+        })
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not cancel holiday.");
+      if (!response.ok) throw new Error(payload.error || "Could not send cancellation request.");
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
+      setHolidayCancelForm(EMPTY_HOLIDAY_CANCEL_FORM);
+      setHolidayCancelOpen(false);
       await refreshNotifications();
-      setMessage(createMessage("Holiday cancelled.", "success"));
+      setMessage(createMessage("Holiday cancellation request sent.", "success"));
     } catch (error) {
       console.error(error);
-      setMessage(createMessage(error.message || "Could not cancel holiday.", "error"));
+      setMessage(createMessage(error.message || "Could not send cancellation request.", "error"));
+    } finally {
+      setHolidayRequestSaving(false);
     }
   }
 
@@ -3596,14 +3699,18 @@ export default function App() {
         holidayYearLabel={holidayYearLabel}
         currentHolidayYearStart={currentHolidayYearStart}
         setHolidayYearStart={setHolidayYearStart}
-        holidayRequestOpen={holidayRequestOpen}
-        setHolidayRequestOpen={setHolidayRequestOpen}
-        holidayRequestForm={holidayRequestForm}
-        setHolidayRequestForm={setHolidayRequestForm}
-        holidayRequestSaving={holidayRequestSaving}
-        holidayEventOpen={holidayEventOpen}
-        setHolidayEventOpen={setHolidayEventOpen}
-        holidayEventForm={holidayEventForm}
+          holidayRequestOpen={holidayRequestOpen}
+          setHolidayRequestOpen={setHolidayRequestOpen}
+          holidayRequestForm={holidayRequestForm}
+          setHolidayRequestForm={setHolidayRequestForm}
+          holidayRequestSaving={holidayRequestSaving}
+          holidayCancelOpen={holidayCancelOpen}
+          setHolidayCancelOpen={setHolidayCancelOpen}
+          holidayCancelForm={holidayCancelForm}
+          setHolidayCancelForm={setHolidayCancelForm}
+          holidayEventOpen={holidayEventOpen}
+          setHolidayEventOpen={setHolidayEventOpen}
+          holidayEventForm={holidayEventForm}
         setHolidayEventForm={setHolidayEventForm}
         holidayEventSaving={holidayEventSaving}
         holidayAllowanceSavingKey={holidayAllowanceSavingKey}

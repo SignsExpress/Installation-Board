@@ -1363,6 +1363,8 @@ function sanitizeHolidayRequest(payload) {
   const normalizedStatus = String(payload.status || "pending").trim().toLowerCase();
   const status = ["pending", "approved", "rejected"].includes(normalizedStatus) ? normalizedStatus : "pending";
   const normalizedDuration = String(payload.duration || "Full Day").trim();
+  const normalizedAction = String(payload.action || "book").trim().toLowerCase();
+  const action = ["book", "cancel"].includes(normalizedAction) ? normalizedAction : "book";
   return {
     id: String(payload.id || makeId()),
     person: String(payload.person || "").trim(),
@@ -1372,6 +1374,8 @@ function sanitizeHolidayRequest(payload) {
     endDate: String(payload.endDate || payload.startDate || "").trim(),
     duration: normalizedDuration || "Full Day",
     notes: String(payload.notes || "").trim(),
+    action,
+    targetRequestId: String(payload.targetRequestId || "").trim(),
     status,
     reviewedAt: String(payload.reviewedAt || "").trim(),
     reviewedBy: String(payload.reviewedBy || "").trim(),
@@ -3900,7 +3904,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.status(400).json({ error: "Holiday requests must fit within a single holiday year." });
       return;
     }
-    if (!canEditHolidays(request.user)) {
+    if (!canEditHolidays(request.user) && nextRequest.action === "book") {
       const allowanceSummary = buildHolidayAllowanceSummaries(store, requestYearStart, holidayStaffList).find(
           (entry) => getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(nextRequest.person)
         );
@@ -3923,9 +3927,11 @@ app.get("/api/corebridge/orders", async (request, response) => {
       store.notifications.unshift(
         createNotification({
           userId: user.id,
-          type: "holiday-request",
-          title: "Holiday request received",
-          message: `${nextRequest.requestedByName || nextRequest.person} requested ${requestDateRange}${nextRequest.notes ? ` (${nextRequest.notes})` : ""}.`,
+          type: nextRequest.action === "cancel" ? "holiday-request" : "holiday-request",
+          title: nextRequest.action === "cancel" ? "Holiday cancellation requested" : "Holiday request received",
+          message: nextRequest.action === "cancel"
+            ? `${nextRequest.requestedByName || nextRequest.person} requested cancellation for ${requestDateRange}${nextRequest.notes ? ` (${nextRequest.notes})` : ""}.`
+            : `${nextRequest.requestedByName || nextRequest.person} requested ${requestDateRange}${nextRequest.notes ? ` (${nextRequest.notes})` : ""}.`,
           link: "/holidays"
         })
       );
@@ -3963,7 +3969,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     };
     store.holidayRequests[requestIndex] = holidayRequest;
 
-    if (status === "approved") {
+    if (status === "approved" && holidayRequest.action !== "cancel") {
       const requestDates = enumerateIsoDates(holidayRequest.startDate, holidayRequest.endDate).filter(isWeekdayIsoDate);
       for (const date of requestDates) {
         const holidayEntry = sanitizeStaffHoliday({
@@ -3990,14 +3996,42 @@ app.get("/api/corebridge/orders", async (request, response) => {
       }
     }
 
+    if (status === "approved" && holidayRequest.action === "cancel") {
+      const requestDates = enumerateIsoDates(holidayRequest.startDate, holidayRequest.endDate).filter(isWeekdayIsoDate);
+      store.holidays = (store.holidays || []).filter((entry) => {
+        if (getHolidayType(entry) === "birthday") return true;
+        const samePerson = getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(holidayRequest.person);
+        const sameDate = requestDates.includes(String(entry.date || ""));
+        return !(samePerson && sameDate);
+      });
+
+      if (holidayRequest.targetRequestId) {
+        store.holidayRequests = store.holidayRequests.filter(
+          (entry, index) =>
+            index === requestIndex ||
+            String(entry.id || "") !== String(holidayRequest.targetRequestId || "")
+        );
+      }
+    }
+
     if (holidayRequest.requestedByUserId) {
       const requestDateRange = formatHolidayRequestDateRange(holidayRequest.startDate, holidayRequest.endDate);
       store.notifications.unshift(
         createNotification({
           userId: holidayRequest.requestedByUserId,
           type: status === "approved" ? "holiday-approved" : "holiday-declined",
-          title: status === "approved" ? "Holiday approved" : "Holiday declined",
-          message: `${requestDateRange} for ${holidayRequest.person} was ${status} by ${request.user?.displayName || "admin"}.`,
+          title:
+            holidayRequest.action === "cancel"
+              ? status === "approved"
+                ? "Holiday cancellation approved"
+                : "Holiday cancellation declined"
+              : status === "approved"
+                ? "Holiday approved"
+                : "Holiday declined",
+          message:
+            holidayRequest.action === "cancel"
+              ? `${requestDateRange} cancellation for ${holidayRequest.person} was ${status} by ${request.user?.displayName || "admin"}.`
+              : `${requestDateRange} for ${holidayRequest.person} was ${status} by ${request.user?.displayName || "admin"}.`,
           link: "/holidays"
         })
       );
