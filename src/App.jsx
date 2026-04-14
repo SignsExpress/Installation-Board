@@ -420,47 +420,6 @@ function getNextWeekdayIsoDate(isoDate) {
   return toIsoDate(cursor);
 }
 
-function buildCancellableHolidayGroups(holidays, person) {
-  const personKey = getHolidayStaffIdentityKey(person);
-  const filtered = [...holidays]
-    .filter(
-      (holiday) =>
-        !isBirthdayHoliday(holiday) &&
-        getHolidayStaffIdentityKey(holiday.person) === personKey
-    )
-    .sort((left, right) => {
-      if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
-      return String(left.duration || "").localeCompare(String(right.duration || ""));
-    });
-
-  const groups = [];
-  for (const holiday of filtered) {
-    const currentDate = String(holiday.date || "");
-    const currentDuration = String(holiday.duration || "Full Day");
-    const previous = groups[groups.length - 1];
-    if (
-      previous &&
-      previous.duration === currentDuration &&
-      getNextWeekdayIsoDate(previous.endDate) === currentDate
-    ) {
-      previous.endDate = currentDate;
-      previous.holidayIds.push(holiday.id);
-      continue;
-    }
-
-    groups.push({
-      id: `${currentDate}:${currentDuration}`,
-      person: holiday.person,
-      startDate: currentDate,
-      endDate: currentDate,
-      duration: currentDuration,
-      holidayIds: [holiday.id]
-    });
-  }
-
-  return groups;
-}
-
 function escapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1364,18 +1323,19 @@ function HolidaysPage({
   const currentPerson = getHolidayStaffPersonForUser(currentUser);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
   const [selectedHolidayPerson, setSelectedHolidayPerson] = useState("");
-  const cancellableHolidayEntries = useMemo(() => {
+  const cancellableHolidayRequests = useMemo(() => {
     if (canReview || !currentPerson) return [];
-    return holidays.filter(
-      (holiday) =>
-        !isBirthdayHoliday(holiday) &&
-        getHolidayStaffIdentityKey(holiday.person) === getHolidayStaffIdentityKey(currentPerson)
-    );
-  }, [canReview, currentPerson, holidays]);
-  const cancellableHolidayGroups = useMemo(
-    () => buildCancellableHolidayGroups(cancellableHolidayEntries, currentPerson),
-    [cancellableHolidayEntries, currentPerson]
-  );
+    const personKey = getHolidayStaffIdentityKey(currentPerson);
+    const currentUserId = String(currentUser?.id || "");
+    return holidayRequests.filter((request) => {
+      const requestStatus = String(request.status || "").trim().toLowerCase();
+      const requestAction = String(request.action || "book").trim().toLowerCase();
+      const sameUser =
+        (currentUserId && String(request.requestedByUserId || "") === currentUserId) ||
+        getHolidayStaffIdentityKey(request.person) === personKey;
+      return sameUser && requestStatus === "approved" && requestAction === "book";
+    });
+  }, [canReview, currentPerson, currentUser, holidayRequests]);
   const visibleHolidayAllowances = useMemo(
     () =>
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
@@ -1428,7 +1388,7 @@ function HolidaysPage({
                     className="ghost-button"
                     type="button"
                     onClick={() => setHolidayCancelOpen(true)}
-                    disabled={!cancellableHolidayGroups.length}
+                    disabled={!cancellableHolidayRequests.length}
                   >
                     Cancel holiday
                   </button>
@@ -1870,10 +1830,10 @@ function HolidaysPage({
                     value={holidayCancelForm.requestId}
                     onChange={(event) => setHolidayCancelForm((current) => ({ ...current, requestId: event.target.value }))}
                   >
-                    <option value="">Select booked holiday range</option>
-                    {cancellableHolidayGroups.map((holidayGroup) => (
-                      <option key={holidayGroup.id} value={holidayGroup.id}>
-                        {formatHolidayRequestDateRange(holidayGroup.startDate, holidayGroup.endDate)} - {holidayGroup.duration || "Full Day"}
+                    <option value="">Select approved holiday request</option>
+                    {cancellableHolidayRequests.map((holidayRequest) => (
+                      <option key={holidayRequest.id} value={holidayRequest.id}>
+                        {formatHolidayRequestDateRange(holidayRequest.startDate, holidayRequest.endDate)} - {holidayRequest.duration || "Full Day"}
                       </option>
                     ))}
                   </select>
@@ -1889,7 +1849,7 @@ function HolidaysPage({
                 </label>
 
                 <div className="form-actions">
-                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableHolidayGroups.length}>
+                  <button className="primary-button" type="submit" disabled={holidayRequestSaving || !cancellableHolidayRequests.length}>
                     {holidayRequestSaving ? "Sending..." : "Send cancellation request"}
                   </button>
                   <button className="ghost-button" type="button" onClick={() => setHolidayCancelOpen(false)}>
@@ -2893,9 +2853,11 @@ export default function App() {
   }
 
   async function cancelHolidayRequest() {
-    const targetHolidayGroup = cancellableHolidayGroups.find((group) => group.id === holidayCancelForm.requestId);
-    if (!targetHolidayGroup) {
-      setMessage(createMessage("Choose a booked holiday range to cancel.", "error"));
+    const targetHolidayRequest = cancellableHolidayRequests.find(
+      (request) => String(request.id || "") === String(holidayCancelForm.requestId || "")
+    );
+    if (!targetHolidayRequest) {
+      setMessage(createMessage("Choose an approved holiday request to cancel.", "error"));
       return;
     }
 
@@ -2905,14 +2867,14 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          person: targetHolidayGroup.person,
+          person: targetHolidayRequest.person,
           holidayYearStart,
-          startDate: targetHolidayGroup.startDate,
-          endDate: targetHolidayGroup.endDate,
-          duration: targetHolidayGroup.duration,
+          startDate: targetHolidayRequest.startDate,
+          endDate: targetHolidayRequest.endDate,
+          duration: targetHolidayRequest.duration,
           notes: holidayCancelForm.notes,
           action: "cancel",
-          targetRequestId: ""
+          targetRequestId: targetHolidayRequest.id
         })
       });
       const payload = await response.json();
