@@ -255,15 +255,35 @@ function toHolidayCode(displayName) {
 }
 
 function buildHolidayStaffList(users = [], allowanceEntries = []) {
-  const merged = [...HOLIDAY_STAFF.map((entry) => ({ ...entry, fullName: entry.name }))];
-  const seen = new Set(
-    merged.flatMap((entry) => [entry.code, entry.person, entry.name]).map((value) => String(value || "").trim().toLowerCase()).filter(Boolean)
+  const merged = [];
+  const seen = new Set();
+  const activeUserNames = new Set(
+    users.map((user) => String(user.displayName || "").trim().toLowerCase()).filter(Boolean)
   );
 
-  const sourceNames = [
-    ...users.map((user) => user.displayName),
-    ...allowanceEntries.map((entry) => entry.person)
-  ];
+  function addEntry(entry) {
+    const normalizedName = String(entry?.name || entry?.fullName || "").trim();
+    const normalizedPerson = String(entry?.person || "").trim();
+    const normalizedCode = String(entry?.code || "").trim();
+    if (!normalizedName || seen.has(normalizedName.toLowerCase())) return;
+    merged.push({
+      ...entry,
+      name: normalizedName,
+      fullName: entry.fullName || normalizedName,
+      person: normalizedPerson || toHolidayPersonLabel(normalizedName)
+    });
+    seen.add(normalizedName.toLowerCase());
+    if (normalizedPerson) seen.add(normalizedPerson.toLowerCase());
+    if (normalizedCode) seen.add(normalizedCode.toLowerCase());
+  }
+
+  HOLIDAY_STAFF.forEach((entry) => {
+    if (activeUserNames.has(String(entry.name || "").trim().toLowerCase())) {
+      addEntry({ ...entry, fullName: entry.name });
+    }
+  });
+
+  const sourceNames = users.map((user) => user.displayName);
 
   sourceNames.forEach((displayName) => {
     const normalizedName = String(displayName || "").trim();
@@ -3283,23 +3303,44 @@ function createServer() {
     }
   });
 
-  app.delete("/api/auth/users/:id", async (request, response) => {
-    const session = getSessionFromRequest(request);
-    if (!session) {
-      response.status(401).json({ error: "Login required." });
-      return;
+    app.delete("/api/auth/users/:id", async (request, response) => {
+      const session = getSessionFromRequest(request);
+      if (!session) {
+        response.status(401).json({ error: "Login required." });
+        return;
     }
 
-    request.user = session.user;
-    if (!requirePermissionsManager(request, response)) return;
+      request.user = session.user;
+      if (!requirePermissionsManager(request, response)) return;
 
-    try {
-      const deletedUser = await deleteUser(request.params.id);
-      response.json({ user: deletedUser });
-    } catch (error) {
-      response.status(400).json({ error: error.message || "Could not delete user." });
-    }
-  });
+      try {
+        const deletedUser = await deleteUser(request.params.id);
+        const store = await readStore();
+        const deletedDisplayName = String(deletedUser?.displayName || "").trim();
+        const deletedPersonKey = getHolidayStaffIdentityKey(getHolidayStaffPerson(deletedDisplayName) || deletedDisplayName);
+
+        store.holidays = (store.holidays || []).filter((entry) => {
+          if (getHolidayType(entry) === "birthday") return true;
+          return getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey;
+        });
+        store.holidayRequests = (store.holidayRequests || []).filter((entry) => {
+          const samePerson = getHolidayStaffIdentityKey(entry.person) === deletedPersonKey;
+          const sameRequester = String(entry.requestedByUserId || "") === String(deletedUser.id || "");
+          return !samePerson && !sameRequester;
+        });
+        store.holidayAllowances = (store.holidayAllowances || []).filter(
+          (entry) => getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey
+        );
+        store.notifications = (store.notifications || []).filter(
+          (entry) => String(entry.userId || "") !== String(deletedUser.id || "")
+        );
+
+        await writeStore(store);
+        response.json({ user: deletedUser });
+      } catch (error) {
+        response.status(400).json({ error: error.message || "Could not delete user." });
+      }
+    });
 
   app.use("/api", async (request, response, next) => {
     if (request.path.startsWith("/auth/")) {

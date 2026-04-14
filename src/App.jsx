@@ -39,7 +39,6 @@ const HOLIDAY_STAFF = [
   { code: "KC", person: "Keilan C", fullName: "Keilan Curtis", colorClass: "holiday-person-red", birthDate: "" },
   { code: "TS", person: "Tamas", fullName: "Tamas", colorClass: "holiday-person-amber" }
 ];
-const STAFF_NAMES = HOLIDAY_STAFF.map((entry) => entry.person);
 const HOLIDAY_PERSON_COLORS = Object.fromEntries(HOLIDAY_STAFF.map((entry) => [entry.person, entry.colorClass]));
 const UNSCHEDULED_DROP_ZONE = "__unscheduled__";
 
@@ -3902,13 +3901,14 @@ export default function App() {
                             </div>
                           ) : null}
                           {!isClientMode && activeHolidayDate === row.isoDate ? (
-                            <div className="date-holiday-popover" onClick={(event) => event.stopPropagation()}>
-                              {STAFF_NAMES.map((name) => {
-                                const existing = row.staffHolidays.find((holiday) => holiday.person === name);
-                                const durationLabel =
-                                  existing?.duration === "Morning"
-                                    ? ".AM"
-                                    : existing?.duration === "Afternoon"
+                              <div className="date-holiday-popover" onClick={(event) => event.stopPropagation()}>
+                                {holidayStaff.map((entry) => {
+                                  const name = entry.person;
+                                  const existing = row.staffHolidays.find((holiday) => holiday.person === name);
+                                  const durationLabel =
+                                    existing?.duration === "Morning"
+                                      ? ".AM"
+                                      : existing?.duration === "Afternoon"
                                       ? ".PM"
                                       : "";
                                 const initials = getHolidayDisplayToken(name);
