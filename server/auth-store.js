@@ -88,7 +88,8 @@ function deriveRoleFromPermissions(permissions) {
   return "host";
 }
 
-function normalizeStore(parsed) {
+function normalizeStore(parsed, options = {}) {
+  const includeMissingSeedUsers = Boolean(options.includeMissingSeedUsers);
   const users = Array.isArray(parsed?.users) ? parsed.users : [];
   const map = new Map(users.map((user) => [String(user.displayName || "").toLowerCase(), user]));
 
@@ -102,15 +103,17 @@ function normalizeStore(parsed) {
       continue;
     }
 
-    users.push({
-      id: makeId(),
-      displayName: seeded.displayName,
-      role: seeded.role,
-      permissions: getDefaultPermissions(seeded.role),
-      passwordSalt: "",
-      passwordHash: "",
-      passwordUpdatedAt: ""
-    });
+    if (includeMissingSeedUsers) {
+      users.push({
+        id: makeId(),
+        displayName: seeded.displayName,
+        role: seeded.role,
+        permissions: getDefaultPermissions(seeded.role),
+        passwordSalt: "",
+        passwordHash: "",
+        passwordUpdatedAt: ""
+      });
+    }
   }
 
   for (const user of users) {
@@ -136,7 +139,7 @@ function ensureUsersFile() {
   const file = getUsersFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `${JSON.stringify(normalizeStore({ users: [] }), null, 2)}\n`, "utf8");
+    fs.writeFileSync(file, `${JSON.stringify(normalizeStore({ users: [] }, { includeMissingSeedUsers: true }), null, 2)}\n`, "utf8");
     return;
   }
 
@@ -146,7 +149,7 @@ function ensureUsersFile() {
     const normalized = normalizeStore(parsed);
     fs.writeFileSync(file, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   } catch (error) {
-    const normalized = normalizeStore({ users: [] });
+    const normalized = normalizeStore({ users: [] }, { includeMissingSeedUsers: true });
     fs.writeFileSync(file, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   }
 }
