@@ -739,7 +739,6 @@ function MainNavBar({
               className={`host-nav-link ${active === "home" ? "active" : ""}`}
               onClick={() => goTo(homePath)}
             >
-              <span className="host-nav-link-icon"><HomeIcon /></span>
               <span className="host-nav-link-label">Home</span>
             </button>
             <button
@@ -751,7 +750,6 @@ function MainNavBar({
               }}
               disabled={!boardAllowed}
             >
-              <span className="host-nav-link-icon"><BoardIcon /></span>
               <span className="host-nav-link-label">Installation Board</span>
             </button>
             <button
@@ -763,7 +761,6 @@ function MainNavBar({
               }}
               disabled={!holidaysAllowed}
             >
-              <span className="host-nav-link-icon"><HolidayIcon /></span>
               <span className="host-nav-link-label">Holidays</span>
             </button>
             <button
@@ -775,7 +772,6 @@ function MainNavBar({
               }}
               disabled={!installerAllowed}
             >
-              <span className="host-nav-link-icon"><InstallerIcon /></span>
               <span className="host-nav-link-label">Subcontractor Directory</span>
             </button>
             <button
@@ -783,17 +779,15 @@ function MainNavBar({
               className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
               onClick={() => goTo(notificationsPath)}
             >
-              <span className="host-nav-link-icon">
-                <NotificationIcon />
-                {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
+              <span className="host-nav-link-label">
+                Notifications
+                {unreadNotifications.length ? <span className="host-nav-badge inline">{unreadNotifications.length}</span> : null}
               </span>
-              <span className="host-nav-link-label">Notifications</span>
             </button>
           </div>
           <div className="host-nav-meta">
             <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
             <button className="host-nav-logout" type="button" onClick={onLogout}>
-              <span className="host-nav-link-icon"><LogoutIcon /></span>
               <span className="host-nav-link-label">Log out</span>
             </button>
           </div>
