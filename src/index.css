@@ -86,6 +86,10 @@ button {
   padding: 12px 20px 24px;
 }
 
+.app-shell:has(.host-nav-shell) {
+  padding-top: 98px;
+}
+
 .app-shell:has(.auth-panel) {
   display: grid;
   place-items: center;
@@ -108,17 +112,30 @@ button {
   backdrop-filter: blur(10px);
 }
 
+.host-nav-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(199, 183, 210, 0.45);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(14px);
+}
+
 .host-nav {
+  width: 100%;
+}
+
+.host-nav-inner {
+  max-width: 1680px;
+  margin: 0 auto;
+  padding: 10px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 18px;
-  border-radius: 20px;
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: rgba(255, 255, 255, 0.97);
 }
 
 .host-nav-brand {
@@ -127,7 +144,13 @@ button {
   align-items: center;
   justify-content: center;
   min-height: 52px;
-  padding: 0 4px 0 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 0;
 }
 
 .host-nav-brand-logo {
@@ -3276,9 +3299,10 @@ button {
     display: grid;
   }
 
-  .host-nav {
+  .host-nav-inner {
     display: grid;
     justify-items: stretch;
+    padding: 10px 16px;
   }
 
   .host-nav-links,
@@ -3319,6 +3343,10 @@ button {
 }
 
 @media (max-width: 780px) {
+  .app-shell:has(.host-nav-shell) {
+    padding-top: 128px;
+  }
+
   .host-landing-tools {
     justify-content: flex-start;
   }
@@ -3334,11 +3362,9 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .host-nav {
+  .host-nav-inner {
     gap: 10px;
     padding: 10px 12px;
-    border-radius: 18px;
-    top: 0;
   }
 
   .host-nav-links,

@@ -727,75 +727,79 @@ function MainNavBar({
   const unreadNotifications = notifications.filter((entry) => !entry.read);
 
   return (
-    <nav className="panel host-nav">
-      <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)}>
-        <BrandLogoIcon />
-      </button>
-      <div className="host-nav-links">
-        <button
-          type="button"
-          className={`host-nav-link ${active === "home" ? "active" : ""}`}
-          onClick={() => goTo(homePath)}
-        >
-          <span className="host-nav-link-icon"><HomeIcon /></span>
-          <span className="host-nav-link-label">Home</span>
-        </button>
-        <button
-          type="button"
-          className={`host-nav-link ${active === "board" ? "active" : ""} ${!boardAllowed ? "disabled" : ""}`}
-          onClick={() => {
-            if (!boardAllowed) return;
-            goTo(boardPath);
-          }}
-          disabled={!boardAllowed}
-        >
-          <span className="host-nav-link-icon"><BoardIcon /></span>
-          <span className="host-nav-link-label">Installation Board</span>
-        </button>
-        <button
-          type="button"
-          className={`host-nav-link ${active === "holidays" ? "active" : ""} ${!holidaysAllowed ? "disabled" : ""}`}
-          onClick={() => {
-            if (!holidaysAllowed) return;
-            goTo(holidaysPath);
-          }}
-          disabled={!holidaysAllowed}
-        >
-          <span className="host-nav-link-icon"><HolidayIcon /></span>
-          <span className="host-nav-link-label">Holidays</span>
-        </button>
-        <button
-          type="button"
-          className={`host-nav-link ${active === "installer" ? "active" : ""} ${!installerAllowed ? "disabled" : ""}`}
-          onClick={() => {
-            if (!installerAllowed) return;
-            goTo(installerPath);
-          }}
-          disabled={!installerAllowed}
-        >
-          <span className="host-nav-link-icon"><InstallerIcon /></span>
-          <span className="host-nav-link-label">Subcontractor Directory</span>
-        </button>
-        <button
-          type="button"
-          className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
-          onClick={() => goTo(notificationsPath)}
-        >
-          <span className="host-nav-link-icon">
-            <NotificationIcon />
-            {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
-          </span>
-          <span className="host-nav-link-label">Notifications</span>
-        </button>
-      </div>
-      <div className="host-nav-meta">
-        <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
-        <button className="host-nav-logout" type="button" onClick={onLogout}>
-          <span className="host-nav-link-icon"><LogoutIcon /></span>
-          <span className="host-nav-link-label">Log out</span>
-        </button>
-      </div>
-    </nav>
+    <header className="host-nav-shell">
+      <nav className="host-nav">
+        <div className="host-nav-inner">
+          <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)} aria-label="Go to home">
+            <BrandLogoIcon />
+          </button>
+          <div className="host-nav-links">
+            <button
+              type="button"
+              className={`host-nav-link ${active === "home" ? "active" : ""}`}
+              onClick={() => goTo(homePath)}
+            >
+              <span className="host-nav-link-icon"><HomeIcon /></span>
+              <span className="host-nav-link-label">Home</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "board" ? "active" : ""} ${!boardAllowed ? "disabled" : ""}`}
+              onClick={() => {
+                if (!boardAllowed) return;
+                goTo(boardPath);
+              }}
+              disabled={!boardAllowed}
+            >
+              <span className="host-nav-link-icon"><BoardIcon /></span>
+              <span className="host-nav-link-label">Installation Board</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "holidays" ? "active" : ""} ${!holidaysAllowed ? "disabled" : ""}`}
+              onClick={() => {
+                if (!holidaysAllowed) return;
+                goTo(holidaysPath);
+              }}
+              disabled={!holidaysAllowed}
+            >
+              <span className="host-nav-link-icon"><HolidayIcon /></span>
+              <span className="host-nav-link-label">Holidays</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "installer" ? "active" : ""} ${!installerAllowed ? "disabled" : ""}`}
+              onClick={() => {
+                if (!installerAllowed) return;
+                goTo(installerPath);
+              }}
+              disabled={!installerAllowed}
+            >
+              <span className="host-nav-link-icon"><InstallerIcon /></span>
+              <span className="host-nav-link-label">Subcontractor Directory</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
+              onClick={() => goTo(notificationsPath)}
+            >
+              <span className="host-nav-link-icon">
+                <NotificationIcon />
+                {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
+              </span>
+              <span className="host-nav-link-label">Notifications</span>
+            </button>
+          </div>
+          <div className="host-nav-meta">
+            <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
+            <button className="host-nav-logout" type="button" onClick={onLogout}>
+              <span className="host-nav-link-icon"><LogoutIcon /></span>
+              <span className="host-nav-link-label">Log out</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+    </header>
   );
 }
 
