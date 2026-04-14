@@ -678,6 +678,10 @@ function LogoutIcon() {
   );
 }
 
+function BrandLogoIcon() {
+  return <img src="/branding/signs-express-logo.svg" alt="Signs Express" className="host-nav-brand-logo" />;
+}
+
 function getNotificationCategory(notification) {
   const title = String(notification?.title || "").toLowerCase();
   const message = String(notification?.message || "").toLowerCase();
@@ -706,13 +710,8 @@ function MainNavBar({
   currentUser,
   active = "home",
   onLogout,
-  notifications = [],
-  onOpenNotification,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead
+  notifications = []
 }) {
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-
   function goTo(path) {
     window.location.assign(path);
   }
@@ -724,20 +723,14 @@ function MainNavBar({
   const boardPath = getBoardPathForUser(currentUser);
   const holidaysPath = "/holidays";
   const installerPath = "/installer";
+  const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
-  const recentNotifications = notifications.slice(0, 10);
-
-  useEffect(() => {
-    function handleWindowClick() {
-      setNotificationsOpen(false);
-    }
-    if (!notificationsOpen) return undefined;
-    window.addEventListener("click", handleWindowClick);
-    return () => window.removeEventListener("click", handleWindowClick);
-  }, [notificationsOpen]);
 
   return (
     <nav className="panel host-nav">
+      <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)}>
+        <BrandLogoIcon />
+      </button>
       <div className="host-nav-links">
         <button
           type="button"
@@ -783,83 +776,19 @@ function MainNavBar({
           <span className="host-nav-link-icon"><InstallerIcon /></span>
           <span className="host-nav-link-label">Subcontractor Directory</span>
         </button>
+        <button
+          type="button"
+          className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
+          onClick={() => goTo(notificationsPath)}
+        >
+          <span className="host-nav-link-icon">
+            <NotificationIcon />
+            {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
+          </span>
+          <span className="host-nav-link-label">Notifications</span>
+        </button>
       </div>
       <div className="host-nav-meta">
-        <div className="host-nav-notifications-wrap">
-          <button
-            className={`host-nav-link host-nav-notifications-button ${notificationsOpen ? "active" : ""}`}
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              setNotificationsOpen((current) => !current);
-            }}
-          >
-            <span className="host-nav-link-icon">
-              <NotificationIcon />
-              {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
-            </span>
-            <span className="host-nav-link-label">Notifications</span>
-          </button>
-          {notificationsOpen ? (
-            <div className="host-nav-notifications-dropdown" onClick={(event) => event.stopPropagation()}>
-              <div className="host-nav-notifications-head">
-                <div>
-                  <strong>Notifications</strong>
-                  <span>{unreadNotifications.length ? `${unreadNotifications.length} new` : "You're all caught up"}</span>
-                </div>
-                {notifications.length ? (
-                  <button className="text-button" type="button" onClick={onMarkAllNotificationsRead}>
-                    Mark all read
-                  </button>
-                ) : null}
-              </div>
-              <div className="host-nav-notifications-list">
-                {recentNotifications.length ? recentNotifications.map((notification) => {
-                  const category = getNotificationCategory(notification);
-                  const CategoryIcon = category.icon;
-                  return (
-                    <article
-                      key={notification.id}
-                      className={`host-nav-notification-card ${notification.read ? "read" : "unread"}`}
-                    >
-                      <button
-                        type="button"
-                        className="host-nav-notification-main"
-                        onClick={() => {
-                          setNotificationsOpen(false);
-                          onOpenNotification?.(notification);
-                        }}
-                      >
-                        <span className={`host-nav-notification-icon ${category.className}`}>
-                          <CategoryIcon />
-                        </span>
-                        <div className="host-nav-notification-copy">
-                          <div className="host-nav-notification-topline">
-                            <strong>{notification.title}</strong>
-                            {!notification.read ? <span className="host-nav-notification-status">New</span> : null}
-                          </div>
-                          <span>{notification.message}</span>
-                          <small>{category.label}</small>
-                        </div>
-                      </button>
-                      {!notification.read ? (
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={() => onMarkNotificationRead?.(notification.id)}
-                        >
-                          Mark read
-                        </button>
-                      ) : null}
-                    </article>
-                  );
-                }) : (
-                  <div className="host-nav-notification-empty">No notifications yet.</div>
-                )}
-              </div>
-            </div>
-          ) : null}
-        </div>
         <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
         <button className="host-nav-logout" type="button" onClick={onLogout}>
           <span className="host-nav-link-icon"><LogoutIcon /></span>
@@ -1032,105 +961,110 @@ function PermissionsPanel({
   );
 }
 
-function NotificationsPanel({ notifications, onOpenNotification, onMarkNotificationRead, onMarkAllNotificationsRead }) {
-  const [showReadNotifications, setShowReadNotifications] = useState(false);
-  const unreadNotifications = notifications.filter((entry) => !entry.read);
-  const readNotifications = notifications.filter((entry) => entry.read);
-  const unreadCount = unreadNotifications.length;
+function NotificationsPage({
+  currentUser,
+  onLogout,
+  notifications,
+  onOpenNotification,
+  onMarkNotificationRead,
+  onMarkAllNotificationsRead
+}) {
+  const [activeFilter, setActiveFilter] = useState("all");
+  const filterOptions = [
+    { value: "all", label: "All" },
+    { value: "unread", label: "Unread" },
+    { value: "holiday", label: "Holidays" },
+    { value: "board", label: "Jobs" },
+    { value: "message", label: "Messages" }
+  ];
+  const unreadCount = notifications.filter((entry) => !entry.read).length;
+  const filteredNotifications = notifications.filter((notification) => {
+    const category = getNotificationCategory(notification).label.toLowerCase();
+    if (activeFilter === "all") return true;
+    if (activeFilter === "unread") return !notification.read;
+    return category === activeFilter;
+  });
 
   return (
-    <section className="panel landing-notifications-panel">
-      <div className="landing-notifications-head">
-        <div>
-          <h3>Notifications</h3>
-          <p>{unreadCount ? `${unreadCount} unread` : "You're all caught up."}</p>
-        </div>
-        {notifications.length ? (
-          <button className="ghost-button" type="button" onClick={onMarkAllNotificationsRead}>
-            Mark all read
-          </button>
-        ) : null}
-      </div>
-      {notifications.length ? (
-        <div className="landing-notification-stack">
-          {unreadNotifications.length ? (
-            <div className="landing-notification-section">
-              <div className="landing-notification-section-head">
-                <strong>New</strong>
-              </div>
-              <div className="landing-notification-list">
-                {unreadNotifications.slice(0, 8).map((notification) => (
+    <div className="app-shell notifications-shell">
+      <div className="page notifications-page">
+        <MainNavBar currentUser={currentUser} active="notifications" onLogout={onLogout} notifications={notifications} />
+
+        <section className="panel notifications-panel">
+          <div className="notifications-panel-head">
+            <div>
+              <h2>Notifications</h2>
+              <p>{unreadCount ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "You're all caught up."}</p>
+            </div>
+            {notifications.length ? (
+              <button className="ghost-button" type="button" onClick={onMarkAllNotificationsRead}>
+                Mark all read
+              </button>
+            ) : null}
+          </div>
+
+          <div className="notifications-filter-row">
+            {filterOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`notification-filter-chip ${activeFilter === option.value ? "active" : ""}`}
+                onClick={() => setActiveFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {filteredNotifications.length ? (
+            <div className="notifications-feed">
+              {filteredNotifications.map((notification) => {
+                const category = getNotificationCategory(notification);
+                const CategoryIcon = category.icon;
+                return (
                   <article
                     key={notification.id}
-                    className="landing-notification-card unread"
+                    className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
                   >
                     <button
                       type="button"
-                      className="landing-notification-main"
+                      className="notification-feed-main"
                       onClick={() => onOpenNotification(notification)}
                     >
-                      <span className="landing-notification-dot" />
-                      <div className="landing-notification-copy">
-                        <strong>{notification.title}</strong>
+                      <span className={`notification-feed-icon ${category.className}`}>
+                        <CategoryIcon />
+                      </span>
+                      <div className="notification-feed-copy">
+                        <div className="notification-feed-top">
+                          <strong>{notification.title}</strong>
+                          {!notification.read ? <span className="notification-feed-status">New</span> : null}
+                        </div>
                         <span>{notification.message}</span>
+                        <small>{category.label}</small>
                       </div>
                     </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      onClick={() => onMarkNotificationRead(notification.id)}
-                    >
-                      Mark read
-                    </button>
+                    <div className="notification-feed-actions">
+                      {!notification.read ? (
+                        <button
+                          type="button"
+                          className="text-button"
+                          onClick={() => onMarkNotificationRead(notification.id)}
+                        >
+                          Mark read
+                        </button>
+                      ) : null}
+                    </div>
                   </article>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          ) : null}
-
-          {readNotifications.length ? (
-            <div className="landing-notification-section">
-              <div className="landing-notification-section-head">
-                <strong>Earlier</strong>
-                <button
-                  className="text-button"
-                  type="button"
-                  onClick={() => setShowReadNotifications((current) => !current)}
-                >
-                  {showReadNotifications ? "Hide" : `Show ${Math.min(readNotifications.length, 8)}`}
-                </button>
-              </div>
-              {showReadNotifications ? (
-                <div className="landing-notification-list">
-                  {readNotifications.slice(0, 8).map((notification) => (
-                    <button
-                      key={notification.id}
-                      type="button"
-                      className="landing-notification-card read"
-                      onClick={() => onOpenNotification(notification)}
-                    >
-                      <div className="landing-notification-copy">
-                        <strong>{notification.title}</strong>
-                        <span>{notification.message}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <div className="landing-notification-empty">No notifications yet.</div>
-      )}
-    </section>
+          ) : (
+            <div className="notifications-empty">No notifications in this view.</div>
+          )}
+        </section>
+      </div>
+    </div>
   );
-}
-
-function countUnreadNotificationsForLink(notifications, link) {
-  return notifications.filter(
-    (entry) => !entry.read && String(entry.link || "").trim().toLowerCase() === String(link || "").trim().toLowerCase()
-  ).length;
 }
 
 function HostLandingPage({
@@ -1142,13 +1076,9 @@ function HostLandingPage({
   onCreateUser,
   onResetPassword,
   onDeleteUser,
-  notifications,
-  onOpenNotification,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead
+  notifications
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
-  const holidaysNotificationCount = countUnreadNotificationsForLink(notifications, "/holidays");
 
   function goTo(path) {
     window.location.assign(path);
@@ -1157,17 +1087,11 @@ function HostLandingPage({
   return (
     <div className="app-shell host-landing-shell">
       <div className="page host-landing-page">
-        <div className="host-landing-brand">
-          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-        </div>
         <MainNavBar
           currentUser={currentUser}
           active="home"
           onLogout={onLogout}
           notifications={notifications}
-          onOpenNotification={onOpenNotification}
-          onMarkNotificationRead={onMarkNotificationRead}
-          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
         />
 
         <section className="panel host-landing-panel">
@@ -1181,7 +1105,6 @@ function HostLandingPage({
               }}
               disabled={!canAccessHolidays(currentUser)}
             >
-              {holidaysNotificationCount ? <span className="launch-card-badge">{holidaysNotificationCount}</span> : null}
               <strong>Holidays</strong>
             </button>
             <button
@@ -1255,13 +1178,8 @@ function HostLandingPage({
 function ClientLandingPage({
   currentUser,
   onLogout,
-  notifications,
-  onOpenNotification,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead
+  notifications
 }) {
-  const holidaysNotificationCount = countUnreadNotificationsForLink(notifications, "/holidays");
-
   function goTo(path) {
     window.location.assign(path);
   }
@@ -1269,17 +1187,11 @@ function ClientLandingPage({
   return (
     <div className="app-shell host-landing-shell client-landing-shell">
       <div className="page host-landing-page">
-        <div className="host-landing-brand">
-          <img className="hero-logo host-landing-brand-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
-        </div>
         <MainNavBar
           currentUser={currentUser}
           active="home"
           onLogout={onLogout}
           notifications={notifications}
-          onOpenNotification={onOpenNotification}
-          onMarkNotificationRead={onMarkNotificationRead}
-          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
         />
 
         <section className="panel host-landing-panel">
@@ -1293,7 +1205,6 @@ function ClientLandingPage({
               }}
               disabled={!canAccessHolidays(currentUser)}
             >
-              {holidaysNotificationCount ? <span className="launch-card-badge">{holidaysNotificationCount}</span> : null}
               <strong>Holidays</strong>
             </button>
             <button className="host-launch-card disabled" type="button" disabled>
@@ -1319,9 +1230,6 @@ function HolidaysPage({
   currentUser,
   onLogout,
   notifications,
-  onOpenNotification,
-  onMarkNotificationRead,
-  onMarkAllNotificationsRead,
   holidays,
   holidayRequests,
   holidayStaff,
@@ -1386,9 +1294,6 @@ function HolidaysPage({
           active="holidays"
           onLogout={onLogout}
           notifications={notifications}
-          onOpenNotification={onOpenNotification}
-          onMarkNotificationRead={onMarkNotificationRead}
-          onMarkAllNotificationsRead={onMarkAllNotificationsRead}
         />
 
         <section className="panel holidays-panel">
@@ -1888,6 +1793,7 @@ export default function App() {
   const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
   const isHolidaysRoute = pathname.startsWith("/holidays");
+  const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
@@ -1951,13 +1857,14 @@ export default function App() {
   const isClientMode = currentUser ? !boardEditable : false;
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
+  const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isHolidaysRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute && !isHolidaysRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isHolidaysRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute && !isHolidaysRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -2184,6 +2091,11 @@ export default function App() {
       return;
     }
 
+    if (isNotificationsRoute && !currentUser) {
+      window.location.replace("/");
+      return;
+    }
+
     if (isInstallerRoute && !canAccessInstaller(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -2199,7 +2111,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -2207,7 +2119,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isHolidaysRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isHolidaysRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -3611,9 +3523,6 @@ export default function App() {
         onResetPassword={handleResetUserPassword}
         onDeleteUser={handleDeleteUser}
         notifications={notifications}
-        onOpenNotification={openNotification}
-        onMarkNotificationRead={markNotificationRead}
-        onMarkAllNotificationsRead={markAllNotificationsRead}
       />
     );
   }
@@ -3621,6 +3530,16 @@ export default function App() {
   if (showClientLanding) {
     return (
       <ClientLandingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showNotifications) {
+    return (
+      <NotificationsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
@@ -3637,9 +3556,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        onOpenNotification={openNotification}
-        onMarkNotificationRead={markNotificationRead}
-        onMarkAllNotificationsRead={markAllNotificationsRead}
         holidays={holidays}
         holidayRequests={holidayRequests}
         holidayStaff={holidayStaff}
@@ -3684,9 +3600,6 @@ export default function App() {
           active="board"
           onLogout={handleLogout}
           notifications={notifications}
-          onOpenNotification={openNotification}
-          onMarkNotificationRead={markNotificationRead}
-          onMarkAllNotificationsRead={markAllNotificationsRead}
         />
 
         <div className="layout">
