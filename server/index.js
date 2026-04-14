@@ -347,6 +347,42 @@ function getHolidayNotificationRecipients(users, excludedUserIds = []) {
   return users.filter((user) => canEditHolidays(sanitizeUser(user)) && !excluded.has(String(user.id || "")));
 }
 
+function getBoardNotificationRecipients(users) {
+  return users.filter((user) => canAccessBoard(sanitizeUser(user)));
+}
+
+function getBoardLinkForUser(user) {
+  return canEditBoard(sanitizeUser(user)) ? "/board" : "/client/board";
+}
+
+function formatBoardNotificationDate(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  if (!parsed) return String(isoDate || "");
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: TIME_ZONE
+  }).format(parsed);
+}
+
+function getJobNotificationLabel(job) {
+  return String(job?.orderReference || "").trim() || String(job?.customerName || "").trim() || "Job";
+}
+
+function pushBoardNotification(store, users, buildPayload) {
+  store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+  getBoardNotificationRecipients(users).forEach((user) => {
+    store.notifications.unshift(
+      createNotification({
+        userId: user.id,
+        link: getBoardLinkForUser(user),
+        ...buildPayload(user)
+      })
+    );
+  });
+}
+
 function getHolidayStaffIdentityKey(value) {
   const match = getHolidayStaffEntry(value);
   if (match?.code) return match.code.toLowerCase();
@@ -3535,11 +3571,34 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
     const store = await readStore();
     const index = store.jobs.findIndex((job) => job.id === nextJob.id);
+    const existingJob = index >= 0 ? sanitizeJob(store.jobs[index]) : null;
     if (index >= 0) {
       nextJob.createdAt = store.jobs[index].createdAt || nextJob.createdAt;
       store.jobs[index] = nextJob;
     } else {
       store.jobs.unshift(nextJob);
+    }
+
+    const usersStore = await readUsersStore();
+    if (!existingJob && nextJob.date) {
+      const jobLabel = getJobNotificationLabel(nextJob);
+      const bookedDate = formatBoardNotificationDate(nextJob.date);
+      pushBoardNotification(store, usersStore.users || [], () => ({
+        type: "job-added",
+        title: "Job added to board",
+        message: `${jobLabel} was added for ${bookedDate} by ${request.user?.displayName || "a user"}.`
+      }));
+    } else if (existingJob && existingJob.date !== nextJob.date && nextJob.date) {
+      const jobLabel = getJobNotificationLabel(nextJob);
+      const fromLabel = existingJob.date ? formatBoardNotificationDate(existingJob.date) : "Unscheduled";
+      const toLabel = formatBoardNotificationDate(nextJob.date);
+      pushBoardNotification(store, usersStore.users || [], () => ({
+        type: "job-moved",
+        title: existingJob.date ? "Job moved on board" : "Job added to board",
+        message: existingJob.date
+          ? `${jobLabel} moved from ${fromLabel} to ${toLabel} by ${request.user?.displayName || "a user"}.`
+          : `${jobLabel} was added for ${toLabel} by ${request.user?.displayName || "a user"}.`
+      }));
     }
 
     const savedStore = await writeStore(store);
@@ -3572,6 +3631,15 @@ app.get("/api/corebridge/orders", async (request, response) => {
     });
 
     store.jobs[index] = nextJob;
+    if (!existing.isCompleted) {
+      const usersStore = await readUsersStore();
+      const jobLabel = getJobNotificationLabel(nextJob);
+      pushBoardNotification(store, usersStore.users || [], () => ({
+        type: "job-completed",
+        title: "Job marked complete",
+        message: `${jobLabel} was marked complete by ${request.user?.displayName || "a user"}.`
+      }));
+    }
     const savedStore = await writeStore(store);
     const payload = {
       jobs: toPublicJobs(savedStore.jobs),
