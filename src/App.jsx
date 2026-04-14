@@ -1286,6 +1286,7 @@ function HolidaysPage({
   notifications,
   holidays,
   holidayRequests,
+  approvedHolidayRequests,
   holidayStaff,
   holidayAllowances,
   holidayEvents,
@@ -1326,7 +1327,7 @@ function HolidaysPage({
     if (canReview || !currentPerson) return [];
     const personKey = getHolidayStaffIdentityKey(currentPerson);
     const currentUserId = String(currentUser?.id || "");
-    return holidayRequests.filter((request) => {
+    return approvedHolidayRequests.filter((request) => {
       const requestStatus = String(request.status || "").trim().toLowerCase();
       const requestAction = String(request.action || "book").trim().toLowerCase();
       const sameUser =
@@ -1334,7 +1335,7 @@ function HolidaysPage({
         getHolidayStaffIdentityKey(request.person) === personKey;
       return sameUser && requestStatus === "approved" && requestAction === "book";
     });
-  }, [canReview, currentPerson, currentUser, holidayRequests]);
+  }, [canReview, currentPerson, currentUser, approvedHolidayRequests]);
   const visibleHolidayAllowances = useMemo(
     () =>
       holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
@@ -1936,6 +1937,7 @@ export default function App() {
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [holidayRequests, setHolidayRequests] = useState([]);
+  const [approvedHolidayRequests, setApprovedHolidayRequests] = useState([]);
   const [holidayStaff, setHolidayStaff] = useState(HOLIDAY_STAFF);
   const [holidayAllowances, setHolidayAllowances] = useState([]);
   const [holidayEvents, setHolidayEvents] = useState([]);
@@ -2202,6 +2204,7 @@ export default function App() {
           if (!active) return;
           setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
           setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+          setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
           setHolidayStaff(normalizeHolidayStaffEntries(payload.holidayStaff));
           setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
           setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -2424,6 +2427,7 @@ export default function App() {
       setJobs([]);
       setHolidays([]);
       setHolidayRequests([]);
+      setApprovedHolidayRequests([]);
       setLoginPassword("");
       setLoginError("");
       window.location.replace(isClientRoute ? "/client" : "/");
@@ -2633,6 +2637,7 @@ export default function App() {
       const payload = await response.json();
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
       setHolidayStaff(normalizeHolidayStaffEntries(payload.holidayStaff));
       setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -2709,6 +2714,7 @@ export default function App() {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Could not send holiday request.");
         setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+        setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
         setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
         setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
         setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -2734,6 +2740,7 @@ export default function App() {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Could not update holiday request.");
         setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+        setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
         setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
         setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
         setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -2765,6 +2772,7 @@ export default function App() {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "Could not save holiday allowance.");
         setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+        setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
         setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
         setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
         setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -2879,6 +2887,7 @@ export default function App() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not send cancellation request.");
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
@@ -3580,6 +3589,7 @@ export default function App() {
       if (!response.ok) throw new Error(payload.error || "Could not save calendar event.");
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
       setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
       setHolidayEventForm(EMPTY_HOLIDAY_EVENT_FORM);
@@ -3606,6 +3616,7 @@ export default function App() {
       if (!response.ok) throw new Error(payload.error || "Could not delete calendar event.");
       setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       setHolidayRequests(Array.isArray(payload.holidayRequests) ? payload.holidayRequests : []);
+      setApprovedHolidayRequests(Array.isArray(payload.approvedHolidayRequests) ? payload.approvedHolidayRequests : []);
       setHolidayAllowances(Array.isArray(payload.holidayAllowances) ? payload.holidayAllowances : []);
       setHolidayEvents(Array.isArray(payload.holidayEvents) ? payload.holidayEvents : []);
       setHolidayEventForm(EMPTY_HOLIDAY_EVENT_FORM);
@@ -3740,6 +3751,7 @@ export default function App() {
         notifications={notifications}
         holidays={holidays}
         holidayRequests={holidayRequests}
+        approvedHolidayRequests={approvedHolidayRequests}
         holidayStaff={holidayStaff}
         holidayAllowances={holidayAllowances}
         holidayEvents={holidayEvents}

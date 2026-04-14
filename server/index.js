@@ -1797,16 +1797,22 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
           String(request.person || "").trim().toLowerCase() === String(currentPerson || "").toLowerCase()
       );
 
-  const yearRequests = visibleRequests.filter((request) => {
+  const requestsInYear = visibleRequests.filter((request) => {
     const requestStart = String(request.startDate || "");
     const requestEnd = String(request.endDate || request.startDate || "");
-    if (!(requestStart <= endIso && requestEnd >= startIso)) {
-      return false;
-    }
-
-    const requestStatus = String(request.status || "pending").trim().toLowerCase();
-    return canEditHolidays(forUser) ? requestStatus === "pending" : ["pending", "approved"].includes(requestStatus);
+    return requestStart <= endIso && requestEnd >= startIso;
   });
+  const yearRequests = requestsInYear.filter((request) => {
+    const requestStatus = String(request.status || "pending").trim().toLowerCase();
+    return canEditHolidays(forUser) ? requestStatus === "pending" : requestStatus === "pending";
+  });
+  const approvedHolidayRequests = canEditHolidays(forUser)
+    ? []
+    : requestsInYear.filter((request) => {
+        const requestStatus = String(request.status || "pending").trim().toLowerCase();
+        const requestAction = String(request.action || "book").trim().toLowerCase();
+        return requestStatus === "approved" && requestAction === "book";
+      });
 
   const yearHolidays = (store.holidays || []).filter((holiday) => {
     const holidayDate = String(holiday.date || "");
@@ -1824,6 +1830,7 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
     return {
       holidays: displayYearHolidays,
       holidayRequests: yearRequests,
+      approvedHolidayRequests,
       holidayStaff: holidayStaffList,
       holidayAllowances: allowanceRows,
       holidayEvents: (store.holidayEvents || []).filter((event) => {
