@@ -1780,7 +1780,12 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
   const yearRequests = visibleRequests.filter((request) => {
     const requestStart = String(request.startDate || "");
     const requestEnd = String(request.endDate || request.startDate || "");
-    return requestStart <= endIso && requestEnd >= startIso && String(request.status || "pending").trim().toLowerCase() === "pending";
+    if (!(requestStart <= endIso && requestEnd >= startIso)) {
+      return false;
+    }
+
+    const requestStatus = String(request.status || "pending").trim().toLowerCase();
+    return canEditHolidays(forUser) ? requestStatus === "pending" : ["pending", "approved"].includes(requestStatus);
   });
 
   const yearHolidays = (store.holidays || []).filter((holiday) => {
