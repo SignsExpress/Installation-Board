@@ -3626,7 +3626,7 @@ function createServer() {
   });
 
   app.patch("/api/auth/users/:id/attendance-profile", async (request, response) => {
-    if (!request.user?.canManagePermissions) {
+    if (!canManagePermissions(request.user)) {
       response.status(403).json({ error: "Only Matt Rutlidge can change attendance settings." });
       return;
     }
