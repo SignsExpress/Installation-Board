@@ -3176,38 +3176,38 @@ export default function App() {
     } finally {
       setPermissionSavingKey("");
     }
+  }
 
-    async function handleUpdateAttendanceProfile(userId, attendanceProfile) {
-      const targetUser = loginUsers.find((entry) => entry.id === userId);
-      if (!targetUser || !currentUser?.canManagePermissions) return;
+  async function handleUpdateAttendanceProfile(userId, attendanceProfile) {
+    const targetUser = loginUsers.find((entry) => entry.id === userId);
+    if (!targetUser || !currentUser?.canManagePermissions) return;
 
-      setPermissionSavingKey(`${userId}:attendance-profile`);
+    setPermissionSavingKey(`${userId}:attendance-profile`);
 
-      try {
-        const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/attendance-profile`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(attendanceProfile)
-        });
+    try {
+      const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/attendance-profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(attendanceProfile)
+      });
 
-        const payload = await response.json();
-        if (!response.ok) {
-          throw new Error(payload.error || "Could not update attendance settings.");
-        }
-
-        setLoginUsers((current) =>
-          current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
-        );
-        if (currentUser?.id === userId) {
-          setCurrentUser((existing) => ({ ...existing, ...payload.user }));
-        }
-        setMessage(createMessage(`Updated ${targetUser.displayName}'s attendance settings.`, "success"));
-      } catch (error) {
-        console.error(error);
-        setMessage(createMessage(error.message || "Could not update attendance settings.", "error"));
-      } finally {
-        setPermissionSavingKey("");
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not update attendance settings.");
       }
+
+      setLoginUsers((current) =>
+        current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
+      );
+      if (currentUser?.id === userId) {
+        setCurrentUser((existing) => ({ ...existing, ...payload.user }));
+      }
+      setMessage(createMessage(`Updated ${targetUser.displayName}'s attendance settings.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update attendance settings.", "error"));
+    } finally {
+      setPermissionSavingKey("");
     }
   }
 
