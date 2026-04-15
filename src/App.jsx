@@ -3202,6 +3202,13 @@ export default function App() {
       if (currentUser?.id === userId) {
         setCurrentUser((existing) => ({ ...existing, ...payload.user }));
       }
+      if (showAttendance) {
+        const attendanceResponse = await fetch(`/api/attendance?month=${encodeURIComponent(attendanceMonthId)}`);
+        if (attendanceResponse.ok) {
+          const attendancePayload = await attendanceResponse.json();
+          setAttendanceData(attendancePayload);
+        }
+      }
       setMessage(createMessage(`Updated ${targetUser.displayName}'s attendance settings.`, "success"));
     } catch (error) {
       console.error(error);
