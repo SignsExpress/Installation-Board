@@ -12,6 +12,7 @@ const {
   readUsersStore,
   sanitizeUser,
   setUserPasswordById,
+  updateUserAttendanceProfile,
   updateUserPermissions,
   verifyPassword
 } = require("./auth-store");
@@ -1972,10 +1973,18 @@ function getAttendanceDisplayLabel(entry, bankHolidayLabel) {
   if (entry) {
     const type = getHolidayType(entry);
     if (type === "birthday") return "Birthday";
+    if (type === "unpaid" || type === "unpaid-holiday" || type === "unpaid holiday") return "Unpaid holiday";
+    if (type === "absence" || type === "absent") return "Absence";
     return "Holiday";
   }
   if (bankHolidayLabel) return bankHolidayLabel;
   return "";
+}
+
+function getWeekdayKeyFromIso(isoDate) {
+  const parsed = parseIsoDate(isoDate);
+  const day = parsed?.getUTCDay();
+  return ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][day] || "";
 }
 
 function getAttendanceLinkForUser(user, date = "") {
@@ -2062,6 +2071,13 @@ async function getAttendancePayload(forUser, monthId = "") {
     .map((user) => sanitizeUser(user))
     .filter((user) => canAccessAttendance(user));
 
+  const attendanceUserByPersonKey = new Map(
+    attendanceUsers.map((user) => [
+      getHolidayStaffIdentityKey(getHolidayStaffPerson(user.displayName) || user.displayName),
+      user
+    ])
+  );
+
   const staffEntries = holidayStaffList.filter((staffEntry) =>
     attendanceUsers.some(
       (user) => getHolidayStaffIdentityKey(getHolidayStaffPerson(user.displayName) || user.displayName) === getHolidayStaffIdentityKey(staffEntry.person)
@@ -2072,6 +2088,11 @@ async function getAttendancePayload(forUser, monthId = "") {
   const visibleStaff = canEditAttendance(forUser)
     ? staffEntries
     : staffEntries.filter((entry) => getHolidayStaffIdentityKey(entry.person) === currentPersonKey);
+  const filteredVisibleStaff = visibleStaff.filter((entry) => {
+    const user = attendanceUserByPersonKey.get(getHolidayStaffIdentityKey(entry.person));
+    const mode = String(user?.attendanceProfile?.mode || "required").trim().toLowerCase();
+    return mode !== "exempt";
+  });
 
   const rows = enumerateIsoDates(startIso, endIso).map((isoDate) => {
     const parsed = parseIsoDate(isoDate);
@@ -2085,12 +2106,25 @@ async function getAttendancePayload(forUser, monthId = "") {
         ? parsed.toLocaleDateString("en-GB", { weekday: "short", timeZone: TIME_ZONE })
         : "",
       isToday: isoDate === todayIso,
-      cells: visibleStaff.map((staffEntry) => {
+      cells: filteredVisibleStaff.map((staffEntry) => {
         const key = `${getHolidayStaffIdentityKey(staffEntry.person)}::${isoDate}`;
         const holidayEntry = holidayByKey.get(key);
         const attendanceEntry = entryByKey.get(key) || null;
-        const displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
+        const user = attendanceUserByPersonKey.get(getHolidayStaffIdentityKey(staffEntry.person));
+        const attendanceProfile = user?.attendanceProfile || { mode: "required", contractedHours: {} };
+        const attendanceMode = String(attendanceProfile.mode || "required").trim().toLowerCase();
+        const weekdayKey = getWeekdayKeyFromIso(isoDate);
+        const contractedHours = attendanceProfile.contractedHours?.[weekdayKey] || { in: "", out: "" };
+        let displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
         const isWorkingDay = !displayLabel && !isWeekend;
+        const usesContractedHours =
+          attendanceMode === "fixed" &&
+          isWorkingDay &&
+          contractedHours.in &&
+          contractedHours.out;
+        if (usesContractedHours) {
+          displayLabel = "";
+        }
         const hasMissingClock = Boolean(
           attendanceEntry &&
           ((attendanceEntry.clockIn && !attendanceEntry.clockOut) || (!attendanceEntry.clockIn && attendanceEntry.clockOut))
@@ -2100,17 +2134,22 @@ async function getAttendancePayload(forUser, monthId = "") {
           person: staffEntry.person,
           code: staffEntry.code,
           fullName: staffEntry.fullName || staffEntry.name || staffEntry.person,
+          attendanceMode,
           displayLabel: displayLabel || (isWeekend ? "Weekend" : ""),
           isHoliday: Boolean(displayLabel),
           isWeekend,
           isWorkingDay,
-          clockIn: attendanceEntry?.clockIn || "",
-          clockOut: attendanceEntry?.clockOut || "",
+          clockIn: attendanceEntry?.clockIn || (usesContractedHours ? contractedHours.in : ""),
+          clockOut: attendanceEntry?.clockOut || (usesContractedHours ? contractedHours.out : ""),
           adminNote: attendanceEntry?.adminNote || "",
           employeeNote: attendanceEntry?.employeeNote || "",
-          hasMissingClock,
+          hasMissingClock: usesContractedHours ? false : hasMissingClock,
           entryId: attendanceEntry?.id || "",
-          canExplain: !canEditAttendance(forUser) && getHolidayStaffIdentityKey(staffEntry.person) === currentPersonKey && hasMissingClock
+          canExplain:
+            !usesContractedHours &&
+            !canEditAttendance(forUser) &&
+            getHolidayStaffIdentityKey(staffEntry.person) === currentPersonKey &&
+            hasMissingClock
         };
       })
     };
@@ -2124,10 +2163,12 @@ async function getAttendancePayload(forUser, monthId = "") {
     monthId: resolvedMonthId,
     monthLabel: start.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: TIME_ZONE }),
     today: todayIso,
-    staff: visibleStaff.map((entry) => ({
+    staff: filteredVisibleStaff.map((entry) => ({
       person: entry.person,
       code: entry.code,
-      fullName: entry.fullName || entry.name || entry.person
+      fullName: entry.fullName || entry.name || entry.person,
+      attendanceMode:
+        attendanceUserByPersonKey.get(getHolidayStaffIdentityKey(entry.person))?.attendanceProfile?.mode || "required"
     })),
     rows,
     adminMode: canEditAttendance(forUser),
@@ -3581,6 +3622,21 @@ function createServer() {
       response.json({ user: updatedUser });
     } catch (error) {
       response.status(400).json({ error: error.message || "Could not update permissions." });
+    }
+  });
+
+  app.patch("/api/auth/users/:id/attendance-profile", async (request, response) => {
+    if (!request.user?.canManagePermissions) {
+      response.status(403).json({ error: "Only Matt Rutlidge can change attendance settings." });
+      return;
+    }
+
+    try {
+      const user = await updateUserAttendanceProfile(request.params.id, request.body || {});
+      response.json({ user });
+    } catch (error) {
+      console.error(error);
+      response.status(400).json({ error: error.message || "Could not update attendance settings." });
     }
   });
 

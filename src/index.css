@@ -2967,6 +2967,13 @@ button {
   gap: 12px;
 }
 
+.permissions-user-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.95fr) minmax(380px, 1.2fr);
+  gap: 14px;
+  align-items: start;
+}
+
 .permissions-user-head {
   display: flex;
   align-items: center;
@@ -3001,6 +3008,98 @@ button {
 
 .permissions-main-grid {
   display: grid;
+  gap: 10px;
+}
+
+.permissions-attendance-settings {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(199, 183, 210, 0.45);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.permissions-attendance-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.permissions-attendance-head strong {
+  display: block;
+  color: #1f2937;
+}
+
+.permissions-attendance-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.84rem;
+}
+
+.permissions-saving-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(113, 76, 152, 0.12);
+  color: var(--sx-main);
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.permissions-attendance-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.permissions-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.permissions-hours-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.permissions-hours-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.permissions-hours-day {
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.permissions-hours-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--sx-border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  font: inherit;
+  text-align: center;
+}
+
+.permissions-hours-input:focus {
+  outline: 2px solid rgba(113, 76, 152, 0.18);
+  border-color: var(--sx-main);
+}
+
+.permissions-attendance-actions {
+  display: flex;
+  justify-content: flex-end;
   gap: 10px;
 }
 
@@ -3865,6 +3964,14 @@ button {
   .permissions-admin-tools,
   .permissions-user-actions {
     grid-template-columns: 1fr;
+  }
+
+  .permissions-user-body {
+    grid-template-columns: 1fr;
+  }
+
+  .permissions-hours-row {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .host-nav-inner {

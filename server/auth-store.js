@@ -52,6 +52,38 @@ function getDefaultPermissions(role) {
   };
 }
 
+function getDefaultAttendanceProfile() {
+  return {
+    mode: "required",
+    contractedHours: {
+      monday: { in: "", out: "" },
+      tuesday: { in: "", out: "" },
+      wednesday: { in: "", out: "" },
+      thursday: { in: "", out: "" },
+      friday: { in: "", out: "" }
+    }
+  };
+}
+
+function normalizeAttendanceTime(value) {
+  const raw = String(value || "").trim();
+  return /^\d{2}:\d{2}$/.test(raw) ? raw : "";
+}
+
+function normalizeAttendanceProfile(profile) {
+  const defaults = getDefaultAttendanceProfile();
+  const normalizedMode = String(profile?.mode || "").trim().toLowerCase();
+  const mode = ["required", "fixed", "exempt"].includes(normalizedMode) ? normalizedMode : defaults.mode;
+  const contractedHours = {};
+  for (const day of Object.keys(defaults.contractedHours)) {
+    contractedHours[day] = {
+      in: normalizeAttendanceTime(profile?.contractedHours?.[day]?.in),
+      out: normalizeAttendanceTime(profile?.contractedHours?.[day]?.out)
+    };
+  }
+  return { mode, contractedHours };
+}
+
 function normalizePermissionValue(value, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return PERMISSION_VALUES.includes(normalized) ? normalized : fallback;
@@ -120,6 +152,7 @@ function normalizeStore(parsed, options = {}) {
         displayName: seeded.displayName,
         role: seeded.role,
         permissions: getDefaultPermissions(seeded.role),
+        attendanceProfile: getDefaultAttendanceProfile(),
         passwordSalt: "",
         passwordHash: "",
         passwordUpdatedAt: ""
@@ -129,6 +162,7 @@ function normalizeStore(parsed, options = {}) {
 
   for (const user of users) {
     user.permissions = normalizePermissions(user.permissions, user.role);
+    user.attendanceProfile = normalizeAttendanceProfile(user.attendanceProfile);
     if (isOwnerUser(user)) {
       user.permissions = {
         board: "admin",
@@ -203,6 +237,7 @@ function sanitizeUser(user) {
     displayName: safeUser.displayName,
     role: deriveRoleFromPermissions(permissions),
     permissions,
+    attendanceProfile: normalizeAttendanceProfile(safeUser.attendanceProfile),
     hasPassword: Boolean(safeUser.passwordHash)
   };
 }
@@ -228,6 +263,7 @@ async function createUser({ displayName, role = "client", password = "" }) {
     displayName: nextDisplayName,
     role: normalizedRole,
     permissions: getDefaultPermissions(normalizedRole),
+    attendanceProfile: getDefaultAttendanceProfile(),
     passwordSalt: "",
     passwordHash: "",
     passwordUpdatedAt: ""
@@ -312,6 +348,19 @@ async function updateUserPermissions(userId, permissions) {
   return sanitizeUser(user);
 }
 
+async function updateUserAttendanceProfile(userId, attendanceProfile) {
+  const store = await readUsersStore();
+  const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
+
+  if (!user) {
+    throw new Error(`No user found for id "${userId}".`);
+  }
+
+  user.attendanceProfile = normalizeAttendanceProfile(attendanceProfile);
+  await writeUsersStore(store);
+  return sanitizeUser(user);
+}
+
 async function deleteUser(userId) {
   const store = await readUsersStore();
   const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
@@ -378,6 +427,7 @@ module.exports = {
   sanitizeUser,
   setUserPassword,
   setUserPasswordById,
+  updateUserAttendanceProfile,
   updateUserPermissions,
   verifyPassword,
   writeUsersStore

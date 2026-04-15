@@ -82,6 +82,14 @@ const EMPTY_ATTENDANCE_NOTE_FORM = {
   note: ""
 };
 
+const ATTENDANCE_WEEKDAYS = [
+  ["monday", "Mon"],
+  ["tuesday", "Tue"],
+  ["wednesday", "Wed"],
+  ["thursday", "Thu"],
+  ["friday", "Fri"]
+];
+
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -163,6 +171,30 @@ function normalizeHolidayStaffEntries(entries) {
 function toAllowanceNumber(value) {
   const numeric = Number(value);
   return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function normalizeAttendanceDraft(profile) {
+  const base = {
+    mode: "required",
+    contractedHours: Object.fromEntries(
+      ATTENDANCE_WEEKDAYS.map(([dayKey]) => [dayKey, { in: "", out: "" }])
+    )
+  };
+  const nextMode = ["required", "fixed", "exempt"].includes(String(profile?.mode || "").trim().toLowerCase())
+    ? String(profile.mode).trim().toLowerCase()
+    : "required";
+
+  for (const [dayKey] of ATTENDANCE_WEEKDAYS) {
+    base.contractedHours[dayKey] = {
+      in: String(profile?.contractedHours?.[dayKey]?.in || "").trim(),
+      out: String(profile?.contractedHours?.[dayKey]?.out || "").trim()
+    };
+  }
+
+  return {
+    mode: nextMode,
+    contractedHours: base.contractedHours
+  };
 }
 
 function getHolidayAllowanceSummary(entry) {
@@ -916,21 +948,42 @@ function PermissionsPanel({
   users,
   savingKey,
   onChangePermission,
+  onUpdateAttendanceProfile,
   onCreateUser,
   onResetPassword,
   onDeleteUser
 }) {
   const [createForm, setCreateForm] = useState({ displayName: "", role: "client", password: "" });
   const [passwordDrafts, setPasswordDrafts] = useState({});
+  const [attendanceDrafts, setAttendanceDrafts] = useState({});
   const visibleUsers = [...users].sort((left, right) => left.displayName.localeCompare(right.displayName));
 
+  useEffect(() => {
+    setAttendanceDrafts(
+      Object.fromEntries(
+        users.map((user) => [user.id, normalizeAttendanceDraft(user.attendanceProfile)])
+      )
+    );
+  }, [users]);
+
+  function updateAttendanceDraft(userId, updater) {
+    setAttendanceDrafts((current) => {
+      const existing = current[userId] || normalizeAttendanceDraft(null);
+      const nextValue = typeof updater === "function" ? updater(existing) : updater;
+      return {
+        ...current,
+        [userId]: normalizeAttendanceDraft(nextValue)
+      };
+    });
+  }
+
   return (
-    <section className="panel permissions-panel">
-      <div className="permissions-head">
-        <h3>Permissions</h3>
-        <p>Manage access, add users, update passwords and remove accounts.</p>
-      </div>
-      <div className="permissions-admin-tools">
+      <section className="panel permissions-panel">
+        <div className="permissions-head">
+          <h3>User portal</h3>
+          <p>Manage access, passwords, contracted hours and attendance rules in one place.</p>
+        </div>
+        <div className="permissions-admin-tools">
         <input
           type="text"
           placeholder="Full name"
@@ -963,92 +1016,219 @@ function PermissionsPanel({
         </button>
       </div>
       <div className="permissions-grid">
-        {visibleUsers.map((user) => {
-          const isSelf = user.id === currentUser.id;
-          const boardPermission = getPermissionForApp(user, "board");
-          const holidaysPermission = getPermissionForApp(user, "holidays");
-          const installerPermission = getPermissionForApp(user, "installer");
-          const attendancePermission = getPermissionForApp(user, "attendance");
+          {visibleUsers.map((user) => {
+            const isSelf = user.id === currentUser.id;
+            const boardPermission = getPermissionForApp(user, "board");
+            const holidaysPermission = getPermissionForApp(user, "holidays");
+            const installerPermission = getPermissionForApp(user, "installer");
+            const attendancePermission = getPermissionForApp(user, "attendance");
+            const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
+            const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
+            const attendanceMode = String(attendanceDraft.mode || "required");
+            const contractedHours = attendanceDraft.contractedHours || {};
+            const exemptFromClocking = attendanceMode === "exempt";
+            const fixedHoursMode = attendanceMode === "fixed";
+            const attendanceChanged = JSON.stringify(attendanceDraft) !== JSON.stringify(attendanceProfile);
 
-          return (
-            <article key={user.id} className="permissions-user-card">
+            return (
+              <article key={user.id} className="permissions-user-card">
               <div className="permissions-user-head">
                 <div className="permissions-user-identity">
                   <strong>{user.displayName}</strong>
                   <span className="permissions-user-meta">{user.role === "host" ? "Host" : "Client"}</span>
-                </div>
-                {isSelf ? <span className="permissions-owner-pill">Owner</span> : null}
-              </div>
-
-              <div className="permissions-main-grid">
-                <div className="permissions-app-row">
-                  <span className="permissions-app-label">Installation Board</span>
-                  <div className="permission-segment">
-                    {PERMISSION_OPTIONS.map((option) => (
-                      <button
-                        key={`${user.id}-board-${option.value}`}
-                        type="button"
-                        className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
-                        disabled={isSelf || savingKey === `${user.id}:board`}
-                        onClick={() => onChangePermission(user.id, "board", option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
                   </div>
+                  {isSelf ? <span className="permissions-owner-pill">Owner</span> : null}
                 </div>
 
-                <div className="permissions-app-row">
-                  <span className="permissions-app-label">Subcontractor Directory</span>
-                  <div className="permission-segment">
-                    {PERMISSION_OPTIONS.map((option) => (
-                      <button
-                        key={`${user.id}-installer-${option.value}`}
-                        type="button"
-                        className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
-                        disabled={isSelf || savingKey === `${user.id}:installer`}
-                        onClick={() => onChangePermission(user.id, "installer", option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <div className="permissions-user-body">
+                  <div className="permissions-main-grid">
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Installation Board</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-board-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:board`}
+                            onClick={() => onChangePermission(user.id, "board", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="permissions-app-row">
-                  <span className="permissions-app-label">Holidays</span>
-                  <div className="permission-segment">
-                    {PERMISSION_OPTIONS.map((option) => (
-                      <button
-                        key={`${user.id}-holidays-${option.value}`}
-                        type="button"
-                        className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
-                        disabled={isSelf || savingKey === `${user.id}:holidays`}
-                        onClick={() => onChangePermission(user.id, "holidays", option.value)}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Subcontractor Directory</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-installer-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:installer`}
+                            onClick={() => onChangePermission(user.id, "installer", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="permissions-app-row">
-                  <span className="permissions-app-label">Attendance</span>
-                  <div className="permission-segment">
-                    {PERMISSION_OPTIONS.map((option) => (
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Holidays</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-holidays-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:holidays`}
+                            onClick={() => onChangePermission(user.id, "holidays", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Attendance</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-attendance-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${attendancePermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:attendance`}
+                            onClick={() => onChangePermission(user.id, "attendance", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="permissions-attendance-settings">
+                    <div className="permissions-attendance-head">
+                      <div>
+                        <strong>Attendance profile</strong>
+                        <p>
+                          {exemptFromClocking
+                            ? "Removed from the attendance board."
+                            : fixedHoursMode
+                            ? "Uses contracted hours instead of clockings."
+                            : "Uses live clock in / out times."}
+                        </p>
+                      </div>
+                      {savingKey === `${user.id}:attendance-profile` ? (
+                        <span className="permissions-saving-pill">Saving...</span>
+                      ) : null}
+                    </div>
+                    <div className="permissions-attendance-toggles">
+                      <label className="permissions-toggle">
+                        <input
+                          type="checkbox"
+                          checked={exemptFromClocking}
+                          disabled={savingKey === `${user.id}:attendance-profile`}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            const nextMode = checked ? "exempt" : fixedHoursMode ? "fixed" : "required";
+                            updateAttendanceDraft(user.id, (current) => ({
+                              ...current,
+                              mode: nextMode
+                            }));
+                          }}
+                        />
+                        <span>Exempt from clocking in / out</span>
+                      </label>
+                      <label className="permissions-toggle">
+                        <input
+                          type="checkbox"
+                          checked={fixedHoursMode}
+                          disabled={exemptFromClocking || savingKey === `${user.id}:attendance-profile`}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            updateAttendanceDraft(user.id, (current) => ({
+                              ...current,
+                              mode: checked ? "fixed" : "required"
+                            }));
+                          }}
+                        />
+                        <span>No clocking in / out required</span>
+                      </label>
+                    </div>
+
+                    <div className="permissions-hours-grid">
+                      {ATTENDANCE_WEEKDAYS.map(([dayKey, dayLabel]) => (
+                        <div key={`${user.id}-${dayKey}`} className="permissions-hours-row">
+                          <span className="permissions-hours-day">{dayLabel}</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="09:00"
+                            className="permissions-hours-input"
+                            value={contractedHours?.[dayKey]?.in || ""}
+                            disabled={savingKey === `${user.id}:attendance-profile`}
+                            onChange={(event) =>
+                              updateAttendanceDraft(user.id, (current) => ({
+                                ...current,
+                                contractedHours: {
+                                  ...current.contractedHours,
+                                  [dayKey]: {
+                                    ...(current.contractedHours?.[dayKey] || {}),
+                                    in: event.target.value
+                                  }
+                                }
+                              }))
+                            }
+                          />
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="17:00"
+                            className="permissions-hours-input"
+                            value={contractedHours?.[dayKey]?.out || ""}
+                            disabled={savingKey === `${user.id}:attendance-profile`}
+                            onChange={(event) =>
+                              updateAttendanceDraft(user.id, (current) => ({
+                                ...current,
+                                contractedHours: {
+                                  ...current.contractedHours,
+                                  [dayKey]: {
+                                    ...(current.contractedHours?.[dayKey] || {}),
+                                    out: event.target.value
+                                  }
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="permissions-attendance-actions">
                       <button
-                        key={`${user.id}-attendance-${option.value}`}
+                        className="ghost-button"
                         type="button"
-                        className={`permission-chip ${attendancePermission === option.value ? "active" : ""}`}
-                        disabled={isSelf || savingKey === `${user.id}:attendance`}
-                        onClick={() => onChangePermission(user.id, "attendance", option.value)}
+                        disabled={!attendanceChanged || savingKey === `${user.id}:attendance-profile`}
+                        onClick={() => updateAttendanceDraft(user.id, attendanceProfile)}
                       >
-                        {option.label}
+                        Reset
                       </button>
-                    ))}
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={!attendanceChanged || savingKey === `${user.id}:attendance-profile`}
+                        onClick={() => onUpdateAttendanceProfile(user.id, attendanceDraft)}
+                      >
+                        Save attendance settings
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
 
               <div className="permissions-user-actions">
                 <input
@@ -1214,6 +1394,7 @@ function HostLandingPage({
   users,
   savingKey,
   onChangePermission,
+  onUpdateAttendanceProfile,
   onCreateUser,
   onResetPassword,
   onDeleteUser,
@@ -1311,15 +1492,16 @@ function HostLandingPage({
                 x
               </button>
             </div>
-            <PermissionsPanel
-              currentUser={currentUser}
-              users={users}
-              savingKey={savingKey}
-              onChangePermission={onChangePermission}
-              onCreateUser={onCreateUser}
-              onResetPassword={onResetPassword}
-              onDeleteUser={onDeleteUser}
-            />
+              <PermissionsPanel
+                currentUser={currentUser}
+                users={users}
+                savingKey={savingKey}
+                onChangePermission={onChangePermission}
+                onUpdateAttendanceProfile={onUpdateAttendanceProfile}
+                onCreateUser={onCreateUser}
+                onResetPassword={onResetPassword}
+                onDeleteUser={onDeleteUser}
+              />
           </div>
         </div>
       ) : null}
@@ -2994,6 +3176,39 @@ export default function App() {
     } finally {
       setPermissionSavingKey("");
     }
+
+    async function handleUpdateAttendanceProfile(userId, attendanceProfile) {
+      const targetUser = loginUsers.find((entry) => entry.id === userId);
+      if (!targetUser || !currentUser?.canManagePermissions) return;
+
+      setPermissionSavingKey(`${userId}:attendance-profile`);
+
+      try {
+        const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/attendance-profile`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(attendanceProfile)
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not update attendance settings.");
+        }
+
+        setLoginUsers((current) =>
+          current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
+        );
+        if (currentUser?.id === userId) {
+          setCurrentUser((existing) => ({ ...existing, ...payload.user }));
+        }
+        setMessage(createMessage(`Updated ${targetUser.displayName}'s attendance settings.`, "success"));
+      } catch (error) {
+        console.error(error);
+        setMessage(createMessage(error.message || "Could not update attendance settings.", "error"));
+      } finally {
+        setPermissionSavingKey("");
+      }
+    }
   }
 
   async function handleCreateUser({ displayName, role, password }) {
@@ -4276,17 +4491,18 @@ export default function App() {
 
   if (showHostLanding) {
     return (
-      <HostLandingPage
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        users={loginUsers}
-        savingKey={permissionSavingKey}
-        onChangePermission={handlePermissionChange}
-        onCreateUser={handleCreateUser}
-        onResetPassword={handleResetUserPassword}
-        onDeleteUser={handleDeleteUser}
-        notifications={notifications}
-      />
+        <HostLandingPage
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          users={loginUsers}
+          savingKey={permissionSavingKey}
+          onChangePermission={handlePermissionChange}
+          onUpdateAttendanceProfile={handleUpdateAttendanceProfile}
+          onCreateUser={handleCreateUser}
+          onResetPassword={handleResetUserPassword}
+          onDeleteUser={handleDeleteUser}
+          notifications={notifications}
+        />
     );
   }
 
