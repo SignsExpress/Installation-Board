@@ -177,7 +177,7 @@ function normalizeAttendanceDraft(profile) {
   const base = {
     mode: "required",
     contractedHours: Object.fromEntries(
-      ATTENDANCE_WEEKDAYS.map(([dayKey]) => [dayKey, { in: "", out: "" }])
+      ATTENDANCE_WEEKDAYS.map(([dayKey]) => [dayKey, { in: "", out: "", off: false }])
     )
   };
   const nextMode = ["required", "fixed", "exempt"].includes(String(profile?.mode || "").trim().toLowerCase())
@@ -187,7 +187,8 @@ function normalizeAttendanceDraft(profile) {
   for (const [dayKey] of ATTENDANCE_WEEKDAYS) {
     base.contractedHours[dayKey] = {
       in: String(profile?.contractedHours?.[dayKey]?.in || "").trim(),
-      out: String(profile?.contractedHours?.[dayKey]?.out || "").trim()
+      out: String(profile?.contractedHours?.[dayKey]?.out || "").trim(),
+      off: Boolean(profile?.contractedHours?.[dayKey]?.off)
     };
   }
 
@@ -454,6 +455,7 @@ function getAttendanceDisplayClass(cell) {
   if (label.includes("birthday")) return "is-birthday";
   if (label.includes("bank holiday")) return "is-bank-holiday";
   if (label.includes("weekend")) return "is-weekend";
+  if (label === "off") return "is-weekend";
   if (label.includes("holiday")) return "is-holiday";
   return "";
 }
@@ -1171,7 +1173,7 @@ function PermissionsPanel({
                             placeholder="09:00"
                             className="permissions-hours-input"
                             value={contractedHours?.[dayKey]?.in || ""}
-                            disabled={savingKey === `${user.id}:attendance-profile`}
+                            disabled={Boolean(contractedHours?.[dayKey]?.off) || savingKey === `${user.id}:attendance-profile`}
                             onChange={(event) =>
                               updateAttendanceDraft(user.id, (current) => ({
                                 ...current,
@@ -1191,7 +1193,7 @@ function PermissionsPanel({
                             placeholder="17:00"
                             className="permissions-hours-input"
                             value={contractedHours?.[dayKey]?.out || ""}
-                            disabled={savingKey === `${user.id}:attendance-profile`}
+                            disabled={Boolean(contractedHours?.[dayKey]?.off) || savingKey === `${user.id}:attendance-profile`}
                             onChange={(event) =>
                               updateAttendanceDraft(user.id, (current) => ({
                                 ...current,
@@ -1205,6 +1207,26 @@ function PermissionsPanel({
                               }))
                             }
                           />
+                          <label className="permissions-hours-off">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(contractedHours?.[dayKey]?.off)}
+                              disabled={savingKey === `${user.id}:attendance-profile`}
+                              onChange={(event) =>
+                                updateAttendanceDraft(user.id, (current) => ({
+                                  ...current,
+                                  contractedHours: {
+                                    ...current.contractedHours,
+                                    [dayKey]: {
+                                      ...(current.contractedHours?.[dayKey] || {}),
+                                      off: event.target.checked
+                                    }
+                                  }
+                                }))
+                              }
+                            />
+                            <span>Off</span>
+                          </label>
                         </div>
                       ))}
                     </div>

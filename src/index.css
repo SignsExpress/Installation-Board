@@ -3070,7 +3070,7 @@ button {
 
 .permissions-hours-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
 }
@@ -3095,6 +3095,16 @@ button {
 .permissions-hours-input:focus {
   outline: 2px solid rgba(113, 76, 152, 0.18);
   border-color: var(--sx-main);
+}
+
+.permissions-hours-off {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .permissions-attendance-actions {
@@ -3971,7 +3981,7 @@ button {
   }
 
   .permissions-hours-row {
-    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) auto;
   }
 
   .host-nav-inner {

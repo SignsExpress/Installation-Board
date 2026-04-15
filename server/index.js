@@ -2120,14 +2120,19 @@ async function getAttendancePayload(forUser, monthId = "") {
         const attendanceProfile = user?.attendanceProfile || { mode: "required", contractedHours: {} };
         const attendanceMode = String(attendanceProfile.mode || "required").trim().toLowerCase();
         const weekdayKey = getWeekdayKeyFromIso(isoDate);
-        const contractedHours = attendanceProfile.contractedHours?.[weekdayKey] || { in: "", out: "" };
+        const contractedHours = attendanceProfile.contractedHours?.[weekdayKey] || { in: "", out: "", off: false };
         let displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
         const isWorkingDay = !displayLabel && !isWeekend;
+        const isContractedOff = Boolean(contractedHours.off) && isWorkingDay;
         const usesContractedHours =
           attendanceMode === "fixed" &&
           isWorkingDay &&
+          !isContractedOff &&
           contractedHours.in &&
           contractedHours.out;
+        if (isContractedOff) {
+          displayLabel = "Off";
+        }
         if (usesContractedHours) {
           displayLabel = "";
         }
@@ -2149,10 +2154,11 @@ async function getAttendancePayload(forUser, monthId = "") {
           clockOut: attendanceEntry?.clockOut || (usesContractedHours ? contractedHours.out : ""),
           adminNote: attendanceEntry?.adminNote || "",
           employeeNote: attendanceEntry?.employeeNote || "",
-          hasMissingClock: usesContractedHours ? false : hasMissingClock,
+          hasMissingClock: usesContractedHours || isContractedOff ? false : hasMissingClock,
           entryId: attendanceEntry?.id || "",
           canExplain:
             !usesContractedHours &&
+            !isContractedOff &&
             !canEditAttendance(forUser) &&
             getHolidayStaffIdentityKey(staffEntry.person) === currentPersonKey &&
             hasMissingClock

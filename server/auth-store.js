@@ -56,11 +56,11 @@ function getDefaultAttendanceProfile() {
   return {
     mode: "required",
     contractedHours: {
-      monday: { in: "", out: "" },
-      tuesday: { in: "", out: "" },
-      wednesday: { in: "", out: "" },
-      thursday: { in: "", out: "" },
-      friday: { in: "", out: "" }
+      monday: { in: "", out: "", off: false },
+      tuesday: { in: "", out: "", off: false },
+      wednesday: { in: "", out: "", off: false },
+      thursday: { in: "", out: "", off: false },
+      friday: { in: "", out: "", off: false }
     }
   };
 }
@@ -84,7 +84,8 @@ function normalizeAttendanceProfile(profile) {
   for (const day of Object.keys(defaults.contractedHours)) {
     contractedHours[day] = {
       in: normalizeAttendanceTime(profile?.contractedHours?.[day]?.in),
-      out: normalizeAttendanceTime(profile?.contractedHours?.[day]?.out)
+      out: normalizeAttendanceTime(profile?.contractedHours?.[day]?.out),
+      off: Boolean(profile?.contractedHours?.[day]?.off)
     };
   }
   return { mode, contractedHours };
