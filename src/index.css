@@ -3522,7 +3522,7 @@ button {
 
 @media (max-width: 780px) {
   .app-shell:has(.host-nav-shell) {
-    padding-top: 134px;
+    padding-top: 228px;
   }
 
   .host-landing-tools {
@@ -3541,8 +3541,8 @@ button {
   }
 
   .host-nav-inner {
-    gap: 10px;
-    padding: 8px 12px 6px;
+    gap: 8px;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px;
   }
 
   .host-nav-links,
@@ -3557,13 +3557,13 @@ button {
   }
 
   .host-nav-brand-logo {
-    width: 132px;
+    width: 118px;
   }
 
   .host-nav-link,
   .host-nav-logout {
-    min-height: 36px;
-    padding: 4px 6px 8px;
+    min-height: 32px;
+    padding: 4px 6px 6px;
   }
 
   .host-nav-link-icon {
@@ -3577,12 +3577,39 @@ button {
   }
 
   .host-nav-link-label {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
   }
 
   .host-nav-user {
     font-size: 0.82rem;
     line-height: 1.25;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .host-nav-links {
+    width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .host-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .host-nav-meta {
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
   .notification-feed-card {
