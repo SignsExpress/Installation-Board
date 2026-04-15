@@ -2332,6 +2332,280 @@ button {
   justify-content: center;
 }
 
+.attendance-panel {
+  gap: 18px;
+}
+
+.attendance-toolbar p {
+  color: var(--sx-subtle);
+  margin-top: 4px;
+}
+
+.attendance-grid-wrap {
+  overflow: auto;
+  border: 1px solid var(--sx-border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.attendance-grid-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.attendance-grid-table th,
+.attendance-grid-table td {
+  border-right: 1px solid rgba(203, 213, 225, 0.75);
+  border-bottom: 1px solid rgba(203, 213, 225, 0.75);
+  padding: 10px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.attendance-grid-table thead th {
+  background: rgba(248, 250, 252, 0.96);
+  color: #475569;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.attendance-date-head,
+.attendance-date-cell {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #fff9de;
+}
+
+.attendance-date-cell {
+  min-width: 114px;
+  text-align: left;
+}
+
+.attendance-date-cell span,
+.attendance-date-cell strong,
+.attendance-date-cell em {
+  display: block;
+}
+
+.attendance-date-cell span {
+  color: #64748b;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.attendance-date-cell strong {
+  color: #0f172a;
+  font-size: 0.98rem;
+  margin-top: 2px;
+}
+
+.attendance-date-cell em {
+  margin-top: 4px;
+  color: var(--sx-main);
+  font-style: normal;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.attendance-staff-head small {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.attendance-sub-head {
+  min-width: 82px;
+}
+
+.attendance-value-cell {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.attendance-time-input {
+  width: 100%;
+  min-width: 64px;
+  border: 1px solid var(--sx-border);
+  border-radius: 12px;
+  background: white;
+  padding: 8px 10px;
+  text-align: center;
+  font: inherit;
+  color: #0f172a;
+}
+
+.attendance-time-input:focus {
+  outline: 2px solid rgba(113, 76, 152, 0.18);
+  border-color: var(--sx-main);
+}
+
+.attendance-cell-missing {
+  background: rgba(244, 114, 182, 0.18);
+}
+
+.attendance-merged-cell {
+  background: rgba(248, 250, 252, 0.92);
+  color: #475569;
+  font-weight: 700;
+}
+
+.attendance-merged-holiday {
+  color: var(--sx-holiday-text);
+}
+
+.attendance-row-today .attendance-date-cell {
+  background: rgba(113, 76, 152, 0.14);
+}
+
+.attendance-self-service {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+
+.attendance-self-panel {
+  border: 1px solid var(--sx-border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.attendance-self-list {
+  display: grid;
+  gap: 12px;
+}
+
+.attendance-self-card {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 20px;
+  background: #fff;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.attendance-self-card.is-today {
+  border-color: rgba(113, 76, 152, 0.5);
+  box-shadow: 0 0 0 2px rgba(113, 76, 152, 0.08);
+}
+
+.attendance-self-card.is-missing {
+  background: rgba(244, 114, 182, 0.08);
+  border-color: rgba(244, 114, 182, 0.4);
+}
+
+.attendance-self-card.is-focused {
+  box-shadow: 0 0 0 2px rgba(113, 76, 152, 0.16);
+}
+
+.attendance-self-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.attendance-self-card-head strong,
+.attendance-self-card-head span {
+  display: block;
+}
+
+.attendance-self-card-head span {
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
+.attendance-self-status {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(219, 234, 254, 0.85);
+  color: #1d4ed8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.attendance-self-status.missing {
+  background: rgba(244, 114, 182, 0.18);
+  color: #be185d;
+}
+
+.attendance-self-times {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  color: #475569;
+}
+
+.attendance-self-note {
+  color: #475569;
+  margin: 0;
+}
+
+.attendance-note-button {
+  justify-self: flex-start;
+}
+
+.attendance-missing-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.attendance-missing-chip {
+  border: 1px solid var(--sx-border);
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+}
+
+.attendance-missing-chip.active {
+  border-color: rgba(113, 76, 152, 0.45);
+  background: rgba(113, 76, 152, 0.12);
+  color: var(--sx-main);
+}
+
+.attendance-note-form {
+  display: grid;
+  gap: 12px;
+}
+
+.attendance-note-form label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.attendance-note-form input,
+.attendance-note-form textarea {
+  width: 100%;
+  border: 1px solid var(--sx-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  font: inherit;
+  background: white;
+}
+
+.attendance-note-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .host-landing-brand {
   display: flex;
   justify-content: center;
@@ -3640,6 +3914,14 @@ button {
     white-space: normal;
   }
 
+  .attendance-self-service {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-self-panel {
+    padding: 16px;
+  }
+
   .app-shell {
     padding: 14px;
   }
@@ -3904,6 +4186,24 @@ button {
     border-radius: 5px;
     padding: 2px 4px;
     font-size: 0.56rem;
+  }
+
+  .attendance-grid-table {
+    min-width: 860px;
+  }
+
+  .attendance-date-cell {
+    min-width: 92px;
+  }
+
+  .attendance-sub-head {
+    min-width: 70px;
+  }
+
+  .attendance-time-input {
+    min-width: 56px;
+    padding: 6px 8px;
+    font-size: 0.88rem;
   }
 
   .client-mode .hero {

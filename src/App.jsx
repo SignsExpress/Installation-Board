@@ -77,6 +77,11 @@ const EMPTY_HOLIDAY_EVENT_FORM = {
   title: ""
 };
 
+const EMPTY_ATTENDANCE_NOTE_FORM = {
+  date: "",
+  note: ""
+};
+
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -398,6 +403,19 @@ function formatNotificationDate(value) {
   }).format(parsed);
 }
 
+function toMonthIdFromIso(value) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) return "";
+  return `${parsed.getUTCFullYear()}-${String(parsed.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function shiftMonthId(value, offset) {
+  const [year, month] = String(value || "").split("-").map(Number);
+  if (!year || !month) return toMonthIdFromIso(getLocalTodayIso());
+  const next = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
 function formatNotificationMessage(message) {
   const raw = String(message || "").trim();
   if (!raw) return "";
@@ -667,8 +685,21 @@ function canEditHolidays(user) {
   return getPermissionForApp(user, "holidays") === "admin";
 }
 
+function canAccessAttendance(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "attendance") !== "none";
+}
+
+function canEditAttendance(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "attendance") === "admin";
+}
+
 function usesHostShell(user) {
-  return Boolean(user && (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || user.canManagePermissions));
+  return Boolean(
+    user &&
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || user.canManagePermissions)
+  );
 }
 
 function getHomePathForUser(user) {
@@ -699,6 +730,14 @@ function HolidayIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M7 3h2v2h6V3h2v2h1.5A1.5 1.5 0 0 1 20 6.5v12A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5v-12A1.5 1.5 0 0 1 5.5 5H7Zm11 6.5h-12v8.5h12Zm-9.5 2h3v3h-3Z" />
+    </svg>
+  );
+}
+
+function AttendanceIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4h10a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2Zm0 2v11a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6Zm2 2h6v2H9Zm0 4h4v2H9Z" />
     </svg>
   );
 }
@@ -739,6 +778,9 @@ function getNotificationCategory(notification) {
   if (link.includes("/holidays") || title.includes("holiday") || message.includes("holiday")) {
     return { label: "Holiday", icon: HolidayIcon, className: "notification-type-holiday" };
   }
+  if (link.includes("/attendance") || title.includes("clock") || message.includes("clock")) {
+    return { label: "Attendance", icon: AttendanceIcon, className: "notification-type-update" };
+  }
   if (link.includes("/board") || title.includes("job") || message.includes("job")) {
     return { label: "Board", icon: BoardIcon, className: "notification-type-board" };
   }
@@ -766,10 +808,12 @@ function MainNavBar({
   }
 
   const boardAllowed = canAccessBoard(currentUser);
+  const attendanceAllowed = canAccessAttendance(currentUser);
   const holidaysAllowed = canAccessHolidays(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
+  const attendancePath = "/attendance";
   const holidaysPath = "/holidays";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
@@ -800,6 +844,17 @@ function MainNavBar({
               disabled={!boardAllowed}
             >
               <span className="host-nav-link-label">Installation Board</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "attendance" ? "active" : ""} ${!attendanceAllowed ? "disabled" : ""}`}
+              onClick={() => {
+                if (!attendanceAllowed) return;
+                goTo(attendancePath);
+              }}
+              disabled={!attendanceAllowed}
+            >
+              <span className="host-nav-link-label">Attendance</span>
             </button>
             <button
               type="button"
@@ -903,6 +958,7 @@ function PermissionsPanel({
           const boardPermission = getPermissionForApp(user, "board");
           const holidaysPermission = getPermissionForApp(user, "holidays");
           const installerPermission = getPermissionForApp(user, "installer");
+          const attendancePermission = getPermissionForApp(user, "attendance");
 
           return (
             <article key={user.id} className="permissions-user-card">
@@ -959,6 +1015,23 @@ function PermissionsPanel({
                         className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
                         disabled={isSelf || savingKey === `${user.id}:holidays`}
                         onClick={() => onChangePermission(user.id, "holidays", option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="permissions-app-row">
+                  <span className="permissions-app-label">Attendance</span>
+                  <div className="permission-segment">
+                    {PERMISSION_OPTIONS.map((option) => (
+                      <button
+                        key={`${user.id}-attendance-${option.value}`}
+                        type="button"
+                        className={`permission-chip ${attendancePermission === option.value ? "active" : ""}`}
+                        disabled={isSelf || savingKey === `${user.id}:attendance`}
+                        onClick={() => onChangePermission(user.id, "attendance", option.value)}
                       >
                         {option.label}
                       </button>
@@ -1155,6 +1228,17 @@ function HostLandingPage({
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
             <button
+              className={`host-launch-card ${!canAccessAttendance(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessAttendance(currentUser)) return;
+                goTo("/attendance");
+              }}
+              disabled={!canAccessAttendance(currentUser)}
+            >
+              <strong>Attendance</strong>
+            </button>
+            <button
               className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
               type="button"
               onClick={() => {
@@ -1255,6 +1339,17 @@ function ClientLandingPage({
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
             <button
+              className={`host-launch-card ${!canAccessAttendance(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessAttendance(currentUser)) return;
+                goTo("/attendance");
+              }}
+              disabled={!canAccessAttendance(currentUser)}
+            >
+              <strong>Attendance</strong>
+            </button>
+            <button
               className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
               type="button"
               onClick={() => {
@@ -1269,7 +1364,15 @@ function ClientLandingPage({
               <strong>Subcontractor Directory</strong>
             </button>
 
-            <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
+            <button
+              className={`host-launch-card ${!canAccessBoard(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessBoard(currentUser)) return;
+                goTo(getBoardPathForUser(currentUser));
+              }}
+              disabled={!canAccessBoard(currentUser)}
+            >
               <strong>Installation Board</strong>
             </button>
 
@@ -1929,12 +2032,297 @@ function HolidaysPage({
     );
   }
 
+function AttendancePage({
+  currentUser,
+  onLogout,
+  notifications,
+  attendanceData,
+  loading,
+  attendanceMonthId,
+  setAttendanceMonthId,
+  attendanceSavingKey,
+  attendanceNoteSavingKey,
+  attendanceFocusDate,
+  onSaveAttendanceEntry,
+  onSubmitAttendanceExplanation
+}) {
+  const adminMode = canEditAttendance(currentUser);
+  const [drafts, setDrafts] = useState({});
+  const [noteForm, setNoteForm] = useState(EMPTY_ATTENDANCE_NOTE_FORM);
+
+  useEffect(() => {
+    setDrafts({});
+  }, [attendanceData?.monthId]);
+
+  useEffect(() => {
+    if (!attendanceFocusDate) return;
+    setNoteForm((current) =>
+      current.date === attendanceFocusDate
+        ? current
+        : {
+            date: attendanceFocusDate,
+            note: ""
+          }
+    );
+  }, [attendanceFocusDate]);
+
+  const rows = Array.isArray(attendanceData?.rows) ? attendanceData.rows : [];
+  const staff = Array.isArray(attendanceData?.staff) ? attendanceData.staff : [];
+  const missingEntries = Array.isArray(attendanceData?.missingEntries) ? attendanceData.missingEntries : [];
+  const attendanceMonthLabel = attendanceData?.monthLabel || "Attendance";
+  const focusedMissingEntry =
+    missingEntries.find((entry) => entry.isoDate === noteForm.date) || missingEntries[0] || null;
+
+  useEffect(() => {
+    if (adminMode) return;
+    if (noteForm.date) return;
+    if (!missingEntries.length) return;
+    setNoteForm({
+      date: missingEntries[0].isoDate,
+      note: missingEntries[0].employeeNote || ""
+    });
+  }, [adminMode, missingEntries, noteForm.date]);
+
+  function getDraftValue(person, date, field, fallback = "") {
+    const key = `${person}:${date}`;
+    return drafts[key]?.[field] ?? fallback;
+  }
+
+  function setDraftValue(person, date, updates) {
+    const key = `${person}:${date}`;
+    setDrafts((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] || {}),
+        ...updates
+      }
+    }));
+  }
+
+  async function handleAttendanceBlur(cell) {
+    const person = cell.person;
+    const date = cell.isoDate;
+    const key = `${person}:${date}`;
+    const draft = drafts[key] || {};
+    const clockIn = draft.clockIn ?? cell.clockIn ?? "";
+    const clockOut = draft.clockOut ?? cell.clockOut ?? "";
+    const adminNote = draft.adminNote ?? cell.adminNote ?? "";
+    await onSaveAttendanceEntry({ person, date, clockIn, clockOut, adminNote });
+  }
+
+  async function submitEmployeeNote(event) {
+    event.preventDefault();
+    if (!noteForm.date || !noteForm.note.trim()) return;
+    await onSubmitAttendanceExplanation({
+      date: noteForm.date,
+      note: noteForm.note.trim()
+    });
+    setNoteForm(EMPTY_ATTENDANCE_NOTE_FORM);
+  }
+
+  return (
+    <div className="app-shell holidays-shell">
+      <div className="page holidays-page attendance-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="attendance"
+          onLogout={onLogout}
+          notifications={notifications}
+        />
+
+        <section className="panel holidays-panel attendance-panel">
+          <div className="holidays-toolbar attendance-toolbar">
+            <div>
+              <h2>Attendance</h2>
+              <p>{attendanceMonthLabel}</p>
+            </div>
+            <div className="holidays-toolbar-actions">
+              <button className="ghost-button" type="button" onClick={() => setAttendanceMonthId(shiftMonthId(attendanceMonthId, -1))}>
+                Previous month
+              </button>
+              <button className="ghost-button" type="button" onClick={() => setAttendanceMonthId(toMonthIdFromIso(getLocalTodayIso()))}>
+                Current month
+              </button>
+              <button className="ghost-button" type="button" onClick={() => setAttendanceMonthId(shiftMonthId(attendanceMonthId, 1))}>
+                Next month
+              </button>
+            </div>
+          </div>
+
+          {loading ? <div className="board-loading">Loading attendance...</div> : null}
+
+          {!loading && adminMode ? (
+            <div className="attendance-grid-wrap">
+              <table className="attendance-grid-table">
+                <thead>
+                  <tr>
+                    <th className="attendance-date-head" rowSpan={2}>Date</th>
+                    {staff.map((person) => (
+                      <th key={`staff-${person.person}`} className="attendance-staff-head" colSpan={2}>
+                        <span>{person.fullName || person.person}</span>
+                        <small>{person.code}</small>
+                      </th>
+                    ))}
+                  </tr>
+                  <tr>
+                    {staff.map((person) => (
+                      <>
+                        <th key={`${person.person}-in`} className="attendance-sub-head">In</th>
+                        <th key={`${person.person}-out`} className="attendance-sub-head">Out</th>
+                      </>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.isoDate} className={row.isToday ? "attendance-row-today" : ""}>
+                      <th className="attendance-date-cell">
+                        <span>{row.weekdayLabel}</span>
+                        <strong>{row.dateLabel}</strong>
+                        {row.isToday ? <em>Today</em> : null}
+                      </th>
+                      {row.cells.map((cell) => {
+                        const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
+                        if (cell.displayLabel) {
+                          return (
+                            <td key={`${row.isoDate}-${cell.person}`} className={`attendance-merged-cell ${missingClass}`} colSpan={2}>
+                              <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>{cell.displayLabel}</span>
+                            </td>
+                          );
+                        }
+                        return (
+                          <>
+                            <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
+                              <input
+                                className="attendance-time-input"
+                                value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
+                                placeholder="--:--"
+                                onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
+                                onBlur={() => handleAttendanceBlur(cell)}
+                              />
+                            </td>
+                            <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
+                              <input
+                                className="attendance-time-input"
+                                value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
+                                placeholder="--:--"
+                                onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
+                                onBlur={() => handleAttendanceBlur(cell)}
+                              />
+                            </td>
+                          </>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          {!loading && !adminMode ? (
+            <div className="attendance-self-service">
+              <section className="attendance-self-panel">
+                <h3>Your times</h3>
+                <div className="attendance-self-list">
+                  {rows.map((row) => {
+                    const cell = row.cells[0];
+                    if (!cell) return null;
+                    return (
+                      <article
+                        key={row.isoDate}
+                        className={`attendance-self-card ${row.isToday ? "is-today" : ""} ${cell.hasMissingClock ? "is-missing" : ""} ${noteForm.date === row.isoDate ? "is-focused" : ""}`}
+                      >
+                        <div className="attendance-self-card-head">
+                          <div>
+                            <strong>{row.dateLabel}</strong>
+                            <span>{row.weekdayLabel}</span>
+                          </div>
+                          {cell.displayLabel ? <span className="attendance-self-status">{cell.displayLabel}</span> : null}
+                          {!cell.displayLabel && cell.hasMissingClock ? <span className="attendance-self-status missing">Missing clocking</span> : null}
+                        </div>
+                        {cell.displayLabel ? null : (
+                          <div className="attendance-self-times">
+                            <span>In: <strong>{cell.clockIn || "--:--"}</strong></span>
+                            <span>Out: <strong>{cell.clockOut || "--:--"}</strong></span>
+                          </div>
+                        )}
+                        {!cell.displayLabel && cell.canExplain ? (
+                          <button
+                            type="button"
+                            className="ghost-button attendance-note-button"
+                            onClick={() => setNoteForm({ date: row.isoDate, note: cell.employeeNote || "" })}
+                          >
+                            {cell.employeeNote ? "Update note" : "Add note"}
+                          </button>
+                        ) : null}
+                        {cell.employeeNote ? <p className="attendance-self-note">{cell.employeeNote}</p> : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+
+              <section className="attendance-self-panel">
+                <h3>Missing clockings</h3>
+                {missingEntries.length ? (
+                  <>
+                    <div className="attendance-missing-list">
+                      {missingEntries.map((entry) => (
+                        <button
+                          key={`${entry.person}-${entry.isoDate}`}
+                          type="button"
+                          className={`attendance-missing-chip ${noteForm.date === entry.isoDate ? "active" : ""}`}
+                          onClick={() => setNoteForm({ date: entry.isoDate, note: entry.employeeNote || "" })}
+                        >
+                          {entry.dateLabel}: {entry.clockIn ? "Missing out" : entry.clockOut ? "Missing in" : "Missing in/out"}
+                        </button>
+                      ))}
+                    </div>
+                    <form className="attendance-note-form" onSubmit={submitEmployeeNote}>
+                      <label>
+                        <span>Date</span>
+                        <input type="text" value={focusedMissingEntry?.dateLabel || ""} readOnly />
+                      </label>
+                      <label>
+                        <span>Explanation</span>
+                        <textarea
+                          rows={4}
+                          value={noteForm.note}
+                          onChange={(event) => setNoteForm((current) => ({ ...current, note: event.target.value }))}
+                          placeholder="Explain the missing clocking so admin can check it."
+                        />
+                      </label>
+                      <div className="attendance-note-actions">
+                        <button
+                          className="primary-button"
+                          type="submit"
+                          disabled={!noteForm.date || !noteForm.note.trim() || attendanceNoteSavingKey === noteForm.date}
+                        >
+                          {attendanceNoteSavingKey === noteForm.date ? "Saving..." : "Send note"}
+                        </button>
+                      </div>
+                    </form>
+                  </>
+                ) : (
+                  <div className="notifications-empty">No missing clockings for this month.</div>
+                )}
+              </section>
+            </div>
+          ) : null}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
   const isClientRoute = pathname.startsWith("/client");
   const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
+  const isAttendanceRoute = pathname.startsWith("/attendance");
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
@@ -1957,6 +2345,11 @@ export default function App() {
   const [holidayEventSaving, setHolidayEventSaving] = useState(false);
   const [holidayYearStart, setHolidayYearStart] = useState(getCurrentHolidayYearStart());
   const [currentHolidayYearStart, setCurrentHolidayYearStart] = useState(getCurrentHolidayYearStart());
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [attendanceMonthId, setAttendanceMonthId] = useState(toMonthIdFromIso(getLocalTodayIso()));
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceSavingKey, setAttendanceSavingKey] = useState("");
+  const [attendanceNoteSavingKey, setAttendanceNoteSavingKey] = useState("");
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -1996,6 +2389,10 @@ export default function App() {
     const params = new URLSearchParams(search);
     return params.get("job") || "";
   }, [search]);
+  const attendanceNotificationDate = useMemo(() => {
+    const params = new URLSearchParams(search);
+    return params.get("date") || "";
+  }, [search]);
   const dragPreviewRef = useRef(null);
   const transparentDragImageRef = useRef(null);
   const dragPositionRef = useRef({ x: 0, y: 0 });
@@ -2004,9 +2401,11 @@ export default function App() {
   const openedNotificationJobIdRef = useRef("");
   const boardEditable = canEditBoard(currentUser);
   const installerEditable = canEditInstaller(currentUser);
+  const attendanceEditable = canEditAttendance(currentUser);
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
+  const showAttendance = Boolean(currentUser && canAccessAttendance(currentUser) && isAttendanceRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
@@ -2014,8 +2413,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isHolidaysRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && canAccessBoard(currentUser) && !isClientBoardRoute && !isHolidaysRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -2255,11 +2654,53 @@ export default function App() {
   }, [currentUser, showHolidays, holidayYearStart]);
 
   useEffect(() => {
+    if (!showAttendance) return;
+    if (!attendanceNotificationDate) return;
+    const focusMonthId = toMonthIdFromIso(attendanceNotificationDate);
+    if (focusMonthId) {
+      setAttendanceMonthId(focusMonthId);
+    }
+  }, [attendanceNotificationDate, showAttendance]);
+
+  useEffect(() => {
+    if (!currentUser || !showAttendance) return undefined;
+    let active = true;
+
+    async function loadAttendance() {
+      try {
+        setAttendanceLoading(true);
+        const response = await fetch(`/api/attendance?month=${encodeURIComponent(attendanceMonthId)}`);
+        if (!response.ok) {
+          throw new Error("Could not load attendance.");
+        }
+        const payload = await response.json();
+        if (!active) return;
+        setAttendanceData(payload);
+      } catch (error) {
+        console.error(error);
+        if (active) setMessage(createMessage(error.message || "Could not load attendance.", "error"));
+      } finally {
+        if (active) setAttendanceLoading(false);
+      }
+    }
+
+    loadAttendance();
+    return () => {
+      active = false;
+    };
+  }, [attendanceMonthId, currentUser, showAttendance]);
+
+  useEffect(() => {
     if (!currentUser) return;
     const nextHomePath = getHomePathForUser(currentUser);
     const nextBoardPath = getBoardPathForUser(currentUser);
 
     if (isHolidaysRoute && !canAccessHolidays(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
+    if (isAttendanceRoute && !canAccessAttendance(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -2284,7 +2725,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -2292,7 +2733,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isHolidaysRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -2320,6 +2761,32 @@ export default function App() {
       stream.close();
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    if (!currentUser || !showAttendance) return undefined;
+    const stream = new EventSource("/api/events");
+
+    async function handleUpdate() {
+      try {
+        const response = await fetch(`/api/attendance?month=${encodeURIComponent(attendanceMonthId)}`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        setAttendanceData(payload);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    stream.addEventListener("attendance-updated", handleUpdate);
+    stream.onerror = () => {
+      stream.close();
+    };
+
+    return () => {
+      stream.removeEventListener("attendance-updated", handleUpdate);
+      stream.close();
+    };
+  }, [attendanceMonthId, currentUser, showAttendance]);
 
   useEffect(() => {
     if (!message) return undefined;
@@ -2473,6 +2940,7 @@ export default function App() {
       board: getPermissionForApp(targetUser, "board"),
       installer: getPermissionForApp(targetUser, "installer"),
       holidays: getPermissionForApp(targetUser, "holidays"),
+      attendance: getPermissionForApp(targetUser, "attendance"),
       [appKey]: value
     };
 
@@ -2681,6 +3149,51 @@ export default function App() {
     if (!response.ok) throw new Error("Could not refresh notifications.");
     const payload = await response.json();
     setNotifications(Array.isArray(payload) ? payload : []);
+  }
+
+  async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "" }) {
+    setAttendanceSavingKey(`${person}:${date}`);
+    try {
+      const response = await fetch("/api/attendance/entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ person, date, clockIn, clockOut, adminNote })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save attendance.");
+      }
+      setAttendanceData(payload);
+      setMessage(createMessage(`Updated attendance for ${person} on ${formatJobDate(date)}.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not save attendance.", "error"));
+    } finally {
+      setAttendanceSavingKey("");
+    }
+  }
+
+  async function submitAttendanceExplanation({ date, note }) {
+    setAttendanceNoteSavingKey(date);
+    try {
+      const response = await fetch("/api/attendance/explanations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, note })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not send attendance note.");
+      }
+      setAttendanceData(payload);
+      await refreshNotifications();
+      setMessage(createMessage("Attendance note sent.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not send attendance note.", "error"));
+    } finally {
+      setAttendanceNoteSavingKey("");
+    }
   }
 
   async function searchCoreBridgeOrders(searchTerm = orderLookupQuery) {
@@ -3770,6 +4283,25 @@ export default function App() {
         onOpenNotification={openNotification}
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
+      />
+    );
+  }
+
+  if (showAttendance) {
+    return (
+      <AttendancePage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        attendanceData={attendanceData}
+        loading={attendanceLoading}
+        attendanceMonthId={attendanceMonthId}
+        setAttendanceMonthId={setAttendanceMonthId}
+        attendanceSavingKey={attendanceSavingKey}
+        attendanceNoteSavingKey={attendanceNoteSavingKey}
+        attendanceFocusDate={attendanceNotificationDate}
+        onSaveAttendanceEntry={saveAttendanceEntry}
+        onSubmitAttendanceExplanation={submitAttendanceExplanation}
       />
     );
   }
