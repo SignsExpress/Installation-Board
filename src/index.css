@@ -699,6 +699,7 @@ button {
 
 .primary-button,
 .ghost-button,
+.success-button,
 .text-button {
   transition: 0.18s ease;
 }
@@ -724,6 +725,19 @@ button {
   color: #334155;
   border: 1px solid #cbd5e1;
   font-weight: 600;
+}
+
+.success-button {
+  min-height: 46px;
+  border-radius: 16px;
+  padding: 0 18px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 700;
 }
 
 .danger-button {
@@ -754,6 +768,10 @@ button {
 
 .ghost-button:hover {
   background: #f3eef6;
+}
+
+.success-button:hover {
+  background: #15803d;
 }
 
 .danger-button:hover {
@@ -1574,6 +1592,16 @@ button {
   flex-wrap: wrap;
   padding-top: 4px;
   border-top: 1px solid #e2e8f0;
+}
+
+.job-form-actions {
+  align-items: center;
+}
+
+.form-complete-prompt {
+  flex-basis: 100%;
+  order: 99;
+  margin-top: 6px;
 }
 
 .client-complete-prompt {

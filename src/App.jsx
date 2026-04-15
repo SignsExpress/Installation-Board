@@ -4344,82 +4344,79 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="client-job-actions admin-job-actions">
-                    {!activeAdminJob.isCompleted ? (
-                      <>
-                        {!adminCompletePrompt ? (
-                          <button
-                            className="primary-button"
-                            type="button"
-                            onClick={() => setAdminCompletePrompt(true)}
-                            disabled={adminPhotoUploading || adminExporting}
-                          >
-                            Mark as Complete
-                          </button>
-                        ) : (
-                          <div className="client-complete-prompt">
-                            <span>Would you like to upload job photos?</span>
-                            <div className="client-complete-prompt-actions">
-                              <button
-                                className="ghost-button"
-                                type="button"
-                                onClick={() => markAdminJobComplete(activeAdminJob)}
-                                disabled={adminPhotoUploading}
-                              >
-                                No
-                              </button>
-                              <button
-                                className="primary-button"
-                                type="button"
-                                onClick={() => adminPhotoInputRef.current?.click()}
-                                disabled={adminPhotoUploading}
-                              >
-                                {adminPhotoUploading ? "Uploading..." : "Yes"}
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => adminPhotoInputRef.current?.click()}
-                          disabled={adminPhotoUploading}
-                        >
-                          {adminPhotoUploading ? "Uploading..." : "Upload photos"}
-                        </button>
-                        <button
-                          className="ghost-button"
-                          type="button"
-                          onClick={() => undoAdminJobComplete(activeAdminJob)}
-                          disabled={adminPhotoUploading || adminExporting}
-                        >
-                          Undo complete
-                        </button>
-                      </>
-                    )}
+                  </>
+                ) : null}
 
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() => exportJob(activeAdminJob, setAdminExporting)}
-                      disabled={adminExporting || adminPhotoUploading}
-                    >
-                      {adminExporting ? "Exporting..." : "Export"}
-                    </button>
-                  </div>
-                </>
-              ) : null}
-
-              <div className="form-actions">
+              <div className="form-actions job-form-actions">
+                {activeAdminJob && !activeAdminJob.isCompleted && !adminCompletePrompt ? (
+                  <button
+                    className="success-button"
+                    type="button"
+                    onClick={() => setAdminCompletePrompt(true)}
+                    disabled={adminPhotoUploading || adminExporting}
+                  >
+                    Mark as Complete
+                  </button>
+                ) : null}
                 <button className="primary-button" type="submit" disabled={saving}>
                   {saving ? "Saving..." : editingId ? "Update job" : "Add job"}
                 </button>
                 <button className="ghost-button" type="button" onClick={() => resetForm()}>
                   Cancel
                 </button>
+                {activeAdminJob?.isCompleted ? (
+                  <>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => adminPhotoInputRef.current?.click()}
+                      disabled={adminPhotoUploading}
+                    >
+                      {adminPhotoUploading ? "Uploading..." : "Upload photos"}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => undoAdminJobComplete(activeAdminJob)}
+                      disabled={adminPhotoUploading || adminExporting}
+                    >
+                      Undo complete
+                    </button>
+                  </>
+                ) : null}
+                {activeAdminJob ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => exportJob(activeAdminJob, setAdminExporting)}
+                    disabled={adminExporting || adminPhotoUploading}
+                  >
+                    {adminExporting ? "Exporting..." : "Export"}
+                  </button>
+                ) : null}
+                {activeAdminJob && !activeAdminJob.isCompleted && adminCompletePrompt ? (
+                  <div className="client-complete-prompt form-complete-prompt">
+                    <span>Would you like to upload job photos?</span>
+                    <div className="client-complete-prompt-actions">
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => markAdminJobComplete(activeAdminJob)}
+                        disabled={adminPhotoUploading}
+                      >
+                        No
+                      </button>
+                      <button
+                        className="success-button"
+                        type="button"
+                        onClick={() => adminPhotoInputRef.current?.click()}
+                        disabled={adminPhotoUploading}
+                      >
+                        {adminPhotoUploading ? "Uploading..." : "Yes"}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </form>
             <input
