@@ -416,6 +416,16 @@ function shiftMonthId(value, offset) {
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function getAttendanceDisplayClass(cell) {
+  const label = String(cell?.displayLabel || "").trim().toLowerCase();
+  if (label.includes("unpaid") || label.includes("absence") || label.includes("absent")) return "is-unpaid";
+  if (label.includes("birthday")) return "is-birthday";
+  if (label.includes("bank holiday")) return "is-bank-holiday";
+  if (label.includes("weekend")) return "is-weekend";
+  if (label.includes("holiday")) return "is-holiday";
+  return "";
+}
+
 function formatNotificationMessage(message) {
   const raw = String(message || "").trim();
   if (!raw) return "";
@@ -2164,9 +2174,14 @@ function AttendancePage({
                   <tr>
                     <th className="attendance-date-head" rowSpan={2}>Date</th>
                     {staff.map((person) => (
-                      <th key={`staff-${person.person}`} className="attendance-staff-head" colSpan={2}>
-                        <span>{person.fullName || person.person}</span>
-                        <small>{person.code}</small>
+                      <th
+                        key={`staff-${person.person}`}
+                        className="attendance-staff-head"
+                        colSpan={2}
+                        title={person.fullName || person.person}
+                      >
+                        <span>{person.code || person.fullName || person.person}</span>
+                        <small>{person.fullName || person.person}</small>
                       </th>
                     ))}
                   </tr>
@@ -2189,9 +2204,14 @@ function AttendancePage({
                       </th>
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
+                        const displayClass = getAttendanceDisplayClass(cell);
                         if (cell.displayLabel) {
                           return (
-                            <td key={`${row.isoDate}-${cell.person}`} className={`attendance-merged-cell ${missingClass}`} colSpan={2}>
+                            <td
+                              key={`${row.isoDate}-${cell.person}`}
+                              className={`attendance-merged-cell ${displayClass} ${missingClass}`.trim()}
+                              colSpan={2}
+                            >
                               <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>{cell.displayLabel}</span>
                             </td>
                           );
