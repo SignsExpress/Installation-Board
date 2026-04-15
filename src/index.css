@@ -2346,20 +2346,22 @@ button {
   border: 1px solid var(--sx-border);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.86);
+  max-height: calc(100vh - 260px);
 }
 
 .attendance-grid-table {
   width: 100%;
-  min-width: 980px;
+  min-width: 0;
   border-collapse: separate;
   border-spacing: 0;
+  table-layout: fixed;
 }
 
 .attendance-grid-table th,
 .attendance-grid-table td {
   border-right: 1px solid rgba(203, 213, 225, 0.75);
   border-bottom: 1px solid rgba(203, 213, 225, 0.75);
-  padding: 10px 8px;
+  padding: 8px 6px;
   text-align: center;
   vertical-align: middle;
 }
@@ -2367,9 +2369,9 @@ button {
 .attendance-grid-table thead th {
   background: rgba(248, 250, 252, 0.96);
   color: #475569;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
   position: sticky;
   top: 0;
   z-index: 2;
@@ -2384,7 +2386,8 @@ button {
 }
 
 .attendance-date-cell {
-  min-width: 114px;
+  width: 92px;
+  min-width: 92px;
   text-align: left;
 }
 
@@ -2396,14 +2399,14 @@ button {
 
 .attendance-date-cell span {
   color: #64748b;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .attendance-date-cell strong {
   color: #0f172a;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
   margin-top: 2px;
 }
 
@@ -2411,7 +2414,7 @@ button {
   margin-top: 4px;
   color: var(--sx-main);
   font-style: normal;
-  font-size: 0.74rem;
+  font-size: 0.66rem;
   font-weight: 700;
 }
 
@@ -2419,11 +2422,12 @@ button {
   display: block;
   margin-top: 2px;
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: 0.65rem;
 }
 
 .attendance-sub-head {
-  min-width: 82px;
+  width: 60px;
+  min-width: 60px;
 }
 
 .attendance-value-cell {
@@ -2432,14 +2436,15 @@ button {
 
 .attendance-time-input {
   width: 100%;
-  min-width: 64px;
+  min-width: 48px;
   border: 1px solid var(--sx-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: white;
-  padding: 8px 10px;
+  padding: 6px 6px;
   text-align: center;
   font: inherit;
   color: #0f172a;
+  font-size: 0.85rem;
 }
 
 .attendance-time-input:focus {

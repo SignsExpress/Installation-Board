@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 
 const DEFAULT_USERS_FILE = path.join(__dirname, "..", "data", "users.json");
 const PERMISSION_VALUES = ["admin", "user", "none"];
+const REMOVED_LEGACY_USERS = new Set(["tamas"]);
 const SEEDED_USERS = [
   { displayName: "Matt Rutlidge", role: "host" },
   { displayName: "Tom Van-Boyd", role: "host" },
@@ -98,7 +99,9 @@ function deriveRoleFromPermissions(permissions) {
 
 function normalizeStore(parsed, options = {}) {
   const includeMissingSeedUsers = Boolean(options.includeMissingSeedUsers);
-  const users = Array.isArray(parsed?.users) ? parsed.users : [];
+  const users = (Array.isArray(parsed?.users) ? parsed.users : []).filter(
+    (user) => !REMOVED_LEGACY_USERS.has(String(user?.displayName || "").trim().toLowerCase())
+  );
   const map = new Map(users.map((user) => [String(user.displayName || "").toLowerCase(), user]));
 
   for (const seeded of SEEDED_USERS) {

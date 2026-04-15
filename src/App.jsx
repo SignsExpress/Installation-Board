@@ -1444,9 +1444,15 @@ function HolidaysPage({
     });
   }, [canReview, currentPerson, currentUser, approvedHolidayRequests]);
   const visibleHolidayAllowances = useMemo(
-    () =>
-      holidayAllowances.map((rawEntry) => getHolidayAllowanceSummary(rawEntry)),
-    [holidayAllowances]
+    () => {
+      const allowedPeople = new Set(
+        holidayStaff.map((entry) => getHolidayStaffIdentityKey(entry.person || entry.fullName || entry.name))
+      );
+      return holidayAllowances
+        .map((rawEntry) => getHolidayAllowanceSummary(rawEntry))
+        .filter((entry) => allowedPeople.has(getHolidayStaffIdentityKey(entry.person)));
+    },
+    [holidayAllowances, holidayStaff]
   );
   const activeHolidayFilter = selectedHolidayPerson;
   const filteredHolidayRows = useMemo(
