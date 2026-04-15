@@ -38,14 +38,16 @@ function getDefaultPermissions(role) {
     return {
       board: "admin",
       installer: "admin",
-      holidays: "admin"
+      holidays: "admin",
+      attendance: "admin"
     };
   }
 
   return {
     board: "user",
     installer: "none",
-    holidays: "user"
+    holidays: "user",
+    attendance: "user"
   };
 }
 
@@ -59,7 +61,8 @@ function normalizePermissions(permissions, role) {
   return {
     board: normalizePermissionValue(permissions?.board, defaults.board),
     installer: normalizePermissionValue(permissions?.installer, defaults.installer),
-    holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays)
+    holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
+    attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance)
   };
 }
 
@@ -74,13 +77,19 @@ function applyOwnerPermissions(user) {
     permissions: {
       board: "admin",
       installer: "admin",
-      holidays: "admin"
+      holidays: "admin",
+      attendance: "admin"
     }
   };
 }
 
 function deriveRoleFromPermissions(permissions) {
-  if (permissions?.board === "user" && permissions?.installer === "none" && permissions?.holidays === "user") {
+  if (
+    permissions?.board === "user" &&
+    permissions?.installer === "none" &&
+    permissions?.holidays === "user" &&
+    permissions?.attendance === "user"
+  ) {
     return "client";
   }
 
@@ -121,7 +130,8 @@ function normalizeStore(parsed, options = {}) {
       user.permissions = {
         board: "admin",
         installer: "admin",
-        holidays: "admin"
+        holidays: "admin",
+        attendance: "admin"
       };
     }
   }
@@ -287,13 +297,14 @@ async function updateUserPermissions(userId, permissions) {
   }
 
   user.permissions = normalizePermissions(permissions, user.role);
-  if (isOwnerUser(user)) {
-    user.permissions = {
-      board: "admin",
-      installer: "admin",
-      holidays: "admin"
-    };
-  }
+    if (isOwnerUser(user)) {
+      user.permissions = {
+        board: "admin",
+        installer: "admin",
+        holidays: "admin",
+        attendance: "admin"
+      };
+    }
   await writeUsersStore(store);
   return sanitizeUser(user);
 }

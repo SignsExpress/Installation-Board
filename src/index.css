@@ -3522,7 +3522,13 @@ button {
 
 @media (max-width: 780px) {
   .app-shell:has(.host-nav-shell) {
-    padding-top: 228px;
+    padding-top: 12px;
+  }
+
+  .host-nav-shell {
+    position: sticky;
+    top: 0;
+    z-index: 90;
   }
 
   .host-landing-tools {
@@ -3541,8 +3547,14 @@ button {
   }
 
   .host-nav-inner {
-    gap: 8px;
-    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "brand meta"
+      "links links";
+    align-items: center;
+    gap: 8px 12px;
+    padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 10px;
   }
 
   .host-nav-links,
@@ -3551,13 +3563,14 @@ button {
   }
 
   .host-nav-brand {
-    width: 100%;
+    grid-area: brand;
+    width: auto;
     justify-content: flex-start;
     padding: 0;
   }
 
   .host-nav-brand-logo {
-    width: 118px;
+    width: 106px;
   }
 
   .host-nav-link,
@@ -3591,6 +3604,7 @@ button {
   }
 
   .host-nav-links {
+    grid-area: links;
     width: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -3606,8 +3620,10 @@ button {
   }
 
   .host-nav-meta {
-    width: 100%;
-    justify-content: space-between;
+    grid-area: meta;
+    width: auto;
+    min-width: 0;
+    justify-content: flex-end;
     align-items: center;
     flex-wrap: nowrap;
   }

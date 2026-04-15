@@ -229,6 +229,16 @@ function canEditHolidays(user) {
   return getUserPermission(user, "holidays", user?.role === "host" ? "admin" : "user") === "admin";
 }
 
+function canAccessAttendance(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "attendance", user?.role === "host" ? "admin" : "user") !== "none";
+}
+
+function canEditAttendance(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "attendance", user?.role === "host" ? "admin" : "user") === "admin";
+}
+
 function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -443,17 +453,29 @@ function requireHolidayAdmin(request, response) {
   return false;
 }
 
+function requireAttendanceAccess(request, response) {
+  if (canAccessAttendance(request.user)) return true;
+  response.status(403).json({ error: "Attendance access required." });
+  return false;
+}
+
+function requireAttendanceAdmin(request, response) {
+  if (canEditAttendance(request.user)) return true;
+  response.status(403).json({ error: "Attendance admin access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  if (!fs.existsSync(file)) {
-    fs.writeFileSync(
-      file,
-      `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [] }, null, 2)}\n`,
-      "utf8"
-    );
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(
+        file,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [] }, null, 2)}\n`,
+        "utf8"
+      );
+    }
   }
-}
 
 function readHolidaySeed() {
     if (!fs.existsSync(DEFAULT_HOLIDAY_SEED_FILE)) {
@@ -476,14 +498,15 @@ function readHolidaySeed() {
 
 function mergeHolidaySeed(store) {
   const seed = readHolidaySeed();
-    const nextStore = {
-      jobs: Array.isArray(store.jobs) ? store.jobs : [],
-      holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
-      holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
-      holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
-      holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
-      notifications: Array.isArray(store.notifications) ? [...store.notifications] : []
-    };
+      const nextStore = {
+        jobs: Array.isArray(store.jobs) ? store.jobs : [],
+        holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
+        holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
+        holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
+        holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
+        notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
+        attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : []
+      };
 
   seed.holidays.forEach((holiday) => {
     const normalized = sanitizeStaffHoliday(holiday);
@@ -567,42 +590,45 @@ async function readStore() {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-        const migrated = applyHolidayResetMigration({
-          jobs: parsed,
-          holidays: [],
-          holidayRequests: [],
-        holidayAllowances: [],
-        holidayEvents: [],
-        notifications: []
-        });
+          const migrated = applyHolidayResetMigration({
+            jobs: parsed,
+            holidays: [],
+            holidayRequests: [],
+            holidayAllowances: [],
+            holidayEvents: [],
+            notifications: [],
+            attendanceEntries: []
+          });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
       }
       return mergeHolidaySeed(migrated);
     }
-      const migrated = applyHolidayResetMigration({
-        jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
-        holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
-        holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
-        holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
-        holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
-        notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
-        holidayResetVersion: Number(parsed.holidayResetVersion || 0)
-      });
+        const migrated = applyHolidayResetMigration({
+          jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+          holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+          holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
+          holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
+          holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
+          notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+          attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
+          holidayResetVersion: Number(parsed.holidayResetVersion || 0)
+        });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
       await writeStore(migrated);
     }
     return mergeHolidaySeed(migrated);
   } catch (error) {
     console.error("Invalid board store JSON, returning empty store.", error);
-      const migrated = applyHolidayResetMigration({
-        jobs: [],
-        holidays: [],
-        holidayRequests: [],
-      holidayAllowances: [],
-      holidayEvents: [],
-      notifications: []
-      });
+        const migrated = applyHolidayResetMigration({
+          jobs: [],
+          holidays: [],
+          holidayRequests: [],
+          holidayAllowances: [],
+          holidayEvents: [],
+          notifications: [],
+          attendanceEntries: []
+        });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
   }
@@ -631,6 +657,12 @@ async function writeStore(store) {
         if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
         return String(left.title || "").localeCompare(String(right.title || ""));
       }),
+      attendanceEntries: [...(store.attendanceEntries || [])]
+        .map((entry) => sanitizeAttendanceEntry(entry))
+        .sort((left, right) => {
+          if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+          return String(left.person || "").localeCompare(String(right.person || ""));
+        }),
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
@@ -1470,6 +1502,28 @@ function sanitizeHolidayAllowance(payload) {
     bankHolidayDays: toNumber(payload.bankHolidayDays),
     unpaidDaysBooked: toNumber(payload.unpaidDaysBooked),
     createdAt: String(payload.createdAt || new Date().toISOString()),
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+function sanitizeAttendanceTime(value) {
+  const raw = String(value || "").trim();
+  return /^\d{2}:\d{2}$/.test(raw) ? raw : "";
+}
+
+function sanitizeAttendanceEntry(payload) {
+  return {
+    id: String(payload.id || makeId()),
+    person: String(payload.person || "").trim(),
+    date: String(payload.date || "").trim(),
+    clockIn: sanitizeAttendanceTime(payload.clockIn),
+    clockOut: sanitizeAttendanceTime(payload.clockOut),
+    source: String(payload.source || "manual").trim().toLowerCase() || "manual",
+    adminNote: String(payload.adminNote || "").trim(),
+    employeeNote: String(payload.employeeNote || "").trim(),
+    missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
+    missingNotificationResolvedAt: String(payload.missingNotificationResolvedAt || "").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
 }
@@ -1889,6 +1943,195 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
       currentHolidayYearStart: getCurrentHolidayYearStart(),
       holidayYearLabel: getHolidayYearLabel(yearStart),
     holidayYearOptions: getHolidayYearOptions(getCurrentHolidayYearStart())
+  };
+}
+
+function parseMonthId(value) {
+  const match = String(value || "").trim().match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!year || !month || month < 1 || month > 12) return null;
+  return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function toMonthId(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function getAttendanceMonthBounds(monthId = "") {
+  const target = parseMonthId(monthId) || getStartOfMonth(getTodayInLondon());
+  return {
+    monthId: toMonthId(target),
+    start: getStartOfMonth(target),
+    end: getEndOfMonth(target)
+  };
+}
+
+function getAttendanceDisplayLabel(entry, bankHolidayLabel) {
+  if (entry) {
+    const type = getHolidayType(entry);
+    if (type === "birthday") return "Birthday";
+    return "Holiday";
+  }
+  if (bankHolidayLabel) return bankHolidayLabel;
+  return "";
+}
+
+function getAttendanceLinkForUser(user, date = "") {
+  const basePath = "/attendance";
+  if (!date) return basePath;
+  const params = new URLSearchParams({ date: String(date) });
+  return `${basePath}?${params.toString()}`;
+}
+
+function syncAttendanceMissingNotification(store, users, attendanceEntry) {
+  const personKey = getHolidayStaffIdentityKey(attendanceEntry.person);
+  const matchingUser = (users || []).find((user) => {
+    if (!canAccessAttendance(sanitizeUser(user))) return false;
+    return getHolidayStaffIdentityKey(getHolidayStaffPerson(user.displayName) || user.displayName) === personKey;
+  });
+  if (!matchingUser) return;
+
+  store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+  const existingNotification = store.notifications.find((notification) =>
+    String(notification.type || "") === "attendance-missing" &&
+    String(notification.userId || "") === String(matchingUser.id || "") &&
+    String(notification.link || "") === getAttendanceLinkForUser(matchingUser, attendanceEntry.date)
+  );
+
+  const hasMissingClock = Boolean(
+    (attendanceEntry.clockIn && !attendanceEntry.clockOut) ||
+    (!attendanceEntry.clockIn && attendanceEntry.clockOut)
+  );
+
+  if (hasMissingClock) {
+    const title = "Missing clocking data";
+    const message = `${attendanceEntry.person} has missing attendance data on ${formatBoardNotificationDate(attendanceEntry.date)}. Please add a note to explain it.`;
+    if (existingNotification) {
+      existingNotification.read = false;
+      existingNotification.title = title;
+      existingNotification.message = message;
+      existingNotification.updatedAt = new Date().toISOString();
+      return;
+    }
+    store.notifications.unshift(
+      createNotification({
+        userId: matchingUser.id,
+        type: "attendance-missing",
+        title,
+        message,
+        link: getAttendanceLinkForUser(matchingUser, attendanceEntry.date)
+      })
+    );
+    return;
+  }
+
+  if (existingNotification) {
+    existingNotification.read = true;
+    existingNotification.updatedAt = new Date().toISOString();
+  }
+}
+
+async function getAttendancePayload(forUser, monthId = "") {
+  const store = await readStore();
+  const usersStore = await readUsersStore();
+  const holidayStaffList = buildHolidayStaffList(usersStore.users || [], store.holidayAllowances || []);
+  const { monthId: resolvedMonthId, start, end } = getAttendanceMonthBounds(monthId);
+  const startIso = toIsoDate(start);
+  const endIso = toIsoDate(end);
+  const todayIso = toIsoDate(getTodayInLondon());
+  const displayHolidays = getDisplayStaffHolidays(
+    store.holidays || [],
+    startIso,
+    endIso,
+    buildBirthdayEntriesForRange(store, startIso, endIso)
+  );
+  const holidayByKey = new Map(
+    displayHolidays.map((entry) => [`${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`, entry])
+  );
+  const bankHolidayMap = getHolidayMap(start, end);
+  const attendanceEntries = (store.attendanceEntries || []).map((entry) => sanitizeAttendanceEntry(entry));
+  const entryByKey = new Map(
+    attendanceEntries
+      .filter((entry) => entry.date >= startIso && entry.date <= endIso)
+      .map((entry) => [`${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`, entry])
+  );
+
+  const attendanceUsers = (usersStore.users || [])
+    .map((user) => sanitizeUser(user))
+    .filter((user) => canAccessAttendance(user));
+
+  const staffEntries = holidayStaffList.filter((staffEntry) =>
+    attendanceUsers.some(
+      (user) => getHolidayStaffIdentityKey(getHolidayStaffPerson(user.displayName) || user.displayName) === getHolidayStaffIdentityKey(staffEntry.person)
+    )
+  );
+
+  const currentPersonKey = getHolidayStaffIdentityKey(getHolidayStaffPerson(forUser?.displayName) || forUser?.displayName);
+  const visibleStaff = canEditAttendance(forUser)
+    ? staffEntries
+    : staffEntries.filter((entry) => getHolidayStaffIdentityKey(entry.person) === currentPersonKey);
+
+  const rows = enumerateIsoDates(startIso, endIso).map((isoDate) => {
+    const parsed = parseIsoDate(isoDate);
+    const weekday = parsed?.getUTCDay() ?? 0;
+    const isWeekend = weekday === 0 || weekday === 6;
+    const bankHolidayLabel = bankHolidayMap.get(isoDate) || "";
+    return {
+      isoDate,
+      dateLabel: formatBoardNotificationDate(isoDate),
+      weekdayLabel: parsed
+        ? parsed.toLocaleDateString("en-GB", { weekday: "short", timeZone: TIME_ZONE })
+        : "",
+      isToday: isoDate === todayIso,
+      cells: visibleStaff.map((staffEntry) => {
+        const key = `${getHolidayStaffIdentityKey(staffEntry.person)}::${isoDate}`;
+        const holidayEntry = holidayByKey.get(key);
+        const attendanceEntry = entryByKey.get(key) || null;
+        const displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
+        const isWorkingDay = !displayLabel && !isWeekend;
+        const hasMissingClock = Boolean(
+          attendanceEntry &&
+          ((attendanceEntry.clockIn && !attendanceEntry.clockOut) || (!attendanceEntry.clockIn && attendanceEntry.clockOut))
+        );
+
+        return {
+          person: staffEntry.person,
+          code: staffEntry.code,
+          fullName: staffEntry.fullName || staffEntry.name || staffEntry.person,
+          displayLabel: displayLabel || (isWeekend ? "Weekend" : ""),
+          isHoliday: Boolean(displayLabel),
+          isWeekend,
+          isWorkingDay,
+          clockIn: attendanceEntry?.clockIn || "",
+          clockOut: attendanceEntry?.clockOut || "",
+          adminNote: attendanceEntry?.adminNote || "",
+          employeeNote: attendanceEntry?.employeeNote || "",
+          hasMissingClock,
+          entryId: attendanceEntry?.id || "",
+          canExplain: !canEditAttendance(forUser) && getHolidayStaffIdentityKey(staffEntry.person) === currentPersonKey && hasMissingClock
+        };
+      })
+    };
+  });
+
+  const missingEntries = rows
+    .flatMap((row) => row.cells.map((cell) => ({ ...cell, isoDate: row.isoDate, dateLabel: row.dateLabel })))
+    .filter((cell) => cell.canExplain);
+
+  return {
+    monthId: resolvedMonthId,
+    monthLabel: start.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: TIME_ZONE }),
+    today: todayIso,
+    staff: visibleStaff.map((entry) => ({
+      person: entry.person,
+      code: entry.code,
+      fullName: entry.fullName || entry.name || entry.person
+    })),
+    rows,
+    adminMode: canEditAttendance(forUser),
+    missingEntries
   };
 }
 
@@ -3257,7 +3500,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -3329,11 +3572,12 @@ function createServer() {
     if (!requirePermissionsManager(request, response)) return;
 
     try {
-      const updatedUser = await updateUserPermissions(request.params.id, {
-        board: request.body?.board,
-        installer: request.body?.installer,
-        holidays: request.body?.holidays
-      });
+        const updatedUser = await updateUserPermissions(request.params.id, {
+          board: request.body?.board,
+          installer: request.body?.installer,
+          holidays: request.body?.holidays,
+          attendance: request.body?.attendance
+        });
       response.json({ user: updatedUser });
     } catch (error) {
       response.status(400).json({ error: error.message || "Could not update permissions." });
@@ -3383,12 +3627,15 @@ function createServer() {
           const sameRequester = String(entry.requestedByUserId || "") === String(deletedUser.id || "");
           return !samePerson && !sameRequester;
         });
-        store.holidayAllowances = (store.holidayAllowances || []).filter(
-          (entry) => getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey
-        );
-        store.notifications = (store.notifications || []).filter(
-          (entry) => String(entry.userId || "") !== String(deletedUser.id || "")
-        );
+          store.holidayAllowances = (store.holidayAllowances || []).filter(
+            (entry) => getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey
+          );
+          store.attendanceEntries = (store.attendanceEntries || []).filter(
+            (entry) => getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey
+          );
+          store.notifications = (store.notifications || []).filter(
+            (entry) => String(entry.userId || "") !== String(deletedUser.id || "")
+          );
 
         await writeStore(store);
         response.json({ user: deletedUser });
@@ -4005,6 +4252,108 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(
       savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
     );
+  });
+
+  app.get("/api/attendance", async (request, response) => {
+    if (!requireAttendanceAccess(request, response)) return;
+    const payload = await getAttendancePayload(request.user, String(request.query.month || "").trim());
+    response.json(payload);
+  });
+
+  app.post("/api/attendance/entries", async (request, response) => {
+    if (!requireAttendanceAdmin(request, response)) return;
+    const nextEntry = sanitizeAttendanceEntry(request.body || {});
+    if (!nextEntry.person || !isValidIsoDate(nextEntry.date)) {
+      response.status(400).json({ error: "A valid employee and date are required." });
+      return;
+    }
+
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    store.attendanceEntries = Array.isArray(store.attendanceEntries) ? store.attendanceEntries : [];
+    const identity = getHolidayStaffIdentityKey(nextEntry.person);
+    const existingIndex = store.attendanceEntries.findIndex(
+      (entry) =>
+        getHolidayStaffIdentityKey(entry.person) === identity &&
+        String(entry.date || "") === nextEntry.date
+    );
+
+    if (existingIndex >= 0) {
+      nextEntry.id = store.attendanceEntries[existingIndex].id;
+      nextEntry.createdAt = store.attendanceEntries[existingIndex].createdAt || nextEntry.createdAt;
+      nextEntry.employeeNote = store.attendanceEntries[existingIndex].employeeNote || nextEntry.employeeNote;
+      store.attendanceEntries[existingIndex] = nextEntry;
+    } else {
+      store.attendanceEntries.unshift(nextEntry);
+    }
+
+    syncAttendanceMissingNotification(store, usersStore.users || [], nextEntry);
+    const savedStore = await writeStore(store);
+    broadcast("attendance-updated", { monthId: String(nextEntry.date || "").slice(0, 7), date: nextEntry.date });
+    const payload = await getAttendancePayload(request.user, String(nextEntry.date || "").slice(0, 7));
+    response.json(payload);
+  });
+
+  app.post("/api/attendance/explanations", async (request, response) => {
+    if (!requireAttendanceAccess(request, response)) return;
+    const targetDate = String(request.body?.date || "").trim();
+    const note = String(request.body?.employeeNote || "").trim();
+    if (!isValidIsoDate(targetDate)) {
+      response.status(400).json({ error: "A valid attendance date is required." });
+      return;
+    }
+
+    const person = getHolidayStaffPerson(request.user?.displayName) || request.user?.displayName || "";
+    if (!person) {
+      response.status(400).json({ error: "This user is not linked to an attendance record." });
+      return;
+    }
+
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    store.attendanceEntries = Array.isArray(store.attendanceEntries) ? store.attendanceEntries : [];
+    const identity = getHolidayStaffIdentityKey(person);
+    const existingIndex = store.attendanceEntries.findIndex(
+      (entry) =>
+        getHolidayStaffIdentityKey(entry.person) === identity &&
+        String(entry.date || "") === targetDate
+    );
+
+    let nextEntry = sanitizeAttendanceEntry({
+      person,
+      date: targetDate,
+      employeeNote: note
+    });
+
+    if (existingIndex >= 0) {
+      nextEntry = sanitizeAttendanceEntry({
+        ...store.attendanceEntries[existingIndex],
+        employeeNote: note
+      });
+      store.attendanceEntries[existingIndex] = nextEntry;
+    } else {
+      store.attendanceEntries.unshift(nextEntry);
+    }
+
+    const adminRecipients = (usersStore.users || []).filter((user) => canEditAttendance(sanitizeUser(user)));
+    const explanationMessage = `${person} added an attendance note for ${formatBoardNotificationDate(targetDate)}${note ? ` (${note})` : "."}`;
+    adminRecipients.forEach((user) => {
+      store.notifications.unshift(
+        createNotification({
+          userId: user.id,
+          type: "attendance-note",
+          title: "Attendance note added",
+          message: explanationMessage,
+          link: getAttendanceLinkForUser(user, targetDate)
+        })
+      );
+    });
+
+    syncAttendanceMissingNotification(store, usersStore.users || [], nextEntry);
+    const savedStore = await writeStore(store);
+    broadcast("attendance-updated", { monthId: String(targetDate).slice(0, 7), date: targetDate });
+    const payload = await getAttendancePayload(request.user, String(targetDate).slice(0, 7));
+    response.json(payload);
   });
 
   app.post("/api/holiday-requests", async (request, response) => {
