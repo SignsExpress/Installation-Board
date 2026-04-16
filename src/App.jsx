@@ -2374,10 +2374,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
   function applyMileagePayload(payload) {
     setMonthLabel(payload.monthLabel || "");
     setHistory(Array.isArray(payload.history) ? payload.history : []);
-    const nextLines = Array.isArray(payload.claim?.lines) && payload.claim.lines.length
-      ? payload.claim.lines.map((line) => createMileageLine(line))
-      : [createMileageLine()];
-    setLines(nextLines);
+    setLines([createMileageLine()]);
   }
 
   async function loadMileage(nextMonthId = monthId) {
