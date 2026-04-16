@@ -102,27 +102,69 @@ const VAN_ESTIMATOR_TEMPLATE = {
 
 const VEHICLE_GRAPHICS_PRICING = {
   standardVinylRate: 85,
-  wrapFilmRate: 110,
+  wrapMaterialRates: {
+    under15: 110,
+    under35: 100,
+    under60: 92,
+    under85: 88,
+    full: 78
+  },
   labourSellRate: 160,
-  standardLargeHoursPerM2: 0.8,
+  standardLargeHoursPerM2: 0.65,
   standardSmallHoursPerM2: 0.75,
   standardSmallMinHours: 1,
-  standardSmallMaxHours: 1.75,
-  wrapUnder20HoursPerM2: 1.25,
-  wrapUnder45HoursPerM2: 1.45,
-  wrapUnder70HoursPerM2: 1.65,
-  wrapFullHoursPerM2: 1.9,
-  connectedWrapLabourDiscount: 0.15,
+  standardSmallMaxHours: 1.5,
+  wrapLabourBands: {
+    under15: 0.95,
+    under35: 1.05,
+    under60: 0.95,
+    under85: 0.85,
+    full: 0.65
+  },
+  sectionFactors: {
+    one: 0.9,
+    twoToThree: 1,
+    fourToFive: 1.08,
+    moreThanFive: 1.18
+  },
+  difficultyFactors: {
+    flat: 1,
+    light_curve: 1.08,
+    normal_wrap_curve: 1.15,
+    deep_recess: 1.25
+  },
+  marketAnchors: {
+    under15: 400,
+    under35: 900,
+    under60: 1600,
+    under85: 2400,
+    full: 3200
+  },
+  blendWeights: {
+    noWrap: { calculated: 0.7, anchor: 0.3 },
+    wrapUnder60: { calculated: 0.6, anchor: 0.4 },
+    coverageUnder85: { calculated: 0.45, anchor: 0.55 },
+    coverageFull: { calculated: 0.25, anchor: 0.75 }
+  },
+  packageClamps: {
+    frontEnd: { min: 900, max: 1500 },
+    rearHalf: { min: 1500, max: 2400 },
+    heavyPartial: { min: 1800, max: 2900 },
+    fullWrap: { min: 2600, max: 3800 }
+  },
   minPrice: 250,
   minAnyWrapPrice: 600,
-  minWrapLedPartialPrice: 900,
-  minFullWrapPrice: 1800
+  minMediumPartialWrapPrice: 900,
+  minFullWrapPrice: 1800,
+  premiumOverride: false
 };
 
 const VEHICLE_ZONE_MATERIALS = {
   standard_vinyl: { label: "Standard vinyl", rate: VEHICLE_GRAPHICS_PRICING.standardVinylRate },
-  wrap_film: { label: "Wrap film", rate: VEHICLE_GRAPHICS_PRICING.wrapFilmRate }
+  wrap_film: { label: "Wrap film", rate: VEHICLE_GRAPHICS_PRICING.wrapMaterialRates.under15 }
 };
+
+const VEHICLE_PRICING_STORAGE_KEY = "vehicle-pricing-settings";
 
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -3128,6 +3170,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [svgMarkup, setSvgMarkup] = useState("");
   const [svgError, setSvgError] = useState("");
   const [shapes, setShapes] = useState([]);
+  const [pricingSettings, setPricingSettings] = useState(() => {
+    if (typeof window === "undefined") return VEHICLE_GRAPHICS_PRICING;
+    try {
+      const storedSettings = window.localStorage.getItem(VEHICLE_PRICING_STORAGE_KEY);
+      return storedSettings ? { ...VEHICLE_GRAPHICS_PRICING, ...JSON.parse(storedSettings) } : VEHICLE_GRAPHICS_PRICING;
+    } catch (error) {
+      return VEHICLE_GRAPHICS_PRICING;
+    }
+  });
   const [drawMode, setDrawMode] = useState("rectangle");
   const [drawingRect, setDrawingRect] = useState(null);
   const [drawStart, setDrawStart] = useState(null);
@@ -3139,6 +3190,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const overlaySvgRef = useRef(null);
   const vehicleBodyPathsRef = useRef([]);
   const wrapLinesRef = useRef([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(VEHICLE_PRICING_STORAGE_KEY, JSON.stringify(pricingSettings));
+    } catch (error) {
+      // Pricing changes still apply immediately if storage is unavailable.
+    }
+  }, [pricingSettings]);
 
   useEffect(() => {
     let active = true;
@@ -3409,12 +3469,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function getVehicleZoneMetadata(area) {
     const wrapRequired = isWrapFilmArea(area);
+    const bounds = area.bounds || area;
+    const bodyBounds = getVehicleBodyBounds();
+    const centerX = bounds.x + bounds.width / 2;
+    const frontThreshold = bodyBounds.x + bodyBounds.width * 0.62;
+    const rearThreshold = bodyBounds.x + bodyBounds.width * 0.38;
+
     if (wrapRequired) {
+      const installGroup = centerX >= frontThreshold ? "front_end" : centerX <= rearThreshold ? "rear_half" : "main_face";
       return {
         material_type: "wrap_film",
-        surface_type: "curved",
-        complexity_factor: 1.25,
-        install_group: "wrap_required"
+        surface_type: "normal_wrap_curve",
+        complexity_factor: 1.15,
+        install_group: installGroup
       };
     }
 
@@ -3426,15 +3493,47 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
-  function getWrapHoursPerM2(wrapCoverage) {
-    if (wrapCoverage < 0.2) return VEHICLE_GRAPHICS_PRICING.wrapUnder20HoursPerM2;
-    if (wrapCoverage < 0.45) return VEHICLE_GRAPHICS_PRICING.wrapUnder45HoursPerM2;
-    if (wrapCoverage < 0.7) return VEHICLE_GRAPHICS_PRICING.wrapUnder70HoursPerM2;
-    return VEHICLE_GRAPHICS_PRICING.wrapFullHoursPerM2;
+  function getCoverageBand(coverage) {
+    if (coverage < 0.15) return "under15";
+    if (coverage < 0.35) return "under35";
+    if (coverage < 0.6) return "under60";
+    if (coverage < 0.85) return "under85";
+    return "full";
   }
 
   function clampNumber(value, min, max) {
     return Math.min(max, Math.max(min, value));
+  }
+
+  function getVehicleDrawableAreaM2() {
+    if (!vehicleBodyPathsRef.current.length) {
+      return (
+        (VAN_ESTIMATOR_TEMPLATE.viewBox.width *
+          VAN_ESTIMATOR_TEMPLATE.viewBox.height *
+          VAN_ESTIMATOR_TEMPLATE.scaleFactor *
+          VAN_ESTIMATOR_TEMPLATE.scaleFactor) /
+        1000000
+      );
+    }
+
+    const bounds = getVehicleBodyBounds();
+    const columns = 90;
+    const rows = 52;
+    let insideVehicle = 0;
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const point = {
+          x: bounds.x + ((column + 0.5) * bounds.width) / columns,
+          y: bounds.y + ((row + 0.5) * bounds.height) / rows
+        };
+        if (isPointInVehicleBody(point)) insideVehicle += 1;
+      }
+    }
+
+    const unitsArea = bounds.width * bounds.height * (insideVehicle / (columns * rows));
+    const scaleFactor = VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    return (unitsArea * scaleFactor * scaleFactor) / 1000000;
   }
 
   function getShapeCenter(shape) {
@@ -3445,47 +3544,98 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
-  function isContinuousWrapJob(wrapShapes, wrapArea) {
-    if (!wrapShapes.length || wrapArea <= 0) return false;
-    if (wrapShapes.length <= 2) return true;
-    const largestArea = Math.max(...wrapShapes.map((shape) => shape.areaM2 || 0));
-    return largestArea / wrapArea >= 0.7;
+  function countConnectedShapeSections(sectionShapes) {
+    if (!sectionShapes.length) return 0;
+    const visited = new Set();
+    const expansion = 12;
+
+    function expandedBounds(shape) {
+      const bounds = shape.bounds || shape;
+      return {
+        x: bounds.x - expansion,
+        y: bounds.y - expansion,
+        width: bounds.width + expansion * 2,
+        height: bounds.height + expansion * 2
+      };
+    }
+
+    let sections = 0;
+    sectionShapes.forEach((shape, index) => {
+      if (visited.has(index)) return;
+      sections += 1;
+      const queue = [index];
+      visited.add(index);
+
+      while (queue.length) {
+        const currentIndex = queue.shift();
+        const currentBounds = expandedBounds(sectionShapes[currentIndex]);
+        sectionShapes.forEach((candidate, candidateIndex) => {
+          if (visited.has(candidateIndex)) return;
+          if (!rectsIntersect(currentBounds, expandedBounds(candidate))) return;
+          visited.add(candidateIndex);
+          queue.push(candidateIndex);
+        });
+      }
+    });
+
+    return sections;
   }
 
-  function isFrontLedWrapJob(wrapShapes, wrapCoverage) {
-    if (!wrapShapes.length || wrapCoverage >= 0.2) return false;
-    const bodyBounds = getVehicleBodyBounds();
-    const frontThreshold = bodyBounds.x + bodyBounds.width * 0.62;
-    const frontArea = wrapShapes.reduce((sum, shape) => {
-      const center = getShapeCenter(shape);
-      return center.x >= frontThreshold ? sum + shape.areaM2 : sum;
+  function getWrapSectionFactor(sectionCount, settings) {
+    if (sectionCount <= 1) return settings.sectionFactors.one;
+    if (sectionCount <= 3) return settings.sectionFactors.twoToThree;
+    if (sectionCount <= 5) return settings.sectionFactors.fourToFive;
+    return settings.sectionFactors.moreThanFive;
+  }
+
+  function getWeightedDifficultyFactor(wrapShapes, wrapArea, settings) {
+    if (!wrapShapes.length || wrapArea <= 0) return 1;
+    const weightedDifficulty = wrapShapes.reduce((sum, shape) => {
+      const surfaceType = shape.zoneMetadata?.surface_type || "normal_wrap_curve";
+      const factor = settings.difficultyFactors[surfaceType] || shape.zoneMetadata?.complexity_factor || 1;
+      return sum + shape.areaM2 * factor;
     }, 0);
+    return weightedDifficulty / wrapArea;
+  }
+
+  function getWrapAreaShare(wrapShapes, installGroups) {
     const wrapArea = wrapShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
-    return wrapArea > 0 && frontArea / wrapArea >= 0.6;
+    if (wrapArea <= 0) return 0;
+    const groupedArea = wrapShapes.reduce((sum, shape) => {
+      return installGroups.includes(shape.zoneMetadata?.install_group) ? sum + shape.areaM2 : sum;
+    }, 0);
+    return groupedArea / wrapArea;
   }
 
-  function isWrapComplexityExtreme(wrapShapes, wrapCoverage) {
-    const maxComplexity = Math.max(1, ...wrapShapes.map((shape) => shape.zoneMetadata?.complexity_factor || 1));
-    return maxComplexity >= 1.4 || wrapShapes.length >= 7;
+  function getMainFaceCount(wrapShapes) {
+    return new Set(wrapShapes.map((shape) => shape.zoneMetadata?.install_group).filter(Boolean)).size;
   }
 
-  function applyWrapPackageCaps(estimate, { wrapShapes, wrapArea, standardArea, wrapCoverage }) {
-    if (!wrapShapes.length || wrapArea <= 0) return estimate;
-    const extremeComplexity = isWrapComplexityExtreme(wrapShapes, wrapCoverage);
+  function applyPackageRules(estimate, { wrapShapes, coverage, weightedDifficulty, settings }) {
+    if (!wrapShapes.length || settings.premiumOverride) return { estimate, packageType: "" };
+    const extremeComplexity = weightedDifficulty >= 1.25;
 
-    if (isFrontLedWrapJob(wrapShapes, wrapCoverage) && !extremeComplexity) {
-      return clampNumber(estimate, 900, 1500);
+    if (getWrapAreaShare(wrapShapes, ["front_end"]) > 0.7 && coverage < 0.35 && !extremeComplexity) {
+      const band = settings.packageClamps.frontEnd;
+      return { estimate: clampNumber(estimate, band.min, band.max), packageType: "FRONT-END PACKAGE" };
     }
 
-    if (wrapCoverage >= 0.2 && wrapCoverage < 0.65 && wrapArea >= standardArea && !extremeComplexity) {
-      return Math.min(estimate, 3000);
+    if (getWrapAreaShare(wrapShapes, ["rear_half"]) > 0.7 && coverage < 0.6 && !extremeComplexity) {
+      const band = settings.packageClamps.rearHalf;
+      return { estimate: clampNumber(estimate, band.min, band.max), packageType: "REAR-HALF PACKAGE" };
     }
 
-    if (wrapCoverage >= 0.7 && !extremeComplexity) {
-      return clampNumber(estimate, 2300, 4000);
+    if (coverage >= 0.35 && coverage < 0.85 && getMainFaceCount(wrapShapes) >= 2 && !extremeComplexity) {
+      const band = settings.packageClamps.heavyPartial;
+      return { estimate: clampNumber(estimate, band.min, band.max), packageType: "HEAVY PARTIAL PACKAGE" };
     }
 
-    return estimate;
+    if (coverage >= 0.85 && !extremeComplexity) {
+      const band = settings.packageClamps.fullWrap;
+      return { estimate: clampNumber(estimate, band.min, band.max), packageType: "FULL WRAP PACKAGE" };
+    }
+
+    return { estimate, packageType: "" };
   }
 
   function clearTextSelection() {
@@ -3688,20 +3838,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   const totals = useMemo(() => {
+    const settings = pricingSettings;
     const classifiedShapes = shapes.map((shape) => {
       const zoneMetadata =
         shape.zoneMetadata ||
         (shape.isWrapFilm
           ? {
               material_type: "wrap_film",
-              surface_type: "curved",
-              complexity_factor: 1.25,
-              install_group: "wrap_required"
+              surface_type: "normal_wrap_curve",
+              complexity_factor: settings.difficultyFactors.normal_wrap_curve,
+              install_group: "main_face"
             }
           : {
               material_type: "standard_vinyl",
               surface_type: "flat",
-              complexity_factor: 1,
+              complexity_factor: settings.difficultyFactors.flat,
               install_group: "standard_panel"
             });
       return { ...shape, zoneMetadata };
@@ -3710,95 +3861,103 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const wrapShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type === "wrap_film");
     const standardArea = standardShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
     const wrapArea = wrapShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
-    const flatArea = classifiedShapes
-      .filter((shape) => shape.zoneMetadata.surface_type === "flat")
-      .reduce((sum, shape) => sum + shape.areaM2, 0);
-    const curvedArea = classifiedShapes
-      .filter((shape) => shape.zoneMetadata.surface_type === "curved")
-      .reduce((sum, shape) => sum + shape.areaM2, 0);
     const totalArea = standardArea + wrapArea;
-    const vehicleArea =
-      (VAN_ESTIMATOR_TEMPLATE.viewBox.width *
-        VAN_ESTIMATOR_TEMPLATE.viewBox.height *
-        VAN_ESTIMATOR_TEMPLATE.scaleFactor *
-        VAN_ESTIMATOR_TEMPLATE.scaleFactor) /
-      1000000;
+    const vehicleArea = getVehicleDrawableAreaM2();
     const coverage = vehicleArea > 0 ? totalArea / vehicleArea : 0;
     const wrapCoverage = vehicleArea > 0 ? wrapArea / vehicleArea : 0;
+    const totalCoverageBand = getCoverageBand(coverage);
+    const wrapCoverageBand = getCoverageBand(wrapCoverage);
+    const wrapSectionCount = countConnectedShapeSections(wrapShapes);
+    const wrapSectionsConnected = wrapSectionCount <= 1;
+    const wrapSectionFactor = wrapArea > 0 ? getWrapSectionFactor(wrapSectionCount, settings) : 1;
+    const weightedDifficulty = getWeightedDifficultyFactor(wrapShapes, wrapArea, settings);
+
     if (totalArea <= 0) {
       return {
         standardArea,
         wrapArea,
-        flatArea,
-        curvedArea,
         totalArea,
-        materialSell: 0,
+        standardSell: 0,
+        standardLabourSell: 0,
+        wrapSell: 0,
+        wrapLabourSell: 0,
         labourHours: 0,
-        labourSell: 0,
         basePrice: 0,
         vehicleArea,
         coverage: 0,
         wrapCoverage: 0,
+        wrapSectionCount: 0,
+        wrapSectionsConnected: true,
+        weightedDifficulty: 1,
         anchor: 0,
+        packageType: "",
         estimate: 0
       };
     }
-    const materialSell = classifiedShapes.reduce((sum, shape) => {
-      const material = VEHICLE_ZONE_MATERIALS[shape.zoneMetadata.material_type] || VEHICLE_ZONE_MATERIALS.standard_vinyl;
-      return sum + shape.areaM2 * material.rate;
-    }, 0);
-    const standardComplexity = Math.max(1, ...standardShapes.map((shape) => shape.zoneMetadata.complexity_factor || 1));
+    const standardSell = standardArea * settings.standardVinylRate;
+    const wrapFilmRate = settings.wrapMaterialRates[wrapCoverageBand] || settings.wrapMaterialRates.under15;
+    const wrapSell = wrapArea * wrapFilmRate;
     const standardLabourHours =
       standardArea <= 0
         ? 0
         : coverage < 0.15
           ? clampNumber(
-              standardArea * VEHICLE_GRAPHICS_PRICING.standardSmallHoursPerM2 * standardComplexity,
-              VEHICLE_GRAPHICS_PRICING.standardSmallMinHours,
-              VEHICLE_GRAPHICS_PRICING.standardSmallMaxHours
+              standardArea * settings.standardSmallHoursPerM2,
+              settings.standardSmallMinHours,
+              settings.standardSmallMaxHours
             )
-          : standardArea * VEHICLE_GRAPHICS_PRICING.standardLargeHoursPerM2 * standardComplexity;
-    let wrapLabourHours = wrapArea * getWrapHoursPerM2(wrapCoverage);
-    const hasConnectedWrapDiscount = isContinuousWrapJob(wrapShapes, wrapArea);
-    if (hasConnectedWrapDiscount) {
-      wrapLabourHours *= 1 - VEHICLE_GRAPHICS_PRICING.connectedWrapLabourDiscount;
-    }
+          : standardArea * settings.standardLargeHoursPerM2;
+    const wrapBaseHoursPerM2 = settings.wrapLabourBands[wrapCoverageBand] || settings.wrapLabourBands.under15;
+    const wrapLabourHours = wrapArea * wrapBaseHoursPerM2 * wrapSectionFactor * weightedDifficulty;
     const labourHours = standardLabourHours + wrapLabourHours;
-    const labourSell = labourHours * VEHICLE_GRAPHICS_PRICING.labourSellRate;
-    const basePrice = materialSell + labourSell;
-    const anchor = coverage < 0.15 ? 400 : coverage < 0.4 ? 900 : coverage < 0.7 ? 1500 : 2750;
-    let estimate = 0.65 * basePrice + 0.35 * anchor;
-    estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minPrice);
+    const standardLabourSell = standardLabourHours * settings.labourSellRate;
+    const wrapLabourSell = wrapLabourHours * settings.labourSellRate;
+    const basePrice = standardSell + standardLabourSell + wrapSell + wrapLabourSell;
+    const anchor = settings.marketAnchors[totalCoverageBand] || settings.marketAnchors.under15;
+    const blend =
+      wrapArea <= 0
+        ? settings.blendWeights.noWrap
+        : coverage < 0.6
+          ? settings.blendWeights.wrapUnder60
+          : coverage < 0.85
+            ? settings.blendWeights.coverageUnder85
+            : settings.blendWeights.coverageFull;
+    let estimate = blend.calculated * basePrice + blend.anchor * anchor;
+    estimate = Math.max(estimate, settings.minPrice);
     if (wrapArea > 0) {
-      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minAnyWrapPrice);
+      estimate = Math.max(estimate, settings.minAnyWrapPrice);
     }
-    if (wrapArea > 0 && coverage < 0.7 && wrapArea >= standardArea) {
-      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minWrapLedPartialPrice);
+    if (wrapArea > 0 && coverage >= 0.35 && coverage < 0.85) {
+      estimate = Math.max(estimate, settings.minMediumPartialWrapPrice);
     }
-    if (wrapArea > 0 && coverage >= 0.7) {
-      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minFullWrapPrice);
+    if (wrapArea > 0 && coverage >= 0.85) {
+      estimate = Math.max(estimate, settings.minFullWrapPrice);
     }
-    estimate = applyWrapPackageCaps(estimate, { wrapShapes, wrapArea, standardArea, wrapCoverage });
+    const packageResult = applyPackageRules(estimate, { wrapShapes, coverage, weightedDifficulty, settings });
+    estimate = packageResult.estimate;
     estimate = Math.round(estimate / 50) * 50;
 
     return {
       standardArea,
       wrapArea,
-      flatArea,
-      curvedArea,
       totalArea,
-      materialSell,
+      standardSell,
+      standardLabourSell,
+      wrapSell,
+      wrapLabourSell,
       labourHours,
-      labourSell,
       basePrice,
       vehicleArea,
       coverage,
       wrapCoverage,
+      wrapSectionCount,
+      wrapSectionsConnected,
+      weightedDifficulty,
       anchor,
-      hasConnectedWrapDiscount,
+      packageType: packageResult.packageType,
       estimate
     };
-  }, [shapes]);
+  }, [pricingSettings, shapes, vehicleClipPathsD.length]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -3812,6 +3971,48 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function formatM2(value) {
     return `${(Number(value) || 0).toFixed(2)}m²`;
+  }
+
+  function formatPercent(value) {
+    return `${Math.round((Number(value) || 0) * 100)}%`;
+  }
+
+  function updatePricingValue(path, value) {
+    const numericValue = Number(value);
+    if (Number.isNaN(numericValue)) return;
+    setPricingSettings((current) => {
+      const next = { ...current };
+      let target = next;
+      path.slice(0, -1).forEach((key) => {
+        target[key] = { ...target[key] };
+        target = target[key];
+      });
+      target[path[path.length - 1]] = numericValue;
+      return next;
+    });
+  }
+
+  function updatePricingToggle(path, checked) {
+    setPricingSettings((current) => {
+      const next = { ...current };
+      let target = next;
+      path.slice(0, -1).forEach((key) => {
+        target[key] = { ...target[key] };
+        target = target[key];
+      });
+      target[path[path.length - 1]] = checked;
+      return next;
+    });
+  }
+
+  function renderPricingNumber(label, path, step = 1) {
+    const value = path.reduce((target, key) => target?.[key], pricingSettings);
+    return (
+      <label>
+        <span>{label}</span>
+        <input type="number" step={step} value={value} onChange={(event) => updatePricingValue(path, event.target.value)} />
+      </label>
+    );
   }
 
   return (
@@ -4061,6 +4262,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <span>Wrap film</span>
                   <strong>{formatM2(totals.wrapArea)}</strong>
                 </div>
+              </div>
+
+              <div className="vinyl-summary-strip">
                 <div>
                   <span>Labour hours</span>
                   <strong>{totals.labourHours.toFixed(1)}</strong>
@@ -4069,7 +4273,76 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <span>Total coverage</span>
                   <strong>{formatM2(totals.totalArea)}</strong>
                 </div>
+                <div>
+                  <span>% coverage</span>
+                  <strong>{formatPercent(totals.coverage)}</strong>
+                </div>
               </div>
+
+              {currentUser?.canManagePermissions ? (
+                <details className="vinyl-pricing-settings">
+                  <summary>Pricing settings</summary>
+                  <div className="vinyl-pricing-grid">
+                    {renderPricingNumber("Standard vinyl rate", ["standardVinylRate"])}
+                    {renderPricingNumber("Labour sell rate", ["labourSellRate"])}
+                    {renderPricingNumber("Std small hrs/m²", ["standardSmallHoursPerM2"], 0.05)}
+                    {renderPricingNumber("Std small min hrs", ["standardSmallMinHours"], 0.05)}
+                    {renderPricingNumber("Std small max hrs", ["standardSmallMaxHours"], 0.05)}
+                    {renderPricingNumber("Std 15%+ hrs/m²", ["standardLargeHoursPerM2"], 0.05)}
+                    {renderPricingNumber("Wrap rate <15%", ["wrapMaterialRates", "under15"])}
+                    {renderPricingNumber("Wrap rate <35%", ["wrapMaterialRates", "under35"])}
+                    {renderPricingNumber("Wrap rate <60%", ["wrapMaterialRates", "under60"])}
+                    {renderPricingNumber("Wrap rate <85%", ["wrapMaterialRates", "under85"])}
+                    {renderPricingNumber("Wrap rate 85%+", ["wrapMaterialRates", "full"])}
+                    {renderPricingNumber("Wrap hrs <15%", ["wrapLabourBands", "under15"], 0.05)}
+                    {renderPricingNumber("Wrap hrs <35%", ["wrapLabourBands", "under35"], 0.05)}
+                    {renderPricingNumber("Wrap hrs <60%", ["wrapLabourBands", "under60"], 0.05)}
+                    {renderPricingNumber("Wrap hrs <85%", ["wrapLabourBands", "under85"], 0.05)}
+                    {renderPricingNumber("Wrap hrs 85%+", ["wrapLabourBands", "full"], 0.05)}
+                    {renderPricingNumber("1 section factor", ["sectionFactors", "one"], 0.01)}
+                    {renderPricingNumber("2-3 sections factor", ["sectionFactors", "twoToThree"], 0.01)}
+                    {renderPricingNumber("4-5 sections factor", ["sectionFactors", "fourToFive"], 0.01)}
+                    {renderPricingNumber("6+ sections factor", ["sectionFactors", "moreThanFive"], 0.01)}
+                    {renderPricingNumber("Flat difficulty", ["difficultyFactors", "flat"], 0.01)}
+                    {renderPricingNumber("Light curve difficulty", ["difficultyFactors", "light_curve"], 0.01)}
+                    {renderPricingNumber("Normal wrap difficulty", ["difficultyFactors", "normal_wrap_curve"], 0.01)}
+                    {renderPricingNumber("Deep recess difficulty", ["difficultyFactors", "deep_recess"], 0.01)}
+                    {renderPricingNumber("Anchor <15%", ["marketAnchors", "under15"])}
+                    {renderPricingNumber("Anchor <35%", ["marketAnchors", "under35"])}
+                    {renderPricingNumber("Anchor <60%", ["marketAnchors", "under60"])}
+                    {renderPricingNumber("Anchor <85%", ["marketAnchors", "under85"])}
+                    {renderPricingNumber("Anchor 85%+", ["marketAnchors", "full"])}
+                    {renderPricingNumber("No-wrap calc weight", ["blendWeights", "noWrap", "calculated"], 0.05)}
+                    {renderPricingNumber("No-wrap anchor weight", ["blendWeights", "noWrap", "anchor"], 0.05)}
+                    {renderPricingNumber("Wrap <60 calc weight", ["blendWeights", "wrapUnder60", "calculated"], 0.05)}
+                    {renderPricingNumber("Wrap <60 anchor weight", ["blendWeights", "wrapUnder60", "anchor"], 0.05)}
+                    {renderPricingNumber("60-85 calc weight", ["blendWeights", "coverageUnder85", "calculated"], 0.05)}
+                    {renderPricingNumber("60-85 anchor weight", ["blendWeights", "coverageUnder85", "anchor"], 0.05)}
+                    {renderPricingNumber("85+ calc weight", ["blendWeights", "coverageFull", "calculated"], 0.05)}
+                    {renderPricingNumber("85+ anchor weight", ["blendWeights", "coverageFull", "anchor"], 0.05)}
+                    {renderPricingNumber("Front min", ["packageClamps", "frontEnd", "min"])}
+                    {renderPricingNumber("Front max", ["packageClamps", "frontEnd", "max"])}
+                    {renderPricingNumber("Rear-half min", ["packageClamps", "rearHalf", "min"])}
+                    {renderPricingNumber("Rear-half max", ["packageClamps", "rearHalf", "max"])}
+                    {renderPricingNumber("Heavy partial min", ["packageClamps", "heavyPartial", "min"])}
+                    {renderPricingNumber("Heavy partial max", ["packageClamps", "heavyPartial", "max"])}
+                    {renderPricingNumber("Full wrap min", ["packageClamps", "fullWrap", "min"])}
+                    {renderPricingNumber("Full wrap max", ["packageClamps", "fullWrap", "max"])}
+                    {renderPricingNumber("Absolute minimum", ["minPrice"])}
+                    {renderPricingNumber("Any wrap minimum", ["minAnyWrapPrice"])}
+                    {renderPricingNumber("Partial wrap minimum", ["minMediumPartialWrapPrice"])}
+                    {renderPricingNumber("Full wrap minimum", ["minFullWrapPrice"])}
+                    <label className="vinyl-pricing-toggle">
+                      <span>Premium override</span>
+                      <input
+                        type="checkbox"
+                        checked={pricingSettings.premiumOverride}
+                        onChange={(event) => updatePricingToggle(["premiumOverride"], event.target.checked)}
+                      />
+                    </label>
+                  </div>
+                </details>
+              ) : null}
 
               <div className="vinyl-shape-list" hidden>
                 {shapes.length ? (
