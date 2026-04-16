@@ -4015,9 +4015,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     );
   }
 
-  const selectedTemplate =
-    VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
-
   return (
     <div className="app-shell">
       <div className="page vinyl-estimator-page">
@@ -4029,23 +4026,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         />
 
         <section className="panel vinyl-estimator-panel">
-          <div className="vinyl-estimator-head">
-            <div>
-              <h2>Vehicle Pricing Calculator</h2>
-            </div>
-            <label className="vinyl-estimator-template">
-              <span>Select Vehicle Size:</span>
-              <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
-                {VEHICLE_TEMPLATE_OPTIONS.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.sizeName}
-                  </option>
-                ))}
-              </select>
-              <small>Example: {selectedTemplate.exampleName}</small>
-            </label>
-          </div>
-
           <div className="vinyl-estimator-grid">
             <div className="vinyl-canvas-card">
               <div className="vinyl-tool-row">
@@ -4259,6 +4239,17 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             </div>
 
             <aside className="vinyl-estimate-card">
+              <label className="vinyl-estimator-template">
+                <span>Select Vehicle Size:</span>
+                <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                  {VEHICLE_TEMPLATE_OPTIONS.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.sizeName} - example: {template.exampleName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="vinyl-total-hero">
                 <span>Estimated supply & install ex VAT</span>
                 <strong>{currencyFormatter.format(totals.estimate)}</strong>

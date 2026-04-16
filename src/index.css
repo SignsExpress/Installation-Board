@@ -555,40 +555,21 @@ button {
 }
 
 .vinyl-estimator-page {
-  max-width: 1500px;
+  max-width: 1540px;
 }
 
 .vinyl-estimator-panel {
-  padding: 18px;
-}
-
-.vinyl-estimator-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.vinyl-estimator-head h2,
-.vinyl-estimator-head p {
-  margin: 0;
-}
-
-.vinyl-estimator-head p {
-  margin-top: 6px;
-  color: var(--sx-slate-soft);
-  max-width: 680px;
+  padding: 10px;
 }
 
 .vinyl-estimator-template {
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 14px;
-  padding: 9px 12px;
+  border-radius: 12px;
+  padding: 8px;
   background: rgba(248, 250, 252, 0.92);
   display: grid;
-  gap: 4px;
-  min-width: 240px;
+  gap: 5px;
+  min-width: 0;
   text-align: left;
 }
 
@@ -603,33 +584,27 @@ button {
 .vinyl-estimator-template select {
   width: 100%;
   border: 1px solid rgba(203, 213, 225, 0.95);
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
   color: #0f172a;
   font: inherit;
   font-weight: 900;
-  padding: 8px 34px 8px 10px;
-}
-
-.vinyl-estimator-template small {
-  color: #0f172a;
-  font-size: 0.82rem;
-  font-weight: 800;
+  padding: 7px 32px 7px 9px;
 }
 
 .vinyl-estimator-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 10px;
   align-items: start;
 }
 
 .vinyl-canvas-card,
 .vinyl-estimate-card {
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
   box-shadow: 0 16px 44px rgba(15, 23, 42, 0.07);
 }
 
@@ -637,8 +612,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
 .vinyl-tool-segment,
@@ -657,8 +632,8 @@ button {
 }
 
 .vinyl-tool-segment button {
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 12px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -676,11 +651,11 @@ button {
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(99, 102, 241, 0.12);
-  border-radius: 20px;
+  border-radius: 16px;
   background:
     linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.75)),
     #fff;
-  height: clamp(340px, calc(100vh - 282px), 520px);
+  height: clamp(300px, calc(100vh - 222px), 500px);
   min-height: 0;
   user-select: none;
 }
@@ -831,9 +806,10 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 6px;
   color: var(--sx-slate-soft);
   font-weight: 700;
+  font-size: 0.88rem;
 }
 
 .vinyl-canvas-actions > div {
@@ -843,14 +819,14 @@ button {
 
 .vinyl-estimate-card {
   display: grid;
-  gap: 16px;
+  gap: 8px;
   position: sticky;
-  top: 94px;
+  top: 78px;
 }
 
 .vinyl-total-hero {
-  border-radius: 22px;
-  padding: 18px;
+  border-radius: 16px;
+  padding: 12px;
   background: linear-gradient(135deg, #0f172a, #683e84);
   color: #fff;
   display: grid;
@@ -869,13 +845,13 @@ button {
 }
 
 .vinyl-total-hero strong {
-  font-size: 2rem;
+  font-size: 1.72rem;
 }
 
 .vinyl-stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .vinyl-summary-strip {
@@ -888,8 +864,8 @@ button {
 .vinyl-summary-strip > div,
 .vinyl-breakdown > div {
   border: 1px solid rgba(203, 213, 225, 0.85);
-  border-radius: 16px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 8px;
   display: grid;
   gap: 5px;
   background: rgba(248, 250, 252, 0.85);
@@ -904,14 +880,14 @@ button {
 .vinyl-summary-strip strong,
 .vinyl-breakdown strong {
   color: #0f172a;
-  font-size: 1.12rem;
+  font-size: 1rem;
 }
 
 .vinyl-pricing-settings {
   border: 1px solid rgba(203, 213, 225, 0.85);
-  border-radius: 16px;
+  border-radius: 12px;
   background: rgba(248, 250, 252, 0.7);
-  padding: 12px;
+  padding: 8px;
 }
 
 .vinyl-pricing-settings summary {
@@ -5418,10 +5394,9 @@ button {
   }
 
   .vinyl-estimator-panel {
-    padding: 18px;
+    padding: 10px;
   }
 
-  .vinyl-estimator-head,
   .vinyl-tool-row,
   .vinyl-canvas-actions {
     align-items: stretch;
@@ -5442,7 +5417,7 @@ button {
   }
 
   .vinyl-canvas {
-    height: clamp(300px, 52vh, 430px);
+    height: clamp(280px, 50vh, 410px);
   }
 
   .van-template-svg {
