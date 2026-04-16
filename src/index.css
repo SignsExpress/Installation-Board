@@ -895,6 +895,11 @@ button {
   background: rgba(255, 237, 213, 0.55);
 }
 
+.vinyl-stats-grid > div:not(.wrap) {
+  border-color: rgba(14, 165, 233, 0.32);
+  background: rgba(224, 242, 254, 0.62);
+}
+
 .vinyl-stats-grid strong,
 .vinyl-summary-strip strong,
 .vinyl-breakdown strong {
