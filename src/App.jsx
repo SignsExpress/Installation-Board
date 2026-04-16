@@ -126,6 +126,42 @@ const VEHICLE_ZONE_MATERIALS = {
   wrap_film: { label: "Wrap film", rate: VEHICLE_GRAPHICS_PRICING.wrapFilmRate }
 };
 
+const VAN_BODY_CLIP_POLYGON = [
+  { x: 790, y: 1010 },
+  { x: 800, y: 865 },
+  { x: 825, y: 715 },
+  { x: 870, y: 560 },
+  { x: 1025, y: 425 },
+  { x: 1125, y: 300 },
+  { x: 1245, y: 200 },
+  { x: 1400, y: 95 },
+  { x: 1625, y: 55 },
+  { x: 1955, y: 45 },
+  { x: 2145, y: 55 },
+  { x: 2210, y: 120 },
+  { x: 2225, y: 295 },
+  { x: 2225, y: 520 },
+  { x: 2205, y: 635 },
+  { x: 2210, y: 760 },
+  { x: 2075, y: 780 },
+  { x: 2070, y: 700 },
+  { x: 2040, y: 600 },
+  { x: 1975, y: 535 },
+  { x: 1880, y: 505 },
+  { x: 1775, y: 520 },
+  { x: 1695, y: 585 },
+  { x: 1645, y: 690 },
+  { x: 1638, y: 885 },
+  { x: 1190, y: 900 },
+  { x: 1165, y: 720 },
+  { x: 1125, y: 620 },
+  { x: 1045, y: 550 },
+  { x: 950, y: 535 },
+  { x: 865, y: 575 },
+  { x: 820, y: 695 },
+  { x: 820, y: 1010 }
+];
+
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -3137,10 +3173,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [editDrag, setEditDrag] = useState(null);
   const [mirrorOnOtherSide, setMirrorOnOtherSide] = useState(false);
-  const [vehicleClipPathD, setVehicleClipPathD] = useState("");
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
-  const vehicleBodyPathRef = useRef(null);
   const wrapLinesRef = useRef([]);
 
   useEffect(() => {
@@ -3173,27 +3207,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
       svg.classList.add("van-template-svg");
     }
-
-    const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
-    const vehicleBodyPath =
-      Array.from(artworkLayer?.querySelectorAll("path") || [])
-        .filter((element) => {
-          const styles = window.getComputedStyle(element);
-          const fill = styles.fill || element.getAttribute("fill") || "";
-          return fill !== "none";
-        })
-        .map((element) => {
-          try {
-            const box = element.getBBox();
-            return { element, area: box.width * box.height };
-          } catch (error) {
-            return null;
-          }
-        })
-        .filter((entry) => entry?.area)
-        .sort((left, right) => right.area - left.area)[0]?.element || null;
-    vehicleBodyPathRef.current = vehicleBodyPath;
-    setVehicleClipPathD(vehicleBodyPath?.getAttribute("d") || "");
 
     const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
     if (!wrapLayer) {
@@ -3282,15 +3295,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function getVehicleBodyBounds() {
-    try {
-      const box = vehicleBodyPathRef.current?.getBBox();
-      if (box?.width && box?.height) {
-        return { x: box.x, y: box.y, width: box.width, height: box.height };
-      }
-    } catch (error) {
-      // Fall back to the full drawing viewBox if the body path is not ready yet.
-    }
-    return VAN_ESTIMATOR_TEMPLATE.viewBox;
+    const xValues = VAN_BODY_CLIP_POLYGON.map((point) => point.x);
+    const yValues = VAN_BODY_CLIP_POLYGON.map((point) => point.y);
+    const x = Math.min(...xValues);
+    const y = Math.min(...yValues);
+    return {
+      x,
+      y,
+      width: Math.max(...xValues) - x,
+      height: Math.max(...yValues) - y
+    };
   }
 
   function rectsIntersect(left, right) {
@@ -3316,30 +3330,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function isPointInVehicleBody(point) {
-    const path = vehicleBodyPathRef.current;
-    const svg = inlineSvgRef.current?.querySelector("svg");
-    if (!path || !svg) return true;
-
-    try {
-      const svgPoint = svg.createSVGPoint();
-      svgPoint.x = point.x;
-      svgPoint.y = point.y;
-      if (typeof path.isPointInFill === "function") return path.isPointInFill(svgPoint);
-    } catch (error) {
-      // Older engines can miss SVG geometry helpers; the bbox fallback still prevents wild off-vehicle areas.
-    }
-
-    const bounds = getVehicleBodyBounds();
-    return (
-      point.x >= bounds.x &&
-      point.x <= bounds.x + bounds.width &&
-      point.y >= bounds.y &&
-      point.y <= bounds.y + bounds.height
-    );
+    return isPointInPolygon(point, VAN_BODY_CLIP_POLYGON);
   }
 
   function getVehicleClipRatio(area) {
-    if (!vehicleBodyPathRef.current) return 1;
     const bounds = area.bounds || area;
     if (!bounds?.width || !bounds?.height) return 1;
 
@@ -3361,12 +3355,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     }
 
     return insideShape > 0 ? insideVehicle / insideShape : 0;
-  }
-
-  function mirrorPointAcrossVehicle(point) {
-    const bounds = getVehicleBodyBounds();
-    const centerX = bounds.x + bounds.width / 2;
-    return { ...point, x: centerX + (centerX - point.x) };
   }
 
   function isWrapFilmArea(area) {
@@ -3499,23 +3487,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function createMirroredShape(shape) {
     if (shape.type === "polygon") {
-      const points = shape.points.map(mirrorPointAcrossVehicle).reverse();
       return refreshShapeMetrics({
         ...shape,
         id: `${shape.id}-mirror`,
-        points,
         mirroredFrom: shape.id,
         isMirror: true
       });
     }
 
-    const rect = normalizeRect(
-      mirrorPointAcrossVehicle({ x: shape.x, y: shape.y }),
-      mirrorPointAcrossVehicle({ x: shape.x + shape.width, y: shape.y + shape.height })
-    );
     return refreshShapeMetrics({
       ...shape,
-      ...rect,
       id: `${shape.id}-mirror`,
       mirroredFrom: shape.id,
       isMirror: true
@@ -3913,16 +3894,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     setEditDrag(null);
                   }}
                 >
-                  {vehicleClipPathD ? (
-                    <defs>
-                      <clipPath id="vinyl-vehicle-body-clip">
-                        <path d={vehicleClipPathD} />
-                      </clipPath>
-                    </defs>
-                  ) : null}
+                  <defs>
+                    <clipPath id="vinyl-vehicle-body-clip" clipPathUnits="userSpaceOnUse">
+                      <polygon points={pointsToSvg(VAN_BODY_CLIP_POLYGON)} />
+                    </clipPath>
+                  </defs>
                   {shapes.map((shape) => (
                     <g key={shape.id} className="vinyl-shape-group">
-                      <g clipPath={vehicleClipPathD ? "url(#vinyl-vehicle-body-clip)" : undefined}>
+                      <g clipPath="url(#vinyl-vehicle-body-clip)">
                         {shape.type === "polygon" ? (
                           <polygon
                             points={pointsToSvg(shape.points)}
