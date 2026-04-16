@@ -4109,6 +4109,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     );
   }
 
+  const selectedTemplate =
+    VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
+
   return (
     <div className="app-shell">
       <div className="page vinyl-estimator-page">
@@ -4346,7 +4349,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     </option>
                   ))}
                 </select>
-                <small>eg. {VAN_ESTIMATOR_TEMPLATE.exampleName}</small>
+                <small>eg. {selectedTemplate.exampleName}</small>
               </label>
 
               <div className="vinyl-total-hero">
