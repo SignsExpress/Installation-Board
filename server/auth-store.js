@@ -40,7 +40,8 @@ function getDefaultPermissions(role) {
       board: "admin",
       installer: "admin",
       holidays: "admin",
-      attendance: "admin"
+      attendance: "admin",
+      mileage: "admin"
     };
   }
 
@@ -48,7 +49,8 @@ function getDefaultPermissions(role) {
     board: "user",
     installer: "none",
     holidays: "user",
-    attendance: "user"
+    attendance: "user",
+    mileage: "user"
   };
 }
 
@@ -102,7 +104,8 @@ function normalizePermissions(permissions, role) {
     board: normalizePermissionValue(permissions?.board, defaults.board),
     installer: normalizePermissionValue(permissions?.installer, defaults.installer),
     holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
-    attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance)
+    attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
+    mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage)
   };
 }
 
@@ -118,7 +121,8 @@ function applyOwnerPermissions(user) {
       board: "admin",
       installer: "admin",
       holidays: "admin",
-      attendance: "admin"
+      attendance: "admin",
+      mileage: "admin"
     }
   };
 }
@@ -128,7 +132,8 @@ function deriveRoleFromPermissions(permissions) {
     permissions?.board === "user" &&
     permissions?.installer === "none" &&
     permissions?.holidays === "user" &&
-    permissions?.attendance === "user"
+    permissions?.attendance === "user" &&
+    permissions?.mileage === "user"
   ) {
     return "client";
   }
@@ -175,7 +180,8 @@ function normalizeStore(parsed, options = {}) {
         board: "admin",
         installer: "admin",
         holidays: "admin",
-        attendance: "admin"
+        attendance: "admin",
+        mileage: "admin"
       };
     }
   }
@@ -348,7 +354,8 @@ async function updateUserPermissions(userId, permissions) {
         board: "admin",
         installer: "admin",
         holidays: "admin",
-        attendance: "admin"
+        attendance: "admin",
+        mileage: "admin"
       };
     }
   await writeUsersStore(store);

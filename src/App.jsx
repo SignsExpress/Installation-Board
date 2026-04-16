@@ -739,10 +739,20 @@ function canEditAttendance(user) {
   return getPermissionForApp(user, "attendance") === "admin";
 }
 
+function canAccessMileage(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "mileage") !== "none";
+}
+
+function canEditMileage(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "mileage") === "admin";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || user.canManagePermissions)
   );
 }
 
@@ -786,6 +796,14 @@ function AttendanceIcon() {
   );
 }
 
+function MileageIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6.5 5a3.5 3.5 0 0 0-3.5 3.5c0 2.5 3.5 6.5 3.5 6.5S10 11 10 8.5A3.5 3.5 0 0 0 6.5 5Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM17.5 3A3.5 3.5 0 0 0 14 6.5c0 2.5 3.5 6.5 3.5 6.5S21 9 21 6.5A3.5 3.5 0 0 0 17.5 3Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM7 18h11a1 1 0 1 1 0 2H7a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2Zm10-2a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2h1v2Z" />
+    </svg>
+  );
+}
+
 function InstallerIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -825,6 +843,9 @@ function getNotificationCategory(notification) {
   if (link.includes("/attendance") || title.includes("clock") || message.includes("clock")) {
     return { label: "Attendance", icon: AttendanceIcon, className: "notification-type-update" };
   }
+  if (link.includes("/mileage") || title.includes("mileage") || message.includes("miles")) {
+    return { label: "Mileage", icon: MileageIcon, className: "notification-type-update" };
+  }
   if (link.includes("/board") || title.includes("job") || message.includes("job")) {
     return { label: "Board", icon: BoardIcon, className: "notification-type-board" };
   }
@@ -854,11 +875,13 @@ function MainNavBar({
   const boardAllowed = canAccessBoard(currentUser);
   const attendanceAllowed = canAccessAttendance(currentUser);
   const holidaysAllowed = canAccessHolidays(currentUser);
+  const mileageAllowed = canAccessMileage(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
   const attendancePath = "/attendance";
   const holidaysPath = "/holidays";
+  const mileagePath = "/mileage";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -910,6 +933,17 @@ function MainNavBar({
               disabled={!holidaysAllowed}
             >
               <span className="host-nav-link-label">Holidays</span>
+            </button>
+            <button
+              type="button"
+              className={`host-nav-link ${active === "mileage" ? "active" : ""} ${!mileageAllowed ? "disabled" : ""}`}
+              onClick={() => {
+                if (!mileageAllowed) return;
+                goTo(mileagePath);
+              }}
+              disabled={!mileageAllowed}
+            >
+              <span className="host-nav-link-label">Mileage</span>
             </button>
             <button
               type="button"
@@ -1024,6 +1058,7 @@ function PermissionsPanel({
             const holidaysPermission = getPermissionForApp(user, "holidays");
             const installerPermission = getPermissionForApp(user, "installer");
             const attendancePermission = getPermissionForApp(user, "attendance");
+            const mileagePermission = getPermissionForApp(user, "mileage");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -1105,6 +1140,23 @@ function PermissionsPanel({
                             className={`permission-chip ${attendancePermission === option.value ? "active" : ""}`}
                             disabled={isSelf || savingKey === `${user.id}:attendance`}
                             onClick={() => onChangePermission(user.id, "attendance", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Mileage</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-mileage-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${mileagePermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:mileage`}
+                            onClick={() => onChangePermission(user.id, "mileage", option.value)}
                           >
                             {option.label}
                           </button>
@@ -1307,6 +1359,7 @@ function NotificationsPage({
     { value: "unread", label: "Unread" },
     { value: "holiday", label: "Holidays" },
     { value: "board", label: "Jobs" },
+    { value: "mileage", label: "Mileage" },
     { value: "message", label: "Messages" }
   ];
   const unreadCount = notifications.filter((entry) => !entry.read).length;
@@ -1463,6 +1516,17 @@ function HostLandingPage({
               <strong>Holidays</strong>
             </button>
             <button
+              className={`host-launch-card ${!canAccessMileage(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessMileage(currentUser)) return;
+                goTo("/mileage");
+              }}
+              disabled={!canAccessMileage(currentUser)}
+            >
+              <strong>Mileage</strong>
+            </button>
+            <button
               className={`host-launch-card ${!canAccessInstaller(currentUser) ? "disabled" : ""}`}
               type="button"
               onClick={() => {
@@ -1573,6 +1637,17 @@ function ClientLandingPage({
               disabled={!canAccessHolidays(currentUser)}
             >
               <strong>Holidays</strong>
+            </button>
+            <button
+              className={`host-launch-card ${!canAccessMileage(currentUser) ? "disabled" : ""}`}
+              type="button"
+              onClick={() => {
+                if (!canAccessMileage(currentUser)) return;
+                goTo("/mileage");
+              }}
+              disabled={!canAccessMileage(currentUser)}
+            >
+              <strong>Mileage</strong>
             </button>
             <button className="host-launch-card disabled" type="button" disabled>
               <strong>Subcontractor Directory</strong>
@@ -2252,6 +2327,274 @@ function HolidaysPage({
     );
   }
 
+function createMileageLine(overrides = {}) {
+  return {
+    id: overrides.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    from: overrides.from || "",
+    to: overrides.to || "",
+    miles: overrides.miles ?? ""
+  };
+}
+
+function MileagePage({ currentUser, onLogout, notifications, onRefreshNotifications }) {
+  const initialMonth = useMemo(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    return params.get("month") || toMonthIdFromIso(getLocalTodayIso());
+  }, []);
+  const [monthId, setMonthId] = useState(initialMonth);
+  const [lines, setLines] = useState([createMileageLine()]);
+  const [history, setHistory] = useState([]);
+  const [monthLabel, setMonthLabel] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [estimatingLineId, setEstimatingLineId] = useState("");
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  const totalMiles = useMemo(
+    () => Math.round(lines.reduce((sum, line) => sum + (Number(line.miles) || 0), 0) * 10) / 10,
+    [lines]
+  );
+
+  function updateLine(lineId, key, value) {
+    setLines((current) =>
+      current.map((line) => (line.id === lineId ? { ...line, [key]: value } : line))
+    );
+  }
+
+  function removeLine(lineId) {
+    setLines((current) => {
+      const next = current.filter((line) => line.id !== lineId);
+      return next.length ? next : [createMileageLine()];
+    });
+  }
+
+  function applyMileagePayload(payload) {
+    setMonthLabel(payload.monthLabel || "");
+    setHistory(Array.isArray(payload.history) ? payload.history : []);
+    const nextLines = Array.isArray(payload.claim?.lines) && payload.claim.lines.length
+      ? payload.claim.lines.map((line) => createMileageLine(line))
+      : [createMileageLine()];
+    setLines(nextLines);
+  }
+
+  async function loadMileage(nextMonthId = monthId) {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/mileage?month=${encodeURIComponent(nextMonthId)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not load mileage.");
+      applyMileagePayload(payload);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(createMessage(error.message || "Could not load mileage.", "error"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function estimateLine(line) {
+    if (!line.from.trim() || !line.to.trim()) {
+      setStatusMessage(createMessage("Enter both From and To before estimating miles.", "error"));
+      return;
+    }
+
+    try {
+      setEstimatingLineId(line.id);
+      const response = await fetch("/api/mileage/estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from: line.from, to: line.to })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not estimate mileage.");
+      if (payload.resolved && Number(payload.miles) > 0) {
+        updateLine(line.id, "miles", String(payload.miles));
+        setStatusMessage(createMessage("Mileage estimate added. You can still adjust it if needed.", "success"));
+      } else {
+        setStatusMessage(createMessage(payload.message || "Could not estimate that route. Please enter the miles manually.", "error"));
+      }
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(createMessage(error.message || "Could not estimate mileage.", "error"));
+    } finally {
+      setEstimatingLineId("");
+    }
+  }
+
+  async function submitMileage(event) {
+    event.preventDefault();
+    const cleanLines = lines
+      .map((line) => ({
+        id: line.id,
+        from: line.from.trim(),
+        to: line.to.trim(),
+        miles: Number(line.miles) || 0
+      }))
+      .filter((line) => line.from || line.to || line.miles);
+
+    if (!cleanLines.length) {
+      setStatusMessage(createMessage("Add at least one mileage line before submitting.", "error"));
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const response = await fetch("/api/mileage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ monthId, lines: cleanLines })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not submit mileage.");
+      applyMileagePayload(payload);
+      await onRefreshNotifications?.();
+      setStatusMessage(createMessage("Mileage submitted to Matt.", "success"));
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(createMessage(error.message || "Could not submit mileage.", "error"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMileage(monthId);
+  }, [monthId]);
+
+  useEffect(() => {
+    if (!statusMessage) return undefined;
+    const timer = window.setTimeout(() => setStatusMessage(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
+  return (
+    <div className="app-shell mileage-shell">
+      <div className="page mileage-page">
+        <MainNavBar currentUser={currentUser} active="mileage" onLogout={onLogout} notifications={notifications} />
+
+        <section className="panel mileage-panel">
+          <div className="mileage-head">
+            <div>
+              <p className="eyebrow">Mileage</p>
+              <h2>{monthLabel || "Mileage claim"}</h2>
+              <p>Add journeys, estimate the driving miles, and submit the monthly total to Matt.</p>
+            </div>
+            <div className="mileage-month-tools">
+              <button className="ghost-button" type="button" onClick={() => setMonthId(shiftMonthId(monthId, -1))}>
+                Previous month
+              </button>
+              <input
+                type="month"
+                value={monthId}
+                onChange={(event) => setMonthId(event.target.value || toMonthIdFromIso(getLocalTodayIso()))}
+              />
+              <button className="ghost-button" type="button" onClick={() => setMonthId(shiftMonthId(monthId, 1))}>
+                Next month
+              </button>
+            </div>
+          </div>
+
+          {statusMessage ? <div className={`flash ${statusMessage.tone}`}>{statusMessage.text}</div> : null}
+
+          <form className="mileage-form" onSubmit={submitMileage}>
+            <div className="mileage-lines">
+              {lines.map((line, index) => (
+                <div key={line.id} className="mileage-line">
+                  <span className="mileage-line-number">{index + 1}</span>
+                  <label>
+                    From
+                    <input
+                      type="text"
+                      value={line.from}
+                      placeholder="Start destination"
+                      onChange={(event) => updateLine(line.id, "from", event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    To
+                    <input
+                      type="text"
+                      value={line.to}
+                      placeholder="End destination"
+                      onChange={(event) => updateLine(line.id, "to", event.target.value)}
+                    />
+                  </label>
+                  <label className="mileage-miles-field">
+                    Miles
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={line.miles}
+                      placeholder="0"
+                      onChange={(event) => updateLine(line.id, "miles", event.target.value)}
+                    />
+                  </label>
+                  <div className="mileage-line-actions">
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => estimateLine(line)}
+                      disabled={estimatingLineId === line.id}
+                    >
+                      {estimatingLineId === line.id ? "Checking..." : "Suggest"}
+                    </button>
+                    <button className="text-button danger" type="button" onClick={() => removeLine(line.id)}>
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mileage-footer">
+              <button
+                className="ghost-button mileage-add-line"
+                type="button"
+                onClick={() => setLines((current) => [...current, createMileageLine()])}
+              >
+                + Add journey
+              </button>
+              <div className="mileage-total">
+                <span>Monthly total</span>
+                <strong>{totalMiles.toFixed(1)} miles</strong>
+              </div>
+              <button className="primary-button" type="submit" disabled={saving || loading}>
+                {saving ? "Submitting..." : "Submit mileage"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel mileage-history-panel">
+          <div className="mileage-history-head">
+            <h3>History</h3>
+            <p>Your previously submitted mileage totals.</p>
+          </div>
+          {history.length ? (
+            <div className="mileage-history-list">
+              {history.map((entry) => (
+                <button
+                  key={entry.id || entry.monthId}
+                  type="button"
+                  className={`mileage-history-card ${entry.monthId === monthId ? "active" : ""}`}
+                  onClick={() => setMonthId(entry.monthId)}
+                >
+                  <span>{entry.monthLabel}</span>
+                  <strong>{Number(entry.totalMiles || 0).toFixed(1)} miles</strong>
+                  <small>{entry.lineCount} journey{entry.lineCount === 1 ? "" : "s"}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="notifications-empty">No mileage submitted yet.</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function AttendancePage({
   currentUser,
   onLogout,
@@ -2560,6 +2903,7 @@ export default function App() {
   const isInstallerRoute = pathname.startsWith("/installer");
   const isAttendanceRoute = pathname.startsWith("/attendance");
   const isHolidaysRoute = pathname.startsWith("/holidays");
+  const isMileageRoute = pathname.startsWith("/mileage");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
@@ -2643,14 +2987,15 @@ export default function App() {
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
   const showAttendance = Boolean(currentUser && canAccessAttendance(currentUser) && isAttendanceRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
+  const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -2941,6 +3286,11 @@ export default function App() {
       return;
     }
 
+    if (isMileageRoute && !canAccessMileage(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isNotificationsRoute && !currentUser) {
       window.location.replace("/");
       return;
@@ -2961,7 +3311,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -2969,7 +3319,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -3177,6 +3527,7 @@ export default function App() {
       installer: getPermissionForApp(targetUser, "installer"),
       holidays: getPermissionForApp(targetUser, "holidays"),
       attendance: getPermissionForApp(targetUser, "attendance"),
+      mileage: getPermissionForApp(targetUser, "mileage"),
       [appKey]: value
     };
 
@@ -4560,6 +4911,17 @@ export default function App() {
         onOpenNotification={openNotification}
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
+      />
+    );
+  }
+
+  if (showMileage) {
+    return (
+      <MileagePage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        onRefreshNotifications={refreshNotifications}
       />
     );
   }

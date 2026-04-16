@@ -240,6 +240,16 @@ function canEditAttendance(user) {
   return getUserPermission(user, "attendance", user?.role === "host" ? "admin" : "user") === "admin";
 }
 
+function canAccessMileage(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "mileage", user?.role === "host" ? "admin" : "user") !== "none";
+}
+
+function canEditMileage(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "mileage", user?.role === "host" ? "admin" : "user") === "admin";
+}
+
 function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -466,13 +476,19 @@ function requireAttendanceAdmin(request, response) {
   return false;
 }
 
+function requireMileageAccess(request, response) {
+  if (canAccessMileage(request.user)) return true;
+  response.status(403).json({ error: "Mileage access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
     if (!fs.existsSync(file)) {
       fs.writeFileSync(
         file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [] }, null, 2)}\n`,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [] }, null, 2)}\n`,
         "utf8"
       );
     }
@@ -506,7 +522,8 @@ function mergeHolidaySeed(store) {
         holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
-        attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : []
+        attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
+        mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : []
       };
 
   seed.holidays.forEach((holiday) => {
@@ -598,7 +615,8 @@ async function readStore() {
             holidayAllowances: [],
             holidayEvents: [],
             notifications: [],
-            attendanceEntries: []
+            attendanceEntries: [],
+            mileageClaims: []
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -613,6 +631,7 @@ async function readStore() {
           holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
+          mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -628,7 +647,8 @@ async function readStore() {
           holidayAllowances: [],
           holidayEvents: [],
           notifications: [],
-          attendanceEntries: []
+          attendanceEntries: [],
+          mileageClaims: []
         });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -663,6 +683,12 @@ async function writeStore(store) {
         .sort((left, right) => {
           if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
           return String(left.person || "").localeCompare(String(right.person || ""));
+        }),
+      mileageClaims: [...(store.mileageClaims || [])]
+        .map((entry) => sanitizeMileageClaim(entry))
+        .sort((left, right) => {
+          if (left.monthId !== right.monthId) return String(right.monthId || "").localeCompare(String(left.monthId || ""));
+          return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
@@ -825,6 +851,72 @@ function parseMonthId(value) {
   const month = Number(match[2]);
   if (!year || month < 1 || month > 12) return null;
   return new Date(Date.UTC(year, month - 1, 1));
+}
+
+function getCurrentMonthId() {
+  return toMonthId(getStartOfMonth(getTodayInLondon()));
+}
+
+function formatMileageMonthLabel(monthId) {
+  const parsed = parseMonthId(monthId);
+  return parsed ? monthFormatter.format(parsed) : String(monthId || "");
+}
+
+async function geocodeMileageLocation(query) {
+  const normalized = String(query || "").trim();
+  if (!normalized) return null;
+
+  const url = new URL("https://nominatim.openstreetmap.org/search");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("limit", "1");
+  url.searchParams.set("countrycodes", "gb");
+  url.searchParams.set("q", normalized);
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "sxpreston-mileage/1.0 (https://www.sxpreston.com)"
+    }
+  });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  const first = Array.isArray(payload) ? payload[0] : null;
+  const lat = Number(first?.lat);
+  const lon = Number(first?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return { lat, lon, label: first?.display_name || normalized };
+}
+
+async function estimateDrivingMiles(from, to) {
+  const [origin, destination] = await Promise.all([
+    geocodeMileageLocation(from),
+    geocodeMileageLocation(to)
+  ]);
+
+  if (!origin || !destination) {
+    return { miles: 0, resolved: false, message: "Could not resolve one of those addresses." };
+  }
+
+  const routeUrl = new URL(
+    `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}`
+  );
+  routeUrl.searchParams.set("overview", "false");
+  const response = await fetch(routeUrl, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    return { miles: 0, resolved: false, message: "Could not calculate a driving route." };
+  }
+  const payload = await response.json();
+  const distanceMeters = Number(payload?.routes?.[0]?.distance);
+  if (!Number.isFinite(distanceMeters)) {
+    return { miles: 0, resolved: false, message: "Could not calculate a driving route." };
+  }
+
+  return {
+    miles: Math.round((distanceMeters / 1609.344) * 10) / 10,
+    resolved: true,
+    origin: origin.label,
+    destination: destination.label
+  };
 }
 
 function buildMonthNavigation(today = getTodayInLondon()) {
@@ -1531,6 +1623,35 @@ function sanitizeAttendanceEntry(payload) {
     missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
     missingNotificationResolvedAt: String(payload.missingNotificationResolvedAt || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeMileageLine(payload) {
+  const miles = Number(payload?.miles);
+  return {
+    id: String(payload?.id || makeId()),
+    from: String(payload?.from || "").trim(),
+    to: String(payload?.to || "").trim(),
+    miles: Number.isFinite(miles) ? Math.max(0, Math.round(miles * 10) / 10) : 0
+  };
+}
+
+function sanitizeMileageClaim(payload) {
+  const lines = Array.isArray(payload?.lines)
+    ? payload.lines.map((line) => sanitizeMileageLine(line)).filter((line) => line.from || line.to || line.miles)
+    : [];
+  const totalMiles = Math.round(lines.reduce((sum, line) => sum + Number(line.miles || 0), 0) * 10) / 10;
+  return {
+    id: String(payload?.id || makeId()),
+    userId: String(payload?.userId || "").trim(),
+    userName: String(payload?.userName || "").trim(),
+    monthId: String(payload?.monthId || "").trim(),
+    lines,
+    totalMiles,
+    status: String(payload?.status || "submitted").trim().toLowerCase() || "submitted",
+    submittedAt: String(payload?.submittedAt || new Date().toISOString()),
+    createdAt: String(payload?.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
 }
@@ -3569,7 +3690,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -3645,7 +3766,8 @@ function createServer() {
           board: request.body?.board,
           installer: request.body?.installer,
           holidays: request.body?.holidays,
-          attendance: request.body?.attendance
+          attendance: request.body?.attendance,
+          mileage: request.body?.mileage
         });
       response.json({ user: updatedUser });
     } catch (error) {
@@ -3723,6 +3845,9 @@ function createServer() {
           );
           store.attendanceEntries = (store.attendanceEntries || []).filter(
             (entry) => getHolidayStaffIdentityKey(entry.person) !== deletedPersonKey
+          );
+          store.mileageClaims = (store.mileageClaims || []).filter(
+            (entry) => String(entry.userId || "") !== String(deletedUser.id || "")
           );
           store.notifications = (store.notifications || []).filter(
             (entry) => String(entry.userId || "") !== String(deletedUser.id || "")
@@ -4343,6 +4468,127 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(
       savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
     );
+  });
+
+  app.get("/api/mileage", async (request, response) => {
+    if (!requireMileageAccess(request, response)) return;
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    const requestedMonth = String(request.query.month || "").trim();
+    const monthId = parseMonthId(requestedMonth) ? requestedMonth : getCurrentMonthId();
+    const userClaims = (store.mileageClaims || [])
+      .map((claim) => sanitizeMileageClaim(claim))
+      .filter((claim) => String(claim.userId || "") === userId);
+    const currentClaim =
+      userClaims.find((claim) => String(claim.monthId || "") === monthId) ||
+      sanitizeMileageClaim({
+        userId,
+        userName: request.user?.displayName || "",
+        monthId,
+        lines: []
+      });
+
+    response.json({
+      monthId,
+      monthLabel: formatMileageMonthLabel(monthId),
+      claim: currentClaim,
+      history: userClaims.map((claim) => ({
+        id: claim.id,
+        monthId: claim.monthId,
+        monthLabel: formatMileageMonthLabel(claim.monthId),
+        totalMiles: claim.totalMiles,
+        lineCount: claim.lines.length,
+        updatedAt: claim.updatedAt,
+        submittedAt: claim.submittedAt
+      }))
+    });
+  });
+
+  app.post("/api/mileage/estimate", async (request, response) => {
+    if (!requireMileageAccess(request, response)) return;
+    const from = String(request.body?.from || "").trim();
+    const to = String(request.body?.to || "").trim();
+    if (!from || !to) {
+      response.status(400).json({ error: "From and To destinations are required." });
+      return;
+    }
+
+    try {
+      response.json(await estimateDrivingMiles(from, to));
+    } catch (error) {
+      console.error("Mileage estimate failed.", error.message);
+      response.json({ miles: 0, resolved: false, message: "Could not calculate a driving route yet." });
+    }
+  });
+
+  app.post("/api/mileage", async (request, response) => {
+    if (!requireMileageAccess(request, response)) return;
+    const requestedMonth = String(request.body?.monthId || "").trim();
+    const monthId = parseMonthId(requestedMonth) ? requestedMonth : getCurrentMonthId();
+    const userId = String(request.user?.id || "");
+    const nextClaim = sanitizeMileageClaim({
+      ...request.body,
+      userId,
+      userName: request.user?.displayName || "",
+      monthId,
+      status: "submitted"
+    });
+
+    if (!nextClaim.lines.length) {
+      response.status(400).json({ error: "Add at least one mileage line before submitting." });
+      return;
+    }
+
+    const store = await readStore();
+    store.mileageClaims = Array.isArray(store.mileageClaims) ? store.mileageClaims : [];
+    const existingIndex = store.mileageClaims.findIndex(
+      (claim) => String(claim.userId || "") === userId && String(claim.monthId || "") === monthId
+    );
+
+    if (existingIndex >= 0) {
+      nextClaim.id = store.mileageClaims[existingIndex].id || nextClaim.id;
+      nextClaim.createdAt = store.mileageClaims[existingIndex].createdAt || nextClaim.createdAt;
+      store.mileageClaims[existingIndex] = nextClaim;
+    } else {
+      store.mileageClaims.unshift(nextClaim);
+    }
+
+    const usersStore = await readUsersStore();
+    const matt = (usersStore.users || []).find(
+      (user) => String(user.displayName || "").trim().toLowerCase() === "matt rutlidge"
+    );
+    if (matt?.id) {
+      store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+      store.notifications.unshift(
+        createNotification({
+          userId: matt.id,
+          type: "mileage-submitted",
+          title: "Mileage submitted",
+          message: `${request.user?.displayName || "A user"} submitted ${nextClaim.totalMiles} miles for ${formatMileageMonthLabel(monthId)}.`,
+          link: `/mileage?month=${encodeURIComponent(monthId)}`
+        })
+      );
+    }
+
+    const savedStore = await writeStore(store);
+    const savedClaims = (savedStore.mileageClaims || [])
+      .map((claim) => sanitizeMileageClaim(claim))
+      .filter((claim) => String(claim.userId || "") === userId);
+    const savedClaim = savedClaims.find((claim) => String(claim.monthId || "") === monthId) || nextClaim;
+    response.json({
+      monthId,
+      monthLabel: formatMileageMonthLabel(monthId),
+      claim: savedClaim,
+      history: savedClaims.map((claim) => ({
+        id: claim.id,
+        monthId: claim.monthId,
+        monthLabel: formatMileageMonthLabel(claim.monthId),
+        totalMiles: claim.totalMiles,
+        lineCount: claim.lines.length,
+        updatedAt: claim.updatedAt,
+        submittedAt: claim.submittedAt
+      }))
+    });
   });
 
   app.get("/api/attendance", async (request, response) => {
