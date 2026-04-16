@@ -901,61 +901,51 @@ function MainNavBar({
             >
               <span className="host-nav-link-label">Home</span>
             </button>
-            <button
-              type="button"
-              className={`host-nav-link ${active === "board" ? "active" : ""} ${!boardAllowed ? "disabled" : ""}`}
-              onClick={() => {
-                if (!boardAllowed) return;
-                goTo(boardPath);
-              }}
-              disabled={!boardAllowed}
-            >
-              <span className="host-nav-link-label">Installation Board</span>
-            </button>
-            <button
-              type="button"
-              className={`host-nav-link ${active === "attendance" ? "active" : ""} ${!attendanceAllowed ? "disabled" : ""}`}
-              onClick={() => {
-                if (!attendanceAllowed) return;
-                goTo(attendancePath);
-              }}
-              disabled={!attendanceAllowed}
-            >
-              <span className="host-nav-link-label">Attendance</span>
-            </button>
-            <button
-              type="button"
-              className={`host-nav-link ${active === "holidays" ? "active" : ""} ${!holidaysAllowed ? "disabled" : ""}`}
-              onClick={() => {
-                if (!holidaysAllowed) return;
-                goTo(holidaysPath);
-              }}
-              disabled={!holidaysAllowed}
-            >
-              <span className="host-nav-link-label">Holidays</span>
-            </button>
-            <button
-              type="button"
-              className={`host-nav-link ${active === "mileage" ? "active" : ""} ${!mileageAllowed ? "disabled" : ""}`}
-              onClick={() => {
-                if (!mileageAllowed) return;
-                goTo(mileagePath);
-              }}
-              disabled={!mileageAllowed}
-            >
-              <span className="host-nav-link-label">Mileage</span>
-            </button>
-            <button
-              type="button"
-              className={`host-nav-link ${active === "installer" ? "active" : ""} ${!installerAllowed ? "disabled" : ""}`}
-              onClick={() => {
-                if (!installerAllowed) return;
-                goTo(installerPath);
-              }}
-              disabled={!installerAllowed}
-            >
-              <span className="host-nav-link-label">Subcontractor Directory</span>
-            </button>
+            {boardAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "board" ? "active" : ""}`}
+                onClick={() => goTo(boardPath)}
+              >
+                <span className="host-nav-link-label">Installation Board</span>
+              </button>
+            ) : null}
+            {attendanceAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "attendance" ? "active" : ""}`}
+                onClick={() => goTo(attendancePath)}
+              >
+                <span className="host-nav-link-label">Attendance</span>
+              </button>
+            ) : null}
+            {holidaysAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "holidays" ? "active" : ""}`}
+                onClick={() => goTo(holidaysPath)}
+              >
+                <span className="host-nav-link-label">Holidays</span>
+              </button>
+            ) : null}
+            {mileageAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "mileage" ? "active" : ""}`}
+                onClick={() => goTo(mileagePath)}
+              >
+                <span className="host-nav-link-label">Mileage</span>
+              </button>
+            ) : null}
+            {installerAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "installer" ? "active" : ""}`}
+                onClick={() => goTo(installerPath)}
+              >
+                <span className="host-nav-link-label">Subcontractor Directory</span>
+              </button>
+            ) : null}
             <button
               type="button"
               className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
@@ -1493,74 +1483,36 @@ function HostLandingPage({
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
-            <button
-              className={`host-launch-card ${!canAccessAttendance(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessAttendance(currentUser)) return;
-                goTo("/attendance");
-              }}
-              disabled={!canAccessAttendance(currentUser)}
-            >
-              <strong>Attendance</strong>
-            </button>
-            <button
-              className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessHolidays(currentUser)) return;
-                goTo("/holidays");
-              }}
-              disabled={!canAccessHolidays(currentUser)}
-            >
-              <strong>Holidays</strong>
-            </button>
-            <button
-              className={`host-launch-card ${!canAccessMileage(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessMileage(currentUser)) return;
-                goTo("/mileage");
-              }}
-              disabled={!canAccessMileage(currentUser)}
-            >
-              <strong>Mileage</strong>
-            </button>
-            <button
-              className={`host-launch-card ${!canAccessInstaller(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessInstaller(currentUser)) return;
-                goTo("/installer");
-              }}
-              disabled={!canAccessInstaller(currentUser)}
-            >
-              <strong>Subcontractor Database</strong>
-            </button>
-
-            <button
-              className={`host-launch-card ${!canAccessBoard(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessBoard(currentUser)) return;
-                goTo(getBoardPathForUser(currentUser));
-              }}
-              disabled={!canAccessBoard(currentUser)}
-            >
-              <strong>Installation Board</strong>
-            </button>
-
-            <button
-              className={`host-launch-card ${!currentUser?.canManagePermissions ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!currentUser?.canManagePermissions) return;
-                setPermissionsOpen(true);
-              }}
-              disabled={!currentUser?.canManagePermissions}
-            >
-              <strong>Manage Permissions</strong>
-            </button>
+            {canAccessAttendance(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/attendance")}>
+                <strong>Attendance</strong>
+              </button>
+            ) : null}
+            {canAccessHolidays(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+                <strong>Holidays</strong>
+              </button>
+            ) : null}
+            {canAccessMileage(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/mileage")}>
+                <strong>Mileage</strong>
+              </button>
+            ) : null}
+            {canAccessInstaller(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
+                <strong>Subcontractor Database</strong>
+              </button>
+            ) : null}
+            {canAccessBoard(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
+                <strong>Installation Board</strong>
+              </button>
+            ) : null}
+            {currentUser?.canManagePermissions ? (
+              <button className="host-launch-card" type="button" onClick={() => setPermissionsOpen(true)}>
+                <strong>Manage Permissions</strong>
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -1616,58 +1568,31 @@ function ClientLandingPage({
 
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
-            <button
-              className={`host-launch-card ${!canAccessAttendance(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessAttendance(currentUser)) return;
-                goTo("/attendance");
-              }}
-              disabled={!canAccessAttendance(currentUser)}
-            >
-              <strong>Attendance</strong>
-            </button>
-            <button
-              className={`host-launch-card ${!canAccessHolidays(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessHolidays(currentUser)) return;
-                goTo("/holidays");
-              }}
-              disabled={!canAccessHolidays(currentUser)}
-            >
-              <strong>Holidays</strong>
-            </button>
-            <button
-              className={`host-launch-card ${!canAccessMileage(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessMileage(currentUser)) return;
-                goTo("/mileage");
-              }}
-              disabled={!canAccessMileage(currentUser)}
-            >
-              <strong>Mileage</strong>
-            </button>
-            <button className="host-launch-card disabled" type="button" disabled>
-              <strong>Subcontractor Directory</strong>
-            </button>
-
-            <button
-              className={`host-launch-card ${!canAccessBoard(currentUser) ? "disabled" : ""}`}
-              type="button"
-              onClick={() => {
-                if (!canAccessBoard(currentUser)) return;
-                goTo(getBoardPathForUser(currentUser));
-              }}
-              disabled={!canAccessBoard(currentUser)}
-            >
-              <strong>Installation Board</strong>
-            </button>
-
-            <button className="host-launch-card disabled" type="button" disabled>
-              <strong>Manage Permissions</strong>
-            </button>
+            {canAccessAttendance(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/attendance")}>
+                <strong>Attendance</strong>
+              </button>
+            ) : null}
+            {canAccessHolidays(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
+                <strong>Holidays</strong>
+              </button>
+            ) : null}
+            {canAccessMileage(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/mileage")}>
+                <strong>Mileage</strong>
+              </button>
+            ) : null}
+            {canAccessInstaller(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
+                <strong>Subcontractor Directory</strong>
+              </button>
+            ) : null}
+            {canAccessBoard(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
+                <strong>Installation Board</strong>
+              </button>
+            ) : null}
           </div>
         </section>
 
