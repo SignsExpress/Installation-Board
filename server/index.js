@@ -4367,6 +4367,36 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(payload);
   });
 
+  app.post("/api/jobs/:id/unsnagging", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const nextJob = sanitizeJob({
+      ...existing,
+      isSnagging: false,
+      snaggingAt: "",
+      snaggingByUserId: "",
+      snaggingByName: ""
+    });
+
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
   app.post("/api/jobs/:id/uncomplete", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     const store = await readStore();

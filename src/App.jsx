@@ -4229,6 +4229,18 @@ export default function App() {
     return payload;
   }
 
+  async function clearSnaggingJob(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/unsnagging`, {
+      method: "POST"
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not remove the snagging tag.");
+    }
+    applyBoardPayloadToState(payload, jobId);
+    return payload;
+  }
+
   async function undoCompleteJob(jobId) {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/uncomplete`, {
       method: "POST"
@@ -4330,6 +4342,18 @@ export default function App() {
     } catch (error) {
       console.error(error);
       setMessage(createMessage(error.message || "Could not mark the job as snagging.", "error"));
+    }
+  }
+
+  async function removeAdminJobSnagging(job) {
+    if (!job?.id) return;
+    try {
+      await clearSnaggingJob(job.id);
+      setAdminCompletePrompt(false);
+      setMessage(createMessage("Snagging removed.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not remove snagging.", "error"));
     }
   }
 
@@ -5701,6 +5725,16 @@ export default function App() {
                     disabled={adminPhotoUploading || adminExporting}
                   >
                     Snagging
+                  </button>
+                ) : null}
+                {activeAdminJob && activeAdminJob.isSnagging && !adminCompletePrompt ? (
+                  <button
+                    className="snagging-button is-active"
+                    type="button"
+                    onClick={() => removeAdminJobSnagging(activeAdminJob)}
+                    disabled={adminPhotoUploading || adminExporting}
+                  >
+                    Remove Snagging
                   </button>
                 ) : null}
                 <button className="primary-button" type="submit" disabled={saving}>

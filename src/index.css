@@ -1129,6 +1129,16 @@ button {
   background: #facc15;
 }
 
+.snagging-button.is-active {
+  background: #fff7ed;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.snagging-button.is-active:hover {
+  background: #ffedd5;
+}
+
 .danger-button:hover {
   background: #ffe4e6;
   border-color: #fb7185;
