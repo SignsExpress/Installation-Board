@@ -102,9 +102,9 @@ const VAN_ESTIMATOR_TEMPLATE = {
 };
 
 const DEFAULT_VAN_ESTIMATE_RATES = {
-  standardMaterial: 45,
-  wrapMaterial: 85,
-  install: 95,
+  standardMaterial: 50,
+  wrapMaterial: 100,
+  install: 40,
   setup: 75,
   wastePercent: 15
 };
