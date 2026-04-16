@@ -284,7 +284,7 @@ button {
 
 .mileage-line {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1.5fr) minmax(0, 1.5fr) 120px auto;
+  grid-template-columns: 42px minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(180px, 1fr) 120px auto;
   align-items: end;
   gap: 12px;
   padding: 14px;
@@ -316,6 +316,10 @@ button {
 
 .mileage-miles-field input {
   text-align: right;
+}
+
+.mileage-note-field {
+  min-width: 180px;
 }
 
 .mileage-line-actions {
@@ -877,6 +881,12 @@ button {
   color: #334155;
   border: 1px solid #cbd5e1;
   font-weight: 600;
+}
+
+.ghost-button.danger {
+  background: #fff1f2;
+  border-color: #fda4af;
+  color: #be123c;
 }
 
 .success-button {

@@ -1633,13 +1633,14 @@ function sanitizeMileageLine(payload) {
     id: String(payload?.id || makeId()),
     from: String(payload?.from || "").trim(),
     to: String(payload?.to || "").trim(),
+    note: String(payload?.note || "").trim(),
     miles: Number.isFinite(miles) ? Math.max(0, Math.round(miles * 10) / 10) : 0
   };
 }
 
 function sanitizeMileageClaim(payload) {
   const lines = Array.isArray(payload?.lines)
-    ? payload.lines.map((line) => sanitizeMileageLine(line)).filter((line) => line.from || line.to || line.miles)
+    ? payload.lines.map((line) => sanitizeMileageLine(line)).filter((line) => line.from || line.to || line.note || line.miles)
     : [];
   const totalMiles = Math.round(lines.reduce((sum, line) => sum + Number(line.miles || 0), 0) * 10) / 10;
   return {
@@ -4538,6 +4539,11 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.status(400).json({ error: "Add at least one mileage line before submitting." });
       return;
     }
+    const invalidLine = nextClaim.lines.find((line) => !line.from || !line.to || !line.note || !Number(line.miles));
+    if (invalidLine) {
+      response.status(400).json({ error: "Every mileage line needs From, To, Miles and a note explaining what it was for." });
+      return;
+    }
 
     const store = await readStore();
     store.mileageClaims = Array.isArray(store.mileageClaims) ? store.mileageClaims : [];
@@ -4579,6 +4585,67 @@ app.get("/api/corebridge/orders", async (request, response) => {
       monthId,
       monthLabel: formatMileageMonthLabel(monthId),
       claim: savedClaim,
+      history: savedClaims.map((claim) => ({
+        id: claim.id,
+        monthId: claim.monthId,
+        monthLabel: formatMileageMonthLabel(claim.monthId),
+        totalMiles: claim.totalMiles,
+        lineCount: claim.lines.length,
+        updatedAt: claim.updatedAt,
+        submittedAt: claim.submittedAt
+      }))
+    });
+  });
+
+  app.delete("/api/mileage/:monthId", async (request, response) => {
+    if (!requireMileageAccess(request, response)) return;
+    const monthId = String(request.params.monthId || "").trim();
+    if (!parseMonthId(monthId)) {
+      response.status(400).json({ error: "A valid mileage month is required." });
+      return;
+    }
+
+    const userId = String(request.user?.id || "");
+    const store = await readStore();
+    const existingClaim = (store.mileageClaims || []).find(
+      (claim) => String(claim.userId || "") === userId && String(claim.monthId || "") === monthId
+    );
+    store.mileageClaims = (store.mileageClaims || []).filter(
+      (claim) => !(String(claim.userId || "") === userId && String(claim.monthId || "") === monthId)
+    );
+
+    if (existingClaim) {
+      const usersStore = await readUsersStore();
+      const matt = (usersStore.users || []).find(
+        (user) => String(user.displayName || "").trim().toLowerCase() === "matt rutlidge"
+      );
+      if (matt?.id) {
+        store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+        store.notifications.unshift(
+          createNotification({
+            userId: matt.id,
+            type: "mileage-deleted",
+            title: "Mileage deleted",
+            message: `${request.user?.displayName || "A user"} deleted their ${formatMileageMonthLabel(monthId)} mileage submission.`,
+            link: `/mileage?month=${encodeURIComponent(monthId)}`
+          })
+        );
+      }
+    }
+
+    const savedStore = await writeStore(store);
+    const savedClaims = (savedStore.mileageClaims || [])
+      .map((claim) => sanitizeMileageClaim(claim))
+      .filter((claim) => String(claim.userId || "") === userId);
+    response.json({
+      monthId,
+      monthLabel: formatMileageMonthLabel(monthId),
+      claim: sanitizeMileageClaim({
+        userId,
+        userName: request.user?.displayName || "",
+        monthId,
+        lines: []
+      }),
       history: savedClaims.map((claim) => ({
         id: claim.id,
         monthId: claim.monthId,

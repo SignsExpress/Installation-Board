@@ -2332,6 +2332,7 @@ function createMileageLine(overrides = {}) {
     id: overrides.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
     from: overrides.from || "",
     to: overrides.to || "",
+    note: overrides.note || "",
     miles: overrides.miles ?? ""
   };
 }
@@ -2347,6 +2348,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
   const [monthLabel, setMonthLabel] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [estimatingLineId, setEstimatingLineId] = useState("");
   const [statusMessage, setStatusMessage] = useState(null);
 
@@ -2354,6 +2356,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
     () => Math.round(lines.reduce((sum, line) => sum + (Number(line.miles) || 0), 0) * 10) / 10,
     [lines]
   );
+  const hasCurrentSubmission = history.some((entry) => entry.monthId === monthId);
 
   function updateLine(lineId, key, value) {
     setLines((current) =>
@@ -2428,12 +2431,17 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
         id: line.id,
         from: line.from.trim(),
         to: line.to.trim(),
+        note: line.note.trim(),
         miles: Number(line.miles) || 0
       }))
-      .filter((line) => line.from || line.to || line.miles);
+      .filter((line) => line.from || line.to || line.note || line.miles);
 
     if (!cleanLines.length) {
       setStatusMessage(createMessage("Add at least one mileage line before submitting.", "error"));
+      return;
+    }
+    if (cleanLines.some((line) => !line.from || !line.to || !line.note || !line.miles)) {
+      setStatusMessage(createMessage("Every journey needs From, To, Miles and a note explaining what it was for.", "error"));
       return;
     }
 
@@ -2454,6 +2462,29 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
       setStatusMessage(createMessage(error.message || "Could not submit mileage.", "error"));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteMileageSubmission() {
+    if (!hasCurrentSubmission) {
+      setStatusMessage(createMessage("There is no submitted mileage for this month to delete.", "error"));
+      return;
+    }
+    if (!window.confirm(`Delete your mileage submission for ${monthLabel || monthId}?`)) return;
+
+    try {
+      setDeleting(true);
+      const response = await fetch(`/api/mileage/${encodeURIComponent(monthId)}`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not delete mileage submission.");
+      applyMileagePayload(payload);
+      await onRefreshNotifications?.();
+      setStatusMessage(createMessage("Mileage submission deleted.", "success"));
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(createMessage(error.message || "Could not delete mileage submission.", "error"));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -2519,6 +2550,15 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                       onChange={(event) => updateLine(line.id, "to", event.target.value)}
                     />
                   </label>
+                  <label className="mileage-note-field">
+                    Journey note
+                    <input
+                      type="text"
+                      value={line.note}
+                      placeholder="What was this journey for?"
+                      onChange={(event) => updateLine(line.id, "note", event.target.value)}
+                    />
+                  </label>
                   <label className="mileage-miles-field">
                     Miles
                     <input
@@ -2561,6 +2601,9 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
               </div>
               <button className="primary-button" type="submit" disabled={saving || loading}>
                 {saving ? "Submitting..." : "Submit mileage"}
+              </button>
+              <button className="ghost-button danger" type="button" onClick={deleteMileageSubmission} disabled={deleting || loading || !hasCurrentSubmission}>
+                {deleting ? "Deleting..." : "Delete submission"}
               </button>
             </div>
           </form>
