@@ -1703,6 +1703,50 @@ function sanitizeMileageClaim(payload) {
   };
 }
 
+function buildMileageHistory(claims) {
+  const monthGroups = new Map();
+
+  (Array.isArray(claims) ? claims : []).map((claim) => sanitizeMileageClaim(claim)).forEach((claim) => {
+    claim.lines.forEach((line) => {
+      const lineDate = parseIsoDate(line.date);
+      const lineMonthId = lineDate ? toMonthId(getStartOfMonth(lineDate)) : claim.monthId;
+      if (!lineMonthId) return;
+
+      const existing = monthGroups.get(lineMonthId) || {
+        id: `mileage-${lineMonthId}`,
+        monthId: lineMonthId,
+        monthLabel: formatMileageMonthLabel(lineMonthId),
+        totalMiles: 0,
+        lineCount: 0,
+        lines: [],
+        updatedAt: "",
+        submittedAt: ""
+      };
+
+      const nextLine = {
+        ...line,
+        claimMonthId: claim.monthId
+      };
+      existing.lines.push(nextLine);
+      existing.totalMiles = Math.round((existing.totalMiles + Number(line.miles || 0)) * 10) / 10;
+      existing.lineCount += 1;
+      existing.updatedAt = String(claim.updatedAt || "") > String(existing.updatedAt || "") ? claim.updatedAt : existing.updatedAt;
+      existing.submittedAt = String(claim.submittedAt || "") > String(existing.submittedAt || "") ? claim.submittedAt : existing.submittedAt;
+      monthGroups.set(lineMonthId, existing);
+    });
+  });
+
+  return [...monthGroups.values()]
+    .map((group) => ({
+      ...group,
+      lines: group.lines.sort((left, right) => {
+        if (left.date !== right.date) return String(right.date || "").localeCompare(String(left.date || ""));
+        return String(right.id || "").localeCompare(String(left.id || ""));
+      })
+    }))
+    .sort((left, right) => String(right.monthId || "").localeCompare(String(left.monthId || "")));
+}
+
 function sanitizeHolidayEvent(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -4539,16 +4583,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       monthId,
       monthLabel: formatMileageMonthLabel(monthId),
       claim: currentClaim,
-      history: userClaims.map((claim) => ({
-        id: claim.id,
-        monthId: claim.monthId,
-        monthLabel: formatMileageMonthLabel(claim.monthId),
-        totalMiles: claim.totalMiles,
-        lineCount: claim.lines.length,
-        lines: claim.lines,
-        updatedAt: claim.updatedAt,
-        submittedAt: claim.submittedAt
-      }))
+      history: buildMileageHistory(userClaims)
     });
   });
 
@@ -4642,16 +4677,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         monthId,
         lines: []
       }),
-      history: savedClaims.map((claim) => ({
-        id: claim.id,
-        monthId: claim.monthId,
-        monthLabel: formatMileageMonthLabel(claim.monthId),
-        totalMiles: claim.totalMiles,
-        lineCount: claim.lines.length,
-        lines: claim.lines,
-        updatedAt: claim.updatedAt,
-        submittedAt: claim.submittedAt
-      }))
+      history: buildMileageHistory(savedClaims)
     });
   });
 
@@ -4725,16 +4751,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       monthId,
       monthLabel: formatMileageMonthLabel(monthId),
       claim: savedClaim,
-      history: savedClaims.map((claim) => ({
-        id: claim.id,
-        monthId: claim.monthId,
-        monthLabel: formatMileageMonthLabel(claim.monthId),
-        totalMiles: claim.totalMiles,
-        lineCount: claim.lines.length,
-        lines: claim.lines,
-        updatedAt: claim.updatedAt,
-        submittedAt: claim.submittedAt
-      }))
+      history: buildMileageHistory(savedClaims)
     });
   });
 
@@ -4787,16 +4804,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         monthId,
         lines: []
       }),
-      history: savedClaims.map((claim) => ({
-        id: claim.id,
-        monthId: claim.monthId,
-        monthLabel: formatMileageMonthLabel(claim.monthId),
-        totalMiles: claim.totalMiles,
-        lineCount: claim.lines.length,
-        lines: claim.lines,
-        updatedAt: claim.updatedAt,
-        submittedAt: claim.submittedAt
-      }))
+      history: buildMileageHistory(savedClaims)
     });
   });
 

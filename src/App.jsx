@@ -2653,7 +2653,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                         <button
                           type="button"
                           className="text-button danger mileage-history-delete"
-                          onClick={() => deleteMileageJourney(entry.monthId, line.id, entry.monthLabel)}
+                          onClick={() => deleteMileageJourney(line.claimMonthId || entry.monthId, line.id, entry.monthLabel)}
                           disabled={deleting}
                         >
                           Delete
