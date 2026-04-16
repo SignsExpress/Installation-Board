@@ -866,13 +866,31 @@ button {
   font-weight: 800;
 }
 
-.vinyl-rate-grid input {
+.vinyl-rate-grid input,
+.vinyl-rate-grid select {
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 13px;
   padding: 10px 12px;
   color: #0f172a;
   background: #fff;
+}
+
+.vinyl-rate-grid .vinyl-checkbox-field {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: end;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.vinyl-rate-grid .vinyl-checkbox-field input {
+  width: 18px;
+  height: 18px;
 }
 
 .vinyl-breakdown {

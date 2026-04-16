@@ -101,12 +101,33 @@ const VAN_ESTIMATOR_TEMPLATE = {
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
 
-const DEFAULT_VAN_ESTIMATE_RATES = {
-  standardMaterial: 50,
-  wrapMaterial: 100,
-  install: 40,
-  setup: 75,
-  wastePercent: 15
+const VEHICLE_GRAPHICS_PRICING = {
+  cutVinylRate: 45,
+  printedVinylRate: 85,
+  wrapFilmRate: 110,
+  labourRate: 65,
+  labourSellMultiplier: 2.5,
+  minPrice: 250,
+  minWrapPrice: 1800
+};
+
+const VEHICLE_GRAPHICS_TYPES = {
+  cut_vinyl: { label: "Cut vinyl", rate: VEHICLE_GRAPHICS_PRICING.cutVinylRate, hoursPerM2: 0.75 },
+  printed_panel: { label: "Printed panel", rate: VEHICLE_GRAPHICS_PRICING.printedVinylRate, hoursPerM2: 1.25 },
+  wrap: { label: "Wrap", rate: VEHICLE_GRAPHICS_PRICING.wrapFilmRate, hoursPerM2: 2.25 }
+};
+
+const VEHICLE_GRAPHICS_COMPLEXITY = {
+  flat: { label: "Flat", multiplier: 1 },
+  light: { label: "Light curves", multiplier: 1.2 },
+  deep: { label: "Deep curves", multiplier: 1.5 }
+};
+
+const DEFAULT_VAN_QUOTE_SETTINGS = {
+  type: "printed_panel",
+  curves: "flat",
+  bonnet: false,
+  rear: false
 };
 
 function getLocalTodayIso() {
@@ -3119,7 +3140,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [editDrag, setEditDrag] = useState(null);
-  const [rates, setRates] = useState(DEFAULT_VAN_ESTIMATE_RATES);
+  const [quoteSettings, setQuoteSettings] = useState(DEFAULT_VAN_QUOTE_SETTINGS);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
   const wrapLinesRef = useRef([]);
@@ -3444,9 +3465,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     ]);
   }
 
-  function updateRate(key, value) {
-    const numeric = Math.max(0, Number(value) || 0);
-    setRates((current) => ({ ...current, [key]: numeric }));
+  function updateQuoteSetting(key, value) {
+    setQuoteSettings((current) => ({ ...current, [key]: value }));
   }
 
   function startShapeCornerDrag(event, shape, cornerOrPointIndex) {
@@ -3490,28 +3510,62 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       .filter((shape) => shape.isWrapFilm)
       .reduce((sum, shape) => sum + shape.areaM2, 0);
     const totalArea = standardArea + wrapArea;
-    const wasteMultiplier = 1 + (Number(rates.wastePercent) || 0) / 100;
-    const billableStandardArea = standardArea * wasteMultiplier;
-    const billableWrapArea = wrapArea * wasteMultiplier;
-    const billableTotalArea = billableStandardArea + billableWrapArea;
-    const materialCost =
-      billableStandardArea * (Number(rates.standardMaterial) || 0) +
-      billableWrapArea * (Number(rates.wrapMaterial) || 0);
-    const installCost = billableTotalArea * (Number(rates.install) || 0);
-    const estimate = materialCost + installCost + (Number(rates.setup) || 0);
+    if (totalArea <= 0) {
+      return {
+        standardArea,
+        wrapArea,
+        totalArea,
+        quoteTypeLabel: "",
+        materialSell: 0,
+        labourHours: 0,
+        labourSell: 0,
+        basePrice: 0,
+        complexity: 1,
+        vehicleArea: 0,
+        coverage: 0,
+        anchor: 0,
+        estimate: 0
+      };
+    }
+    const type = VEHICLE_GRAPHICS_TYPES[quoteSettings.type] || VEHICLE_GRAPHICS_TYPES.printed_panel;
+    const baseComplexity =
+      VEHICLE_GRAPHICS_COMPLEXITY[quoteSettings.curves]?.multiplier || VEHICLE_GRAPHICS_COMPLEXITY.flat.multiplier;
+    const complexity = baseComplexity + (quoteSettings.bonnet ? 0.2 : 0) + (quoteSettings.rear ? 0.2 : 0);
+    const materialSell = totalArea * type.rate;
+    const labourHours = totalArea * type.hoursPerM2 * complexity;
+    const labourSell = labourHours * VEHICLE_GRAPHICS_PRICING.labourRate * VEHICLE_GRAPHICS_PRICING.labourSellMultiplier;
+    const basePrice = materialSell + labourSell;
+    const vehicleArea =
+      (VAN_ESTIMATOR_TEMPLATE.viewBox.width *
+        VAN_ESTIMATOR_TEMPLATE.viewBox.height *
+        VAN_ESTIMATOR_TEMPLATE.scaleFactor *
+        VAN_ESTIMATOR_TEMPLATE.scaleFactor) /
+      1000000;
+    const coverage = vehicleArea > 0 ? totalArea / vehicleArea : 0;
+    const anchor = coverage < 0.15 ? 400 : coverage < 0.4 ? 900 : coverage < 0.7 ? 1500 : 2500;
+    let estimate = 0.65 * basePrice + 0.35 * anchor;
+    estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minPrice);
+    if (quoteSettings.type === "wrap") {
+      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minWrapPrice);
+    }
+    estimate = Math.round(estimate / 50) * 50;
 
     return {
       standardArea,
       wrapArea,
       totalArea,
-      billableStandardArea,
-      billableWrapArea,
-      billableTotalArea,
-      materialCost,
-      installCost,
+      quoteTypeLabel: type.label,
+      materialSell,
+      labourHours,
+      labourSell,
+      basePrice,
+      complexity,
+      vehicleArea,
+      coverage,
+      anchor,
       estimate
     };
-  }, [rates, shapes]);
+  }, [quoteSettings, shapes]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -3737,75 +3791,65 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <strong>{formatM2(totals.wrapArea)}</strong>
                 </div>
                 <div>
-                  <span>Billable with waste</span>
-                  <strong>{formatM2(totals.billableTotalArea)}</strong>
+                  <span>Total coverage</span>
+                  <strong>{formatM2(totals.totalArea)}</strong>
                 </div>
                 <div>
-                  <span>Shapes</span>
-                  <strong>{shapes.length}</strong>
+                  <span>Vehicle coverage</span>
+                  <strong>{Math.round(totals.coverage * 100)}%</strong>
                 </div>
               </div>
 
               <div className="vinyl-rate-grid">
                 <label>
-                  Standard vinyl £/m²
-                  <input
-                    type="number"
-                    min="0"
-                    value={rates.standardMaterial}
-                    onChange={(event) => updateRate("standardMaterial", event.target.value)}
-                  />
+                  Graphics type
+                  <select value={quoteSettings.type} onChange={(event) => updateQuoteSetting("type", event.target.value)}>
+                    {Object.entries(VEHICLE_GRAPHICS_TYPES).map(([value, option]) => (
+                      <option key={value} value={value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label>
-                  Wrap film £/m²
-                  <input
-                    type="number"
-                    min="0"
-                    value={rates.wrapMaterial}
-                    onChange={(event) => updateRate("wrapMaterial", event.target.value)}
-                  />
+                  Curves
+                  <select value={quoteSettings.curves} onChange={(event) => updateQuoteSetting("curves", event.target.value)}>
+                    {Object.entries(VEHICLE_GRAPHICS_COMPLEXITY).map(([value, option]) => (
+                      <option key={value} value={value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                <label>
-                  Install £/m²
+                <label className="vinyl-checkbox-field">
                   <input
-                    type="number"
-                    min="0"
-                    value={rates.install}
-                    onChange={(event) => updateRate("install", event.target.value)}
+                    type="checkbox"
+                    checked={quoteSettings.bonnet}
+                    onChange={(event) => updateQuoteSetting("bonnet", event.target.checked)}
                   />
+                  Bonnet
                 </label>
-                <label>
-                  Setup
+                <label className="vinyl-checkbox-field">
                   <input
-                    type="number"
-                    min="0"
-                    value={rates.setup}
-                    onChange={(event) => updateRate("setup", event.target.value)}
+                    type="checkbox"
+                    checked={quoteSettings.rear}
+                    onChange={(event) => updateQuoteSetting("rear", event.target.checked)}
                   />
-                </label>
-                <label>
-                  Waste %
-                  <input
-                    type="number"
-                    min="0"
-                    value={rates.wastePercent}
-                    onChange={(event) => updateRate("wastePercent", event.target.value)}
-                  />
+                  Rear
                 </label>
               </div>
-
               <div className="vinyl-breakdown">
                 <div>
                   <span>Material</span>
-                  <strong>{currencyFormatter.format(totals.materialCost)}</strong>
+                  <strong>{currencyFormatter.format(totals.materialSell)}</strong>
                 </div>
                 <div>
-                  <span>Install</span>
-                  <strong>{currencyFormatter.format(totals.installCost)}</strong>
+                  <span>Labour</span>
+                  <strong>{currencyFormatter.format(totals.labourSell)}</strong>
                 </div>
                 <div>
-                  <span>Setup</span>
-                  <strong>{currencyFormatter.format(rates.setup)}</strong>
+                  <span>Market anchor</span>
+                  <strong>{currencyFormatter.format(totals.anchor)}</strong>
                 </div>
               </div>
 
