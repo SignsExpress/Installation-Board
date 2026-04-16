@@ -4596,13 +4596,19 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const existingIndex = store.mileageClaims.findIndex(
       (claim) => String(claim.userId || "") === userId && String(claim.monthId || "") === monthId
     );
+    let savedClaim;
 
     if (existingIndex >= 0) {
-      nextClaim.id = store.mileageClaims[existingIndex].id || nextClaim.id;
-      nextClaim.createdAt = store.mileageClaims[existingIndex].createdAt || nextClaim.createdAt;
-      store.mileageClaims[existingIndex] = nextClaim;
+      const existingClaim = sanitizeMileageClaim(store.mileageClaims[existingIndex]);
+      savedClaim = sanitizeMileageClaim({
+        ...existingClaim,
+        lines: [...existingClaim.lines, ...nextClaim.lines],
+        submittedAt: new Date().toISOString()
+      });
+      store.mileageClaims[existingIndex] = savedClaim;
     } else {
-      store.mileageClaims.unshift(nextClaim);
+      savedClaim = nextClaim;
+      store.mileageClaims.unshift(savedClaim);
     }
 
     const usersStore = await readUsersStore();
@@ -4626,11 +4632,15 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const savedClaims = (savedStore.mileageClaims || [])
       .map((claim) => sanitizeMileageClaim(claim))
       .filter((claim) => String(claim.userId || "") === userId);
-    const savedClaim = savedClaims.find((claim) => String(claim.monthId || "") === monthId) || nextClaim;
     response.json({
       monthId,
       monthLabel: formatMileageMonthLabel(monthId),
-      claim: savedClaim,
+      claim: sanitizeMileageClaim({
+        userId,
+        userName: request.user?.displayName || "",
+        monthId,
+        lines: []
+      }),
       history: savedClaims.map((claim) => ({
         id: claim.id,
         monthId: claim.monthId,
