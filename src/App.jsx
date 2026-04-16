@@ -2420,21 +2420,24 @@ function AttendancePage({
                             </td>
                           );
                         }
-                        return (
-                          <>
-                            <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
-                              <input
-                                className="attendance-time-input"
-                                value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
-                                placeholder="--:--"
-                                onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
-                                onBlur={() => handleAttendanceBlur(cell)}
-                              />
-                            </td>
-                            <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
-                              <input
-                                className="attendance-time-input"
-                                value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
+                          return (
+                            <>
+                              <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
+                                <input
+                                  className="attendance-time-input"
+                                  value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
+                                  placeholder="--:--"
+                                  onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
+                                  onBlur={() => handleAttendanceBlur(cell)}
+                                />
+                                {cell.halfDayHolidayLabel ? (
+                                  <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                                ) : null}
+                              </td>
+                              <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
+                                <input
+                                  className="attendance-time-input"
+                                  value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                 placeholder="--:--"
                                 onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                 onBlur={() => handleAttendanceBlur(cell)}
@@ -2469,8 +2472,11 @@ function AttendancePage({
                             <span>{row.weekdayLabel}</span>
                           </div>
                           {cell.displayLabel ? <span className="attendance-self-status">{cell.displayLabel}</span> : null}
-                          {!cell.displayLabel && cell.hasMissingClock ? <span className="attendance-self-status missing">Missing clocking</span> : null}
-                        </div>
+                           {!cell.displayLabel && cell.hasMissingClock ? <span className="attendance-self-status missing">Missing clocking</span> : null}
+                           {!cell.displayLabel && cell.halfDayHolidayLabel ? (
+                             <span className="attendance-self-status holiday">{cell.halfDayHolidayLabel}</span>
+                           ) : null}
+                          </div>
                         {cell.displayLabel ? null : (
                           <div className="attendance-self-times">
                             <span>In: <strong>{cell.clockIn || "--:--"}</strong></span>

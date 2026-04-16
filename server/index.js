@@ -1696,6 +1696,11 @@ function getHolidayType(entry) {
   return String(entry?.type || "holiday").trim().toLowerCase();
 }
 
+function isHalfDayHoliday(entry) {
+  const duration = String(entry?.duration || "").trim().toLowerCase();
+  return duration === "morning" || duration === "afternoon";
+}
+
 function buildBaseHolidayAllowanceRows(store, yearStart = getCurrentHolidayYearStart(), holidayStaffList = HOLIDAY_STAFF) {
   return holidayStaffList.map((staffEntry) => {
     const existing = (store.holidayAllowances || []).find(
@@ -1981,10 +1986,19 @@ function getAttendanceDisplayLabel(entry, bankHolidayLabel) {
     if (type === "birthday") return "Birthday";
     if (type === "unpaid" || type === "unpaid-holiday" || type === "unpaid holiday") return "Unpaid holiday";
     if (type === "absence" || type === "absent") return "Absence";
+    if (isHalfDayHoliday(entry)) return "";
     return "Holiday";
   }
   if (bankHolidayLabel) return bankHolidayLabel;
   return "";
+}
+
+function getAttendanceHalfDayLabel(entry) {
+  if (!entry || !isHalfDayHoliday(entry)) return "";
+  const type = getHolidayType(entry);
+  if (type === "birthday") return "";
+  const duration = String(entry.duration || "").trim();
+  return `${duration} holiday`;
 }
 
 function getWeekdayKeyFromIso(isoDate) {
@@ -2122,6 +2136,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         const weekdayKey = getWeekdayKeyFromIso(isoDate);
         const contractedHours = attendanceProfile.contractedHours?.[weekdayKey] || { in: "", out: "", off: false };
         let displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
+        const halfDayHolidayLabel = getAttendanceHalfDayLabel(holidayEntry);
         const isWorkingDay = !displayLabel && !isWeekend;
         const isContractedOff = Boolean(contractedHours.off) && isWorkingDay;
         const usesContractedHours =
@@ -2147,6 +2162,7 @@ async function getAttendancePayload(forUser, monthId = "") {
           fullName: staffEntry.fullName || staffEntry.name || staffEntry.person,
           attendanceMode,
           displayLabel: displayLabel || (isWeekend ? "Weekend" : ""),
+          halfDayHolidayLabel,
           isHoliday: Boolean(displayLabel),
           isWeekend,
           isWorkingDay,

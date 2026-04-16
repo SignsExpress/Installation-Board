@@ -2466,6 +2466,19 @@ button {
   border-color: var(--sx-main);
 }
 
+.attendance-half-day-chip {
+  display: inline-block;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: rgba(220, 252, 231, 0.95);
+  color: #166534;
+  padding: 2px 6px;
+  font-size: 0.54rem;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
 .attendance-cell-missing {
   background: rgba(244, 114, 182, 0.18);
 }
@@ -2586,6 +2599,11 @@ button {
 .attendance-self-status.missing {
   background: rgba(244, 114, 182, 0.18);
   color: #be185d;
+}
+
+.attendance-self-status.holiday {
+  background: rgba(220, 252, 231, 0.9);
+  color: #166534;
 }
 
 .attendance-self-times {
