@@ -952,6 +952,13 @@ button {
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
+.vinyl-pricing-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .vinyl-classification-note {
   display: grid;
   gap: 5px;
