@@ -106,9 +106,9 @@ const VEHICLE_GRAPHICS_PRICING = {
   wrapFilmRate: 110,
   labourSellRate: 160,
   standardLargeHoursPerM2: 0.8,
-  standardSmallDefaultHours: 2,
-  standardSmallMinHours: 1.5,
-  standardSmallMaxHours: 2.5,
+  standardSmallHoursPerM2: 0.75,
+  standardSmallMinHours: 1,
+  standardSmallMaxHours: 2,
   partialWrapFlatHoursPerM2: 1.4,
   partialWrapCurvedHoursPerM2: 1.6,
   partialWrapComplexHoursPerM2: 1.8,
@@ -3613,7 +3613,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         ? 0
         : coverage < 0.15
           ? clampNumber(
-              VEHICLE_GRAPHICS_PRICING.standardSmallDefaultHours * standardComplexity,
+              standardArea * VEHICLE_GRAPHICS_PRICING.standardSmallHoursPerM2 * standardComplexity,
               VEHICLE_GRAPHICS_PRICING.standardSmallMinHours,
               VEHICLE_GRAPHICS_PRICING.standardSmallMaxHours
             )
