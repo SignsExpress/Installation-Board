@@ -709,6 +709,8 @@ function getPermissionForApp(user, key) {
       ? user?.role === "host"
         ? "admin"
         : "user"
+      : key === "vanEstimator"
+        ? "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -767,7 +769,8 @@ function canEditMileage(user) {
 }
 
 function canAccessVanEstimator(user) {
-  return Boolean(user?.canManagePermissions);
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "vanEstimator") !== "none";
 }
 
 function usesHostShell(user) {
@@ -968,15 +971,15 @@ function MainNavBar({
                 <span className="host-nav-link-label">Mileage</span>
               </button>
             ) : null}
-            {vanEstimatorAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "van-estimator" ? "active" : ""}`}
-                onClick={() => goTo(vanEstimatorPath)}
-              >
-                <span className="host-nav-link-label">Vinyl Estimator</span>
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className={`host-nav-link ${active === "van-estimator" ? "active" : ""} ${vanEstimatorAllowed ? "" : "disabled"}`}
+              disabled={!vanEstimatorAllowed}
+              onClick={() => goTo(vanEstimatorPath)}
+              title={vanEstimatorAllowed ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+            >
+              <span className="host-nav-link-label">Vinyl Estimator</span>
+            </button>
             {installerAllowed ? (
               <button
                 type="button"
@@ -1089,6 +1092,7 @@ function PermissionsPanel({
             const installerPermission = getPermissionForApp(user, "installer");
             const attendancePermission = getPermissionForApp(user, "attendance");
             const mileagePermission = getPermissionForApp(user, "mileage");
+            const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -1187,6 +1191,23 @@ function PermissionsPanel({
                             className={`permission-chip ${mileagePermission === option.value ? "active" : ""}`}
                             disabled={isSelf || savingKey === `${user.id}:mileage`}
                             onClick={() => onChangePermission(user.id, "mileage", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Vinyl Estimator</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-vanEstimator-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${vanEstimatorPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
+                            onClick={() => onChangePermission(user.id, "vanEstimator", option.value)}
                           >
                             {option.label}
                           </button>
@@ -1538,11 +1559,16 @@ function HostLandingPage({
                 <strong>Mileage</strong>
               </button>
             ) : null}
-            {canAccessVanEstimator(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/van-estimator")}>
-                <strong>Vinyl Estimator</strong>
-              </button>
-            ) : null}
+            <button
+              className={`host-launch-card ${canAccessVanEstimator(currentUser) ? "" : "disabled"}`}
+              type="button"
+              disabled={!canAccessVanEstimator(currentUser)}
+              onClick={() => goTo("/van-estimator")}
+              title={canAccessVanEstimator(currentUser) ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+            >
+              <strong>Vinyl Estimator</strong>
+              {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
+            </button>
             {canAccessInstaller(currentUser) ? (
               <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
                 <strong>Subcontractor Database</strong>
@@ -1628,6 +1654,16 @@ function ClientLandingPage({
                 <strong>Mileage</strong>
               </button>
             ) : null}
+            <button
+              className={`host-launch-card ${canAccessVanEstimator(currentUser) ? "" : "disabled"}`}
+              type="button"
+              disabled={!canAccessVanEstimator(currentUser)}
+              onClick={() => goTo("/van-estimator")}
+              title={canAccessVanEstimator(currentUser) ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+            >
+              <strong>Vinyl Estimator</strong>
+              {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
+            </button>
             {canAccessInstaller(currentUser) ? (
               <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
                 <strong>Subcontractor Directory</strong>
@@ -3621,7 +3657,7 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -4159,6 +4195,7 @@ export default function App() {
       holidays: getPermissionForApp(targetUser, "holidays"),
       attendance: getPermissionForApp(targetUser, "attendance"),
       mileage: getPermissionForApp(targetUser, "mileage"),
+      vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
       [appKey]: value
     };
 

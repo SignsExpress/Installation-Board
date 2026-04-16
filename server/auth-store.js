@@ -41,7 +41,8 @@ function getDefaultPermissions(role) {
       installer: "admin",
       holidays: "admin",
       attendance: "admin",
-      mileage: "admin"
+      mileage: "admin",
+      vanEstimator: "none"
     };
   }
 
@@ -50,7 +51,8 @@ function getDefaultPermissions(role) {
     installer: "none",
     holidays: "user",
     attendance: "user",
-    mileage: "user"
+    mileage: "user",
+    vanEstimator: "none"
   };
 }
 
@@ -105,7 +107,8 @@ function normalizePermissions(permissions, role) {
     installer: normalizePermissionValue(permissions?.installer, defaults.installer),
     holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
     attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
-    mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage)
+    mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage),
+    vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator)
   };
 }
 
@@ -122,7 +125,8 @@ function applyOwnerPermissions(user) {
       installer: "admin",
       holidays: "admin",
       attendance: "admin",
-      mileage: "admin"
+      mileage: "admin",
+      vanEstimator: "admin"
     }
   };
 }
@@ -133,7 +137,8 @@ function deriveRoleFromPermissions(permissions) {
     permissions?.installer === "none" &&
     permissions?.holidays === "user" &&
     permissions?.attendance === "user" &&
-    permissions?.mileage === "user"
+    permissions?.mileage === "user" &&
+    permissions?.vanEstimator === "none"
   ) {
     return "client";
   }
@@ -181,7 +186,8 @@ function normalizeStore(parsed, options = {}) {
         installer: "admin",
         holidays: "admin",
         attendance: "admin",
-        mileage: "admin"
+        mileage: "admin",
+        vanEstimator: "admin"
       };
     }
   }
@@ -355,7 +361,8 @@ async function updateUserPermissions(userId, permissions) {
         installer: "admin",
         holidays: "admin",
         attendance: "admin",
-        mileage: "admin"
+        mileage: "admin",
+        vanEstimator: "admin"
       };
     }
   await writeUsersStore(store);

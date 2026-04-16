@@ -3419,7 +3419,7 @@ button {
   color: #475569;
 }
 
-.host-launch-card:hover {
+.host-launch-card:hover:not(:disabled) {
   border-color: #b39ac1;
   background: linear-gradient(180deg, #ffffff 0%, #efe8f3 100%);
 }
@@ -3429,6 +3429,20 @@ button {
   border-color: #dbe2ea;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.host-launch-status {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .notifications-shell {
