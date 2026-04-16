@@ -93,7 +93,8 @@ const ATTENDANCE_WEEKDAYS = [
 const VAN_ESTIMATOR_TEMPLATE = {
   name: "Ford Transit Custom SWB",
   src: "/vans/ford-transit-custom-swb.svg",
-  scaleFactor: 10,
+  scaleFactor: 3.53,
+  scaleReference: "Calibrated from 686mm outer tyre",
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
 
@@ -3078,7 +3079,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [rates, setRates] = useState(DEFAULT_VAN_ESTIMATE_RATES);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
-  const wrapBoxesRef = useRef([]);
+  const wrapLinesRef = useRef([]);
 
   useEffect(() => {
     let active = true;
@@ -3113,27 +3114,43 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
     const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
     if (!wrapLayer) {
-      wrapBoxesRef.current = [];
+      wrapLinesRef.current = [];
       return;
     }
 
-    wrapBoxesRef.current = Array.from(
-      wrapLayer.querySelectorAll("path,line,polyline,polygon,rect,circle,ellipse")
-    )
+    wrapLinesRef.current = Array.from(wrapLayer.querySelectorAll("path,line,polyline,polygon"))
+      .filter((element) => {
+        const styles = window.getComputedStyle(element);
+        const fill = styles.fill || element.getAttribute("fill") || "";
+        const stroke = styles.stroke || element.getAttribute("stroke") || "";
+        return fill === "none" && stroke !== "none";
+      })
       .map((element) => {
         try {
           const box = element.getBBox();
+          const length = typeof element.getTotalLength === "function" ? element.getTotalLength() : 0;
+          const sampleCount = Math.max(2, Math.ceil(length / 8));
+          const points =
+            length > 0
+              ? Array.from({ length: sampleCount + 1 }, (_, index) => {
+                  const point = element.getPointAtLength((length * index) / sampleCount);
+                  return { x: point.x, y: point.y };
+                })
+              : [];
           return {
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height
+            box: {
+              x: box.x,
+              y: box.y,
+              width: box.width,
+              height: box.height
+            },
+            points
           };
         } catch (error) {
           return null;
         }
       })
-      .filter(Boolean);
+      .filter((line) => line?.points?.length);
   }, [svgMarkup]);
 
   function getPointerPoint(event) {
@@ -3165,7 +3182,18 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function isWrapFilmRect(rect) {
-    return wrapBoxesRef.current.some((box) => rectsIntersect(rect, box));
+    const detectionPadding = 2;
+    const expandedRect = {
+      x: rect.x - detectionPadding,
+      y: rect.y - detectionPadding,
+      width: rect.width + detectionPadding * 2,
+      height: rect.height + detectionPadding * 2
+    };
+
+    return wrapLinesRef.current.some((line) => {
+      if (!rectsIntersect(expandedRect, line.box)) return false;
+      return line.points.some((point) => point.x >= expandedRect.x && point.x <= expandedRect.x + expandedRect.width && point.y >= expandedRect.y && point.y <= expandedRect.y + expandedRect.height);
+    });
   }
 
   function getRectAreaM2(rect) {
@@ -3289,7 +3317,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             </div>
             <div className="vinyl-estimator-template">
               <span>{VAN_ESTIMATOR_TEMPLATE.name}</span>
-              <strong>10% scale drawing, calculated at full size</strong>
+              <strong>{VAN_ESTIMATOR_TEMPLATE.scaleReference}</strong>
             </div>
           </div>
 
