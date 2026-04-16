@@ -3208,6 +3208,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [shapes, setShapes] = useState([]);
   const [pricingSettings, setPricingSettings] = useState(getStoredVehiclePricingSettings);
   const [pricingDraftSettings, setPricingDraftSettings] = useState(() => getStoredVehiclePricingSettings());
+  const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [drawingRect, setDrawingRect] = useState(null);
@@ -3953,7 +3954,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   const totals = useMemo(() => {
-    const settings = pricingSettings;
+    const settings = pricingSettingsOpen ? pricingDraftSettings : pricingSettings;
     const classifiedShapes = shapes.map((shape) => {
       const zoneMetadata =
         shape.zoneMetadata ||
@@ -4072,7 +4073,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       packageType: packageResult.packageType,
       estimate
     };
-  }, [pricingSettings, shapes, vehicleClipPathsD.length]);
+  }, [pricingDraftSettings, pricingSettings, pricingSettingsOpen, shapes, vehicleClipPathsD.length]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -4143,6 +4144,12 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function resetPricingDraft() {
+    setPricingDraftSettings(pricingSettings);
+  }
+
+  function handlePricingSettingsToggle(event) {
+    const isOpen = event.currentTarget.open;
+    setPricingSettingsOpen(isOpen);
     setPricingDraftSettings(pricingSettings);
   }
 
@@ -4433,7 +4440,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               </div>
 
               {currentUser?.canManagePermissions ? (
-                <details className="vinyl-pricing-settings" onToggle={(event) => resetPricingDraft()}>
+                <details className="vinyl-pricing-settings" onToggle={handlePricingSettingsToggle}>
                   <summary>Pricing settings</summary>
                   <div className="vinyl-pricing-grid">
                     {renderPricingNumber("Standard vinyl rate", ["standardVinylRate"])}
