@@ -90,6 +90,21 @@ const ATTENDANCE_WEEKDAYS = [
   ["friday", "Fri"]
 ];
 
+const VAN_ESTIMATOR_TEMPLATE = {
+  name: "Ford Transit Custom SWB",
+  src: "/vans/ford-transit-custom-swb.svg",
+  scaleFactor: 10,
+  viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
+};
+
+const DEFAULT_VAN_ESTIMATE_RATES = {
+  standardMaterial: 45,
+  wrapMaterial: 85,
+  install: 95,
+  setup: 75,
+  wastePercent: 15
+};
+
 function getLocalTodayIso() {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/London",
@@ -750,10 +765,14 @@ function canEditMileage(user) {
   return getPermissionForApp(user, "mileage") === "admin";
 }
 
+function canAccessVanEstimator(user) {
+  return Boolean(user?.canManagePermissions);
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || user.canManagePermissions)
   );
 }
 
@@ -801,6 +820,14 @@ function MileageIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6.5 5a3.5 3.5 0 0 0-3.5 3.5c0 2.5 3.5 6.5 3.5 6.5S10 11 10 8.5A3.5 3.5 0 0 0 6.5 5Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM17.5 3A3.5 3.5 0 0 0 14 6.5c0 2.5 3.5 6.5 3.5 6.5S21 9 21 6.5A3.5 3.5 0 0 0 17.5 3Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM7 18h11a1 1 0 1 1 0 2H7a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2Zm10-2a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2h1v2Z" />
+    </svg>
+  );
+}
+
+function VanEstimatorIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.5 8.5 6.2 5h8.9a2 2 0 0 1 1.7.94l1.58 2.56H20a1 1 0 0 1 1 1v5.25a1.25 1.25 0 0 1-1.25 1.25h-.85a2.5 2.5 0 0 1-4.8 0H9.9a2.5 2.5 0 0 1-4.8 0h-.85A1.25 1.25 0 0 1 3 14.75V10a1.5 1.5 0 0 1 1.5-1.5Zm3-1.5-.75 1.5h4.75V7Zm6 0v1.5h2.55L15.11 7Zm-6 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
     </svg>
   );
 }
@@ -877,12 +904,14 @@ function MainNavBar({
   const attendanceAllowed = canAccessAttendance(currentUser);
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
+  const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
   const attendancePath = "/attendance";
   const holidaysPath = "/holidays";
   const mileagePath = "/mileage";
+  const vanEstimatorPath = "/van-estimator";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -936,6 +965,15 @@ function MainNavBar({
                 onClick={() => goTo(mileagePath)}
               >
                 <span className="host-nav-link-label">Mileage</span>
+              </button>
+            ) : null}
+            {vanEstimatorAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "van-estimator" ? "active" : ""}`}
+                onClick={() => goTo(vanEstimatorPath)}
+              >
+                <span className="host-nav-link-label">Vinyl Estimator</span>
               </button>
             ) : null}
             {installerAllowed ? (
@@ -1497,6 +1535,11 @@ function HostLandingPage({
             {canAccessMileage(currentUser) ? (
               <button className="host-launch-card" type="button" onClick={() => goTo("/mileage")}>
                 <strong>Mileage</strong>
+              </button>
+            ) : null}
+            {canAccessVanEstimator(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/van-estimator")}>
+                <strong>Vinyl Estimator</strong>
               </button>
             ) : null}
             {canAccessInstaller(currentUser) ? (
@@ -3026,6 +3069,422 @@ function AttendancePage({
   );
 }
 
+function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
+  const [svgMarkup, setSvgMarkup] = useState("");
+  const [svgError, setSvgError] = useState("");
+  const [shapes, setShapes] = useState([]);
+  const [drawingRect, setDrawingRect] = useState(null);
+  const [drawStart, setDrawStart] = useState(null);
+  const [rates, setRates] = useState(DEFAULT_VAN_ESTIMATE_RATES);
+  const inlineSvgRef = useRef(null);
+  const overlaySvgRef = useRef(null);
+  const wrapBoxesRef = useRef([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch(VAN_ESTIMATOR_TEMPLATE.src)
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load the van SVG.");
+        return response.text();
+      })
+      .then((text) => {
+        if (!active) return;
+        setSvgMarkup(text);
+        setSvgError("");
+      })
+      .catch((error) => {
+        console.error(error);
+        if (active) setSvgError(error.message || "Could not load the van SVG.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!svgMarkup || !inlineSvgRef.current) return;
+    const svg = inlineSvgRef.current.querySelector("svg");
+    if (svg) {
+      svg.setAttribute("width", "100%");
+      svg.removeAttribute("height");
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      svg.classList.add("van-template-svg");
+    }
+
+    const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
+    if (!wrapLayer) {
+      wrapBoxesRef.current = [];
+      return;
+    }
+
+    wrapBoxesRef.current = Array.from(
+      wrapLayer.querySelectorAll("path,line,polyline,polygon,rect,circle,ellipse")
+    )
+      .map((element) => {
+        try {
+          const box = element.getBBox();
+          return {
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height
+          };
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  }, [svgMarkup]);
+
+  function getPointerPoint(event) {
+    const svg = overlaySvgRef.current;
+    if (!svg) return null;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const matrix = svg.getScreenCTM();
+    if (!matrix) return null;
+    return point.matrixTransform(matrix.inverse());
+  }
+
+  function normalizeRect(start, end) {
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    return { x, y, width, height };
+  }
+
+  function rectsIntersect(left, right) {
+    return (
+      left.x < right.x + right.width &&
+      left.x + left.width > right.x &&
+      left.y < right.y + right.height &&
+      left.y + left.height > right.y
+    );
+  }
+
+  function isWrapFilmRect(rect) {
+    return wrapBoxesRef.current.some((box) => rectsIntersect(rect, box));
+  }
+
+  function getRectAreaM2(rect) {
+    const widthMm = rect.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    const heightMm = rect.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    return (widthMm / 1000) * (heightMm / 1000);
+  }
+
+  function startDrawing(event) {
+    if (event.button !== 0) return;
+    const point = getPointerPoint(event);
+    if (!point) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDrawStart(point);
+    setDrawingRect({ x: point.x, y: point.y, width: 0, height: 0 });
+  }
+
+  function updateDrawing(event) {
+    if (!drawStart) return;
+    const point = getPointerPoint(event);
+    if (!point) return;
+    setDrawingRect(normalizeRect(drawStart, point));
+  }
+
+  function finishDrawing(event) {
+    if (!drawStart || !drawingRect) return;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch (error) {
+      // Pointer capture may already be released if the pointer leaves the browser chrome.
+    }
+
+    const rect = {
+      ...drawingRect,
+      id: `vinyl-${Date.now()}-${Math.round(drawingRect.x)}-${Math.round(drawingRect.y)}`
+    };
+    setDrawStart(null);
+    setDrawingRect(null);
+    if (rect.width < 4 || rect.height < 4) return;
+
+    const isWrapFilm = isWrapFilmRect(rect);
+    const areaM2 = getRectAreaM2(rect);
+    setShapes((current) => [
+      ...current,
+      {
+        ...rect,
+        isWrapFilm,
+        areaM2
+      }
+    ]);
+  }
+
+  function updateRate(key, value) {
+    const numeric = Math.max(0, Number(value) || 0);
+    setRates((current) => ({ ...current, [key]: numeric }));
+  }
+
+  const totals = useMemo(() => {
+    const standardArea = shapes
+      .filter((shape) => !shape.isWrapFilm)
+      .reduce((sum, shape) => sum + shape.areaM2, 0);
+    const wrapArea = shapes
+      .filter((shape) => shape.isWrapFilm)
+      .reduce((sum, shape) => sum + shape.areaM2, 0);
+    const totalArea = standardArea + wrapArea;
+    const wasteMultiplier = 1 + (Number(rates.wastePercent) || 0) / 100;
+    const billableStandardArea = standardArea * wasteMultiplier;
+    const billableWrapArea = wrapArea * wasteMultiplier;
+    const billableTotalArea = billableStandardArea + billableWrapArea;
+    const materialCost =
+      billableStandardArea * (Number(rates.standardMaterial) || 0) +
+      billableWrapArea * (Number(rates.wrapMaterial) || 0);
+    const installCost = billableTotalArea * (Number(rates.install) || 0);
+    const estimate = materialCost + installCost + (Number(rates.setup) || 0);
+
+    return {
+      standardArea,
+      wrapArea,
+      totalArea,
+      billableStandardArea,
+      billableWrapArea,
+      billableTotalArea,
+      materialCost,
+      installCost,
+      estimate
+    };
+  }, [rates, shapes]);
+
+  const currencyFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: "GBP",
+        maximumFractionDigits: 0
+      }),
+    []
+  );
+
+  function formatM2(value) {
+    return `${(Number(value) || 0).toFixed(2)}m²`;
+  }
+
+  return (
+    <div className="app-shell">
+      <div className="page vinyl-estimator-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="van-estimator"
+          onLogout={onLogout}
+          notifications={notifications}
+        />
+
+        <section className="panel vinyl-estimator-panel">
+          <div className="vinyl-estimator-head">
+            <div>
+              <span className="eyebrow">Vehicle vinyl</span>
+              <h2>Vinyl Estimator</h2>
+              <p>
+                Draw boxes on the van. Anything crossing a wrap-film line is counted as wrap film.
+              </p>
+            </div>
+            <div className="vinyl-estimator-template">
+              <span>{VAN_ESTIMATOR_TEMPLATE.name}</span>
+              <strong>10% scale drawing, calculated at full size</strong>
+            </div>
+          </div>
+
+          <div className="vinyl-estimator-grid">
+            <div className="vinyl-canvas-card">
+              {svgError ? <div className="flash error">{svgError}</div> : null}
+              <div className="vinyl-canvas">
+                <div
+                  ref={inlineSvgRef}
+                  className="vinyl-template"
+                  dangerouslySetInnerHTML={{ __html: svgMarkup }}
+                />
+                <svg
+                  ref={overlaySvgRef}
+                  className="vinyl-drawing-layer"
+                  viewBox={`${VAN_ESTIMATOR_TEMPLATE.viewBox.x} ${VAN_ESTIMATOR_TEMPLATE.viewBox.y} ${VAN_ESTIMATOR_TEMPLATE.viewBox.width} ${VAN_ESTIMATOR_TEMPLATE.viewBox.height}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  onPointerDown={startDrawing}
+                  onPointerMove={updateDrawing}
+                  onPointerUp={finishDrawing}
+                  onPointerCancel={() => {
+                    setDrawStart(null);
+                    setDrawingRect(null);
+                  }}
+                >
+                  {shapes.map((shape, index) => (
+                    <g key={shape.id}>
+                      <rect
+                        x={shape.x}
+                        y={shape.y}
+                        width={shape.width}
+                        height={shape.height}
+                        className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                      />
+                      <text x={shape.x + 10} y={shape.y + 24} className="vinyl-shape-label">
+                        {index + 1}
+                      </text>
+                    </g>
+                  ))}
+                  {drawingRect ? (
+                    <rect
+                      x={drawingRect.x}
+                      y={drawingRect.y}
+                      width={drawingRect.width}
+                      height={drawingRect.height}
+                      className="vinyl-shape drawing"
+                    />
+                  ) : null}
+                </svg>
+              </div>
+              <div className="vinyl-canvas-actions">
+                <span>Tip: drag from top-left to bottom-right over the panel you want to cover.</span>
+                <div>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    disabled={!shapes.length}
+                    onClick={() => setShapes((current) => current.slice(0, -1))}
+                  >
+                    Undo last
+                  </button>
+                  <button
+                    className="danger-button"
+                    type="button"
+                    disabled={!shapes.length}
+                    onClick={() => setShapes([])}
+                  >
+                    Clear all
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <aside className="vinyl-estimate-card">
+              <div className="vinyl-total-hero">
+                <span>Estimated supply & install</span>
+                <strong>{currencyFormatter.format(totals.estimate)}</strong>
+              </div>
+
+              <div className="vinyl-stats-grid">
+                <div>
+                  <span>Standard vinyl</span>
+                  <strong>{formatM2(totals.standardArea)}</strong>
+                </div>
+                <div className="wrap">
+                  <span>Wrap film</span>
+                  <strong>{formatM2(totals.wrapArea)}</strong>
+                </div>
+                <div>
+                  <span>Billable with waste</span>
+                  <strong>{formatM2(totals.billableTotalArea)}</strong>
+                </div>
+                <div>
+                  <span>Shapes</span>
+                  <strong>{shapes.length}</strong>
+                </div>
+              </div>
+
+              <div className="vinyl-rate-grid">
+                <label>
+                  Standard vinyl £/m²
+                  <input
+                    type="number"
+                    min="0"
+                    value={rates.standardMaterial}
+                    onChange={(event) => updateRate("standardMaterial", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Wrap film £/m²
+                  <input
+                    type="number"
+                    min="0"
+                    value={rates.wrapMaterial}
+                    onChange={(event) => updateRate("wrapMaterial", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Install £/m²
+                  <input
+                    type="number"
+                    min="0"
+                    value={rates.install}
+                    onChange={(event) => updateRate("install", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Setup
+                  <input
+                    type="number"
+                    min="0"
+                    value={rates.setup}
+                    onChange={(event) => updateRate("setup", event.target.value)}
+                  />
+                </label>
+                <label>
+                  Waste %
+                  <input
+                    type="number"
+                    min="0"
+                    value={rates.wastePercent}
+                    onChange={(event) => updateRate("wastePercent", event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="vinyl-breakdown">
+                <div>
+                  <span>Material</span>
+                  <strong>{currencyFormatter.format(totals.materialCost)}</strong>
+                </div>
+                <div>
+                  <span>Install</span>
+                  <strong>{currencyFormatter.format(totals.installCost)}</strong>
+                </div>
+                <div>
+                  <span>Setup</span>
+                  <strong>{currencyFormatter.format(rates.setup)}</strong>
+                </div>
+              </div>
+
+              <div className="vinyl-shape-list">
+                <h3>Drawn areas</h3>
+                {shapes.length ? (
+                  shapes.map((shape, index) => (
+                    <div key={`shape-row-${shape.id}`} className="vinyl-shape-row">
+                      <span>{index + 1}</span>
+                      <div>
+                        <strong>{shape.isWrapFilm ? "Wrap film" : "Standard vinyl"}</strong>
+                        <small>
+                          {formatM2(shape.areaM2)} · {(shape.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm x{" "}
+                          {(shape.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm
+                        </small>
+                      </div>
+                      <button
+                        className="text-button danger"
+                        type="button"
+                        onClick={() => setShapes((current) => current.filter((entry) => entry.id !== shape.id))}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted">No vinyl areas drawn yet.</p>
+                )}
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
@@ -3035,6 +3494,7 @@ export default function App() {
   const isAttendanceRoute = pathname.startsWith("/attendance");
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
+  const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
@@ -3119,14 +3579,15 @@ export default function App() {
   const showAttendance = Boolean(currentUser && canAccessAttendance(currentUser) && isAttendanceRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
+  const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -3422,6 +3883,11 @@ export default function App() {
       return;
     }
 
+    if (isVanEstimatorRoute && !canAccessVanEstimator(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isNotificationsRoute && !currentUser) {
       window.location.replace("/");
       return;
@@ -3442,7 +3908,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -3450,7 +3916,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -5101,6 +5567,16 @@ export default function App() {
         onLogout={handleLogout}
         notifications={notifications}
         onRefreshNotifications={refreshNotifications}
+      />
+    );
+  }
+
+  if (showVanEstimator) {
+    return (
+      <VinylEstimatorPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
       />
     );
   }

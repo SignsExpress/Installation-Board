@@ -554,6 +554,277 @@ button {
   font-size: 0.92rem;
 }
 
+.vinyl-estimator-page {
+  max-width: 1500px;
+}
+
+.vinyl-estimator-panel {
+  padding: 28px;
+}
+
+.vinyl-estimator-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.vinyl-estimator-head h2,
+.vinyl-estimator-head p {
+  margin: 0;
+}
+
+.vinyl-estimator-head p {
+  margin-top: 6px;
+  color: var(--sx-slate-soft);
+  max-width: 680px;
+}
+
+.vinyl-estimator-template {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 18px;
+  padding: 12px 16px;
+  background: rgba(248, 250, 252, 0.92);
+  display: grid;
+  gap: 4px;
+  min-width: 240px;
+  text-align: right;
+}
+
+.vinyl-estimator-template span {
+  color: var(--sx-slate-soft);
+  font-weight: 800;
+}
+
+.vinyl-estimator-template strong {
+  color: #0f172a;
+  font-size: 0.9rem;
+}
+
+.vinyl-estimator-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 18px;
+  align-items: start;
+}
+
+.vinyl-canvas-card,
+.vinyl-estimate-card {
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 24px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.07);
+}
+
+.vinyl-canvas {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.75)),
+    #fff;
+  min-height: 520px;
+}
+
+.vinyl-template,
+.vinyl-template svg,
+.van-template-svg,
+.vinyl-drawing-layer {
+  display: block;
+  width: 100%;
+}
+
+.van-template-svg {
+  height: auto;
+  min-height: 520px;
+}
+
+.vinyl-template svg {
+  pointer-events: none;
+}
+
+.vinyl-drawing-layer {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.vinyl-shape {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 3;
+  rx: 10;
+}
+
+.vinyl-shape.standard {
+  fill: rgba(14, 165, 233, 0.18);
+  stroke: #0284c7;
+}
+
+.vinyl-shape.wrap {
+  fill: rgba(249, 115, 22, 0.22);
+  stroke: #ea580c;
+}
+
+.vinyl-shape.drawing {
+  fill: rgba(104, 62, 132, 0.14);
+  stroke: var(--sx-main);
+  stroke-dasharray: 12 8;
+}
+
+.vinyl-shape-label {
+  fill: #0f172a;
+  font-size: 22px;
+  font-weight: 900;
+  pointer-events: none;
+}
+
+.vinyl-canvas-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--sx-slate-soft);
+  font-weight: 700;
+}
+
+.vinyl-canvas-actions > div {
+  display: flex;
+  gap: 8px;
+}
+
+.vinyl-estimate-card {
+  display: grid;
+  gap: 16px;
+  position: sticky;
+  top: 94px;
+}
+
+.vinyl-total-hero {
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(135deg, #0f172a, #683e84);
+  color: #fff;
+  display: grid;
+  gap: 4px;
+}
+
+.vinyl-total-hero span,
+.vinyl-stats-grid span,
+.vinyl-breakdown span {
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vinyl-total-hero strong {
+  font-size: 2rem;
+}
+
+.vinyl-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vinyl-stats-grid > div,
+.vinyl-breakdown > div {
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  border-radius: 16px;
+  padding: 12px;
+  display: grid;
+  gap: 5px;
+  background: rgba(248, 250, 252, 0.85);
+}
+
+.vinyl-stats-grid .wrap {
+  border-color: rgba(249, 115, 22, 0.32);
+  background: rgba(255, 237, 213, 0.55);
+}
+
+.vinyl-stats-grid strong,
+.vinyl-breakdown strong {
+  color: #0f172a;
+  font-size: 1.12rem;
+}
+
+.vinyl-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.vinyl-rate-grid label {
+  display: grid;
+  gap: 6px;
+  color: var(--sx-slate);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.vinyl-rate-grid input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 13px;
+  padding: 10px 12px;
+  color: #0f172a;
+  background: #fff;
+}
+
+.vinyl-breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vinyl-shape-list {
+  display: grid;
+  gap: 8px;
+}
+
+.vinyl-shape-list h3 {
+  margin: 0;
+}
+
+.vinyl-shape-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.vinyl-shape-row > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sx-main-soft);
+  color: var(--sx-main);
+  font-weight: 900;
+}
+
+.vinyl-shape-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vinyl-shape-row small {
+  color: var(--sx-slate-soft);
+  font-weight: 700;
+}
+
 .host-nav-link-label {
   font-size: 0.95rem;
   line-height: 1;
@@ -4973,6 +5244,48 @@ button {
 
   .mileage-admin-user-head > strong,
   .mileage-admin-journey > strong {
+    justify-self: start;
+  }
+
+  .vinyl-estimator-panel {
+    padding: 18px;
+  }
+
+  .vinyl-estimator-head,
+  .vinyl-canvas-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vinyl-estimator-template {
+    text-align: left;
+    min-width: 0;
+  }
+
+  .vinyl-estimator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vinyl-estimate-card {
+    position: static;
+  }
+
+  .van-template-svg {
+    min-height: 260px;
+  }
+
+  .vinyl-stats-grid,
+  .vinyl-rate-grid,
+  .vinyl-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .vinyl-shape-row {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .vinyl-shape-row button {
+    grid-column: 2;
     justify-self: start;
   }
 }
