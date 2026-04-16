@@ -102,32 +102,25 @@ const VAN_ESTIMATOR_TEMPLATE = {
 };
 
 const VEHICLE_GRAPHICS_PRICING = {
-  cutVinylRate: 45,
-  printedVinylRate: 85,
+  standardVinylRate: 85,
   wrapFilmRate: 110,
-  labourRate: 65,
-  labourSellMultiplier: 2.5,
+  labourSellRate: 160,
+  standardLargeHoursPerM2: 0.8,
+  standardSmallDefaultHours: 2,
+  standardSmallMinHours: 1.5,
+  standardSmallMaxHours: 2.5,
+  wrapFlatHoursPerM2: 2,
+  wrapCurvedHoursPerM2: 2.25,
+  wrapComplexHoursPerM2: 2.5,
   minPrice: 250,
-  minWrapPrice: 1800
+  minAnyWrapPrice: 600,
+  minWrapLedPartialPrice: 900,
+  minFullWrapPrice: 1800
 };
 
-const VEHICLE_GRAPHICS_TYPES = {
-  cut_vinyl: { label: "Cut vinyl", rate: VEHICLE_GRAPHICS_PRICING.cutVinylRate, hoursPerM2: 0.75 },
-  printed_panel: { label: "Printed panel", rate: VEHICLE_GRAPHICS_PRICING.printedVinylRate, hoursPerM2: 1.25 },
-  wrap: { label: "Wrap", rate: VEHICLE_GRAPHICS_PRICING.wrapFilmRate, hoursPerM2: 2.25 }
-};
-
-const VEHICLE_GRAPHICS_COMPLEXITY = {
-  flat: { label: "Flat", multiplier: 1 },
-  light: { label: "Light curves", multiplier: 1.2 },
-  deep: { label: "Deep curves", multiplier: 1.5 }
-};
-
-const DEFAULT_VAN_QUOTE_SETTINGS = {
-  type: "printed_panel",
-  curves: "flat",
-  bonnet: false,
-  rear: false
+const VEHICLE_ZONE_MATERIALS = {
+  standard_vinyl: { label: "Standard vinyl", rate: VEHICLE_GRAPHICS_PRICING.standardVinylRate },
+  wrap_film: { label: "Wrap film", rate: VEHICLE_GRAPHICS_PRICING.wrapFilmRate }
 };
 
 function getLocalTodayIso() {
@@ -3140,7 +3133,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [editDrag, setEditDrag] = useState(null);
-  const [quoteSettings, setQuoteSettings] = useState(DEFAULT_VAN_QUOTE_SETTINGS);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
   const wrapLinesRef = useRef([]);
@@ -3310,6 +3302,35 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     });
   }
 
+  function getVehicleZoneMetadata(area) {
+    const wrapRequired = isWrapFilmArea(area);
+    if (wrapRequired) {
+      return {
+        material_type: "wrap_film",
+        surface_type: "curved",
+        complexity_factor: 1.25,
+        install_group: "wrap_required"
+      };
+    }
+
+    return {
+      material_type: "standard_vinyl",
+      surface_type: "flat",
+      complexity_factor: 1,
+      install_group: "standard_panel"
+    };
+  }
+
+  function getWrapHoursPerM2(zoneMetadata) {
+    if (zoneMetadata?.complexity_factor >= 1.4) return VEHICLE_GRAPHICS_PRICING.wrapComplexHoursPerM2;
+    if (zoneMetadata?.surface_type === "curved") return VEHICLE_GRAPHICS_PRICING.wrapCurvedHoursPerM2;
+    return VEHICLE_GRAPHICS_PRICING.wrapFlatHoursPerM2;
+  }
+
+  function clampNumber(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
   function getRectAreaM2(rect) {
     const widthMm = rect.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
     const heightMm = rect.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
@@ -3331,13 +3352,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function refreshShapeMetrics(shape) {
     if (shape.type === "polygon") {
       const bounds = getPolygonBounds(shape.points);
+      const zoneMetadata = getVehicleZoneMetadata({ points: shape.points, bounds });
       return {
         ...shape,
         bounds,
         width: bounds.width,
         height: bounds.height,
         areaM2: getPolygonAreaM2(shape.points),
-        isWrapFilm: isWrapFilmArea({ points: shape.points, bounds })
+        zoneMetadata,
+        isWrapFilm: zoneMetadata.material_type === "wrap_film"
       };
     }
 
@@ -3347,12 +3370,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       width: shape.width,
       height: shape.height
     };
+    const zoneMetadata = getVehicleZoneMetadata(rect);
 
     return {
       ...shape,
       bounds: rect,
       areaM2: getRectAreaM2(rect),
-      isWrapFilm: isWrapFilmArea(rect)
+      zoneMetadata,
+      isWrapFilm: zoneMetadata.material_type === "wrap_film"
     };
   }
 
@@ -3375,6 +3400,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const bounds = getPolygonBounds(polygonPoints);
     const areaM2 = getPolygonAreaM2(polygonPoints);
     if (areaM2 <= 0.001) return;
+    const zoneMetadata = getVehicleZoneMetadata({ points: polygonPoints, bounds });
 
     setShapes((current) => [
       ...current,
@@ -3385,7 +3411,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         bounds,
         width: bounds.width,
         height: bounds.height,
-        isWrapFilm: isWrapFilmArea({ points: polygonPoints, bounds }),
+        zoneMetadata,
+        isWrapFilm: zoneMetadata.material_type === "wrap_film",
         areaM2
       }
     ]);
@@ -3451,7 +3478,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setDrawingRect(null);
     if (rect.width < 4 || rect.height < 4) return;
 
-    const isWrapFilm = isWrapFilmArea(rect);
+    const zoneMetadata = getVehicleZoneMetadata(rect);
     const areaM2 = getRectAreaM2(rect);
     setShapes((current) => [
       ...current,
@@ -3459,14 +3486,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         ...rect,
         type: "rectangle",
         bounds: rect,
-        isWrapFilm,
+        zoneMetadata,
+        isWrapFilm: zoneMetadata.material_type === "wrap_film",
         areaM2
       }
     ]);
-  }
-
-  function updateQuoteSetting(key, value) {
-    setQuoteSettings((current) => ({ ...current, [key]: value }));
   }
 
   function startShapeCornerDrag(event, shape, cornerOrPointIndex) {
@@ -3503,38 +3527,35 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   const totals = useMemo(() => {
-    const standardArea = shapes
-      .filter((shape) => !shape.isWrapFilm)
+    const classifiedShapes = shapes.map((shape) => {
+      const zoneMetadata =
+        shape.zoneMetadata ||
+        (shape.isWrapFilm
+          ? {
+              material_type: "wrap_film",
+              surface_type: "curved",
+              complexity_factor: 1.25,
+              install_group: "wrap_required"
+            }
+          : {
+              material_type: "standard_vinyl",
+              surface_type: "flat",
+              complexity_factor: 1,
+              install_group: "standard_panel"
+            });
+      return { ...shape, zoneMetadata };
+    });
+    const standardShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type !== "wrap_film");
+    const wrapShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type === "wrap_film");
+    const standardArea = standardShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
+    const wrapArea = wrapShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
+    const flatArea = classifiedShapes
+      .filter((shape) => shape.zoneMetadata.surface_type === "flat")
       .reduce((sum, shape) => sum + shape.areaM2, 0);
-    const wrapArea = shapes
-      .filter((shape) => shape.isWrapFilm)
+    const curvedArea = classifiedShapes
+      .filter((shape) => shape.zoneMetadata.surface_type === "curved")
       .reduce((sum, shape) => sum + shape.areaM2, 0);
     const totalArea = standardArea + wrapArea;
-    if (totalArea <= 0) {
-      return {
-        standardArea,
-        wrapArea,
-        totalArea,
-        quoteTypeLabel: "",
-        materialSell: 0,
-        labourHours: 0,
-        labourSell: 0,
-        basePrice: 0,
-        complexity: 1,
-        vehicleArea: 0,
-        coverage: 0,
-        anchor: 0,
-        estimate: 0
-      };
-    }
-    const type = VEHICLE_GRAPHICS_TYPES[quoteSettings.type] || VEHICLE_GRAPHICS_TYPES.printed_panel;
-    const baseComplexity =
-      VEHICLE_GRAPHICS_COMPLEXITY[quoteSettings.curves]?.multiplier || VEHICLE_GRAPHICS_COMPLEXITY.flat.multiplier;
-    const complexity = baseComplexity + (quoteSettings.bonnet ? 0.2 : 0) + (quoteSettings.rear ? 0.2 : 0);
-    const materialSell = totalArea * type.rate;
-    const labourHours = totalArea * type.hoursPerM2 * complexity;
-    const labourSell = labourHours * VEHICLE_GRAPHICS_PRICING.labourRate * VEHICLE_GRAPHICS_PRICING.labourSellMultiplier;
-    const basePrice = materialSell + labourSell;
     const vehicleArea =
       (VAN_ESTIMATOR_TEMPLATE.viewBox.width *
         VAN_ESTIMATOR_TEMPLATE.viewBox.height *
@@ -3542,30 +3563,75 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         VAN_ESTIMATOR_TEMPLATE.scaleFactor) /
       1000000;
     const coverage = vehicleArea > 0 ? totalArea / vehicleArea : 0;
+    if (totalArea <= 0) {
+      return {
+        standardArea,
+        wrapArea,
+        flatArea,
+        curvedArea,
+        totalArea,
+        materialSell: 0,
+        labourHours: 0,
+        labourSell: 0,
+        basePrice: 0,
+        vehicleArea,
+        coverage: 0,
+        anchor: 0,
+        estimate: 0
+      };
+    }
+    const materialSell = classifiedShapes.reduce((sum, shape) => {
+      const material = VEHICLE_ZONE_MATERIALS[shape.zoneMetadata.material_type] || VEHICLE_ZONE_MATERIALS.standard_vinyl;
+      return sum + shape.areaM2 * material.rate;
+    }, 0);
+    const standardComplexity = Math.max(1, ...standardShapes.map((shape) => shape.zoneMetadata.complexity_factor || 1));
+    const standardLabourHours =
+      standardArea <= 0
+        ? 0
+        : coverage < 0.15
+          ? clampNumber(
+              VEHICLE_GRAPHICS_PRICING.standardSmallDefaultHours * standardComplexity,
+              VEHICLE_GRAPHICS_PRICING.standardSmallMinHours,
+              VEHICLE_GRAPHICS_PRICING.standardSmallMaxHours
+            )
+          : standardArea * VEHICLE_GRAPHICS_PRICING.standardLargeHoursPerM2 * standardComplexity;
+    const wrapLabourHours = wrapShapes.reduce(
+      (sum, shape) => sum + shape.areaM2 * getWrapHoursPerM2(shape.zoneMetadata),
+      0
+    );
+    const labourHours = standardLabourHours + wrapLabourHours;
+    const labourSell = labourHours * VEHICLE_GRAPHICS_PRICING.labourSellRate;
+    const basePrice = materialSell + labourSell;
     const anchor = coverage < 0.15 ? 400 : coverage < 0.4 ? 900 : coverage < 0.7 ? 1500 : 2500;
     let estimate = 0.65 * basePrice + 0.35 * anchor;
     estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minPrice);
-    if (quoteSettings.type === "wrap") {
-      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minWrapPrice);
+    if (wrapArea > 0) {
+      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minAnyWrapPrice);
+    }
+    if (wrapArea > 0 && coverage < 0.7 && wrapArea >= standardArea) {
+      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minWrapLedPartialPrice);
+    }
+    if (wrapArea > 0 && coverage >= 0.7) {
+      estimate = Math.max(estimate, VEHICLE_GRAPHICS_PRICING.minFullWrapPrice);
     }
     estimate = Math.round(estimate / 50) * 50;
 
     return {
       standardArea,
       wrapArea,
+      flatArea,
+      curvedArea,
       totalArea,
-      quoteTypeLabel: type.label,
       materialSell,
       labourHours,
       labourSell,
       basePrice,
-      complexity,
       vehicleArea,
       coverage,
       anchor,
       estimate
     };
-  }, [quoteSettings, shapes]);
+  }, [shapes]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -3791,52 +3857,26 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <strong>{formatM2(totals.wrapArea)}</strong>
                 </div>
                 <div>
-                  <span>Total coverage</span>
-                  <strong>{formatM2(totals.totalArea)}</strong>
+                  <span>Flat area</span>
+                  <strong>{formatM2(totals.flatArea)}</strong>
                 </div>
                 <div>
-                  <span>Vehicle coverage</span>
-                  <strong>{Math.round(totals.coverage * 100)}%</strong>
+                  <span>Curved area</span>
+                  <strong>{formatM2(totals.curvedArea)}</strong>
+                </div>
+                <div>
+                  <span>Labour hours</span>
+                  <strong>{totals.labourHours.toFixed(1)}</strong>
+                </div>
+                <div>
+                  <span>Market anchor</span>
+                  <strong>{currencyFormatter.format(totals.anchor)}</strong>
                 </div>
               </div>
 
-              <div className="vinyl-rate-grid">
-                <label>
-                  Graphics type
-                  <select value={quoteSettings.type} onChange={(event) => updateQuoteSetting("type", event.target.value)}>
-                    {Object.entries(VEHICLE_GRAPHICS_TYPES).map(([value, option]) => (
-                      <option key={value} value={value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Curves
-                  <select value={quoteSettings.curves} onChange={(event) => updateQuoteSetting("curves", event.target.value)}>
-                    {Object.entries(VEHICLE_GRAPHICS_COMPLEXITY).map(([value, option]) => (
-                      <option key={value} value={value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="vinyl-checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={quoteSettings.bonnet}
-                    onChange={(event) => updateQuoteSetting("bonnet", event.target.checked)}
-                  />
-                  Bonnet
-                </label>
-                <label className="vinyl-checkbox-field">
-                  <input
-                    type="checkbox"
-                    checked={quoteSettings.rear}
-                    onChange={(event) => updateQuoteSetting("rear", event.target.checked)}
-                  />
-                  Rear
-                </label>
+              <div className="vinyl-classification-note">
+                <strong>Auto classified from drawn zones</strong>
+                <span>Wrap-required zones use wrap film, curved surface rules, and wrap labour automatically.</span>
               </div>
               <div className="vinyl-breakdown">
                 <div>
@@ -3848,19 +3888,25 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <strong>{currencyFormatter.format(totals.labourSell)}</strong>
                 </div>
                 <div>
-                  <span>Market anchor</span>
-                  <strong>{currencyFormatter.format(totals.anchor)}</strong>
+                  <span>Total coverage</span>
+                  <strong>{formatM2(totals.totalArea)}</strong>
+                </div>
+                <div>
+                  <span>Vehicle coverage</span>
+                  <strong>{Math.round(totals.coverage * 100)}%</strong>
                 </div>
               </div>
 
               <div className="vinyl-shape-list">
                 <h3>Drawn areas</h3>
                 {shapes.length ? (
-                  shapes.map((shape, index) => (
+                  shapes.map((shape) => (
                     <div key={`shape-row-${shape.id}`} className="vinyl-shape-row">
-                      <span>{index + 1}</span>
                       <div>
-                        <strong>{shape.isWrapFilm ? "Wrap film" : "Standard vinyl"}</strong>
+                        <strong>
+                          {VEHICLE_ZONE_MATERIALS[shape.zoneMetadata?.material_type]?.label ||
+                            (shape.isWrapFilm ? "Wrap film" : "Standard vinyl")}
+                        </strong>
                         <small>
                           {formatM2(shape.areaM2)} · {(shape.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm x{" "}
                           {(shape.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm

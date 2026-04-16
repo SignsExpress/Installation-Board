@@ -814,6 +814,7 @@ button {
 
 .vinyl-total-hero span,
 .vinyl-stats-grid span,
+.vinyl-classification-note span,
 .vinyl-breakdown span {
   font-size: 0.76rem;
   font-weight: 900;
@@ -852,45 +853,22 @@ button {
   font-size: 1.12rem;
 }
 
-.vinyl-rate-grid {
+.vinyl-classification-note {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 5px;
+  border: 1px solid rgba(104, 62, 132, 0.18);
+  border-radius: 16px;
+  padding: 12px;
+  background: rgba(247, 244, 249, 0.78);
 }
 
-.vinyl-rate-grid label {
-  display: grid;
-  gap: 6px;
-  color: var(--sx-slate);
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.vinyl-rate-grid input,
-.vinyl-rate-grid select {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 13px;
-  padding: 10px 12px;
+.vinyl-classification-note strong {
   color: #0f172a;
-  background: #fff;
 }
 
-.vinyl-rate-grid .vinyl-checkbox-field {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  align-self: end;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 13px;
-  background: #fff;
-}
-
-.vinyl-rate-grid .vinyl-checkbox-field input {
-  width: 18px;
-  height: 18px;
+.vinyl-classification-note span {
+  color: var(--sx-slate);
+  line-height: 1.35;
 }
 
 .vinyl-breakdown {
@@ -910,24 +888,12 @@ button {
 
 .vinyl-shape-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 10px;
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.9);
-}
-
-.vinyl-shape-row > span {
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sx-main-soft);
-  color: var(--sx-main);
-  font-weight: 900;
 }
 
 .vinyl-shape-row div {
@@ -5406,17 +5372,15 @@ button {
   }
 
   .vinyl-stats-grid,
-  .vinyl-rate-grid,
   .vinyl-breakdown {
     grid-template-columns: 1fr;
   }
 
   .vinyl-shape-row {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .vinyl-shape-row button {
-    grid-column: 2;
     justify-self: start;
   }
 }
