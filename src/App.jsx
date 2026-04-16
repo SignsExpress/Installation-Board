@@ -3759,6 +3759,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function startDrawing(event) {
     if (event.button !== 0) return;
     if (editDrag) return;
+    if (event.target.closest?.(".vinyl-canvas-toolbar")) return;
     clearTextSelection();
     const point = getPointerPoint(event);
     if (!point) return;
@@ -3827,6 +3828,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       }
       const releasePoint = getPointerPoint(event);
       const points = simplifyFreehandPoints(releasePoint ? [...lassoPoints, releasePoint] : lassoPoints);
+      const bounds = points.length >= 2 ? getPolygonBounds(points) : { width: 0, height: 0 };
+      if (points.length < 4 || Math.max(bounds.width, bounds.height) < 8) {
+        setLassoPoints([]);
+        return;
+      }
       const shape = createPolygonShape(points, "vinyl-lasso");
       if (shape) setShapes((current) => [...current, shape]);
       setLassoPoints([]);
@@ -4117,7 +4123,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             <div className="vinyl-canvas-card">
               {svgError ? <div className="flash error">{svgError}</div> : null}
               <div className="vinyl-canvas">
-                <div className="vinyl-canvas-toolbar" aria-label="Drawing tools">
+                <div
+                  className="vinyl-canvas-toolbar"
+                  aria-label="Drawing tools"
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
                   <button
                     type="button"
                     className={drawMode === "rectangle" ? "active" : ""}
@@ -4317,15 +4329,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     <polyline points={pointsToSvg(lassoPoints)} className="vinyl-shape drawing vinyl-lasso-preview" />
                   ) : null}
                 </svg>
-              </div>
-              <div className="vinyl-canvas-actions">
-                <span>
-                  {drawMode === "polygon"
-                    ? "Point shape: click near the first point to close it."
-                    : drawMode === "lasso"
-                      ? "Draw shape: hold and draw, then release to close it."
-                      : "Rectangle: drag across the panel you want to cover."}
-                </span>
               </div>
             </div>
 

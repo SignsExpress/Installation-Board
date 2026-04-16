@@ -829,22 +829,6 @@ button {
   pointer-events: none;
 }
 
-.vinyl-canvas-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
-  color: var(--sx-slate-soft);
-  font-weight: 700;
-  font-size: 0.88rem;
-}
-
-.vinyl-canvas-actions > div {
-  display: flex;
-  gap: 8px;
-}
-
 .vinyl-estimate-card {
   display: grid;
   gap: 8px;
@@ -5423,11 +5407,6 @@ button {
 
   .vinyl-estimator-panel {
     padding: 10px;
-  }
-
-  .vinyl-canvas-actions {
-    align-items: stretch;
-    flex-direction: column;
   }
 
   .vinyl-estimator-template {
