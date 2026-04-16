@@ -3516,12 +3516,74 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
-  function getCoverageBand(coverage) {
-    if (coverage < 0.15) return "under15";
-    if (coverage < 0.35) return "under35";
-    if (coverage < 0.6) return "under60";
-    if (coverage < 0.85) return "under85";
-    return "full";
+  function interpolatePricingPoint(points, value) {
+    if (value <= points[0].coverage) return points[0].value;
+    for (let index = 1; index < points.length; index += 1) {
+      const previous = points[index - 1];
+      const next = points[index];
+      if (value > next.coverage) continue;
+      const progress = (value - previous.coverage) / (next.coverage - previous.coverage || 1);
+      return previous.value + (next.value - previous.value) * progress;
+    }
+    return points[points.length - 1].value;
+  }
+
+  function getSmoothWrapRate(wrapCoverage, settings) {
+    return interpolatePricingPoint(
+      [
+        { coverage: 0, value: settings.wrapMaterialRates.under15 },
+        { coverage: 0.15, value: settings.wrapMaterialRates.under15 },
+        { coverage: 0.35, value: settings.wrapMaterialRates.under35 },
+        { coverage: 0.6, value: settings.wrapMaterialRates.under60 },
+        { coverage: 0.85, value: settings.wrapMaterialRates.under85 },
+        { coverage: 1, value: settings.wrapMaterialRates.full }
+      ],
+      wrapCoverage
+    );
+  }
+
+  function getSmoothWrapLabourHours(wrapCoverage, settings) {
+    return interpolatePricingPoint(
+      [
+        { coverage: 0, value: settings.wrapLabourBands.under15 },
+        { coverage: 0.15, value: settings.wrapLabourBands.under15 },
+        { coverage: 0.35, value: settings.wrapLabourBands.under35 },
+        { coverage: 0.6, value: settings.wrapLabourBands.under60 },
+        { coverage: 0.85, value: settings.wrapLabourBands.under85 },
+        { coverage: 1, value: settings.wrapLabourBands.full }
+      ],
+      wrapCoverage
+    );
+  }
+
+  function getSmoothMarketAnchor(coverage, settings) {
+    return interpolatePricingPoint(
+      [
+        { coverage: 0, value: settings.marketAnchors.under15 },
+        { coverage: 0.15, value: settings.marketAnchors.under15 },
+        { coverage: 0.35, value: settings.marketAnchors.under35 },
+        { coverage: 0.6, value: settings.marketAnchors.under60 },
+        { coverage: 0.85, value: settings.marketAnchors.under85 },
+        { coverage: 1, value: settings.marketAnchors.full }
+      ],
+      coverage
+    );
+  }
+
+  function interpolateBlend(first, second, progress) {
+    return {
+      calculated: first.calculated + (second.calculated - first.calculated) * progress,
+      anchor: first.anchor + (second.anchor - first.anchor) * progress
+    };
+  }
+
+  function getSmoothBlend(coverage, wrapArea, settings) {
+    if (wrapArea <= 0) return settings.blendWeights.noWrap;
+    if (coverage < 0.6) return settings.blendWeights.wrapUnder60;
+    if (coverage < 0.85) {
+      return interpolateBlend(settings.blendWeights.wrapUnder60, settings.blendWeights.coverageUnder85, (coverage - 0.6) / 0.25);
+    }
+    return interpolateBlend(settings.blendWeights.coverageUnder85, settings.blendWeights.coverageFull, Math.min(1, (coverage - 0.85) / 0.15));
   }
 
   function clampNumber(value, min, max) {
@@ -3981,8 +4043,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const vehicleArea = getVehicleDrawableAreaM2();
     const coverage = vehicleArea > 0 ? totalArea / vehicleArea : 0;
     const wrapCoverage = vehicleArea > 0 ? wrapArea / vehicleArea : 0;
-    const totalCoverageBand = getCoverageBand(coverage);
-    const wrapCoverageBand = getCoverageBand(wrapCoverage);
     const wrapSectionCount = countConnectedShapeSections(wrapShapes);
     const wrapSectionsConnected = wrapSectionCount <= 1;
     const wrapSectionFactor = wrapArea > 0 ? getWrapSectionFactor(wrapSectionCount, settings) : 1;
@@ -4010,67 +4070,85 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         estimate: 0
       };
     }
-    const standardSell = standardArea * settings.standardVinylRate;
-    const wrapFilmRate = settings.wrapMaterialRates[wrapCoverageBand] || settings.wrapMaterialRates.under15;
-    const wrapSell = wrapArea * wrapFilmRate;
-    const standardLabourHours =
-      standardArea <= 0
-        ? 0
-        : coverage < 0.15
-          ? clampNumber(
-              standardArea * settings.standardSmallHoursPerM2,
-              settings.standardSmallMinHours,
-              settings.standardSmallMaxHours
-            )
-          : standardArea * settings.standardLargeHoursPerM2;
-    const wrapBaseHoursPerM2 = settings.wrapLabourBands[wrapCoverageBand] || settings.wrapLabourBands.under15;
-    const wrapLabourHours = wrapArea * wrapBaseHoursPerM2 * wrapSectionFactor * weightedDifficulty;
-    const labourHours = standardLabourHours + wrapLabourHours;
-    const standardLabourSell = standardLabourHours * settings.labourSellRate;
-    const wrapLabourSell = wrapLabourHours * settings.labourSellRate;
-    const basePrice = standardSell + standardLabourSell + wrapSell + wrapLabourSell;
-    const anchor = settings.marketAnchors[totalCoverageBand] || settings.marketAnchors.under15;
-    const blend =
-      wrapArea <= 0
-        ? settings.blendWeights.noWrap
-        : coverage < 0.6
-          ? settings.blendWeights.wrapUnder60
-          : coverage < 0.85
-            ? settings.blendWeights.coverageUnder85
-            : settings.blendWeights.coverageFull;
-    let estimate = blend.calculated * basePrice + blend.anchor * anchor;
-    estimate = Math.max(estimate, settings.minPrice);
-    if (wrapArea > 0) {
-      estimate = Math.max(estimate, settings.minAnyWrapPrice);
+    function calculateScaledEstimate(scale = 1) {
+      const scaledStandardArea = standardArea * scale;
+      const scaledWrapArea = wrapArea * scale;
+      const scaledTotalArea = totalArea * scale;
+      const scaledCoverage = vehicleArea > 0 ? scaledTotalArea / vehicleArea : 0;
+      const scaledWrapCoverage = vehicleArea > 0 ? scaledWrapArea / vehicleArea : 0;
+      const standardSell = scaledStandardArea * settings.standardVinylRate;
+      const wrapFilmRate = getSmoothWrapRate(scaledWrapCoverage, settings);
+      const wrapSell = scaledWrapArea * wrapFilmRate;
+      const standardLabourHours =
+        scaledStandardArea <= 0
+          ? 0
+          : scaledCoverage < 0.15
+            ? clampNumber(
+                scaledStandardArea * settings.standardSmallHoursPerM2,
+                settings.standardSmallMinHours,
+                settings.standardSmallMaxHours
+              )
+            : scaledStandardArea * settings.standardLargeHoursPerM2;
+      const wrapBaseHoursPerM2 = getSmoothWrapLabourHours(scaledWrapCoverage, settings);
+      const wrapLabourHours = scaledWrapArea * wrapBaseHoursPerM2 * wrapSectionFactor * weightedDifficulty;
+      const labourHours = standardLabourHours + wrapLabourHours;
+      const standardLabourSell = standardLabourHours * settings.labourSellRate;
+      const wrapLabourSell = wrapLabourHours * settings.labourSellRate;
+      const basePrice = standardSell + standardLabourSell + wrapSell + wrapLabourSell;
+      const anchor = getSmoothMarketAnchor(scaledCoverage, settings);
+      const blend = getSmoothBlend(scaledCoverage, scaledWrapArea, settings);
+      let estimate = blend.calculated * basePrice + blend.anchor * anchor;
+      estimate = Math.max(estimate, settings.minPrice);
+      if (scaledWrapArea > 0) {
+        estimate = Math.max(estimate, settings.minAnyWrapPrice);
+      }
+      if (scaledWrapArea > 0 && scaledCoverage >= 0.35 && scaledCoverage < 0.85) {
+        estimate = Math.max(estimate, settings.minMediumPartialWrapPrice);
+      }
+      if (scaledWrapArea > 0 && scaledCoverage >= 0.85) {
+        estimate = Math.max(estimate, settings.minFullWrapPrice);
+      }
+      const packageResult = applyPackageRules(estimate, { wrapShapes, coverage: scaledCoverage, weightedDifficulty, settings });
+      estimate = packageResult.estimate;
+
+      return {
+        anchor,
+        basePrice,
+        estimate,
+        labourHours,
+        packageType: packageResult.packageType,
+        standardLabourSell,
+        standardSell,
+        wrapLabourSell,
+        wrapSell
+      };
     }
-    if (wrapArea > 0 && coverage >= 0.35 && coverage < 0.85) {
-      estimate = Math.max(estimate, settings.minMediumPartialWrapPrice);
-    }
-    if (wrapArea > 0 && coverage >= 0.85) {
-      estimate = Math.max(estimate, settings.minFullWrapPrice);
-    }
-    const packageResult = applyPackageRules(estimate, { wrapShapes, coverage, weightedDifficulty, settings });
-    estimate = packageResult.estimate;
-    estimate = Math.round(estimate / 50) * 50;
+
+    const currentPrice = calculateScaledEstimate(1);
+    const monotonicFloor = Array.from({ length: 80 }, (_, index) => (index + 1) / 80).reduce((highest, scale) => {
+      return Math.max(highest, calculateScaledEstimate(scale).estimate);
+    }, currentPrice.estimate);
+    const monotonicEstimate = Math.max(currentPrice.estimate, monotonicFloor);
+    const estimate = Math.round(monotonicEstimate / 50) * 50;
 
     return {
       standardArea,
       wrapArea,
       totalArea,
-      standardSell,
-      standardLabourSell,
-      wrapSell,
-      wrapLabourSell,
-      labourHours,
-      basePrice,
+      standardSell: currentPrice.standardSell,
+      standardLabourSell: currentPrice.standardLabourSell,
+      wrapSell: currentPrice.wrapSell,
+      wrapLabourSell: currentPrice.wrapLabourSell,
+      labourHours: currentPrice.labourHours,
+      basePrice: currentPrice.basePrice,
       vehicleArea,
       coverage,
       wrapCoverage,
       wrapSectionCount,
       wrapSectionsConnected,
       weightedDifficulty,
-      anchor,
-      packageType: packageResult.packageType,
+      anchor: currentPrice.anchor,
+      packageType: currentPrice.packageType,
       estimate
     };
   }, [pricingDraftSettings, pricingSettings, pricingSettingsOpen, shapes, vehicleClipPathsD.length]);
