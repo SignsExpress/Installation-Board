@@ -3136,10 +3136,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [editDrag, setEditDrag] = useState(null);
-  const [vehicleClipPathD, setVehicleClipPathD] = useState("");
+  const [vehicleClipPathsD, setVehicleClipPathsD] = useState([]);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
-  const vehicleBodyPathRef = useRef(null);
+  const vehicleBodyPathsRef = useRef([]);
   const wrapLinesRef = useRef([]);
 
   useEffect(() => {
@@ -3174,23 +3174,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     }
 
     const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
-    const bodyPathCandidates = Array.from(artworkLayer?.querySelectorAll("path.st2") || [])
+    const vehicleBodyPaths = Array.from(artworkLayer?.querySelectorAll("path.st18,path.st2") || [])
       .map((element) => {
         try {
           const box = element.getBBox();
-          return { element, box, area: box.width * box.height };
+          return { element, area: box.width * box.height };
         } catch (error) {
           return null;
         }
       })
-      .filter((entry) => entry?.box?.x > 700 && entry.box.width > 1000 && entry.area)
-      .sort((left, right) => right.area - left.area);
-    const vehicleBodyPath =
-      bodyPathCandidates.find((entry) => entry.box.y > VAN_ESTIMATOR_TEMPLATE.viewBox.height / 2)?.element ||
-      bodyPathCandidates[0]?.element ||
-      null;
-    vehicleBodyPathRef.current = vehicleBodyPath;
-    setVehicleClipPathD(vehicleBodyPath?.getAttribute("d") || "");
+      .filter((entry) => entry?.area > 100000)
+      .map((entry) => entry.element);
+    vehicleBodyPathsRef.current = vehicleBodyPaths;
+    setVehicleClipPathsD(vehicleBodyPaths.map((element) => element.getAttribute("d")).filter(Boolean));
 
     const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
     if (!wrapLayer) {
@@ -3269,6 +3265,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return points.map((point) => `${point.x},${point.y}`).join(" ");
   }
 
+  function getShapeClipId(shapeId) {
+    return `vinyl-shape-clip-${String(shapeId).replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  }
+
   function getRectanglePoints(rect) {
     return [
       { corner: "top-left", x: rect.x, y: rect.y },
@@ -3279,13 +3279,29 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function getVehicleBodyBounds() {
-    try {
-      const box = vehicleBodyPathRef.current?.getBBox();
-      if (box?.width && box?.height) {
-        return { x: box.x, y: box.y, width: box.width, height: box.height };
+    const boxes = [];
+    vehicleBodyPathsRef.current.forEach((path) => {
+      try {
+        const box = path.getBBox();
+        if (box?.width && box?.height) boxes.push(box);
+      } catch (error) {
+        // Ignore paths that are not ready for geometry calculations.
       }
+    });
+    if (boxes.length) {
+      const minX = Math.min(...boxes.map((box) => box.x));
+      const minY = Math.min(...boxes.map((box) => box.y));
+      const maxX = Math.max(...boxes.map((box) => box.x + box.width));
+      const maxY = Math.max(...boxes.map((box) => box.y + box.height));
+      return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    }
+
+    try {
+      const svg = inlineSvgRef.current?.querySelector("svg");
+      const box = svg?.getBBox();
+      if (box?.width && box?.height) return { x: box.x, y: box.y, width: box.width, height: box.height };
     } catch (error) {
-      // Fall back to the full drawing viewBox if the body path is not ready yet.
+      // Fall back to the full drawing viewBox if the SVG is not ready yet.
     }
     return VAN_ESTIMATOR_TEMPLATE.viewBox;
   }
@@ -3313,30 +3329,37 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function isPointInVehicleBody(point) {
-    const path = vehicleBodyPathRef.current;
     const svg = inlineSvgRef.current?.querySelector("svg");
-    if (!path || !svg) return true;
+    if (!vehicleBodyPathsRef.current.length || !svg) return true;
 
     try {
       const svgPoint = svg.createSVGPoint();
       svgPoint.x = point.x;
       svgPoint.y = point.y;
-      if (typeof path.isPointInFill === "function") return path.isPointInFill(svgPoint);
+      if (vehicleBodyPathsRef.current.some((path) => typeof path.isPointInFill === "function" && path.isPointInFill(svgPoint))) {
+        return true;
+      }
     } catch (error) {
       // Older engines can miss SVG geometry helpers; the bbox fallback still prevents wild off-vehicle areas.
     }
 
-    const bounds = getVehicleBodyBounds();
-    return (
-      point.x >= bounds.x &&
-      point.x <= bounds.x + bounds.width &&
-      point.y >= bounds.y &&
-      point.y <= bounds.y + bounds.height
-    );
+    return vehicleBodyPathsRef.current.some((path) => {
+      try {
+        const bounds = path.getBBox();
+        return (
+          point.x >= bounds.x &&
+          point.x <= bounds.x + bounds.width &&
+          point.y >= bounds.y &&
+          point.y <= bounds.y + bounds.height
+        );
+      } catch (error) {
+        return false;
+      }
+    });
   }
 
   function getVehicleClipRatio(area) {
-    if (!vehicleBodyPathRef.current) return 1;
+    if (!vehicleBodyPathsRef.current.length) return 1;
     const bounds = area.bounds || area;
     if (!bounds?.width || !bounds?.height) return 1;
 
@@ -3849,16 +3872,27 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     setEditDrag(null);
                   }}
                 >
-                  {vehicleClipPathD ? (
+                  {vehicleClipPathsD.length ? (
                     <defs>
                       <clipPath id="vinyl-vehicle-body-clip">
-                        <path d={vehicleClipPathD} clipRule="evenodd" />
+                        {vehicleClipPathsD.map((pathD, index) => (
+                          <path key={`vehicle-body-clip-${index}`} d={pathD} clipRule="evenodd" />
+                        ))}
                       </clipPath>
+                      {shapes.map((shape) => (
+                        <clipPath key={`shape-clip-${shape.id}`} id={getShapeClipId(shape.id)}>
+                          {shape.type === "polygon" ? (
+                            <polygon points={pointsToSvg(shape.points)} />
+                          ) : (
+                            <rect x={shape.x} y={shape.y} width={shape.width} height={shape.height} />
+                          )}
+                        </clipPath>
+                      ))}
                     </defs>
                   ) : null}
                   {shapes.map((shape) => (
                     <g key={shape.id} className="vinyl-shape-group">
-                      <g clipPath={vehicleClipPathD ? "url(#vinyl-vehicle-body-clip)" : undefined}>
+                      <g clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}>
                         {shape.type === "polygon" ? (
                           <polygon
                             points={pointsToSvg(shape.points)}
@@ -3874,6 +3908,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                           />
                         )}
                       </g>
+                      {vehicleClipPathsD.length ? (
+                        <g
+                          className={`vinyl-vehicle-edge ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                          clipPath={`url(#${getShapeClipId(shape.id)})`}
+                        >
+                          {vehicleClipPathsD.map((pathD, index) => (
+                            <path key={`${shape.id}-edge-${index}`} d={pathD} />
+                          ))}
+                        </g>
+                      ) : null}
                       <g
                         className="vinyl-shape-delete"
                         role="button"

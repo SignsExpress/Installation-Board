@@ -713,6 +713,26 @@ button {
   stroke: #ea580c;
 }
 
+.vinyl-vehicle-edge {
+  fill: none;
+  pointer-events: none;
+}
+
+.vinyl-vehicle-edge path {
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4.5;
+}
+
+.vinyl-vehicle-edge.standard path {
+  stroke: var(--sx-main);
+}
+
+.vinyl-vehicle-edge.wrap path {
+  stroke: #ea580c;
+}
+
 .vinyl-shape.drawing {
   fill: rgba(104, 62, 132, 0.14);
   stroke: var(--sx-main);
