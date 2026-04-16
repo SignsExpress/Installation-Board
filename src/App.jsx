@@ -93,8 +93,8 @@ const ATTENDANCE_WEEKDAYS = [
 const VAN_ESTIMATOR_TEMPLATE = {
   name: "Ford Transit Custom SWB",
   src: "/vans/ford-transit-custom-swb.svg",
-  scaleFactor: 3.53,
-  scaleReference: "Calibrated from 686mm outer tyre",
+  scaleFactor: 5.46,
+  scaleReference: "Calibrated from 686.5mm front tyre",
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
 
