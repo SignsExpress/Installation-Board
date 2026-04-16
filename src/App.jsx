@@ -2338,7 +2338,7 @@ function createMileageLine(overrides = {}) {
   };
 }
 
-function MileagePage({ currentUser, onLogout, notifications, onRefreshNotifications }) {
+function MileageUserPage({ currentUser, onLogout, notifications, onRefreshNotifications }) {
   const initialMonth = useMemo(() => {
     const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
     return params.get("month") || toMonthIdFromIso(getLocalTodayIso());
@@ -2668,6 +2668,136 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
       </div>
     </div>
   );
+}
+
+function MileageAdminPage({ currentUser, onLogout, notifications }) {
+  const initialMonth = useMemo(() => {
+    const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+    return params.get("month") || toMonthIdFromIso(getLocalTodayIso());
+  }, []);
+  const [monthId, setMonthId] = useState(initialMonth);
+  const [overview, setOverview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(null);
+
+  async function loadMileageOverview(nextMonthId = monthId) {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/mileage/admin?month=${encodeURIComponent(nextMonthId)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not load mileage overview.");
+      setOverview(payload);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(createMessage(error.message || "Could not load mileage overview.", "error"));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMileageOverview(monthId);
+  }, [monthId]);
+
+  useEffect(() => {
+    if (!statusMessage) return undefined;
+    const timer = window.setTimeout(() => setStatusMessage(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [statusMessage]);
+
+  const users = Array.isArray(overview?.users) ? overview.users : [];
+  const monthLabel = overview?.monthLabel || "Mileage overview";
+
+  return (
+    <div className="app-shell mileage-shell">
+      <div className="page mileage-page mileage-admin-page">
+        <MainNavBar currentUser={currentUser} active="mileage" onLogout={onLogout} notifications={notifications} />
+
+        <section className="panel mileage-panel mileage-admin-panel">
+          <div className="mileage-head">
+            <div>
+              <p className="eyebrow">Mileage</p>
+              <h2>{monthLabel}</h2>
+              <p>Admin overview of submitted journeys by each mileage user.</p>
+            </div>
+            <div className="mileage-month-tools">
+              <button className="ghost-button" type="button" onClick={() => setMonthId(shiftMonthId(monthId, -1))}>
+                Previous month
+              </button>
+              <input
+                type="month"
+                value={monthId}
+                onChange={(event) => setMonthId(event.target.value || toMonthIdFromIso(getLocalTodayIso()))}
+              />
+              <button className="ghost-button" type="button" onClick={() => setMonthId(shiftMonthId(monthId, 1))}>
+                Next month
+              </button>
+            </div>
+          </div>
+
+          {statusMessage ? <div className={`flash ${statusMessage.tone}`}>{statusMessage.text}</div> : null}
+
+          <div className="mileage-admin-summary">
+            <div>
+              <span>Total miles</span>
+              <strong>{Number(overview?.totalMiles || 0).toFixed(1)}</strong>
+            </div>
+            <div>
+              <span>Journeys</span>
+              <strong>{Number(overview?.lineCount || 0)}</strong>
+            </div>
+            <div>
+              <span>Submitted</span>
+              <strong>{Number(overview?.submittedUserCount || 0)} / {Number(overview?.userCount || 0)}</strong>
+            </div>
+          </div>
+
+          {loading && !overview ? (
+            <div className="notifications-empty">Loading mileage overview...</div>
+          ) : (
+            <div className="mileage-admin-users">
+              {users.length ? (
+                users.map((user) => (
+                  <article key={user.userId || user.userName} className={`mileage-admin-user-card ${user.lineCount ? "" : "empty"}`}>
+                    <div className="mileage-admin-user-head">
+                      <div>
+                        <h3>{user.userName}</h3>
+                        <p>{user.lineCount} journey{user.lineCount === 1 ? "" : "s"} submitted</p>
+                      </div>
+                      <strong>{Number(user.totalMiles || 0).toFixed(1)} miles</strong>
+                    </div>
+
+                    {Array.isArray(user.journeys) && user.journeys.length ? (
+                      <div className="mileage-admin-journeys">
+                        {user.journeys.map((journey) => (
+                          <div key={`${user.userId}-${journey.claimMonthId}-${journey.id}`} className="mileage-admin-journey">
+                            <div className="mileage-admin-journey-main">
+                              <strong>{journey.note || "No note"}</strong>
+                              <span>{journey.from || "-"} to {journey.to || "-"}</span>
+                            </div>
+                            <time>{formatJobDate(journey.date) || "-"}</time>
+                            <strong>{Number(journey.miles || 0).toFixed(1)} miles</strong>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="notifications-empty compact">No mileage submitted for this month.</div>
+                    )}
+                  </article>
+                ))
+              ) : (
+                <div className="notifications-empty">No mileage users found.</div>
+              )}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function MileagePage(props) {
+  return canEditMileage(props.currentUser) ? <MileageAdminPage {...props} /> : <MileageUserPage {...props} />;
 }
 
 function AttendancePage({

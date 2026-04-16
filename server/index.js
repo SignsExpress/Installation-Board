@@ -482,6 +482,12 @@ function requireMileageAccess(request, response) {
   return false;
 }
 
+function requireMileageAdmin(request, response) {
+  if (canEditMileage(request.user)) return true;
+  response.status(403).json({ error: "Mileage admin access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -1745,6 +1751,70 @@ function buildMileageHistory(claims) {
       })
     }))
     .sort((left, right) => String(right.monthId || "").localeCompare(String(left.monthId || "")));
+}
+
+function getMileageLineMonthId(line, fallbackMonthId = "") {
+  const lineDate = parseIsoDate(line?.date);
+  return lineDate ? toMonthId(getStartOfMonth(lineDate)) : String(fallbackMonthId || "").trim();
+}
+
+function buildMileageAdminOverview(claims, users, monthId) {
+  const targetMonthId = parseMonthId(monthId) ? monthId : getCurrentMonthId();
+  const mileageUsers = (Array.isArray(users) ? users : [])
+    .map((user) => sanitizeUser(user))
+    .filter((user) => canAccessMileage(user))
+    .filter((user) => String(user.displayName || "").trim().toLowerCase() !== "matt rutlidge")
+    .sort((left, right) => String(left.displayName || "").localeCompare(String(right.displayName || "")));
+
+  const claimList = (Array.isArray(claims) ? claims : []).map((claim) => sanitizeMileageClaim(claim));
+  const usersWithClaims = new Map(mileageUsers.map((user) => [String(user.id || ""), user]));
+
+  const userRows = [...usersWithClaims.values()]
+    .map((user) => {
+      const userClaims = claimList.filter((claim) => String(claim.userId || "") === String(user.id || ""));
+      const journeys = [];
+
+      userClaims.forEach((claim) => {
+        claim.lines.forEach((line) => {
+          const lineMonthId = getMileageLineMonthId(line, claim.monthId);
+          if (lineMonthId !== targetMonthId) return;
+          journeys.push({
+            ...line,
+            claimMonthId: claim.monthId,
+            userId: user.id,
+            userName: user.displayName || claim.userName || "Unknown user"
+          });
+        });
+      });
+
+      journeys.sort((left, right) => {
+        if (left.date !== right.date) return String(right.date || "").localeCompare(String(left.date || ""));
+        return String(right.id || "").localeCompare(String(left.id || ""));
+      });
+
+      const totalMiles = Math.round(journeys.reduce((sum, line) => sum + Number(line.miles || 0), 0) * 10) / 10;
+      return {
+        userId: String(user.id || ""),
+        userName: user.displayName || "Unknown user",
+        totalMiles,
+        lineCount: journeys.length,
+        journeys
+      };
+    })
+    .sort((left, right) => {
+      if (right.totalMiles !== left.totalMiles) return right.totalMiles - left.totalMiles;
+      return String(left.userName || "").localeCompare(String(right.userName || ""));
+    });
+
+  return {
+    monthId: targetMonthId,
+    monthLabel: formatMileageMonthLabel(targetMonthId),
+    totalMiles: Math.round(userRows.reduce((sum, user) => sum + Number(user.totalMiles || 0), 0) * 10) / 10,
+    lineCount: userRows.reduce((sum, user) => sum + Number(user.lineCount || 0), 0),
+    userCount: userRows.length,
+    submittedUserCount: userRows.filter((user) => Number(user.lineCount || 0) > 0).length,
+    users: userRows
+  };
 }
 
 function sanitizeHolidayEvent(payload) {
@@ -4559,6 +4629,15 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(
       savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
     );
+  });
+
+  app.get("/api/mileage/admin", async (request, response) => {
+    if (!requireMileageAdmin(request, response)) return;
+    const requestedMonth = String(request.query.month || "").trim();
+    const monthId = parseMonthId(requestedMonth) ? requestedMonth : getCurrentMonthId();
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    response.json(buildMileageAdminOverview(store.mileageClaims || [], usersStore.users || [], monthId));
   });
 
   app.get("/api/mileage", async (request, response) => {
