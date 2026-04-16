@@ -109,6 +109,9 @@ const VEHICLE_GRAPHICS_PRICING = {
   standardSmallDefaultHours: 2,
   standardSmallMinHours: 1.5,
   standardSmallMaxHours: 2.5,
+  partialWrapFlatHoursPerM2: 1.4,
+  partialWrapCurvedHoursPerM2: 1.6,
+  partialWrapComplexHoursPerM2: 1.8,
   wrapFlatHoursPerM2: 2,
   wrapCurvedHoursPerM2: 2.25,
   wrapComplexHoursPerM2: 2.5,
@@ -3321,10 +3324,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
-  function getWrapHoursPerM2(zoneMetadata) {
-    if (zoneMetadata?.complexity_factor >= 1.4) return VEHICLE_GRAPHICS_PRICING.wrapComplexHoursPerM2;
-    if (zoneMetadata?.surface_type === "curved") return VEHICLE_GRAPHICS_PRICING.wrapCurvedHoursPerM2;
-    return VEHICLE_GRAPHICS_PRICING.wrapFlatHoursPerM2;
+  function getWrapHoursPerM2(zoneMetadata, coverage) {
+    const isPartialWrap = coverage < 0.7;
+    if (zoneMetadata?.complexity_factor >= 1.4) {
+      return isPartialWrap
+        ? VEHICLE_GRAPHICS_PRICING.partialWrapComplexHoursPerM2
+        : VEHICLE_GRAPHICS_PRICING.wrapComplexHoursPerM2;
+    }
+    if (zoneMetadata?.surface_type === "curved") {
+      return isPartialWrap
+        ? VEHICLE_GRAPHICS_PRICING.partialWrapCurvedHoursPerM2
+        : VEHICLE_GRAPHICS_PRICING.wrapCurvedHoursPerM2;
+    }
+    return isPartialWrap
+      ? VEHICLE_GRAPHICS_PRICING.partialWrapFlatHoursPerM2
+      : VEHICLE_GRAPHICS_PRICING.wrapFlatHoursPerM2;
   }
 
   function clampNumber(value, min, max) {
@@ -3596,7 +3610,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             )
           : standardArea * VEHICLE_GRAPHICS_PRICING.standardLargeHoursPerM2 * standardComplexity;
     const wrapLabourHours = wrapShapes.reduce(
-      (sum, shape) => sum + shape.areaM2 * getWrapHoursPerM2(shape.zoneMetadata),
+      (sum, shape) => sum + shape.areaM2 * getWrapHoursPerM2(shape.zoneMetadata, coverage),
       0
     );
     const labourHours = standardLabourHours + wrapLabourHours;
