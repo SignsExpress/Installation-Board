@@ -3184,6 +3184,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [drawStart, setDrawStart] = useState(null);
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
+  const [lassoPoints, setLassoPoints] = useState([]);
   const [editDrag, setEditDrag] = useState(null);
   const [vehicleClipPathsD, setVehicleClipPathsD] = useState([]);
   const inlineSvgRef = useRef(null);
@@ -3716,18 +3717,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function finishPolygon() {
     if (polygonPoints.length < 3) return;
-    const bounds = getPolygonBounds(polygonPoints);
-    const shape = refreshShapeMetrics({
-      id: `vinyl-poly-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
-      type: "polygon",
-      points: polygonPoints,
-      bounds,
-      width: bounds.width,
-      height: bounds.height
-    });
-    if (shape.areaM2 <= 0.001) return;
-
-    setShapes((current) => [...current, shape]);
+    const shape = createPolygonShape(polygonPoints);
+    if (shape) setShapes((current) => [...current, shape]);
     setPolygonPoints([]);
     setPolygonPreviewPoint(null);
   }
@@ -3740,6 +3731,29 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     if (points.length < 3) return false;
     const firstPoint = points[0];
     return getDistanceBetweenPoints(point, firstPoint) <= 28;
+  }
+
+  function simplifyFreehandPoints(points) {
+    if (points.length <= 2) return points;
+    return points.reduce((result, point, index) => {
+      if (index === 0 || index === points.length - 1) return [...result, point];
+      const previousPoint = result[result.length - 1];
+      return getDistanceBetweenPoints(point, previousPoint) >= 10 ? [...result, point] : result;
+    }, []);
+  }
+
+  function createPolygonShape(points, idPrefix = "vinyl-poly") {
+    if (points.length < 3) return null;
+    const bounds = getPolygonBounds(points);
+    const shape = refreshShapeMetrics({
+      id: `${idPrefix}-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
+      type: "polygon",
+      points,
+      bounds,
+      width: bounds.width,
+      height: bounds.height
+    });
+    return shape.areaM2 > 0.001 ? shape : null;
   }
 
   function startDrawing(event) {
@@ -3755,6 +3769,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       }
       setPolygonPoints((current) => [...current, point]);
       setPolygonPreviewPoint(null);
+      return;
+    }
+    if (drawMode === "lasso") {
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setLassoPoints([point]);
+      setDrawStart(null);
+      setDrawingRect(null);
       return;
     }
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -3775,6 +3796,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       if (polygonPoints.length) setPolygonPreviewPoint(point);
       return;
     }
+    if (drawMode === "lasso") {
+      setLassoPoints((current) => {
+        const previousPoint = current[current.length - 1];
+        if (previousPoint && getDistanceBetweenPoints(point, previousPoint) < 6) return current;
+        return [...current, point];
+      });
+      return;
+    }
     if (!drawStart) return;
     setDrawingRect(normalizeRect(drawStart, point));
   }
@@ -3790,6 +3819,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       return;
     }
     if (drawMode === "polygon") return;
+    if (drawMode === "lasso") {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture may already be released if the pointer leaves the browser chrome.
+      }
+      const releasePoint = getPointerPoint(event);
+      const points = simplifyFreehandPoints(releasePoint ? [...lassoPoints, releasePoint] : lassoPoints);
+      const shape = createPolygonShape(points, "vinyl-lasso");
+      if (shape) setShapes((current) => [...current, shape]);
+      setLassoPoints([]);
+      return;
+    }
     if (!drawStart || !drawingRect) return;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -3849,6 +3891,37 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     event.preventDefault();
     clearTextSelection();
     setShapes((current) => current.filter((shape) => shape.id !== shapeId));
+  }
+
+  function selectDrawMode(nextMode) {
+    setDrawMode(nextMode);
+    setDrawStart(null);
+    setDrawingRect(null);
+    setPolygonPoints([]);
+    setPolygonPreviewPoint(null);
+    setLassoPoints([]);
+  }
+
+  function undoLastDrawing() {
+    if (lassoPoints.length) {
+      setLassoPoints([]);
+      return;
+    }
+    if (polygonPoints.length) {
+      setPolygonPoints((current) => current.slice(0, -1));
+      setPolygonPreviewPoint(null);
+      return;
+    }
+    setShapes((current) => current.slice(0, -1));
+  }
+
+  function clearDrawing() {
+    setDrawStart(null);
+    setDrawingRect(null);
+    setPolygonPoints([]);
+    setPolygonPreviewPoint(null);
+    setLassoPoints([]);
+    setShapes([]);
   }
 
   const totals = useMemo(() => {
@@ -4050,11 +4123,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     className={drawMode === "rectangle" ? "active" : ""}
                     title="Rectangle tool"
                     aria-label="Rectangle tool"
-                    onClick={() => {
-                      setDrawMode("rectangle");
-                      setPolygonPoints([]);
-                      setPolygonPreviewPoint(null);
-                    }}
+                    onClick={() => selectDrawMode("rectangle")}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <rect x="5" y="6" width="14" height="12" rx="1.5" />
@@ -4065,11 +4134,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     className={drawMode === "polygon" ? "active" : ""}
                     title="Point shape tool"
                     aria-label="Point shape tool"
-                    onClick={() => {
-                      setDrawMode("polygon");
-                      setDrawStart(null);
-                      setDrawingRect(null);
-                    }}
+                    onClick={() => selectDrawMode("polygon")}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M6 17 9 6l9 4-2 8-10-1Z" />
@@ -4079,38 +4144,43 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                       <circle cx="6" cy="17" r="1.7" />
                     </svg>
                   </button>
-                  {drawMode === "polygon" && polygonPoints.length ? (
-                    <>
-                      <button
-                        type="button"
-                        title="Undo point"
-                        aria-label="Undo point"
-                        onClick={() => {
-                          setPolygonPoints((current) => current.slice(0, -1));
-                          setPolygonPreviewPoint(null);
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="M9 7H5v4" />
-                          <path d="M5 7c2.5-2.2 6.5-2.7 9.4-1 3.5 2 4.5 6.4 2.2 9.6-1.9 2.6-5.4 3.5-8.4 2.2" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        title="Cancel point shape"
-                        aria-label="Cancel point shape"
-                        onClick={() => {
-                          setPolygonPoints([]);
-                          setPolygonPreviewPoint(null);
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path d="m7 7 10 10" />
-                          <path d="m17 7-10 10" />
-                        </svg>
-                      </button>
-                    </>
-                  ) : null}
+                  <button
+                    type="button"
+                    className={drawMode === "lasso" ? "active" : ""}
+                    title="Draw shape tool"
+                    aria-label="Draw shape tool"
+                    onClick={() => selectDrawMode("lasso")}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 15c1.5-6.8 6.4-9.9 10.5-7.2 4.5 3 1.7 10.7-4 10.7-3.8 0-5.9-1.8-4.2-4.4 1-1.6 3.6-2.2 5.2-.8" />
+                      <path d="M15.5 7.8 19 5" />
+                    </svg>
+                  </button>
+                  <span className="vinyl-toolbar-divider" aria-hidden="true" />
+                  <button
+                    type="button"
+                    title="Undo last"
+                    aria-label="Undo last"
+                    disabled={!shapes.length && !polygonPoints.length && !lassoPoints.length}
+                    onClick={undoLastDrawing}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M9 7H5v4" />
+                      <path d="M5 7c2.5-2.2 6.5-2.7 9.4-1 3.5 2 4.5 6.4 2.2 9.6-1.9 2.6-5.4 3.5-8.4 2.2" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    title="Clear"
+                    aria-label="Clear all"
+                    disabled={!shapes.length && !polygonPoints.length && !lassoPoints.length}
+                    onClick={clearDrawing}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="m7 7 10 10" />
+                      <path d="m17 7-10 10" />
+                    </svg>
+                  </button>
                 </div>
                 <div
                   ref={inlineSvgRef}
@@ -4129,6 +4199,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     setDrawStart(null);
                     setDrawingRect(null);
                     setEditDrag(null);
+                    setLassoPoints([]);
                   }}
                 >
                   {vehicleClipPathsD.length ? (
@@ -4242,32 +4313,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                       ))}
                     </g>
                   ) : null}
+                  {lassoPoints.length ? (
+                    <polyline points={pointsToSvg(lassoPoints)} className="vinyl-shape drawing vinyl-lasso-preview" />
+                  ) : null}
                 </svg>
               </div>
               <div className="vinyl-canvas-actions">
                 <span>
                   {drawMode === "polygon"
                     ? "Point shape: click near the first point to close it."
-                    : "Rectangle: drag across the panel you want to cover."}
+                    : drawMode === "lasso"
+                      ? "Draw shape: hold and draw, then release to close it."
+                      : "Rectangle: drag across the panel you want to cover."}
                 </span>
-                <div>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    disabled={!shapes.length}
-                    onClick={() => setShapes((current) => current.slice(0, -1))}
-                  >
-                    Undo last
-                  </button>
-                  <button
-                    className="danger-button"
-                    type="button"
-                    disabled={!shapes.length}
-                    onClick={() => setShapes([])}
-                  >
-                    Clear all
-                  </button>
-                </div>
               </div>
             </div>
 
