@@ -2465,19 +2465,24 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
     }
   }
 
-  async function deleteMileageSubmission() {
-    if (!hasCurrentSubmission) {
+  async function deleteMileageSubmission(targetMonthId = monthId, targetMonthLabel = monthLabel) {
+    const submittedMonth = history.find((entry) => entry.monthId === targetMonthId);
+    if (!submittedMonth) {
       setStatusMessage(createMessage("There is no submitted mileage for this month to delete.", "error"));
       return;
     }
-    if (!window.confirm(`Delete your mileage submission for ${monthLabel || monthId}?`)) return;
+    if (!window.confirm(`Delete your mileage submission for ${targetMonthLabel || submittedMonth.monthLabel || targetMonthId}?`)) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(`/api/mileage/${encodeURIComponent(monthId)}`, { method: "DELETE" });
+      const response = await fetch(`/api/mileage/${encodeURIComponent(targetMonthId)}`, { method: "DELETE" });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not delete mileage submission.");
-      applyMileagePayload(payload);
+      if (targetMonthId === monthId) {
+        applyMileagePayload(payload);
+      } else {
+        setHistory(Array.isArray(payload.history) ? payload.history : []);
+      }
       await onRefreshNotifications?.();
       setStatusMessage(createMessage("Mileage submission deleted.", "success"));
     } catch (error) {
@@ -2536,6 +2541,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                     From
                     <input
                       type="text"
+                      required
                       value={line.from}
                       placeholder="Start destination"
                       onChange={(event) => updateLine(line.id, "from", event.target.value)}
@@ -2545,6 +2551,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                     To
                     <input
                       type="text"
+                      required
                       value={line.to}
                       placeholder="End destination"
                       onChange={(event) => updateLine(line.id, "to", event.target.value)}
@@ -2554,6 +2561,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                     Journey note
                     <input
                       type="text"
+                      required
                       value={line.note}
                       placeholder="What was this journey for?"
                       onChange={(event) => updateLine(line.id, "note", event.target.value)}
@@ -2563,6 +2571,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                     Miles
                     <input
                       type="number"
+                      required
                       min="0"
                       step="0.1"
                       value={line.miles}
@@ -2602,7 +2611,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
               <button className="primary-button" type="submit" disabled={saving || loading}>
                 {saving ? "Submitting..." : "Submit mileage"}
               </button>
-              <button className="ghost-button danger" type="button" onClick={deleteMileageSubmission} disabled={deleting || loading || !hasCurrentSubmission}>
+              <button className="ghost-button danger" type="button" onClick={() => deleteMileageSubmission()} disabled={deleting || loading || !hasCurrentSubmission}>
                 {deleting ? "Deleting..." : "Delete submission"}
               </button>
             </div>
@@ -2617,16 +2626,24 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
           {history.length ? (
             <div className="mileage-history-list">
               {history.map((entry) => (
-                <button
+                <article
                   key={entry.id || entry.monthId}
-                  type="button"
                   className={`mileage-history-card ${entry.monthId === monthId ? "active" : ""}`}
-                  onClick={() => setMonthId(entry.monthId)}
                 >
-                  <span>{entry.monthLabel}</span>
-                  <strong>{Number(entry.totalMiles || 0).toFixed(1)} miles</strong>
-                  <small>{entry.lineCount} journey{entry.lineCount === 1 ? "" : "s"}</small>
-                </button>
+                  <button type="button" className="mileage-history-open" onClick={() => setMonthId(entry.monthId)}>
+                    <span>{entry.monthLabel}</span>
+                    <strong>{Number(entry.totalMiles || 0).toFixed(1)} miles</strong>
+                    <small>{entry.lineCount} journey{entry.lineCount === 1 ? "" : "s"}</small>
+                  </button>
+                  <button
+                    type="button"
+                    className="text-button danger mileage-history-delete"
+                    onClick={() => deleteMileageSubmission(entry.monthId, entry.monthLabel)}
+                    disabled={deleting}
+                  >
+                    Delete
+                  </button>
+                </article>
               ))}
             </div>
           ) : (

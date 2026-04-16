@@ -370,6 +370,21 @@ button {
   text-align: left;
 }
 
+.mileage-history-open {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.mileage-history-delete {
+  justify-self: start;
+  margin-top: 6px;
+}
+
 .mileage-history-card.active {
   border-color: var(--sx-main);
   background: var(--sx-main-soft);

@@ -862,29 +862,74 @@ function formatMileageMonthLabel(monthId) {
   return parsed ? monthFormatter.format(parsed) : String(monthId || "");
 }
 
+function extractUkPostcode(value) {
+  const match = String(value || "")
+    .toUpperCase()
+    .match(/\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/);
+  return match ? match[1].replace(/\s+/g, "") : "";
+}
+
+async function geocodeMileagePostcode(query) {
+  const postcode = extractUkPostcode(query);
+  if (!postcode) return null;
+  try {
+    const response = await fetch(`https://api.postcodes.io/postcodes/${encodeURIComponent(postcode)}`, {
+      headers: { Accept: "application/json" }
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    const lat = Number(payload?.result?.latitude);
+    const lon = Number(payload?.result?.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    return { lat, lon, label: payload?.result?.postcode || postcode };
+  } catch (error) {
+    return null;
+  }
+}
+
 async function geocodeMileageLocation(query) {
   const normalized = String(query || "").trim();
   if (!normalized) return null;
 
-  const url = new URL("https://nominatim.openstreetmap.org/search");
-  url.searchParams.set("format", "jsonv2");
-  url.searchParams.set("limit", "1");
-  url.searchParams.set("countrycodes", "gb");
-  url.searchParams.set("q", normalized);
+  const postcodeMatch = await geocodeMileagePostcode(normalized);
+  if (postcodeMatch) return postcodeMatch;
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-      "User-Agent": "sxpreston-mileage/1.0 (https://www.sxpreston.com)"
+  const queryAttempts = [
+    normalized,
+    `${normalized}, UK`,
+    `${normalized}, United Kingdom`
+  ];
+
+  for (const attempt of [...new Set(queryAttempts)]) {
+    try {
+      const url = new URL("https://nominatim.openstreetmap.org/search");
+      url.searchParams.set("format", "jsonv2");
+      url.searchParams.set("addressdetails", "1");
+      url.searchParams.set("limit", "1");
+      url.searchParams.set("countrycodes", "gb");
+      url.searchParams.set("q", attempt);
+
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "Accept-Language": "en-GB,en;q=0.9",
+          "User-Agent": "sxpreston-mileage/1.0 (https://www.sxpreston.com)"
+        }
+      });
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const first = Array.isArray(payload) ? payload[0] : null;
+      const lat = Number(first?.lat);
+      const lon = Number(first?.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return { lat, lon, label: first?.display_name || attempt };
+      }
+    } catch (error) {
+      continue;
     }
-  });
-  if (!response.ok) return null;
-  const payload = await response.json();
-  const first = Array.isArray(payload) ? payload[0] : null;
-  const lat = Number(first?.lat);
-  const lon = Number(first?.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return { lat, lon, label: first?.display_name || normalized };
+  }
+
+  return null;
 }
 
 async function estimateDrivingMiles(from, to) {
