@@ -284,7 +284,7 @@ button {
 
 .mileage-line {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(180px, 1fr) 120px auto;
+  grid-template-columns: 42px 150px minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(180px, 1fr) 120px auto;
   align-items: end;
   gap: 12px;
   padding: 14px;
@@ -354,7 +354,7 @@ button {
 
 .mileage-history-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
   margin-top: 18px;
 }
@@ -402,6 +402,12 @@ button {
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.mileage-history-journey small {
+  color: var(--sx-main-text);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .mileage-history-journey span {

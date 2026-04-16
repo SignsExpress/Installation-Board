@@ -1676,6 +1676,7 @@ function sanitizeMileageLine(payload) {
   const miles = Number(payload?.miles);
   return {
     id: String(payload?.id || makeId()),
+    date: String(payload?.date || "").trim(),
     from: String(payload?.from || "").trim(),
     to: String(payload?.to || "").trim(),
     note: String(payload?.note || "").trim(),
@@ -4585,9 +4586,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.status(400).json({ error: "Add at least one mileage line before submitting." });
       return;
     }
-    const invalidLine = nextClaim.lines.find((line) => !line.from || !line.to || !line.note || !Number(line.miles));
+    const invalidLine = nextClaim.lines.find((line) => !isValidIsoDate(line.date) || !line.from || !line.to || !line.note || !Number(line.miles));
     if (invalidLine) {
-      response.status(400).json({ error: "Every mileage line needs From, To, Miles and a note explaining what it was for." });
+      response.status(400).json({ error: "Every mileage line needs Date, From, To, Miles and a note explaining what it was for." });
       return;
     }
 

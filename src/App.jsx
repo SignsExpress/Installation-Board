@@ -2330,6 +2330,7 @@ function HolidaysPage({
 function createMileageLine(overrides = {}) {
   return {
     id: overrides.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    date: overrides.date || "",
     from: overrides.from || "",
     to: overrides.to || "",
     note: overrides.note || "",
@@ -2428,19 +2429,20 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
     const cleanLines = lines
       .map((line) => ({
         id: line.id,
+        date: line.date,
         from: line.from.trim(),
         to: line.to.trim(),
         note: line.note.trim(),
         miles: Number(line.miles) || 0
       }))
-      .filter((line) => line.from || line.to || line.note || line.miles);
+      .filter((line) => line.date || line.from || line.to || line.note || line.miles);
 
     if (!cleanLines.length) {
       setStatusMessage(createMessage("Add at least one mileage line before submitting.", "error"));
       return;
     }
-    if (cleanLines.some((line) => !line.from || !line.to || !line.note || !line.miles)) {
-      setStatusMessage(createMessage("Every journey needs From, To, Miles and a note explaining what it was for.", "error"));
+    if (cleanLines.some((line) => !line.date || !line.from || !line.to || !line.note || !line.miles)) {
+      setStatusMessage(createMessage("Every journey needs Date, From, To, Miles and a note explaining what it was for.", "error"));
       return;
     }
 
@@ -2535,6 +2537,15 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
               {lines.map((line, index) => (
                 <div key={line.id} className="mileage-line">
                   <span className="mileage-line-number">{index + 1}</span>
+                  <label className="mileage-date-field">
+                    Date
+                    <input
+                      type="date"
+                      required
+                      value={line.date}
+                      onChange={(event) => updateLine(line.id, "date", event.target.value)}
+                    />
+                  </label>
                   <label>
                     From
                     <input
@@ -2635,6 +2646,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                       <div key={`${entry.monthId}-${line.id}`} className="mileage-history-journey">
                         <div>
                           <strong>{line.note || "No note"}</strong>
+                          <small>{formatJobDate(line.date) || "-"}</small>
                           <span>{line.from || "-"} to {line.to || "-"}</span>
                         </div>
                         <span className="mileage-history-miles">{Number(line.miles || 0).toFixed(1)} miles</span>
