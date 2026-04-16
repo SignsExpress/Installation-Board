@@ -371,6 +371,10 @@ function getBoardNotificationRecipients(users) {
   return users.filter((user) => canAccessBoard(sanitizeUser(user)));
 }
 
+function getBoardEditorNotificationRecipients(users) {
+  return users.filter((user) => canEditBoard(sanitizeUser(user)));
+}
+
 function getBoardLinkForUser(user, jobId = "") {
   const basePath = canEditBoard(sanitizeUser(user)) ? "/board" : "/client/board";
   if (!jobId) return basePath;
@@ -405,6 +409,20 @@ function getJobNotificationSummary(job) {
 function pushBoardNotification(store, users, buildPayload) {
   store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
   getBoardNotificationRecipients(users).forEach((user) => {
+    const payload = buildPayload(user) || {};
+    store.notifications.unshift(
+      createNotification({
+        userId: user.id,
+        link: getBoardLinkForUser(user, payload.jobId),
+        ...payload
+      })
+    );
+  });
+}
+
+function pushBoardEditorNotification(store, users, buildPayload) {
+  store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+  getBoardEditorNotificationRecipients(users).forEach((user) => {
     const payload = buildPayload(user) || {};
     store.notifications.unshift(
       createNotification({
@@ -1557,9 +1575,16 @@ function sanitizeJob(payload) {
       payload.isCompleted === true ||
       String(payload.isCompleted || "").trim().toLowerCase() === "true" ||
       String(payload.isCompleted || "").trim() === "1",
+    isSnagging:
+      payload.isSnagging === true ||
+      String(payload.isSnagging || "").trim().toLowerCase() === "true" ||
+      String(payload.isSnagging || "").trim() === "1",
     completedAt: String(payload.completedAt || "").trim(),
     completedByUserId: String(payload.completedByUserId || "").trim(),
     completedByName: String(payload.completedByName || "").trim(),
+    snaggingAt: String(payload.snaggingAt || "").trim(),
+    snaggingByUserId: String(payload.snaggingByUserId || "").trim(),
+    snaggingByName: String(payload.snaggingByName || "").trim(),
     photos: rawPhotos,
     notes: String(payload.notes || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
@@ -4263,9 +4288,13 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const nextJob = sanitizeJob({
       ...existing,
       isCompleted: true,
+      isSnagging: false,
       completedAt: existing.completedAt || new Date().toISOString(),
       completedByUserId: request.user?.id || existing.completedByUserId,
-      completedByName: request.user?.displayName || existing.completedByName
+      completedByName: request.user?.displayName || existing.completedByName,
+      snaggingAt: "",
+      snaggingByUserId: "",
+      snaggingByName: ""
     });
 
     store.jobs[index] = nextJob;
@@ -4286,6 +4315,47 @@ app.get("/api/corebridge/orders", async (request, response) => {
           message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
         }));
     }
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.post("/api/jobs/:id/snagging", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const nextJob = sanitizeJob({
+      ...existing,
+      isSnagging: true,
+      snaggingAt: existing.snaggingAt || new Date().toISOString(),
+      snaggingByUserId: request.user?.id || existing.snaggingByUserId,
+      snaggingByName: request.user?.displayName || existing.snaggingByName
+    });
+
+    store.jobs[index] = nextJob;
+    if (!existing.isSnagging) {
+      const usersStore = await readUsersStore();
+      const jobSummary = getJobNotificationSummary(nextJob);
+      pushBoardEditorNotification(store, usersStore.users || [], () => ({
+        jobId: nextJob.id,
+        type: "job-snagging",
+        title: "Snagging raised",
+        message: `${jobSummary} was marked as snagging by ${request.user?.displayName || "a user"}.`
+      }));
+    }
+
     const savedStore = await writeStore(store);
     const payload = {
       jobs: toPublicJobs(savedStore.jobs),

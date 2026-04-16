@@ -579,7 +579,7 @@ function renderJobCardContent({
   return (
       <div
         key={job.id}
-        className={`job-card ${meta.colorClass}-card ${job.isPlaceholder ? "is-placeholder" : ""} ${job.isCompleted ? "is-complete" : ""} ${isCondensed ? "is-condensed" : ""} ${draggingJobId === job.id ? "is-dragging" : ""}`}
+        className={`job-card ${meta.colorClass}-card ${job.isPlaceholder ? "is-placeholder" : ""} ${job.isCompleted ? "is-complete" : ""} ${job.isSnagging ? "is-snagging" : ""} ${isCondensed ? "is-condensed" : ""} ${draggingJobId === job.id ? "is-dragging" : ""}`}
         draggable={!isClientMode}
       onDragStart={(event) => {
         if (isClientMode) return;
@@ -618,6 +618,7 @@ function renderJobCardContent({
           </div>
         <div className="job-title-meta">
           {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
+          {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
           {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
           {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
           {installerLabels.length ? (
@@ -4216,6 +4217,18 @@ export default function App() {
     return payload;
   }
 
+  async function snaggingJob(jobId) {
+    const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/snagging`, {
+      method: "POST"
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not mark the job as snagging.");
+    }
+    applyBoardPayloadToState(payload, jobId);
+    return payload;
+  }
+
   async function undoCompleteJob(jobId) {
     const response = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/uncomplete`, {
       method: "POST"
@@ -4305,6 +4318,18 @@ export default function App() {
       if (adminPhotoInputRef.current) {
         adminPhotoInputRef.current.value = "";
       }
+    }
+  }
+
+  async function markAdminJobSnagging(job) {
+    if (!job?.id) return;
+    try {
+      await snaggingJob(job.id);
+      setAdminCompletePrompt(false);
+      setMessage(createMessage("Job marked as snagging.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not mark the job as snagging.", "error"));
     }
   }
 
@@ -5594,6 +5619,7 @@ export default function App() {
                     <span className={`job-summary-pill ${activeAdminJob.isCompleted ? "is-complete" : ""}`}>
                       {activeAdminJob.isCompleted ? "Completed" : getJobTypeLabel(activeAdminJob)}
                     </span>
+                    {activeAdminJob.isSnagging ? <span className="job-summary-pill is-snagging">Snagging</span> : null}
                     {activeAdminJob.isPlaceholder ? <span className="job-summary-pill is-placeholder">Placeholder</span> : null}
                     {Array.isArray(activeAdminJob.photos) && activeAdminJob.photos.length ? (
                       <span className="job-summary-pill is-photos">{activeAdminJob.photos.length} photo{activeAdminJob.photos.length === 1 ? "" : "s"}</span>
@@ -5665,6 +5691,16 @@ export default function App() {
                     disabled={adminPhotoUploading || adminExporting}
                   >
                     Mark as Complete
+                  </button>
+                ) : null}
+                {activeAdminJob && !activeAdminJob.isCompleted && !activeAdminJob.isSnagging && !adminCompletePrompt ? (
+                  <button
+                    className="snagging-button"
+                    type="button"
+                    onClick={() => markAdminJobSnagging(activeAdminJob)}
+                    disabled={adminPhotoUploading || adminExporting}
+                  >
+                    Snagging
                   </button>
                 ) : null}
                 <button className="primary-button" type="submit" disabled={saving}>
@@ -5836,6 +5872,7 @@ export default function App() {
                 <span className={`job-summary-pill ${activeClientJob.isCompleted ? "is-complete" : ""}`}>
                   {activeClientJob.isCompleted ? "Completed" : getJobTypeLabel(activeClientJob)}
                 </span>
+                {activeClientJob.isSnagging ? <span className="job-summary-pill is-snagging">Snagging</span> : null}
                 {activeClientJob.isPlaceholder ? <span className="job-summary-pill is-placeholder">Placeholder</span> : null}
                 {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
                   <span className="job-summary-pill is-photos">{activeClientJob.photos.length} photo{activeClientJob.photos.length === 1 ? "" : "s"}</span>

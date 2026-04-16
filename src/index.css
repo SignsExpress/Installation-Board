@@ -1031,6 +1031,7 @@ button {
 .primary-button,
 .ghost-button,
 .success-button,
+.snagging-button,
 .text-button {
   transition: 0.18s ease;
 }
@@ -1077,6 +1078,19 @@ button {
   font-weight: 700;
 }
 
+.snagging-button {
+  min-height: 46px;
+  border-radius: 16px;
+  padding: 0 18px;
+  border: 1px solid #eab308;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fde047;
+  color: #111827;
+  font-weight: 800;
+}
+
 .danger-button {
   min-height: 46px;
   border-radius: 16px;
@@ -1109,6 +1123,10 @@ button {
 
 .success-button:hover {
   background: #15803d;
+}
+
+.snagging-button:hover {
+  background: #facc15;
 }
 
 .danger-button:hover {
@@ -1522,6 +1540,7 @@ button {
 .job-card.is-condensed .job-tag,
 .job-card.is-condensed .installer-badge.title-inline,
 .job-card.is-condensed .placeholder-status-pill,
+.job-card.is-condensed .job-snagging-pill,
 .job-card.is-condensed .job-complete-pill,
 .job-card.is-condensed .job-photo-pill {
   font-size: 0.68rem;
@@ -1599,6 +1618,44 @@ button {
 .job-card.is-placeholder::before {
   width: 8px;
   background: linear-gradient(180deg, #f59e0b 0%, #f97316 100%);
+}
+
+@keyframes snagging-card-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.3), 0 0 0 rgba(250, 204, 21, 0);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(234, 179, 8, 0.55), 0 0 0 5px rgba(250, 204, 21, 0.25);
+  }
+}
+
+@keyframes snagging-pill-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.28);
+  }
+}
+
+.job-card.is-snagging {
+  border-color: #eab308;
+  background: linear-gradient(180deg, #fef9c3 0%, #fef08a 100%);
+  animation: snagging-card-pulse 1.35s ease-in-out infinite;
+}
+
+.job-card.is-snagging > * {
+  position: relative;
+  z-index: 1;
+}
+
+.job-card.is-snagging::before {
+  width: 8px;
+  background: #eab308;
 }
 
 .drag-preview {
@@ -1726,6 +1783,20 @@ button {
   font-size: 0.74rem;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.job-snagging-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #fde047;
+  color: #111827;
+  border: 1px solid #eab308;
+  font-size: 0.74rem;
+  font-weight: 900;
+  white-space: nowrap;
+  animation: snagging-pill-pulse 1.35s ease-in-out infinite;
 }
 
 .job-photo-pill {
@@ -1969,6 +2040,13 @@ button {
   background: #fef3c7;
   border-color: rgba(245, 158, 11, 0.25);
   color: #b45309;
+}
+
+.job-summary-pill.is-snagging {
+  background: #fde047;
+  border-color: #eab308;
+  color: #111827;
+  animation: snagging-pill-pulse 1.35s ease-in-out infinite;
 }
 
 .job-summary-pill.is-photos {
