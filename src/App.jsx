@@ -94,11 +94,15 @@ const VAN_REFERENCE_TYRE_DIAMETER_MM = 686.5;
 const VAN_REFERENCE_TYRE_DIAMETER_UNITS = 194.62;
 
 const VAN_ESTIMATOR_TEMPLATE = {
-  name: "Ford Transit Custom SWB",
+  id: "medium-van-transit-custom",
+  sizeName: "Medium Van",
+  exampleName: "Ford Transit Custom",
   src: "/vans/ford-transit-custom-swb.svg",
   scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
+
+const VEHICLE_TEMPLATE_OPTIONS = [VAN_ESTIMATOR_TEMPLATE];
 
 const VEHICLE_GRAPHICS_PRICING = {
   standardVinylRate: 85,
@@ -157,11 +161,6 @@ const VEHICLE_GRAPHICS_PRICING = {
   minMediumPartialWrapPrice: 900,
   minFullWrapPrice: 1800,
   premiumOverride: false
-};
-
-const VEHICLE_ZONE_MATERIALS = {
-  standard_vinyl: { label: "Standard vinyl", rate: VEHICLE_GRAPHICS_PRICING.standardVinylRate },
-  wrap_film: { label: "Wrap film", rate: VEHICLE_GRAPHICS_PRICING.wrapMaterialRates.under15 }
 };
 
 const VEHICLE_PRICING_STORAGE_KEY = "vehicle-pricing-settings";
@@ -3179,6 +3178,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       return VEHICLE_GRAPHICS_PRICING;
     }
   });
+  const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [drawingRect, setDrawingRect] = useState(null);
   const [drawStart, setDrawStart] = useState(null);
@@ -4015,6 +4015,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     );
   }
 
+  const selectedTemplate =
+    VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
+
   return (
     <div className="app-shell">
       <div className="page vinyl-estimator-page">
@@ -4030,9 +4033,17 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             <div>
               <h2>Vehicle Pricing Calculator</h2>
             </div>
-            <div className="vinyl-estimator-template">
-              <span>{VAN_ESTIMATOR_TEMPLATE.name}</span>
-            </div>
+            <label className="vinyl-estimator-template">
+              <span>Select Vehicle Size:</span>
+              <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+                {VEHICLE_TEMPLATE_OPTIONS.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.sizeName}
+                  </option>
+                ))}
+              </select>
+              <small>Example: {selectedTemplate.exampleName}</small>
+            </label>
           </div>
 
           <div className="vinyl-estimator-grid">
@@ -4344,33 +4355,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 </details>
               ) : null}
 
-              <div className="vinyl-shape-list" hidden>
-                {shapes.length ? (
-                  shapes.map((shape) => (
-                    <div key={`shape-row-${shape.id}`} className="vinyl-shape-row">
-                      <div>
-                        <strong>
-                          {VEHICLE_ZONE_MATERIALS[shape.zoneMetadata?.material_type]?.label ||
-                            (shape.isWrapFilm ? "Wrap film" : "Standard vinyl")}
-                        </strong>
-                        <small>
-                          {formatM2(shape.areaM2)} · {(shape.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm x{" "}
-                          {(shape.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor).toFixed(0)}mm
-                        </small>
-                      </div>
-                      <button
-                        className="text-button danger"
-                        type="button"
-                        onClick={() => setShapes((current) => current.filter((entry) => entry.id !== shape.id))}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <p className="muted">No vinyl areas drawn yet.</p>
-                )}
-              </div>
             </aside>
           </div>
         </section>

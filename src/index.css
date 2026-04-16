@@ -559,15 +559,15 @@ button {
 }
 
 .vinyl-estimator-panel {
-  padding: 28px;
+  padding: 18px;
 }
 
 .vinyl-estimator-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 22px;
+  gap: 14px;
+  margin-bottom: 12px;
 }
 
 .vinyl-estimator-head h2,
@@ -583,38 +583,53 @@ button {
 
 .vinyl-estimator-template {
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 18px;
-  padding: 12px 16px;
+  border-radius: 14px;
+  padding: 9px 12px;
   background: rgba(248, 250, 252, 0.92);
   display: grid;
   gap: 4px;
   min-width: 240px;
-  text-align: right;
+  text-align: left;
 }
 
 .vinyl-estimator-template span {
   color: var(--sx-slate-soft);
   font-weight: 800;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.vinyl-estimator-template strong {
+.vinyl-estimator-template select {
+  width: 100%;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 10px;
+  background: #fff;
   color: #0f172a;
-  font-size: 0.9rem;
+  font: inherit;
+  font-weight: 900;
+  padding: 8px 34px 8px 10px;
+}
+
+.vinyl-estimator-template small {
+  color: #0f172a;
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .vinyl-estimator-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 380px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 14px;
   align-items: start;
 }
 
 .vinyl-canvas-card,
 .vinyl-estimate-card {
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 24px;
+  border-radius: 18px;
   background: #fff;
-  padding: 16px;
+  padding: 12px;
   box-shadow: 0 16px 44px rgba(15, 23, 42, 0.07);
 }
 
@@ -623,7 +638,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .vinyl-tool-segment,
@@ -665,7 +680,8 @@ button {
   background:
     linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.75)),
     #fff;
-  min-height: 520px;
+  height: clamp(340px, calc(100vh - 282px), 520px);
+  min-height: 0;
   user-select: none;
 }
 
@@ -678,9 +694,14 @@ button {
   user-select: none;
 }
 
+.vinyl-template {
+  position: absolute;
+  inset: 0;
+}
+
 .van-template-svg {
-  height: auto;
-  min-height: 520px;
+  height: 100%;
+  min-height: 0;
 }
 
 .vinyl-template svg {
@@ -958,36 +979,6 @@ button {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-}
-
-.vinyl-shape-list {
-  display: grid;
-  gap: 8px;
-}
-
-.vinyl-shape-list h3 {
-  margin: 0;
-}
-
-.vinyl-shape-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(248, 250, 252, 0.9);
-}
-
-.vinyl-shape-row div {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.vinyl-shape-row small {
-  color: var(--sx-slate-soft);
-  font-weight: 700;
 }
 
 .host-nav-link-label {
@@ -5450,8 +5441,12 @@ button {
     position: static;
   }
 
+  .vinyl-canvas {
+    height: clamp(300px, 52vh, 430px);
+  }
+
   .van-template-svg {
-    min-height: 260px;
+    min-height: 0;
   }
 
   .vinyl-stats-grid,
@@ -5461,11 +5456,4 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .vinyl-shape-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .vinyl-shape-row button {
-    justify-self: start;
-  }
 }
