@@ -4544,6 +4544,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         monthLabel: formatMileageMonthLabel(claim.monthId),
         totalMiles: claim.totalMiles,
         lineCount: claim.lines.length,
+        lines: claim.lines,
         updatedAt: claim.updatedAt,
         submittedAt: claim.submittedAt
       }))
@@ -4636,6 +4637,90 @@ app.get("/api/corebridge/orders", async (request, response) => {
         monthLabel: formatMileageMonthLabel(claim.monthId),
         totalMiles: claim.totalMiles,
         lineCount: claim.lines.length,
+        lines: claim.lines,
+        updatedAt: claim.updatedAt,
+        submittedAt: claim.submittedAt
+      }))
+    });
+  });
+
+  app.delete("/api/mileage/:monthId/lines/:lineId", async (request, response) => {
+    if (!requireMileageAccess(request, response)) return;
+    const monthId = String(request.params.monthId || "").trim();
+    const lineId = String(request.params.lineId || "").trim();
+    if (!parseMonthId(monthId) || !lineId) {
+      response.status(400).json({ error: "A valid mileage month and journey are required." });
+      return;
+    }
+
+    const userId = String(request.user?.id || "");
+    const store = await readStore();
+    const claimIndex = (store.mileageClaims || []).findIndex(
+      (claim) => String(claim.userId || "") === userId && String(claim.monthId || "") === monthId
+    );
+
+    if (claimIndex === -1) {
+      response.status(404).json({ error: "Mileage submission not found." });
+      return;
+    }
+
+    const existingClaim = sanitizeMileageClaim(store.mileageClaims[claimIndex]);
+    const removedLine = existingClaim.lines.find((line) => String(line.id || "") === lineId);
+    if (!removedLine) {
+      response.status(404).json({ error: "Mileage journey not found." });
+      return;
+    }
+
+    const nextLines = existingClaim.lines.filter((line) => String(line.id || "") !== lineId);
+    if (nextLines.length) {
+      store.mileageClaims[claimIndex] = sanitizeMileageClaim({
+        ...existingClaim,
+        lines: nextLines
+      });
+    } else {
+      store.mileageClaims = (store.mileageClaims || []).filter((_, index) => index !== claimIndex);
+    }
+
+    const usersStore = await readUsersStore();
+    const matt = (usersStore.users || []).find(
+      (user) => String(user.displayName || "").trim().toLowerCase() === "matt rutlidge"
+    );
+    if (matt?.id) {
+      store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+      store.notifications.unshift(
+        createNotification({
+          userId: matt.id,
+          type: "mileage-journey-deleted",
+          title: "Mileage journey deleted",
+          message: `${request.user?.displayName || "A user"} deleted a ${removedLine.miles} mile journey from ${formatMileageMonthLabel(monthId)} mileage.`,
+          link: `/mileage?month=${encodeURIComponent(monthId)}`
+        })
+      );
+    }
+
+    const savedStore = await writeStore(store);
+    const savedClaims = (savedStore.mileageClaims || [])
+      .map((claim) => sanitizeMileageClaim(claim))
+      .filter((claim) => String(claim.userId || "") === userId);
+    const savedClaim =
+      savedClaims.find((claim) => String(claim.monthId || "") === monthId) ||
+      sanitizeMileageClaim({
+        userId,
+        userName: request.user?.displayName || "",
+        monthId,
+        lines: []
+      });
+    response.json({
+      monthId,
+      monthLabel: formatMileageMonthLabel(monthId),
+      claim: savedClaim,
+      history: savedClaims.map((claim) => ({
+        id: claim.id,
+        monthId: claim.monthId,
+        monthLabel: formatMileageMonthLabel(claim.monthId),
+        totalMiles: claim.totalMiles,
+        lineCount: claim.lines.length,
+        lines: claim.lines,
         updatedAt: claim.updatedAt,
         submittedAt: claim.submittedAt
       }))
@@ -4697,6 +4782,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         monthLabel: formatMileageMonthLabel(claim.monthId),
         totalMiles: claim.totalMiles,
         lineCount: claim.lines.length,
+        lines: claim.lines,
         updatedAt: claim.updatedAt,
         submittedAt: claim.submittedAt
       }))

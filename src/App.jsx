@@ -2356,7 +2356,6 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
     () => Math.round(lines.reduce((sum, line) => sum + (Number(line.miles) || 0), 0) * 10) / 10,
     [lines]
   );
-  const hasCurrentSubmission = history.some((entry) => entry.monthId === monthId);
 
   function updateLine(lineId, key, value) {
     setLines((current) =>
@@ -2465,29 +2464,28 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
     }
   }
 
-  async function deleteMileageSubmission(targetMonthId = monthId, targetMonthLabel = monthLabel) {
-    const submittedMonth = history.find((entry) => entry.monthId === targetMonthId);
-    if (!submittedMonth) {
-      setStatusMessage(createMessage("There is no submitted mileage for this month to delete.", "error"));
-      return;
-    }
-    if (!window.confirm(`Delete your mileage submission for ${targetMonthLabel || submittedMonth.monthLabel || targetMonthId}?`)) return;
+  async function deleteMileageJourney(targetMonthId, lineId, targetMonthLabel = "") {
+    if (!targetMonthId || !lineId) return;
+    if (!window.confirm(`Delete this journey from ${targetMonthLabel || targetMonthId}?`)) return;
 
     try {
       setDeleting(true);
-      const response = await fetch(`/api/mileage/${encodeURIComponent(targetMonthId)}`, { method: "DELETE" });
+      const response = await fetch(
+        `/api/mileage/${encodeURIComponent(targetMonthId)}/lines/${encodeURIComponent(lineId)}`,
+        { method: "DELETE" }
+      );
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not delete mileage submission.");
+      if (!response.ok) throw new Error(payload.error || "Could not delete mileage journey.");
       if (targetMonthId === monthId) {
         applyMileagePayload(payload);
       } else {
         setHistory(Array.isArray(payload.history) ? payload.history : []);
       }
       await onRefreshNotifications?.();
-      setStatusMessage(createMessage("Mileage submission deleted.", "success"));
+      setStatusMessage(createMessage("Mileage journey deleted.", "success"));
     } catch (error) {
       console.error(error);
-      setStatusMessage(createMessage(error.message || "Could not delete mileage submission.", "error"));
+      setStatusMessage(createMessage(error.message || "Could not delete mileage journey.", "error"));
     } finally {
       setDeleting(false);
     }
@@ -2611,9 +2609,6 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
               <button className="primary-button" type="submit" disabled={saving || loading}>
                 {saving ? "Submitting..." : "Submit mileage"}
               </button>
-              <button className="ghost-button danger" type="button" onClick={() => deleteMileageSubmission()} disabled={deleting || loading || !hasCurrentSubmission}>
-                {deleting ? "Deleting..." : "Delete submission"}
-              </button>
             </div>
           </form>
         </section>
@@ -2635,14 +2630,25 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                     <strong>{Number(entry.totalMiles || 0).toFixed(1)} miles</strong>
                     <small>{entry.lineCount} journey{entry.lineCount === 1 ? "" : "s"}</small>
                   </button>
-                  <button
-                    type="button"
-                    className="text-button danger mileage-history-delete"
-                    onClick={() => deleteMileageSubmission(entry.monthId, entry.monthLabel)}
-                    disabled={deleting}
-                  >
-                    Delete
-                  </button>
+                  <div className="mileage-history-journeys">
+                    {(Array.isArray(entry.lines) ? entry.lines : []).map((line) => (
+                      <div key={`${entry.monthId}-${line.id}`} className="mileage-history-journey">
+                        <div>
+                          <strong>{line.note || "No note"}</strong>
+                          <span>{line.from || "-"} to {line.to || "-"}</span>
+                        </div>
+                        <span className="mileage-history-miles">{Number(line.miles || 0).toFixed(1)} miles</span>
+                        <button
+                          type="button"
+                          className="text-button danger mileage-history-delete"
+                          onClick={() => deleteMileageJourney(entry.monthId, line.id, entry.monthLabel)}
+                          disabled={deleting}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </article>
               ))}
             </div>

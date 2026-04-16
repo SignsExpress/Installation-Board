@@ -380,9 +380,43 @@ button {
   text-align: left;
 }
 
+.mileage-history-journeys {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(203, 213, 225, 0.75);
+}
+
+.mileage-history-journey {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.mileage-history-journey div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mileage-history-journey span {
+  color: var(--sx-slate-soft);
+  font-size: 0.86rem;
+}
+
+.mileage-history-miles {
+  color: #0f172a !important;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .mileage-history-delete {
   justify-self: start;
-  margin-top: 6px;
 }
 
 .mileage-history-card.active {
@@ -4699,6 +4733,16 @@ button {
   .mileage-total {
     margin-left: 0;
     text-align: left;
+  }
+
+  .mileage-history-journey {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .mileage-history-miles,
+  .mileage-history-delete {
+    justify-self: start;
   }
 
   .mileage-footer > button,
