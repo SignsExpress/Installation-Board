@@ -3136,8 +3136,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [editDrag, setEditDrag] = useState(null);
+  const [mirrorOnOtherSide, setMirrorOnOtherSide] = useState(false);
+  const [vehicleClipPathD, setVehicleClipPathD] = useState("");
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
+  const vehicleBodyPathRef = useRef(null);
   const wrapLinesRef = useRef([]);
 
   useEffect(() => {
@@ -3170,6 +3173,27 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
       svg.classList.add("van-template-svg");
     }
+
+    const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
+    const vehicleBodyPath =
+      Array.from(artworkLayer?.querySelectorAll("path") || [])
+        .filter((element) => {
+          const styles = window.getComputedStyle(element);
+          const fill = styles.fill || element.getAttribute("fill") || "";
+          return fill !== "none";
+        })
+        .map((element) => {
+          try {
+            const box = element.getBBox();
+            return { element, area: box.width * box.height };
+          } catch (error) {
+            return null;
+          }
+        })
+        .filter((entry) => entry?.area)
+        .sort((left, right) => right.area - left.area)[0]?.element || null;
+    vehicleBodyPathRef.current = vehicleBodyPath;
+    setVehicleClipPathD(vehicleBodyPath?.getAttribute("d") || "");
 
     const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
     if (!wrapLayer) {
@@ -3257,6 +3281,18 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     ];
   }
 
+  function getVehicleBodyBounds() {
+    try {
+      const box = vehicleBodyPathRef.current?.getBBox();
+      if (box?.width && box?.height) {
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      }
+    } catch (error) {
+      // Fall back to the full drawing viewBox if the body path is not ready yet.
+    }
+    return VAN_ESTIMATOR_TEMPLATE.viewBox;
+  }
+
   function rectsIntersect(left, right) {
     return (
       left.x < right.x + right.width &&
@@ -3277,6 +3313,60 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       if (point.x < crossingX) inside = !inside;
     }
     return inside;
+  }
+
+  function isPointInVehicleBody(point) {
+    const path = vehicleBodyPathRef.current;
+    const svg = inlineSvgRef.current?.querySelector("svg");
+    if (!path || !svg) return true;
+
+    try {
+      const svgPoint = svg.createSVGPoint();
+      svgPoint.x = point.x;
+      svgPoint.y = point.y;
+      if (typeof path.isPointInFill === "function") return path.isPointInFill(svgPoint);
+    } catch (error) {
+      // Older engines can miss SVG geometry helpers; the bbox fallback still prevents wild off-vehicle areas.
+    }
+
+    const bounds = getVehicleBodyBounds();
+    return (
+      point.x >= bounds.x &&
+      point.x <= bounds.x + bounds.width &&
+      point.y >= bounds.y &&
+      point.y <= bounds.y + bounds.height
+    );
+  }
+
+  function getVehicleClipRatio(area) {
+    if (!vehicleBodyPathRef.current) return 1;
+    const bounds = area.bounds || area;
+    if (!bounds?.width || !bounds?.height) return 1;
+
+    const columns = Math.max(4, Math.min(32, Math.ceil(bounds.width / 24)));
+    const rows = Math.max(4, Math.min(32, Math.ceil(bounds.height / 24)));
+    let insideShape = 0;
+    let insideVehicle = 0;
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const point = {
+          x: bounds.x + ((column + 0.5) * bounds.width) / columns,
+          y: bounds.y + ((row + 0.5) * bounds.height) / rows
+        };
+        if (area.points?.length && !isPointInPolygon(point, area.points)) continue;
+        insideShape += 1;
+        if (isPointInVehicleBody(point)) insideVehicle += 1;
+      }
+    }
+
+    return insideShape > 0 ? insideVehicle / insideShape : 0;
+  }
+
+  function mirrorPointAcrossVehicle(point) {
+    const bounds = getVehicleBodyBounds();
+    const centerX = bounds.x + bounds.width / 2;
+    return { ...point, x: centerX + (centerX - point.x) };
   }
 
   function isWrapFilmArea(area) {
@@ -3371,12 +3461,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     if (shape.type === "polygon") {
       const bounds = getPolygonBounds(shape.points);
       const zoneMetadata = getVehicleZoneMetadata({ points: shape.points, bounds });
+      const rawAreaM2 = getPolygonAreaM2(shape.points);
+      const clipRatio = getVehicleClipRatio({ points: shape.points, bounds });
       return {
         ...shape,
         bounds,
         width: bounds.width,
         height: bounds.height,
-        areaM2: getPolygonAreaM2(shape.points),
+        rawAreaM2,
+        clipRatio,
+        areaM2: rawAreaM2 * clipRatio,
         zoneMetadata,
         isWrapFilm: zoneMetadata.material_type === "wrap_film"
       };
@@ -3389,14 +3483,61 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       height: shape.height
     };
     const zoneMetadata = getVehicleZoneMetadata(rect);
+    const rawAreaM2 = getRectAreaM2(rect);
+    const clipRatio = getVehicleClipRatio(rect);
 
     return {
       ...shape,
       bounds: rect,
-      areaM2: getRectAreaM2(rect),
+      rawAreaM2,
+      clipRatio,
+      areaM2: rawAreaM2 * clipRatio,
       zoneMetadata,
       isWrapFilm: zoneMetadata.material_type === "wrap_film"
     };
+  }
+
+  function createMirroredShape(shape) {
+    if (shape.type === "polygon") {
+      const points = shape.points.map(mirrorPointAcrossVehicle).reverse();
+      return refreshShapeMetrics({
+        ...shape,
+        id: `${shape.id}-mirror`,
+        points,
+        mirroredFrom: shape.id,
+        isMirror: true
+      });
+    }
+
+    const rect = normalizeRect(
+      mirrorPointAcrossVehicle({ x: shape.x, y: shape.y }),
+      mirrorPointAcrossVehicle({ x: shape.x + shape.width, y: shape.y + shape.height })
+    );
+    return refreshShapeMetrics({
+      ...shape,
+      ...rect,
+      id: `${shape.id}-mirror`,
+      mirroredFrom: shape.id,
+      isMirror: true
+    });
+  }
+
+  function addShapeWithOptionalMirror(shape) {
+    const nextShapes = [shape];
+    if (mirrorOnOtherSide) {
+      const mirroredShape = createMirroredShape(shape);
+      if (mirroredShape.areaM2 > 0.001) nextShapes.push(mirroredShape);
+    }
+    setShapes((current) => [...current, ...nextShapes]);
+  }
+
+  function undoLastShape() {
+    setShapes((current) => {
+      const lastShape = current[current.length - 1];
+      if (!lastShape) return current;
+      const groupId = lastShape.mirroredFrom || lastShape.id;
+      return current.filter((shape) => shape.id !== groupId && shape.mirroredFrom !== groupId);
+    });
   }
 
   function updateShapeCorner(shape, dragState, point) {
@@ -3416,24 +3557,17 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function finishPolygon() {
     if (polygonPoints.length < 3) return;
     const bounds = getPolygonBounds(polygonPoints);
-    const areaM2 = getPolygonAreaM2(polygonPoints);
-    if (areaM2 <= 0.001) return;
-    const zoneMetadata = getVehicleZoneMetadata({ points: polygonPoints, bounds });
+    const shape = refreshShapeMetrics({
+      id: `vinyl-poly-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
+      type: "polygon",
+      points: polygonPoints,
+      bounds,
+      width: bounds.width,
+      height: bounds.height
+    });
+    if (shape.areaM2 <= 0.001) return;
 
-    setShapes((current) => [
-      ...current,
-      {
-        id: `vinyl-poly-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
-        type: "polygon",
-        points: polygonPoints,
-        bounds,
-        width: bounds.width,
-        height: bounds.height,
-        zoneMetadata,
-        isWrapFilm: zoneMetadata.material_type === "wrap_film",
-        areaM2
-      }
-    ]);
+    addShapeWithOptionalMirror(shape);
     setPolygonPoints([]);
     setPolygonPreviewPoint(null);
   }
@@ -3497,19 +3631,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setDrawingRect(null);
     if (rect.width < 4 || rect.height < 4) return;
 
-    const zoneMetadata = getVehicleZoneMetadata(rect);
-    const areaM2 = getRectAreaM2(rect);
-    setShapes((current) => [
-      ...current,
-      {
-        ...rect,
-        type: "rectangle",
-        bounds: rect,
-        zoneMetadata,
-        isWrapFilm: zoneMetadata.material_type === "wrap_film",
-        areaM2
-      }
-    ]);
+    const shape = refreshShapeMetrics({
+      ...rect,
+      type: "rectangle",
+      bounds: rect
+    });
+    if (shape.areaM2 <= 0.001) return;
+    addShapeWithOptionalMirror(shape);
   }
 
   function startShapeCornerDrag(event, shape, cornerOrPointIndex) {
@@ -3546,7 +3674,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     event.stopPropagation();
     event.preventDefault();
     clearTextSelection();
-    setShapes((current) => current.filter((shape) => shape.id !== shapeId));
+    setShapes((current) => {
+      const target = current.find((shape) => shape.id === shapeId);
+      const groupId = target?.mirroredFrom || target?.id || shapeId;
+      return current.filter((shape) => shape.id !== groupId && shape.mirroredFrom !== groupId);
+    });
   }
 
   const totals = useMemo(() => {
@@ -3722,6 +3854,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     Point shape
                   </button>
                 </div>
+                <label className="vinyl-mirror-toggle">
+                  <input
+                    type="checkbox"
+                    checked={mirrorOnOtherSide}
+                    onChange={(event) => setMirrorOnOtherSide(event.target.checked)}
+                  />
+                  <span>Mirror on other side</span>
+                </label>
                 {drawMode === "polygon" ? (
                   <div className="vinyl-point-actions">
                     <button className="ghost-button" type="button" disabled={polygonPoints.length < 3} onClick={finishPolygon}>
@@ -3773,22 +3913,31 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     setEditDrag(null);
                   }}
                 >
+                  {vehicleClipPathD ? (
+                    <defs>
+                      <clipPath id="vinyl-vehicle-body-clip">
+                        <path d={vehicleClipPathD} />
+                      </clipPath>
+                    </defs>
+                  ) : null}
                   {shapes.map((shape) => (
                     <g key={shape.id} className="vinyl-shape-group">
-                      {shape.type === "polygon" ? (
-                        <polygon
-                          points={pointsToSvg(shape.points)}
-                          className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
-                        />
-                      ) : (
-                        <rect
-                          x={shape.x}
-                          y={shape.y}
-                          width={shape.width}
-                          height={shape.height}
-                          className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
-                        />
-                      )}
+                      <g clipPath={vehicleClipPathD ? "url(#vinyl-vehicle-body-clip)" : undefined}>
+                        {shape.type === "polygon" ? (
+                          <polygon
+                            points={pointsToSvg(shape.points)}
+                            className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"} ${shape.isMirror ? "mirror" : ""}`}
+                          />
+                        ) : (
+                          <rect
+                            x={shape.x}
+                            y={shape.y}
+                            width={shape.width}
+                            height={shape.height}
+                            className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"} ${shape.isMirror ? "mirror" : ""}`}
+                          />
+                        )}
+                      </g>
                       <g
                         className="vinyl-shape-delete"
                         role="button"
@@ -3861,7 +4010,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     className="ghost-button"
                     type="button"
                     disabled={!shapes.length}
-                    onClick={() => setShapes((current) => current.slice(0, -1))}
+                    onClick={undoLastShape}
                   >
                     Undo last
                   </button>
