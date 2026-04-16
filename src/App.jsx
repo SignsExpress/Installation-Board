@@ -3118,17 +3118,12 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       return;
     }
 
-    wrapLinesRef.current = Array.from(wrapLayer.querySelectorAll("path,line,polyline,polygon"))
-      .filter((element) => {
-        const styles = window.getComputedStyle(element);
-        const fill = styles.fill || element.getAttribute("fill") || "";
-        const stroke = styles.stroke || element.getAttribute("stroke") || "";
-        return fill === "none" && stroke !== "none";
-      })
+    wrapLinesRef.current = Array.from(wrapLayer.querySelectorAll("line"))
       .map((element) => {
         try {
           const box = element.getBBox();
           const length = typeof element.getTotalLength === "function" ? element.getTotalLength() : 0;
+          if (length < 100) return null;
           const sampleCount = Math.max(2, Math.ceil(length / 8));
           const points =
             length > 0
@@ -3192,7 +3187,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
     return wrapLinesRef.current.some((line) => {
       if (!rectsIntersect(expandedRect, line.box)) return false;
-      return line.points.some((point) => point.x >= expandedRect.x && point.x <= expandedRect.x + expandedRect.width && point.y >= expandedRect.y && point.y <= expandedRect.y + expandedRect.height);
+      return line.points.some(
+        (point) =>
+          point.x >= expandedRect.x &&
+          point.x <= expandedRect.x + expandedRect.width &&
+          point.y >= expandedRect.y &&
+          point.y <= expandedRect.y + expandedRect.height
+      );
     });
   }
 
