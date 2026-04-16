@@ -90,10 +90,13 @@ const ATTENDANCE_WEEKDAYS = [
   ["friday", "Fri"]
 ];
 
+const VAN_REFERENCE_TYRE_DIAMETER_MM = 686.5;
+const VAN_REFERENCE_TYRE_DIAMETER_UNITS = 194.62;
+
 const VAN_ESTIMATOR_TEMPLATE = {
   name: "Ford Transit Custom SWB",
   src: "/vans/ford-transit-custom-swb.svg",
-  scaleFactor: 5.46,
+  scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
   scaleReference: "Calibrated from 686.5mm front tyre",
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
