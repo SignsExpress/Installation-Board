@@ -3345,6 +3345,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return Math.min(max, Math.max(min, value));
   }
 
+  function clearTextSelection() {
+    if (typeof window !== "undefined") window.getSelection?.()?.removeAllRanges();
+  }
+
   function getRectAreaM2(rect) {
     const widthMm = rect.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
     const heightMm = rect.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
@@ -3437,6 +3441,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function startDrawing(event) {
     if (event.button !== 0) return;
     if (editDrag) return;
+    clearTextSelection();
     const point = getPointerPoint(event);
     if (!point) return;
     if (drawMode === "polygon") {
@@ -3509,7 +3514,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function startShapeCornerDrag(event, shape, cornerOrPointIndex) {
     event.stopPropagation();
+    event.preventDefault();
     if (event.button !== 0) return;
+    clearTextSelection();
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch (error) {
@@ -3537,6 +3544,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function deleteShape(event, shapeId) {
     event.stopPropagation();
+    event.preventDefault();
+    clearTextSelection();
     setShapes((current) => current.filter((shape) => shape.id !== shapeId));
   }
 
@@ -3764,7 +3773,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     setEditDrag(null);
                   }}
                 >
-                  {shapes.map((shape, index) => (
+                  {shapes.map((shape) => (
                     <g key={shape.id} className="vinyl-shape-group">
                       {shape.type === "polygon" ? (
                         <polygon
@@ -3784,13 +3793,26 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                         className="vinyl-shape-delete"
                         role="button"
                         tabIndex="0"
-                        onPointerDown={(event) => event.stopPropagation()}
+                        aria-label="Delete drawn area"
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                          event.preventDefault();
+                        }}
                         onClick={(event) => deleteShape(event, shape.id)}
                       >
                         <circle cx={(shape.bounds || shape).x + (shape.bounds || shape).width - 16} cy={(shape.bounds || shape).y + 16} r="13" />
-                        <text x={(shape.bounds || shape).x + (shape.bounds || shape).width - 16} y={(shape.bounds || shape).y + 21}>
-                          X
-                        </text>
+                        <line
+                          x1={(shape.bounds || shape).x + (shape.bounds || shape).width - 21}
+                          y1={(shape.bounds || shape).y + 11}
+                          x2={(shape.bounds || shape).x + (shape.bounds || shape).width - 11}
+                          y2={(shape.bounds || shape).y + 21}
+                        />
+                        <line
+                          x1={(shape.bounds || shape).x + (shape.bounds || shape).width - 11}
+                          y1={(shape.bounds || shape).y + 11}
+                          x2={(shape.bounds || shape).x + (shape.bounds || shape).width - 21}
+                          y2={(shape.bounds || shape).y + 21}
+                        />
                       </g>
                       {(shape.type === "polygon" ? shape.points : getRectanglePoints(shape.bounds || shape)).map((point, pointIndex) => (
                         <circle

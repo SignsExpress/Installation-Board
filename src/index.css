@@ -666,6 +666,7 @@ button {
     linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.75)),
     #fff;
   min-height: 520px;
+  user-select: none;
 }
 
 .vinyl-template,
@@ -674,6 +675,7 @@ button {
 .vinyl-drawing-layer {
   display: block;
   width: 100%;
+  user-select: none;
 }
 
 .van-template-svg {
@@ -691,6 +693,8 @@ button {
   height: 100%;
   cursor: crosshair;
   touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .vinyl-shape {
@@ -758,11 +762,11 @@ button {
   stroke-width: 2.5;
 }
 
-.vinyl-shape-delete text {
-  fill: #be123c;
-  font-size: 15px;
-  font-weight: 900;
-  text-anchor: middle;
+.vinyl-shape-delete line {
+  vector-effect: non-scaling-stroke;
+  stroke: #be123c;
+  stroke-linecap: round;
+  stroke-width: 3;
   pointer-events: none;
 }
 
