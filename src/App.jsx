@@ -3798,6 +3798,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       return;
     }
     if (drawMode === "lasso") {
+      if (!lassoPoints.length) return;
       setLassoPoints((current) => {
         const previousPoint = current[current.length - 1];
         if (previousPoint && getDistanceBetweenPoints(point, previousPoint) < 6) return current;
