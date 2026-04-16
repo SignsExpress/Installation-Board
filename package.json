@@ -1,8 +1,8 @@
 {
-  "name": "sx-installation-board",
+  "name": "sx-portal",
   "version": "1.0.0",
   "private": true,
-  "description": "Shared installation board with rolling calendar view, bank holidays, and live updates.",
+  "description": "SX Portal for installation planning, holidays, attendance, mileage, and subcontractor management.",
   "scripts": {
     "dev": "concurrently \"vite --host 0.0.0.0\" \"node server/index.js\"",
     "server": "node server/index.js",
