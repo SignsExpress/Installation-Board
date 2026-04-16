@@ -4164,8 +4164,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     onClick={() => selectDrawMode("lasso")}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M5 15c1.5-6.8 6.4-9.9 10.5-7.2 4.5 3 1.7 10.7-4 10.7-3.8 0-5.9-1.8-4.2-4.4 1-1.6 3.6-2.2 5.2-.8" />
-                      <path d="M15.5 7.8 19 5" />
+                      <path d="M6.5 13.2c0-3 2.7-5.4 6-5.4s6 2.4 6 5.4-2.7 5.4-6 5.4-6-2.4-6-5.4Z" />
+                      <path d="M12.5 7.8c1.4-2.4 3.3-3.4 5.8-3" />
+                      <path d="M18.3 4.8 17 3.6" />
+                      <path d="M18.3 4.8 16.6 5.7" />
+                      <circle cx="12.5" cy="13.2" r="1.3" />
                     </svg>
                   </button>
                   <span className="vinyl-toolbar-divider" aria-hidden="true" />
@@ -4177,8 +4180,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     onClick={undoLastDrawing}
                   >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M9 7H5v4" />
-                      <path d="M5 7c2.5-2.2 6.5-2.7 9.4-1 3.5 2 4.5 6.4 2.2 9.6-1.9 2.6-5.4 3.5-8.4 2.2" />
+                      <path d="M9 7 5 11l4 4" />
+                      <path d="M5 11h8.2c3.2 0 5.8 2.4 5.8 5.4 0 1.1-.3 2.1-.9 2.9" />
                     </svg>
                   </button>
                   <button
