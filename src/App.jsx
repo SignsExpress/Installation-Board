@@ -3732,6 +3732,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setPolygonPreviewPoint(null);
   }
 
+  function getDistanceBetweenPoints(first, second) {
+    return Math.hypot(first.x - second.x, first.y - second.y);
+  }
+
+  function shouldClosePolygon(point, points) {
+    if (points.length < 3) return false;
+    const firstPoint = points[0];
+    return getDistanceBetweenPoints(point, firstPoint) <= 28;
+  }
+
   function startDrawing(event) {
     if (event.button !== 0) return;
     if (editDrag) return;
@@ -3739,6 +3749,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const point = getPointerPoint(event);
     if (!point) return;
     if (drawMode === "polygon") {
+      if (shouldClosePolygon(point, polygonPoints)) {
+        finishPolygon();
+        return;
+      }
       setPolygonPoints((current) => [...current, point]);
       setPolygonPreviewPoint(null);
       return;
@@ -4028,63 +4042,76 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         <section className="panel vinyl-estimator-panel">
           <div className="vinyl-estimator-grid">
             <div className="vinyl-canvas-card">
-              <div className="vinyl-tool-row">
-                <div className="vinyl-tool-segment" aria-label="Drawing mode">
+              {svgError ? <div className="flash error">{svgError}</div> : null}
+              <div className="vinyl-canvas">
+                <div className="vinyl-canvas-toolbar" aria-label="Drawing tools">
                   <button
                     type="button"
                     className={drawMode === "rectangle" ? "active" : ""}
+                    title="Rectangle tool"
+                    aria-label="Rectangle tool"
                     onClick={() => {
                       setDrawMode("rectangle");
                       setPolygonPoints([]);
                       setPolygonPreviewPoint(null);
                     }}
                   >
-                    Rectangle
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="6" width="14" height="12" rx="1.5" />
+                    </svg>
                   </button>
                   <button
                     type="button"
                     className={drawMode === "polygon" ? "active" : ""}
+                    title="Point shape tool"
+                    aria-label="Point shape tool"
                     onClick={() => {
                       setDrawMode("polygon");
                       setDrawStart(null);
                       setDrawingRect(null);
                     }}
                   >
-                    Point shape
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 17 9 6l9 4-2 8-10-1Z" />
+                      <circle cx="9" cy="6" r="1.7" />
+                      <circle cx="18" cy="10" r="1.7" />
+                      <circle cx="16" cy="18" r="1.7" />
+                      <circle cx="6" cy="17" r="1.7" />
+                    </svg>
                   </button>
+                  {drawMode === "polygon" && polygonPoints.length ? (
+                    <>
+                      <button
+                        type="button"
+                        title="Undo point"
+                        aria-label="Undo point"
+                        onClick={() => {
+                          setPolygonPoints((current) => current.slice(0, -1));
+                          setPolygonPreviewPoint(null);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M9 7H5v4" />
+                          <path d="M5 7c2.5-2.2 6.5-2.7 9.4-1 3.5 2 4.5 6.4 2.2 9.6-1.9 2.6-5.4 3.5-8.4 2.2" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        title="Cancel point shape"
+                        aria-label="Cancel point shape"
+                        onClick={() => {
+                          setPolygonPoints([]);
+                          setPolygonPreviewPoint(null);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="m7 7 10 10" />
+                          <path d="m17 7-10 10" />
+                        </svg>
+                      </button>
+                    </>
+                  ) : null}
                 </div>
-                {drawMode === "polygon" ? (
-                  <div className="vinyl-point-actions">
-                    <button className="ghost-button" type="button" disabled={polygonPoints.length < 3} onClick={finishPolygon}>
-                      Finish shape
-                    </button>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      disabled={!polygonPoints.length}
-                      onClick={() => {
-                        setPolygonPoints((current) => current.slice(0, -1));
-                        setPolygonPreviewPoint(null);
-                      }}
-                    >
-                      Undo point
-                    </button>
-                    <button
-                      className="text-button danger"
-                      type="button"
-                      disabled={!polygonPoints.length}
-                      onClick={() => {
-                        setPolygonPoints([]);
-                        setPolygonPreviewPoint(null);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-              {svgError ? <div className="flash error">{svgError}</div> : null}
-              <div className="vinyl-canvas">
                 <div
                   ref={inlineSvgRef}
                   className="vinyl-template"
@@ -4205,7 +4232,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                         className="vinyl-shape drawing vinyl-polygon-preview"
                       />
                       {polygonPoints.map((point, index) => (
-                        <circle key={`polygon-point-${index}`} cx={point.x} cy={point.y} r="7" className="vinyl-point-handle" />
+                        <circle
+                          key={`polygon-point-${index}`}
+                          cx={point.x}
+                          cy={point.y}
+                          r={index === 0 && polygonPoints.length >= 3 ? "12" : "7"}
+                          className={`vinyl-point-handle ${index === 0 && polygonPoints.length >= 3 ? "snap-target" : ""}`}
+                        />
                       ))}
                     </g>
                   ) : null}
@@ -4214,7 +4247,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               <div className="vinyl-canvas-actions">
                 <span>
                   {drawMode === "polygon"
-                    ? "Point shape: click each corner, then finish the shape."
+                    ? "Point shape: click near the first point to close it."
                     : "Rectangle: drag across the panel you want to cover."}
                 </span>
                 <div>

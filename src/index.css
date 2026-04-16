@@ -608,45 +608,6 @@ button {
   box-shadow: 0 16px 44px rgba(15, 23, 42, 0.07);
 }
 
-.vinyl-tool-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.vinyl-tool-segment,
-.vinyl-point-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.vinyl-tool-segment {
-  padding: 4px;
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 14px;
-  background: #f8fafc;
-}
-
-.vinyl-tool-segment button {
-  min-height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: #475569;
-  font-weight: 900;
-}
-
-.vinyl-tool-segment button.active {
-  background: #fff;
-  color: var(--sx-main);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-}
-
 .vinyl-canvas {
   position: relative;
   overflow: hidden;
@@ -658,6 +619,52 @@ button {
   height: clamp(300px, calc(100vh - 222px), 500px);
   min-height: 0;
   user-select: none;
+}
+
+.vinyl-canvas-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 4;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.vinyl-canvas-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+}
+
+.vinyl-canvas-toolbar button.active {
+  background: rgba(104, 62, 132, 0.12);
+  color: var(--sx-main);
+}
+
+.vinyl-canvas-toolbar svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.vinyl-canvas-toolbar circle {
+  fill: currentColor;
+  stroke: none;
 }
 
 .vinyl-template,
@@ -753,6 +760,11 @@ button {
   fill: #fff;
   stroke: var(--sx-main);
   stroke-width: 3;
+}
+
+.vinyl-point-handle.snap-target {
+  fill: rgba(104, 62, 132, 0.14);
+  stroke-dasharray: 4 3;
 }
 
 .vinyl-corner-handle {
@@ -5397,7 +5409,6 @@ button {
     padding: 10px;
   }
 
-  .vinyl-tool-row,
   .vinyl-canvas-actions {
     align-items: stretch;
     flex-direction: column;
