@@ -3113,8 +3113,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [svgMarkup, setSvgMarkup] = useState("");
   const [svgError, setSvgError] = useState("");
   const [shapes, setShapes] = useState([]);
+  const [drawMode, setDrawMode] = useState("rectangle");
   const [drawingRect, setDrawingRect] = useState(null);
   const [drawStart, setDrawStart] = useState(null);
+  const [polygonPoints, setPolygonPoints] = useState([]);
+  const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
   const [rates, setRates] = useState(DEFAULT_VAN_ESTIMATE_RATES);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
@@ -3211,6 +3214,23 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return { x, y, width, height };
   }
 
+  function getPolygonBounds(points) {
+    const xValues = points.map((point) => point.x);
+    const yValues = points.map((point) => point.y);
+    const x = Math.min(...xValues);
+    const y = Math.min(...yValues);
+    return {
+      x,
+      y,
+      width: Math.max(...xValues) - x,
+      height: Math.max(...yValues) - y
+    };
+  }
+
+  function pointsToSvg(points) {
+    return points.map((point) => `${point.x},${point.y}`).join(" ");
+  }
+
   function rectsIntersect(left, right) {
     return (
       left.x < right.x + right.width &&
@@ -3220,8 +3240,22 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     );
   }
 
-  function isWrapFilmRect(rect) {
+  function isPointInPolygon(point, polygon) {
+    let inside = false;
+    for (let index = 0, previousIndex = polygon.length - 1; index < polygon.length; previousIndex = index++) {
+      const current = polygon[index];
+      const previous = polygon[previousIndex];
+      const crossesY = current.y > point.y !== previous.y > point.y;
+      if (!crossesY) continue;
+      const crossingX = ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) + current.x;
+      if (point.x < crossingX) inside = !inside;
+    }
+    return inside;
+  }
+
+  function isWrapFilmArea(area) {
     const detectionPadding = 2;
+    const rect = area.bounds || area;
     const expandedRect = {
       x: rect.x - detectionPadding,
       y: rect.y - detectionPadding,
@@ -3231,13 +3265,17 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
     return wrapLinesRef.current.some((line) => {
       if (!rectsIntersect(expandedRect, line.box)) return false;
-      return line.points.some(
-        (point) =>
-          point.x >= expandedRect.x &&
-          point.x <= expandedRect.x + expandedRect.width &&
-          point.y >= expandedRect.y &&
-          point.y <= expandedRect.y + expandedRect.height
-      );
+      return line.points.some((point) => {
+        if (
+          point.x < expandedRect.x ||
+          point.x > expandedRect.x + expandedRect.width ||
+          point.y < expandedRect.y ||
+          point.y > expandedRect.y + expandedRect.height
+        ) {
+          return false;
+        }
+        return area.points?.length ? isPointInPolygon(point, area.points) : true;
+      });
     });
   }
 
@@ -3247,23 +3285,68 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return (widthMm / 1000) * (heightMm / 1000);
   }
 
+  function getPolygonAreaM2(points) {
+    const areaUnits =
+      Math.abs(
+        points.reduce((sum, point, index) => {
+          const nextPoint = points[(index + 1) % points.length];
+          return sum + point.x * nextPoint.y - nextPoint.x * point.y;
+        }, 0)
+      ) / 2;
+    const scaleFactor = VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    return (areaUnits * scaleFactor * scaleFactor) / 1000000;
+  }
+
+  function finishPolygon() {
+    if (polygonPoints.length < 3) return;
+    const bounds = getPolygonBounds(polygonPoints);
+    const areaM2 = getPolygonAreaM2(polygonPoints);
+    if (areaM2 <= 0.001) return;
+
+    setShapes((current) => [
+      ...current,
+      {
+        id: `vinyl-poly-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
+        type: "polygon",
+        points: polygonPoints,
+        bounds,
+        width: bounds.width,
+        height: bounds.height,
+        isWrapFilm: isWrapFilmArea({ points: polygonPoints, bounds }),
+        areaM2
+      }
+    ]);
+    setPolygonPoints([]);
+    setPolygonPreviewPoint(null);
+  }
+
   function startDrawing(event) {
     if (event.button !== 0) return;
     const point = getPointerPoint(event);
     if (!point) return;
+    if (drawMode === "polygon") {
+      setPolygonPoints((current) => [...current, point]);
+      setPolygonPreviewPoint(null);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     setDrawStart(point);
     setDrawingRect({ x: point.x, y: point.y, width: 0, height: 0 });
   }
 
   function updateDrawing(event) {
-    if (!drawStart) return;
     const point = getPointerPoint(event);
     if (!point) return;
+    if (drawMode === "polygon") {
+      if (polygonPoints.length) setPolygonPreviewPoint(point);
+      return;
+    }
+    if (!drawStart) return;
     setDrawingRect(normalizeRect(drawStart, point));
   }
 
   function finishDrawing(event) {
+    if (drawMode === "polygon") return;
     if (!drawStart || !drawingRect) return;
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -3279,12 +3362,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setDrawingRect(null);
     if (rect.width < 4 || rect.height < 4) return;
 
-    const isWrapFilm = isWrapFilmRect(rect);
+    const isWrapFilm = isWrapFilmArea(rect);
     const areaM2 = getRectAreaM2(rect);
     setShapes((current) => [
       ...current,
       {
         ...rect,
+        type: "rectangle",
+        bounds: rect,
         isWrapFilm,
         areaM2
       }
@@ -3357,7 +3442,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               <span className="eyebrow">Vehicle vinyl</span>
               <h2>Vinyl Estimator</h2>
               <p>
-                Draw boxes on the van. Anything crossing a wrap-film line is counted as wrap film.
+                Draw rectangles or point-click shapes on the van. Anything crossing a wrap-film line is counted as wrap film.
               </p>
             </div>
             <div className="vinyl-estimator-template">
@@ -3368,6 +3453,61 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
           <div className="vinyl-estimator-grid">
             <div className="vinyl-canvas-card">
+              <div className="vinyl-tool-row">
+                <div className="vinyl-tool-segment" aria-label="Drawing mode">
+                  <button
+                    type="button"
+                    className={drawMode === "rectangle" ? "active" : ""}
+                    onClick={() => {
+                      setDrawMode("rectangle");
+                      setPolygonPoints([]);
+                      setPolygonPreviewPoint(null);
+                    }}
+                  >
+                    Rectangle
+                  </button>
+                  <button
+                    type="button"
+                    className={drawMode === "polygon" ? "active" : ""}
+                    onClick={() => {
+                      setDrawMode("polygon");
+                      setDrawStart(null);
+                      setDrawingRect(null);
+                    }}
+                  >
+                    Point shape
+                  </button>
+                </div>
+                {drawMode === "polygon" ? (
+                  <div className="vinyl-point-actions">
+                    <button className="ghost-button" type="button" disabled={polygonPoints.length < 3} onClick={finishPolygon}>
+                      Finish shape
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      disabled={!polygonPoints.length}
+                      onClick={() => {
+                        setPolygonPoints((current) => current.slice(0, -1));
+                        setPolygonPreviewPoint(null);
+                      }}
+                    >
+                      Undo point
+                    </button>
+                    <button
+                      className="text-button danger"
+                      type="button"
+                      disabled={!polygonPoints.length}
+                      onClick={() => {
+                        setPolygonPoints([]);
+                        setPolygonPreviewPoint(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : null}
+              </div>
               {svgError ? <div className="flash error">{svgError}</div> : null}
               <div className="vinyl-canvas">
                 <div
@@ -3390,14 +3530,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 >
                   {shapes.map((shape, index) => (
                     <g key={shape.id}>
-                      <rect
-                        x={shape.x}
-                        y={shape.y}
-                        width={shape.width}
-                        height={shape.height}
-                        className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
-                      />
-                      <text x={shape.x + 10} y={shape.y + 24} className="vinyl-shape-label">
+                      {shape.type === "polygon" ? (
+                        <polygon
+                          points={pointsToSvg(shape.points)}
+                          className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                        />
+                      ) : (
+                        <rect
+                          x={shape.x}
+                          y={shape.y}
+                          width={shape.width}
+                          height={shape.height}
+                          className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                        />
+                      )}
+                      <text x={(shape.bounds || shape).x + 10} y={(shape.bounds || shape).y + 24} className="vinyl-shape-label">
                         {index + 1}
                       </text>
                     </g>
@@ -3411,10 +3558,25 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                       className="vinyl-shape drawing"
                     />
                   ) : null}
+                  {polygonPoints.length ? (
+                    <g>
+                      <polyline
+                        points={pointsToSvg(polygonPreviewPoint ? [...polygonPoints, polygonPreviewPoint] : polygonPoints)}
+                        className="vinyl-shape drawing vinyl-polygon-preview"
+                      />
+                      {polygonPoints.map((point, index) => (
+                        <circle key={`polygon-point-${index}`} cx={point.x} cy={point.y} r="7" className="vinyl-point-handle" />
+                      ))}
+                    </g>
+                  ) : null}
                 </svg>
               </div>
               <div className="vinyl-canvas-actions">
-                <span>Tip: drag from top-left to bottom-right over the panel you want to cover.</span>
+                <span>
+                  {drawMode === "polygon"
+                    ? "Point shape: click each corner, then finish the shape."
+                    : "Rectangle: drag across the panel you want to cover."}
+                </span>
                 <div>
                   <button
                     className="ghost-button"
