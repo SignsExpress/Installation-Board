@@ -97,7 +97,6 @@ const VAN_ESTIMATOR_TEMPLATE = {
   name: "Ford Transit Custom SWB",
   src: "/vans/ford-transit-custom-swb.svg",
   scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
-  scaleReference: "Calibrated from 686.5mm front tyre",
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
 
@@ -995,9 +994,9 @@ function MainNavBar({
               className={`host-nav-link ${active === "van-estimator" ? "active" : ""} ${vanEstimatorAllowed ? "" : "disabled"}`}
               disabled={!vanEstimatorAllowed}
               onClick={() => goTo(vanEstimatorPath)}
-              title={vanEstimatorAllowed ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+              title={vanEstimatorAllowed ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
             >
-              <span className="host-nav-link-label">Vinyl Estimator</span>
+              <span className="host-nav-link-label">Vehicle Pricing Calculator</span>
             </button>
             {installerAllowed ? (
               <button
@@ -1218,7 +1217,7 @@ function PermissionsPanel({
                     </div>
 
                     <div className="permissions-app-row">
-                      <span className="permissions-app-label">Vinyl Estimator</span>
+                      <span className="permissions-app-label">Vehicle Pricing Calculator</span>
                       <div className="permission-segment">
                         {PERMISSION_OPTIONS.map((option) => (
                           <button
@@ -1583,9 +1582,9 @@ function HostLandingPage({
               type="button"
               disabled={!canAccessVanEstimator(currentUser)}
               onClick={() => goTo("/van-estimator")}
-              title={canAccessVanEstimator(currentUser) ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+              title={canAccessVanEstimator(currentUser) ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
             >
-              <strong>Vinyl Estimator</strong>
+              <strong>Vehicle Pricing Calculator</strong>
               {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
             </button>
             {canAccessInstaller(currentUser) ? (
@@ -1678,9 +1677,9 @@ function ClientLandingPage({
               type="button"
               disabled={!canAccessVanEstimator(currentUser)}
               onClick={() => goTo("/van-estimator")}
-              title={canAccessVanEstimator(currentUser) ? "Open Vinyl Estimator" : "Vinyl Estimator is inactive"}
+              title={canAccessVanEstimator(currentUser) ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
             >
-              <strong>Vinyl Estimator</strong>
+              <strong>Vehicle Pricing Calculator</strong>
               {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
             </button>
             {canAccessInstaller(currentUser) ? (
@@ -3828,15 +3827,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         <section className="panel vinyl-estimator-panel">
           <div className="vinyl-estimator-head">
             <div>
-              <span className="eyebrow">Vehicle vinyl</span>
-              <h2>Vinyl Estimator</h2>
-              <p>
-                Draw rectangles or point-click shapes on the van. Anything crossing a wrap-film line is counted as wrap film.
-              </p>
+              <h2>Vehicle Pricing Calculator</h2>
             </div>
             <div className="vinyl-estimator-template">
               <span>{VAN_ESTIMATOR_TEMPLATE.name}</span>
-              <strong>{VAN_ESTIMATOR_TEMPLATE.scaleReference}</strong>
             </div>
           </div>
 
@@ -4068,48 +4062,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <strong>{formatM2(totals.wrapArea)}</strong>
                 </div>
                 <div>
-                  <span>Flat area</span>
-                  <strong>{formatM2(totals.flatArea)}</strong>
-                </div>
-                <div>
-                  <span>Curved area</span>
-                  <strong>{formatM2(totals.curvedArea)}</strong>
-                </div>
-                <div>
                   <span>Labour hours</span>
                   <strong>{totals.labourHours.toFixed(1)}</strong>
-                </div>
-                <div>
-                  <span>Market anchor ex VAT</span>
-                  <strong>{currencyFormatter.format(totals.anchor)}</strong>
-                </div>
-              </div>
-
-              <div className="vinyl-classification-note">
-                <strong>Auto classified from drawn zones</strong>
-                <span>Wrap-required zones use wrap film and ex VAT wrap labour rules automatically.</span>
-              </div>
-              <div className="vinyl-breakdown">
-                <div>
-                  <span>Material ex VAT</span>
-                  <strong>{currencyFormatter.format(totals.materialSell)}</strong>
-                </div>
-                <div>
-                  <span>Labour ex VAT</span>
-                  <strong>{currencyFormatter.format(totals.labourSell)}</strong>
                 </div>
                 <div>
                   <span>Total coverage</span>
                   <strong>{formatM2(totals.totalArea)}</strong>
                 </div>
-                <div>
-                  <span>Vehicle coverage</span>
-                  <strong>{Math.round(totals.coverage * 100)}%</strong>
-                </div>
               </div>
 
-              <div className="vinyl-shape-list">
-                <h3>Drawn areas</h3>
+              <div className="vinyl-shape-list" hidden>
                 {shapes.length ? (
                   shapes.map((shape) => (
                     <div key={`shape-row-${shape.id}`} className="vinyl-shape-row">
