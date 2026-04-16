@@ -2614,7 +2614,7 @@ function MileagePage({ currentUser, onLogout, notifications, onRefreshNotificati
                 + Add journey
               </button>
               <div className="mileage-total">
-                <span>Monthly total</span>
+                <span>Total miles to submit</span>
                 <strong>{totalMiles.toFixed(1)} miles</strong>
               </div>
               <button className="primary-button" type="submit" disabled={saving || loading}>
