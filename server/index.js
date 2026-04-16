@@ -250,6 +250,11 @@ function canEditMileage(user) {
   return getUserPermission(user, "mileage", user?.role === "host" ? "admin" : "user") === "admin";
 }
 
+function canAccessVanEstimator(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "vanEstimator", "none") !== "none";
+}
+
 function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -3876,7 +3881,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -3953,7 +3958,8 @@ function createServer() {
           installer: request.body?.installer,
           holidays: request.body?.holidays,
           attendance: request.body?.attendance,
-          mileage: request.body?.mileage
+          mileage: request.body?.mileage,
+          vanEstimator: request.body?.vanEstimator
         });
       response.json({ user: updatedUser });
     } catch (error) {
