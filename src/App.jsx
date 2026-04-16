@@ -3118,6 +3118,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [drawStart, setDrawStart] = useState(null);
   const [polygonPoints, setPolygonPoints] = useState([]);
   const [polygonPreviewPoint, setPolygonPreviewPoint] = useState(null);
+  const [editDrag, setEditDrag] = useState(null);
   const [rates, setRates] = useState(DEFAULT_VAN_ESTIMATE_RATES);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
@@ -3231,6 +3232,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return points.map((point) => `${point.x},${point.y}`).join(" ");
   }
 
+  function getRectanglePoints(rect) {
+    return [
+      { corner: "top-left", x: rect.x, y: rect.y },
+      { corner: "top-right", x: rect.x + rect.width, y: rect.y },
+      { corner: "bottom-right", x: rect.x + rect.width, y: rect.y + rect.height },
+      { corner: "bottom-left", x: rect.x, y: rect.y + rect.height }
+    ];
+  }
+
   function rectsIntersect(left, right) {
     return (
       left.x < right.x + right.width &&
@@ -3297,6 +3307,48 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return (areaUnits * scaleFactor * scaleFactor) / 1000000;
   }
 
+  function refreshShapeMetrics(shape) {
+    if (shape.type === "polygon") {
+      const bounds = getPolygonBounds(shape.points);
+      return {
+        ...shape,
+        bounds,
+        width: bounds.width,
+        height: bounds.height,
+        areaM2: getPolygonAreaM2(shape.points),
+        isWrapFilm: isWrapFilmArea({ points: shape.points, bounds })
+      };
+    }
+
+    const rect = {
+      x: shape.x,
+      y: shape.y,
+      width: shape.width,
+      height: shape.height
+    };
+
+    return {
+      ...shape,
+      bounds: rect,
+      areaM2: getRectAreaM2(rect),
+      isWrapFilm: isWrapFilmArea(rect)
+    };
+  }
+
+  function updateShapeCorner(shape, dragState, point) {
+    if (shape.type === "polygon") {
+      const points = shape.points.map((entry, index) => (index === dragState.pointIndex ? point : entry));
+      return refreshShapeMetrics({ ...shape, points });
+    }
+
+    const anchor = dragState.anchor;
+    const rect = normalizeRect(anchor, point);
+    return refreshShapeMetrics({
+      ...shape,
+      ...rect
+    });
+  }
+
   function finishPolygon() {
     if (polygonPoints.length < 3) return;
     const bounds = getPolygonBounds(polygonPoints);
@@ -3322,6 +3374,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function startDrawing(event) {
     if (event.button !== 0) return;
+    if (editDrag) return;
     const point = getPointerPoint(event);
     if (!point) return;
     if (drawMode === "polygon") {
@@ -3337,6 +3390,12 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function updateDrawing(event) {
     const point = getPointerPoint(event);
     if (!point) return;
+    if (editDrag) {
+      setShapes((current) =>
+        current.map((shape) => (shape.id === editDrag.shapeId ? updateShapeCorner(shape, editDrag, point) : shape))
+      );
+      return;
+    }
     if (drawMode === "polygon") {
       if (polygonPoints.length) setPolygonPreviewPoint(point);
       return;
@@ -3346,6 +3405,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function finishDrawing(event) {
+    if (editDrag) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch (error) {
+        // Pointer capture may already be released if the pointer leaves the browser chrome.
+      }
+      setEditDrag(null);
+      return;
+    }
     if (drawMode === "polygon") return;
     if (!drawStart || !drawingRect) return;
     try {
@@ -3379,6 +3447,39 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function updateRate(key, value) {
     const numeric = Math.max(0, Number(value) || 0);
     setRates((current) => ({ ...current, [key]: numeric }));
+  }
+
+  function startShapeCornerDrag(event, shape, cornerOrPointIndex) {
+    event.stopPropagation();
+    if (event.button !== 0) return;
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch (error) {
+      // Some browsers may not allow capture on SVG children; the overlay still receives moves.
+    }
+
+    if (shape.type === "polygon") {
+      setEditDrag({ shapeId: shape.id, pointIndex: cornerOrPointIndex });
+      return;
+    }
+
+    const rect = shape.bounds || shape;
+    const anchors = {
+      "top-left": { x: rect.x + rect.width, y: rect.y + rect.height },
+      "top-right": { x: rect.x, y: rect.y + rect.height },
+      "bottom-right": { x: rect.x, y: rect.y },
+      "bottom-left": { x: rect.x + rect.width, y: rect.y }
+    };
+    setEditDrag({
+      shapeId: shape.id,
+      corner: cornerOrPointIndex,
+      anchor: anchors[cornerOrPointIndex]
+    });
+  }
+
+  function deleteShape(event, shapeId) {
+    event.stopPropagation();
+    setShapes((current) => current.filter((shape) => shape.id !== shapeId));
   }
 
   const totals = useMemo(() => {
@@ -3526,10 +3627,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   onPointerCancel={() => {
                     setDrawStart(null);
                     setDrawingRect(null);
+                    setEditDrag(null);
                   }}
                 >
                   {shapes.map((shape, index) => (
-                    <g key={shape.id}>
+                    <g key={shape.id} className="vinyl-shape-group">
                       {shape.type === "polygon" ? (
                         <polygon
                           points={pointsToSvg(shape.points)}
@@ -3544,9 +3646,30 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                           className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
                         />
                       )}
-                      <text x={(shape.bounds || shape).x + 10} y={(shape.bounds || shape).y + 24} className="vinyl-shape-label">
-                        {index + 1}
-                      </text>
+                      <g
+                        className="vinyl-shape-delete"
+                        role="button"
+                        tabIndex="0"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => deleteShape(event, shape.id)}
+                      >
+                        <circle cx={(shape.bounds || shape).x + (shape.bounds || shape).width - 16} cy={(shape.bounds || shape).y + 16} r="13" />
+                        <text x={(shape.bounds || shape).x + (shape.bounds || shape).width - 16} y={(shape.bounds || shape).y + 21}>
+                          X
+                        </text>
+                      </g>
+                      {(shape.type === "polygon" ? shape.points : getRectanglePoints(shape.bounds || shape)).map((point, pointIndex) => (
+                        <circle
+                          key={`${shape.id}-handle-${pointIndex}`}
+                          cx={point.x}
+                          cy={point.y}
+                          r="8"
+                          className="vinyl-corner-handle"
+                          onPointerDown={(event) =>
+                            startShapeCornerDrag(event, shape, shape.type === "polygon" ? pointIndex : point.corner)
+                          }
+                        />
+                      ))}
                     </g>
                   ))}
                   {drawingRect ? (

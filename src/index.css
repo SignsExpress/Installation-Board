@@ -715,15 +715,63 @@ button {
   stroke-dasharray: 12 8;
 }
 
+.vinyl-shape-group {
+  pointer-events: all;
+}
+
+.vinyl-shape-group .vinyl-shape {
+  cursor: default;
+}
+
 .vinyl-polygon-preview {
   fill: none;
 }
 
-.vinyl-point-handle {
+.vinyl-point-handle,
+.vinyl-corner-handle {
   vector-effect: non-scaling-stroke;
   fill: #fff;
   stroke: var(--sx-main);
   stroke-width: 3;
+}
+
+.vinyl-corner-handle {
+  cursor: grab;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vinyl-corner-handle:active {
+  cursor: grabbing;
+}
+
+.vinyl-shape-delete {
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vinyl-shape-delete circle {
+  vector-effect: non-scaling-stroke;
+  fill: #fff;
+  stroke: #be123c;
+  stroke-width: 2.5;
+}
+
+.vinyl-shape-delete text {
+  fill: #be123c;
+  font-size: 15px;
+  font-weight: 900;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.vinyl-shape-group:hover .vinyl-corner-handle,
+.vinyl-shape-group:hover .vinyl-shape-delete,
+.vinyl-shape-group:focus-within .vinyl-corner-handle,
+.vinyl-shape-group:focus-within .vinyl-shape-delete {
+  opacity: 1;
+  pointer-events: all;
 }
 
 .vinyl-shape-label {
