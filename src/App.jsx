@@ -4342,10 +4342,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
                   {VEHICLE_TEMPLATE_OPTIONS.map((template) => (
                     <option key={template.id} value={template.id}>
-                      {template.sizeName} - example: {template.exampleName}
+                      {template.sizeName}
                     </option>
                   ))}
                 </select>
+                <small>eg. {VAN_ESTIMATOR_TEMPLATE.exampleName}</small>
               </label>
 
               <div className="vinyl-total-hero">

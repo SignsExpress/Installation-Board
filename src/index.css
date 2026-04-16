@@ -592,6 +592,13 @@ button {
   padding: 7px 32px 7px 9px;
 }
 
+.vinyl-estimator-template small {
+  color: var(--sx-slate-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .vinyl-estimator-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 330px;
