@@ -3981,6 +3981,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const standardShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type !== "wrap_film");
     const wrapShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type === "wrap_film");
     const standardArea = standardShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
+    const standardPrintArea = standardShapes
+      .filter((shape) => getShapeMaterialVariant(shape) === "standard")
+      .reduce((sum, shape) => sum + shape.areaM2, 0);
+    const contraArea = standardShapes
+      .filter((shape) => getShapeMaterialVariant(shape) === "contra")
+      .reduce((sum, shape) => sum + shape.areaM2, 0);
+    const reflectiveArea = standardShapes
+      .filter((shape) => getShapeMaterialVariant(shape) === "reflective")
+      .reduce((sum, shape) => sum + shape.areaM2, 0);
     const standardMaterialMultiplierArea = standardShapes.reduce((sum, shape) => {
       const multiplier = settings.materialMultipliers[getShapeMaterialVariant(shape)] || settings.materialMultipliers.standard || 1;
       return sum + shape.areaM2 * multiplier;
@@ -3998,6 +4007,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     if (totalArea <= 0) {
       return {
         standardArea,
+        standardPrintArea,
+        contraArea,
+        reflectiveArea,
         wrapArea,
         totalArea,
         standardSell: 0,
@@ -4084,6 +4096,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
     return {
       standardArea,
+      standardPrintArea,
+      contraArea,
+      reflectiveArea,
       wrapArea,
       totalArea,
       standardSell: currentPrice.standardSell,
@@ -4503,13 +4518,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               </div>
 
               <div className="vinyl-stats-grid">
-                <div>
-                  <span>Standard vinyl</span>
-                  <strong>{formatM2(totals.standardArea)}</strong>
+                <div className="standard">
+                  <span>Std. Print Vinyl</span>
+                  <strong>{formatM2(totals.standardPrintArea)}</strong>
                 </div>
                 <div className="wrap">
                   <span>Wrap film</span>
                   <strong>{formatM2(totals.wrapArea)}</strong>
+                </div>
+                <div className="contra">
+                  <span>Contra-Vision</span>
+                  <strong>{formatM2(totals.contraArea)}</strong>
+                </div>
+                <div className="reflective">
+                  <span>Reflective</span>
+                  <strong>{formatM2(totals.reflectiveArea)}</strong>
                 </div>
               </div>
 
