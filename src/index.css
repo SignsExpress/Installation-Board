@@ -642,7 +642,22 @@ button {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
 }
 
-.vinyl-canvas-toolbar button {
+.vinyl-material-toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 4;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.vinyl-canvas-toolbar button,
+.vinyl-material-toolbar button {
   display: grid;
   place-items: center;
   width: 34px;
@@ -654,12 +669,14 @@ button {
   cursor: pointer;
 }
 
-.vinyl-canvas-toolbar button.active {
+.vinyl-canvas-toolbar button.active,
+.vinyl-material-toolbar button.active {
   background: rgba(104, 62, 132, 0.12);
   color: var(--sx-main);
 }
 
-.vinyl-canvas-toolbar button:disabled {
+.vinyl-canvas-toolbar button:disabled,
+.vinyl-material-toolbar button:disabled {
   color: #cbd5e1;
   cursor: default;
 }
@@ -670,7 +687,8 @@ button {
   background: rgba(203, 213, 225, 0.95);
 }
 
-.vinyl-canvas-toolbar svg {
+.vinyl-canvas-toolbar svg,
+.vinyl-material-toolbar svg {
   width: 21px;
   height: 21px;
   fill: none;
@@ -680,7 +698,8 @@ button {
   stroke-linejoin: round;
 }
 
-.vinyl-canvas-toolbar circle {
+.vinyl-canvas-toolbar circle,
+.vinyl-material-toolbar circle {
   fill: currentColor;
   stroke: none;
 }
@@ -734,6 +753,16 @@ button {
   stroke: #ea580c;
 }
 
+.vinyl-shape.contra {
+  fill: url(#contra-vision-dot-pattern);
+  stroke: #0f172a;
+}
+
+.vinyl-shape.reflective {
+  fill: rgba(255, 255, 255, 0.82);
+  stroke: #64748b;
+}
+
 .vinyl-vehicle-edge {
   fill: none;
   pointer-events: none;
@@ -754,10 +783,28 @@ button {
   stroke: #ea580c;
 }
 
+.vinyl-vehicle-edge.contra path {
+  stroke: #0f172a;
+}
+
+.vinyl-vehicle-edge.reflective path {
+  stroke: #64748b;
+}
+
 .vinyl-shape.drawing {
   fill: rgba(104, 62, 132, 0.14);
   stroke: var(--sx-main);
   stroke-dasharray: 12 8;
+}
+
+.vinyl-shape.drawing.contra {
+  fill: rgba(15, 23, 42, 0.22);
+  stroke: #0f172a;
+}
+
+.vinyl-shape.drawing.reflective {
+  fill: rgba(255, 255, 255, 0.82);
+  stroke: #64748b;
 }
 
 .vinyl-shape-group {

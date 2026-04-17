@@ -149,7 +149,12 @@ const VEHICLE_GRAPHICS_PRICING = {
   minPrice: 250,
   minAnyWrapPrice: 600,
   minPartialWrapPrice: 900,
-  minFullWrapPrice: 1800
+  minFullWrapPrice: 1800,
+  materialMultipliers: {
+    standard: 1,
+    contra: 1.2,
+    reflective: 2
+  }
 };
 
 const VEHICLE_PRICING_STORAGE_KEY = "vehicle-pricing-settings-formula-v2";
@@ -161,6 +166,7 @@ function mergeVehiclePricingSettings(settings = {}) {
     sectionFactors: { ...VEHICLE_GRAPHICS_PRICING.sectionFactors, ...settings.sectionFactors },
     difficultyFactors: { ...VEHICLE_GRAPHICS_PRICING.difficultyFactors, ...settings.difficultyFactors },
     marketAnchors: { ...VEHICLE_GRAPHICS_PRICING.marketAnchors, ...settings.marketAnchors },
+    materialMultipliers: { ...VEHICLE_GRAPHICS_PRICING.materialMultipliers, ...settings.materialMultipliers },
     blendWeights: {
       noWrap: { ...VEHICLE_GRAPHICS_PRICING.blendWeights.noWrap, ...settings.blendWeights?.noWrap },
       wrapUnder35: { ...VEHICLE_GRAPHICS_PRICING.blendWeights.wrapUnder35, ...settings.blendWeights?.wrapUnder35 },
@@ -3189,6 +3195,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const [drawMode, setDrawMode] = useState("rectangle");
+  const [materialMode, setMaterialMode] = useState("standard");
   const [drawingRect, setDrawingRect] = useState(null);
   const [drawStart, setDrawStart] = useState(null);
   const [polygonPoints, setPolygonPoints] = useState([]);
@@ -3494,6 +3501,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
+  function getForcedStandardZoneMetadata(materialVariant = "standard") {
+    return {
+      material_type: "standard_vinyl",
+      surface_type: "flat",
+      complexity_factor: 1,
+      install_group: materialVariant === "standard" ? "standard_panel" : materialVariant
+    };
+  }
+
+  function getShapeMaterialVariant(shape) {
+    return ["contra", "reflective"].includes(shape.materialVariant) ? shape.materialVariant : "standard";
+  }
+
   function interpolatePricingPoint(points, value) {
     if (value <= points[0].coverage) return points[0].value;
     for (let index = 1; index < points.length; index += 1) {
@@ -3661,13 +3681,18 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function refreshShapeMetrics(shape) {
+    const materialVariant = getShapeMaterialVariant(shape);
     if (shape.type === "polygon") {
       const bounds = getPolygonBounds(shape.points);
-      const zoneMetadata = getVehicleZoneMetadata({ points: shape.points, bounds });
+      const zoneMetadata =
+        materialVariant === "standard"
+          ? getVehicleZoneMetadata({ points: shape.points, bounds })
+          : getForcedStandardZoneMetadata(materialVariant);
       const rawAreaM2 = getPolygonAreaM2(shape.points);
       const clipRatio = getVehicleClipRatio({ points: shape.points, bounds });
       return {
         ...shape,
+        materialVariant,
         bounds,
         width: bounds.width,
         height: bounds.height,
@@ -3685,12 +3710,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       width: shape.width,
       height: shape.height
     };
-    const zoneMetadata = getVehicleZoneMetadata(rect);
+    const zoneMetadata = materialVariant === "standard" ? getVehicleZoneMetadata(rect) : getForcedStandardZoneMetadata(materialVariant);
     const rawAreaM2 = getRectAreaM2(rect);
     const clipRatio = getVehicleClipRatio(rect);
 
     return {
       ...shape,
+      materialVariant,
       bounds: rect,
       rawAreaM2,
       clipRatio,
@@ -3747,6 +3773,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const shape = refreshShapeMetrics({
       id: `${idPrefix}-${Date.now()}-${Math.round(bounds.x)}-${Math.round(bounds.y)}`,
       type: "polygon",
+      materialVariant: materialMode,
       points,
       bounds,
       width: bounds.width,
@@ -3758,7 +3785,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function startDrawing(event) {
     if (event.button !== 0) return;
     if (editDrag) return;
-    if (event.target.closest?.(".vinyl-canvas-toolbar")) return;
+    if (event.target.closest?.(".vinyl-canvas-toolbar, .vinyl-material-toolbar")) return;
     clearTextSelection();
     const point = getPointerPoint(event);
     if (!point) return;
@@ -3856,6 +3883,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const shape = refreshShapeMetrics({
       ...rect,
       type: "rectangle",
+      materialVariant: materialMode,
       bounds: rect
     });
     if (shape.areaM2 <= 0.001) return;
@@ -3948,11 +3976,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               complexity_factor: settings.difficultyFactors.flat,
               install_group: "standard_panel"
             });
-      return { ...shape, zoneMetadata };
+      return { ...shape, materialVariant: getShapeMaterialVariant(shape), zoneMetadata };
     });
     const standardShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type !== "wrap_film");
     const wrapShapes = classifiedShapes.filter((shape) => shape.zoneMetadata.material_type === "wrap_film");
     const standardArea = standardShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
+    const standardMaterialMultiplierArea = standardShapes.reduce((sum, shape) => {
+      const multiplier = settings.materialMultipliers[getShapeMaterialVariant(shape)] || settings.materialMultipliers.standard || 1;
+      return sum + shape.areaM2 * multiplier;
+    }, 0);
     const wrapArea = wrapShapes.reduce((sum, shape) => sum + shape.areaM2, 0);
     const totalArea = standardArea + wrapArea;
     const vehicleArea = getVehicleDrawableAreaM2();
@@ -3987,11 +4019,12 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     }
     function calculateScaledEstimate(scale = 1) {
       const scaledStandardArea = standardArea * scale;
+      const scaledStandardMaterialMultiplierArea = standardMaterialMultiplierArea * scale;
       const scaledWrapArea = wrapArea * scale;
       const scaledTotalArea = totalArea * scale;
       const scaledCoverage = vehicleArea > 0 ? scaledTotalArea / vehicleArea : 0;
       const scaledWrapCoverage = vehicleArea > 0 ? scaledWrapArea / vehicleArea : 0;
-      const standardSell = scaledStandardArea * settings.standardVinylRate;
+      const standardSell = scaledStandardMaterialMultiplierArea * settings.standardVinylRate;
       const wrapFilmRate = getFormulaWrapRate(scaledWrapCoverage, settings);
       const wrapSell = scaledWrapArea * wrapFilmRate;
       const standardLabourHours =
@@ -4087,6 +4120,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function formatPercent(value) {
     return `${Math.round((Number(value) || 0) * 100)}%`;
+  }
+
+  function getShapeVisualClass(shape) {
+    if (shape.isWrapFilm) return "wrap";
+    return getShapeMaterialVariant(shape);
   }
 
   function updatePricingValue(path, value) {
@@ -4256,6 +4294,54 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   </button>
                 </div>
                 <div
+                  className="vinyl-material-toolbar"
+                  aria-label="Material modifiers"
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  <button
+                    type="button"
+                    className={materialMode === "standard" ? "active" : ""}
+                    title="Standard vinyl"
+                    aria-label="Standard vinyl"
+                    onClick={() => setMaterialMode("standard")}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="5" width="14" height="14" rx="2" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className={materialMode === "contra" ? "active" : ""}
+                    title="Contra-vision"
+                    aria-label="Contra-vision"
+                    onClick={() => setMaterialMode("contra")}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="5" width="14" height="14" rx="2" />
+                      <circle cx="9" cy="9" r="1" />
+                      <circle cx="15" cy="9" r="1" />
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="9" cy="15" r="1" />
+                      <circle cx="15" cy="15" r="1" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className={materialMode === "reflective" ? "active" : ""}
+                    title="Reflective"
+                    aria-label="Reflective"
+                    onClick={() => setMaterialMode("reflective")}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="5" y="5" width="14" height="14" rx="2" />
+                      <path d="m9 15 6-6" />
+                      <path d="m12 16 4-4" />
+                    </svg>
+                  </button>
+                </div>
+                <div
                   ref={inlineSvgRef}
                   className="vinyl-template"
                   dangerouslySetInnerHTML={{ __html: svgMarkup }}
@@ -4277,6 +4363,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 >
                   {vehicleClipPathsD.length ? (
                     <defs>
+                      <pattern id="contra-vision-dot-pattern" width="12" height="12" patternUnits="userSpaceOnUse">
+                        <rect width="12" height="12" fill="rgba(15, 23, 42, 0.72)" />
+                        <circle cx="3" cy="3" r="1.4" fill="rgba(255, 255, 255, 0.78)" />
+                        <circle cx="9" cy="9" r="1.4" fill="rgba(255, 255, 255, 0.78)" />
+                      </pattern>
                       <clipPath id="vinyl-vehicle-body-clip">
                         {vehicleClipPathsD.map((pathD, index) => (
                           <path key={`vehicle-body-clip-${index}`} d={pathD} clipRule="evenodd" />
@@ -4299,7 +4390,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                         {shape.type === "polygon" ? (
                           <polygon
                             points={pointsToSvg(shape.points)}
-                            className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                            className={`vinyl-shape ${getShapeVisualClass(shape)}`}
                           />
                         ) : (
                           <rect
@@ -4307,13 +4398,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                             y={shape.y}
                             width={shape.width}
                             height={shape.height}
-                            className={`vinyl-shape ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                            className={`vinyl-shape ${getShapeVisualClass(shape)}`}
                           />
                         )}
                       </g>
                       {vehicleClipPathsD.length ? (
                         <g
-                          className={`vinyl-vehicle-edge ${shape.isWrapFilm ? "wrap" : "standard"}`}
+                          className={`vinyl-vehicle-edge ${getShapeVisualClass(shape)}`}
                           clipPath={`url(#${getShapeClipId(shape.id)})`}
                         >
                           {vehicleClipPathsD.map((pathD, index) => (
@@ -4366,14 +4457,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                       y={drawingRect.y}
                       width={drawingRect.width}
                       height={drawingRect.height}
-                      className="vinyl-shape drawing"
+                      className={`vinyl-shape drawing ${materialMode}`}
                     />
                   ) : null}
                   {polygonPoints.length ? (
                     <g>
                       <polyline
                         points={pointsToSvg(polygonPreviewPoint ? [...polygonPoints, polygonPreviewPoint] : polygonPoints)}
-                        className="vinyl-shape drawing vinyl-polygon-preview"
+                        className={`vinyl-shape drawing vinyl-polygon-preview ${materialMode}`}
                       />
                       {polygonPoints.map((point, index) => (
                         <circle
@@ -4387,7 +4478,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     </g>
                   ) : null}
                   {lassoPoints.length ? (
-                    <polyline points={pointsToSvg(lassoPoints)} className="vinyl-shape drawing vinyl-lasso-preview" />
+                    <polyline points={pointsToSvg(lassoPoints)} className={`vinyl-shape drawing vinyl-lasso-preview ${materialMode}`} />
                   ) : null}
                 </svg>
               </div>
@@ -4442,6 +4533,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <summary>Pricing settings</summary>
                   <div className="vinyl-pricing-grid">
                     {renderPricingNumber("Standard vinyl rate", ["standardVinylRate"], 1, "Standard vinyl sell per m2. Raise it and all flat vinyl jobs rise.")}
+                    {renderPricingNumber("Contra multiplier", ["materialMultipliers", "contra"], 0.05, "Multiplier for Contra-vision shapes. These stay standard vinyl, ignore wrap lines, and multiply the standard vinyl material sell.")}
+                    {renderPricingNumber("Reflective multiplier", ["materialMultipliers", "reflective"], 0.05, "Multiplier for Reflective shapes. These stay standard vinyl, ignore wrap lines, and multiply the standard vinyl material sell.")}
                     {renderPricingNumber("Wrap start rate", ["wrapRateStart"], 1, "Starting wrap sell per m2 for very small wrap jobs. Raise it and small wrap jobs rise.")}
                     {renderPricingNumber("Wrap floor rate", ["wrapRateFloor"], 1, "Floor wrap sell per m2 for very large wrap jobs. Raise it and heavy partials and full wraps rise.")}
                     {renderPricingNumber("Wrap material taper", ["wrapRateTaper"], 1, "Controls how quickly wrap material rate falls as wrap coverage grows. Raise it and bigger wrap jobs get cheaper per m2 faster.")}
