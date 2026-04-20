@@ -791,6 +791,32 @@ button {
   stroke: #64748b;
 }
 
+.vinyl-shape-cutline {
+  fill: none;
+  pointer-events: none;
+  rx: 10;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.vinyl-shape-cutline.standard {
+  stroke: #0284c7;
+}
+
+.vinyl-shape-cutline.wrap {
+  stroke: #ea580c;
+}
+
+.vinyl-shape-cutline.contra {
+  stroke: #0f172a;
+}
+
+.vinyl-shape-cutline.reflective {
+  stroke: #64748b;
+}
+
 .vinyl-shape.drawing {
   fill: rgba(104, 62, 132, 0.14);
   stroke: var(--sx-main);

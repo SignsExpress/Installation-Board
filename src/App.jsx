@@ -4549,6 +4549,20 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                           ))}
                         </g>
                       ) : null}
+                      {shape.type === "polygon" ? (
+                        <polygon
+                          points={pointsToSvg(shape.points)}
+                          className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                        />
+                      ) : (
+                        <rect
+                          x={shape.x}
+                          y={shape.y}
+                          width={shape.width}
+                          height={shape.height}
+                          className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                        />
+                      )}
                       <g
                         className="vinyl-shape-delete"
                         role="button"
