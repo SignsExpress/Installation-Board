@@ -190,6 +190,62 @@ function mergeVehiclePricingSettings(settings = {}) {
   };
 }
 
+function looksLikeVehiclePricingSettings(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      ("standardVinylRate" in value ||
+        "wrapRateStart" in value ||
+        "labourSellRate" in value ||
+        "marketAnchors" in value ||
+        "blendWeights" in value)
+  );
+}
+
+function getDefaultVehiclePricingSettingsByTemplate() {
+  return Object.fromEntries(
+    VEHICLE_TEMPLATE_OPTIONS.map((template) => [
+      template.id,
+      mergeVehiclePricingSettings(template.pricingSettings || {})
+    ])
+  );
+}
+
+function getStoredVehiclePricingSettingsByTemplate() {
+  const defaultSettings = getDefaultVehiclePricingSettingsByTemplate();
+  if (typeof window === "undefined") return defaultSettings;
+  try {
+    const storedSettings = window.localStorage.getItem(VEHICLE_PRICING_STORAGE_KEY);
+    if (!storedSettings) return defaultSettings;
+    const parsedSettings = JSON.parse(storedSettings);
+
+    if (looksLikeVehiclePricingSettings(parsedSettings)) {
+      return {
+        ...defaultSettings,
+        [VAN_ESTIMATOR_TEMPLATE.id]: mergeVehiclePricingSettings(parsedSettings)
+      };
+    }
+
+    return Object.fromEntries(
+      VEHICLE_TEMPLATE_OPTIONS.map((template) => [
+        template.id,
+        mergeVehiclePricingSettings(parsedSettings?.[template.id] || template.pricingSettings || {})
+      ])
+    );
+  } catch (error) {
+    return defaultSettings;
+  }
+}
+
+function saveVehiclePricingSettingsByTemplate(settingsByTemplate) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VEHICLE_PRICING_STORAGE_KEY, JSON.stringify(settingsByTemplate));
+  } catch (error) {
+    // The saved values still apply for this browser session if storage is unavailable.
+  }
+}
+
 function decodeSvgLayerId(value = "") {
   return String(value || "").replace(/_x([0-9a-fA-F]{4})_/g, (_, hex) =>
     String.fromCharCode(parseInt(hex, 16))
@@ -223,16 +279,6 @@ function normalizeVehicleScaleFactor(computedScale, fallbackScale, artworkScale 
   }
 
   return computed;
-}
-
-function getStoredVehiclePricingSettings() {
-  if (typeof window === "undefined") return mergeVehiclePricingSettings();
-  try {
-    const storedSettings = window.localStorage.getItem(VEHICLE_PRICING_STORAGE_KEY);
-    return storedSettings ? mergeVehiclePricingSettings(JSON.parse(storedSettings)) : mergeVehiclePricingSettings();
-  } catch (error) {
-    return mergeVehiclePricingSettings();
-  }
 }
 
 function getLocalTodayIso() {
@@ -3244,12 +3290,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [svgMarkup, setSvgMarkup] = useState("");
   const [svgError, setSvgError] = useState("");
   const [shapes, setShapes] = useState([]);
-  const [pricingSettings, setPricingSettings] = useState(getStoredVehiclePricingSettings);
-  const [pricingDraftSettings, setPricingDraftSettings] = useState(() => getStoredVehiclePricingSettings());
-  const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const selectedTemplate =
     VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
+  const [pricingSettingsByTemplate, setPricingSettingsByTemplate] = useState(getStoredVehiclePricingSettingsByTemplate);
+  const pricingSettings = useMemo(
+    () => mergeVehiclePricingSettings(pricingSettingsByTemplate[selectedTemplate.id] || selectedTemplate.pricingSettings || {}),
+    [pricingSettingsByTemplate, selectedTemplate]
+  );
+  const [pricingDraftSettings, setPricingDraftSettings] = useState(() => pricingSettings);
+  const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
   const [activeScaleFactor, setActiveScaleFactor] = useState(selectedTemplate.scaleFactor);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [materialMode, setMaterialMode] = useState("standard");
@@ -3301,6 +3351,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       active = false;
     };
   }, [selectedTemplate]);
+
+  useEffect(() => {
+    setPricingDraftSettings(pricingSettings);
+  }, [selectedTemplate.id]);
 
   useEffect(() => {
     if (!svgMarkup || !inlineSvgRef.current) return;
@@ -4316,14 +4370,15 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function savePricingSettings() {
     const nextSettings = mergeVehiclePricingSettings(pricingDraftSettings);
-    setPricingSettings(nextSettings);
     setPricingDraftSettings(nextSettings);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem(VEHICLE_PRICING_STORAGE_KEY, JSON.stringify(nextSettings));
-    } catch (error) {
-      // The saved values still apply for this browser session if storage is unavailable.
-    }
+    setPricingSettingsByTemplate((current) => {
+      const nextSettingsByTemplate = {
+        ...current,
+        [selectedTemplate.id]: nextSettings
+      };
+      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
+      return nextSettingsByTemplate;
+    });
   }
 
   function resetPricingDraft() {
@@ -4337,15 +4392,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function restoreDefaultPricingSettings() {
-    const defaultSettings = mergeVehiclePricingSettings();
-    setPricingSettings(defaultSettings);
+    const defaultSettings = mergeVehiclePricingSettings(selectedTemplate.pricingSettings || {});
     setPricingDraftSettings(defaultSettings);
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.removeItem(VEHICLE_PRICING_STORAGE_KEY);
-    } catch (error) {
-      // Defaults still apply for this browser session if storage is unavailable.
-    }
+    setPricingSettingsByTemplate((current) => {
+      const nextSettingsByTemplate = {
+        ...current,
+        [selectedTemplate.id]: defaultSettings
+      };
+      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
+      return nextSettingsByTemplate;
+    });
   }
 
   return (
@@ -4699,6 +4755,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
               {currentUser?.canManagePermissions ? (
                 <details className="vinyl-pricing-settings" onToggle={handlePricingSettingsToggle}>
                   <summary>Pricing settings</summary>
+                  <p className="vinyl-pricing-context">
+                    Editing pricing for <strong>{selectedTemplate.sizeName}</strong> ({selectedTemplate.exampleName}).
+                  </p>
                   <div className="vinyl-pricing-grid">
                     {renderPricingNumber("Standard vinyl rate", ["standardVinylRate"], 1, "Standard vinyl sell per m2. Raise it and all flat vinyl jobs rise.")}
                     {renderPricingNumber("Contra multiplier", ["materialMultipliers", "contra"], 0.05, "Multiplier for Contra-vision shapes. These stay standard vinyl, ignore wrap lines, and multiply the standard vinyl material sell.")}
