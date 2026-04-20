@@ -3260,6 +3260,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [lassoPoints, setLassoPoints] = useState([]);
   const [editDrag, setEditDrag] = useState(null);
   const [vehicleClipPathsD, setVehicleClipPathsD] = useState([]);
+  const [vehicleEdgePathsD, setVehicleEdgePathsD] = useState([]);
   const inlineSvgRef = useRef(null);
   const overlaySvgRef = useRef(null);
   const vehicleBodyPathsRef = useRef([]);
@@ -3277,6 +3278,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setLassoPoints([]);
     setEditDrag(null);
     setVehicleClipPathsD([]);
+    setVehicleEdgePathsD([]);
     setActiveScaleFactor(selectedTemplate.scaleFactor);
     vehicleBodyPathsRef.current = [];
     wrapLinesRef.current = [];
@@ -3357,9 +3359,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       }
     }
 
-    const edgeLayer = inlineSvgRef.current.querySelector("#Van_Edges");
     const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
-    const vehicleBodyLayer = edgeLayer || artworkLayer;
+    const edgeLayer = inlineSvgRef.current.querySelector("#Van_Edges");
+    const vehicleBodyLayer = artworkLayer || edgeLayer;
     const vehicleBodyPaths = Array.from(vehicleBodyLayer?.querySelectorAll("path") || [])
       .map((element) => {
         try {
@@ -3374,6 +3376,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       .map((entry) => entry.element);
     vehicleBodyPathsRef.current = vehicleBodyPaths;
     setVehicleClipPathsD(vehicleBodyPaths.map((element) => element.getAttribute("d")).filter(Boolean));
+    setVehicleEdgePathsD(
+      Array.from((edgeLayer || vehicleBodyLayer)?.querySelectorAll("path") || [])
+        .map((element) => element.getAttribute("d"))
+        .filter(Boolean)
+    );
 
     const wrapLayer = inlineSvgRef.current.querySelector("#Wrap_Film_Lines");
     if (!wrapLayer) {
@@ -4539,12 +4546,12 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                           />
                         )}
                       </g>
-                      {vehicleClipPathsD.length ? (
+                      {vehicleEdgePathsD.length ? (
                         <g
                           className={`vinyl-vehicle-edge ${getShapeVisualClass(shape)}`}
                           clipPath={`url(#${getShapeClipId(shape.id)})`}
                         >
-                          {vehicleClipPathsD.map((pathD, index) => (
+                          {vehicleEdgePathsD.map((pathD, index) => (
                             <path key={`${shape.id}-edge-${index}`} d={pathD} />
                           ))}
                         </g>
