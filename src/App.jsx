@@ -4731,7 +4731,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                         )}
                         <g className="vinyl-shape-controls" transform={`translate(${shapeCenter.x} ${shapeCenter.y})`}>
                           <g
-                            className="vinyl-shape-control vinyl-shape-material-toggle"
+                            className={`vinyl-shape-control vinyl-shape-material-toggle ${getShapeVisualClass(shape)}`}
                             role="button"
                             tabIndex="0"
                             aria-label={shape.isWrapFilm ? "Change drawn area to standard vinyl" : "Change drawn area to wrap film"}
@@ -4741,10 +4741,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                             }}
                             onClick={(event) => toggleShapeMaterial(event, shape.id)}
                           >
-                            <circle cx="-16" cy="0" r="13" />
-                            <line x1="-23" y1="0" x2="-9" y2="0" />
-                            <polyline points="-19,-5 -24,0 -19,5" />
-                            <polyline points="-13,-5 -8,0 -13,5" />
+                            <circle cx="-22" cy="0" r="15" />
+                            <line x1="-30" y1="0" x2="-14" y2="0" />
+                            <polyline points="-25,-6 -31,0 -25,6" />
+                            <polyline points="-19,-6 -13,0 -19,6" />
                           </g>
                           <g
                             className="vinyl-shape-control vinyl-shape-delete"
@@ -4757,9 +4757,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                             }}
                             onClick={(event) => deleteShape(event, shape.id)}
                           >
-                            <circle cx="16" cy="0" r="13" />
-                            <line x1="11" y1="-5" x2="21" y2="5" />
-                            <line x1="21" y1="-5" x2="11" y2="5" />
+                            <circle cx="22" cy="0" r="15" />
+                            <line x1="16" y1="-6" x2="28" y2="6" />
+                            <line x1="28" y1="-6" x2="16" y2="6" />
                           </g>
                         </g>
                         {(shape.type === "polygon" ? shape.points : getRectanglePoints(shape.bounds || shape)).map((point, pointIndex) => (

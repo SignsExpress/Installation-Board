@@ -884,7 +884,7 @@ button {
   vector-effect: non-scaling-stroke;
   fill: #fff;
   stroke: #683e84;
-  stroke-width: 2.5;
+  stroke-width: 2.75;
 }
 
 .vinyl-shape-control line,
@@ -894,8 +894,44 @@ button {
   stroke: #683e84;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 3;
+  stroke-width: 3.25;
   pointer-events: none;
+}
+
+.vinyl-shape-material-toggle.standard circle {
+  stroke: #0284c7;
+}
+
+.vinyl-shape-material-toggle.standard line,
+.vinyl-shape-material-toggle.standard polyline {
+  stroke: #0284c7;
+}
+
+.vinyl-shape-material-toggle.wrap circle {
+  stroke: #ea580c;
+}
+
+.vinyl-shape-material-toggle.wrap line,
+.vinyl-shape-material-toggle.wrap polyline {
+  stroke: #ea580c;
+}
+
+.vinyl-shape-material-toggle.contra circle {
+  stroke: #0f172a;
+}
+
+.vinyl-shape-material-toggle.contra line,
+.vinyl-shape-material-toggle.contra polyline {
+  stroke: #0f172a;
+}
+
+.vinyl-shape-material-toggle.reflective circle {
+  stroke: #64748b;
+}
+
+.vinyl-shape-material-toggle.reflective line,
+.vinyl-shape-material-toggle.reflective polyline {
+  stroke: #64748b;
 }
 
 .vinyl-shape-delete circle {
