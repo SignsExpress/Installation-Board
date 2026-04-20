@@ -4460,10 +4460,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function getExportShapeColours(shape) {
     const visualClass = getShapeVisualClass(shape);
-    if (visualClass === "wrap") return { fill: "rgba(249, 115, 22, 0.2)", stroke: "#ea580c" };
-    if (visualClass === "contra") return { fill: "rgba(15, 23, 42, 0.18)", stroke: "#0f172a" };
-    if (visualClass === "reflective") return { fill: "rgba(255, 255, 255, 0.72)", stroke: "#64748b" };
-    return { fill: "rgba(14, 165, 233, 0.18)", stroke: "#0284c7" };
+    if (visualClass === "wrap") return { fill: "#fdba74", opacity: 0.34, stroke: "#ea580c" };
+    if (visualClass === "contra") return { fill: "#0f172a", opacity: 0.18, stroke: "#0f172a" };
+    if (visualClass === "reflective") return { fill: "#ffffff", opacity: 0.74, stroke: "#64748b" };
+    return { fill: "#7dd3fc", opacity: 0.24, stroke: "#0284c7" };
   }
 
   function wrapSvgText(value, maxLength = 24, maxLines = 10) {
@@ -4489,13 +4489,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return trimmedLines.length ? trimmedLines : ["-"];
   }
 
-  function createExportTextBlock({ x, y, title, value, maxLength = 24, maxLines = 3 }) {
+  function createExportTextBlock({ x, y, title, value, maxLength = 24, maxLines = 3, anchor = "start", valueSize = 8.2, titleSize = 8.5, valueWeight = 400 }) {
     const valueLines = wrapSvgText(value, maxLength, maxLines);
-    const titleMarkup = `<text x="${x}" y="${y}" fill="#5f3c74" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5" font-weight="700">${escapeSvgText(title)}</text>`;
+    const titleMarkup = `<text x="${x}" y="${y}" text-anchor="${anchor}" fill="#5f3c74" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="${titleSize}" font-weight="700">${escapeSvgText(title)}</text>`;
     const valueMarkup = valueLines
       .map(
         (line, index) =>
-          `<text x="${x}" y="${y + 11 + index * 9}" fill="#172033" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.2">${escapeSvgText(line)}</text>`
+          `<text x="${x}" y="${y + 11 + index * 9}" text-anchor="${anchor}" fill="#172033" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="${valueSize}" font-weight="${valueWeight}">${escapeSvgText(line)}</text>`
       )
       .join("");
     return { markup: `${titleMarkup}${valueMarkup}`, height: 14 + valueLines.length * 9 };
@@ -4505,7 +4505,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return shapes
       .map((shape) => {
         const colours = getExportShapeColours(shape);
-        const common = `fill="${colours.fill}" stroke="${colours.stroke}" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"`;
+        const common = `fill="${colours.fill}" fill-opacity="${colours.opacity}" stroke="${colours.stroke}" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"`;
         if (shape.type === "polygon") {
           return `<polygon points="${pointsToSvg(shape.points)}" ${common} />`;
         }
@@ -4518,12 +4518,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const sourceSvg = inlineSvgRef.current?.querySelector("svg");
     if (!sourceSvg) return "";
     const viewBox = selectedTemplate.viewBox;
+    const clipMarkup = vehicleClipPathsD.length
+      ? `<defs><clipPath id="export-vehicle-body-clip">${vehicleClipPathsD
+          .map((pathD) => `<path d="${pathD}" clip-rule="evenodd" />`)
+          .join("")}</clipPath></defs>`
+      : "";
+    const clipAttribute = vehicleClipPathsD.length ? ` clip-path="url(#export-vehicle-body-clip)"` : "";
     return `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}">
+        ${clipMarkup}
         <svg x="${viewBox.x}" y="${viewBox.y}" width="${viewBox.width}" height="${viewBox.height}" viewBox="${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMidYMid meet">
           ${sourceSvg.innerHTML}
         </svg>
-        <g id="export-drawn-shapes">${buildExportShapeMarkup()}</g>
+        <g id="export-drawn-shapes"${clipAttribute}>${buildExportShapeMarkup()}</g>
       </svg>
     `;
   }
@@ -4579,9 +4586,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     `;
     artBoardSvg.appendChild(metaGroup);
 
+    const priceLabel = `${currencyFormatter.format(totals.estimate || 0)} +VAT`;
     const details = [
       ["Customer", customerName || "-"],
-      ["Price", currencyFormatter.format(totals.estimate || 0)],
       ["Std. print vinyl", formatM2(totals.standardPrintArea)],
       ["Wrap film", formatM2(totals.wrapArea)],
       ["Contra-vision", formatM2(totals.contraArea)],
@@ -4591,24 +4598,38 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       ["Est. application", `${(Number(totals.labourHours) || 0).toFixed(1)} hours`]
     ];
     let detailY = 108;
+    const priceBlock = createExportTextBlock({
+      x: 822,
+      y: detailY,
+      title: "Price",
+      value: priceLabel,
+      maxLength: 18,
+      maxLines: 1,
+      anchor: "end",
+      valueSize: 13,
+      titleSize: 9,
+      valueWeight: 700
+    });
+    detailY += priceBlock.height + 8;
     const detailMarkup = details
       .map(([title, value]) => {
-        const block = createExportTextBlock({ x: 708, y: detailY, title, value, maxLength: 22, maxLines: 2 });
-        detailY += block.height + 3;
+        const block = createExportTextBlock({ x: 822, y: detailY, title, value, maxLength: 22, maxLines: 2, anchor: "end" });
+        detailY += block.height + 2;
         return block.markup;
       })
       .join("");
     const notesBlock = createExportTextBlock({
-      x: 708,
-      y: 432,
+      x: 822,
+      y: detailY + 5,
       title: "Notes",
       value: notes || "-",
-      maxLength: 23,
-      maxLines: 7
+      maxLength: 26,
+      maxLines: 12,
+      anchor: "end"
     });
     const detailTextGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
     detailTextGroup.setAttribute("id", "Export_Detail_Text");
-    detailTextGroup.innerHTML = `${detailMarkup}${notesBlock.markup}`;
+    detailTextGroup.innerHTML = `${priceBlock.markup}${detailMarkup}${notesBlock.markup}`;
     artBoardSvg.appendChild(detailTextGroup);
 
     return new XMLSerializer().serializeToString(artBoardSvg);
@@ -4653,9 +4674,23 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         font-weight: 700;
       }
       @page { size: A4 landscape; margin: 0; }
-      html, body { margin: 0; width: 100%; min-height: 100%; background: #fff; font-family: Faricy, Arial, sans-serif; }
+      html, body {
+        margin: 0;
+        width: 100%;
+        min-height: 100%;
+        background: #fff;
+        font-family: Faricy, Arial, sans-serif;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
       .sheet { width: 297mm; height: 210mm; margin: 0 auto; overflow: hidden; }
-      .sheet svg { display: block; width: 297mm; height: 210mm; }
+      .sheet svg {
+        display: block;
+        width: 297mm;
+        height: 210mm;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
     </style>
   </head>
   <body>
