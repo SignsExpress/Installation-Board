@@ -4582,11 +4582,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const details = [
       ["Customer", customerName || "-"],
       ["Price", currencyFormatter.format(totals.estimate || 0)],
-      ["Std. print vinyl", formatArea(totals.standardPrintArea)],
-      ["Wrap film", formatArea(totals.wrapArea)],
-      ["Contra-vision", formatArea(totals.contraArea)],
-      ["Reflective", formatArea(totals.reflectiveArea)],
-      ["Total coverage", formatArea(totals.totalArea)],
+      ["Std. print vinyl", formatM2(totals.standardPrintArea)],
+      ["Wrap film", formatM2(totals.wrapArea)],
+      ["Contra-vision", formatM2(totals.contraArea)],
+      ["Reflective", formatM2(totals.reflectiveArea)],
+      ["Total coverage", formatM2(totals.totalArea)],
       ["% coverage", formatPercent(totals.coverage)],
       ["Est. application", `${(Number(totals.labourHours) || 0).toFixed(1)} hours`]
     ];
