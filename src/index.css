@@ -992,7 +992,29 @@ button {
 }
 
 .vehicle-pdf-modal {
-  max-width: 520px;
+  display: grid;
+  gap: 16px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 32px));
+  overflow: auto;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 28px;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(12px);
+}
+
+.vehicle-pdf-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.vehicle-pdf-modal-header h2,
+.vehicle-pdf-modal-header p {
+  margin: 0;
 }
 
 .vehicle-pdf-modal label {
@@ -1005,6 +1027,7 @@ button {
 .vehicle-pdf-modal input,
 .vehicle-pdf-modal textarea {
   width: 100%;
+  box-sizing: border-box;
   border: 1px solid rgba(148, 163, 184, 0.45);
   border-radius: 14px;
   padding: 13px 15px;
@@ -1015,6 +1038,14 @@ button {
 
 .vehicle-pdf-modal textarea {
   resize: vertical;
+  min-height: 140px;
+}
+
+.vehicle-pdf-modal .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
 }
 
 .vinyl-total-hero {

@@ -3345,6 +3345,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [shapes, setShapes] = useState([]);
   const [pdfExportOpen, setPdfExportOpen] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [pdfExportError, setPdfExportError] = useState("");
   const [pdfExportForm, setPdfExportForm] = useState({ customerName: "", notes: "" });
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const selectedTemplate =
@@ -4615,17 +4616,26 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   function openPdfExport() {
     setPdfExportForm({ customerName: "", notes: "" });
+    setPdfExportError("");
     setPdfExportOpen(true);
   }
 
   async function exportVehiclePdf(event) {
     event.preventDefault();
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setPdfExportError("Please allow pop-ups so the PDF export can open.");
+      return;
+    }
+
     setPdfExporting(true);
+    setPdfExportError("");
     setSvgError("");
     try {
+      printWindow.document.write(`<!doctype html><html><head><title>Creating PDF...</title></head><body style="font-family:Arial,sans-serif;padding:24px;">Creating PDF...</body></html>`);
+      printWindow.document.close();
       const exportSvg = buildArtBoardExportSvg(pdfExportForm.customerName, pdfExportForm.notes);
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) throw new Error("Please allow pop-ups so the PDF export can open.");
+      printWindow.document.open();
       printWindow.document.write(`<!doctype html>
 <html>
   <head>
@@ -4664,7 +4674,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       setPdfExportOpen(false);
     } catch (error) {
       console.error(error);
-      setSvgError(error.message || "Could not export the vehicle PDF.");
+      printWindow.close();
+      setPdfExportError(error.message || "Could not export the vehicle PDF.");
     } finally {
       setPdfExporting(false);
     }
@@ -5188,8 +5199,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
           <div className="modal-backdrop" onMouseDown={(event) => {
             if (event.target === event.currentTarget) setPdfExportOpen(false);
           }}>
-            <form className="modal-card vehicle-pdf-modal" onSubmit={exportVehiclePdf}>
-              <div className="modal-header">
+            <form className="vehicle-pdf-modal" onSubmit={exportVehiclePdf}>
+              <div className="vehicle-pdf-modal-header">
                 <div>
                   <p className="eyebrow">Vehicle PDF</p>
                   <h2>Export proposal</h2>
@@ -5198,6 +5209,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   x
                 </button>
               </div>
+              {pdfExportError ? <div className="flash error">{pdfExportError}</div> : null}
               <label>
                 Customer name
                 <input
