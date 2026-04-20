@@ -227,6 +227,146 @@ const VEHICLE_GRAPHICS_PRICING = {
 
 const VEHICLE_PRICING_STORAGE_KEY = "vehicle-pricing-settings-formula-v2";
 
+const SMART_PRICE_IMPORT_FIELDS = {
+  "standard vinyl rate": ["standardVinylRate"],
+  "contra multiplier": ["materialMultipliers", "contra"],
+  "reflective multiplier": ["materialMultipliers", "reflective"],
+  "wrap start rate": ["wrapRateStart"],
+  "wrap floor rate": ["wrapRateFloor"],
+  "wrap material taper": ["wrapRateTaper"],
+  "small std hrs/m2": ["standardSmallHoursPerM2"],
+  "small std hrs m2": ["standardSmallHoursPerM2"],
+  "small standard hrs/m2": ["standardSmallHoursPerM2"],
+  "small std min hrs": ["standardSmallMinHours"],
+  "small std max hrs": ["standardSmallMaxHours"],
+  "large std hrs/m2": ["standardLargeHoursPerM2"],
+  "large std hrs m2": ["standardLargeHoursPerM2"],
+  "large standard hrs/m2": ["standardLargeHoursPerM2"],
+  "wrap start hrs/m2": ["wrapLabourStartHoursPerM2"],
+  "wrap start hrs m2": ["wrapLabourStartHoursPerM2"],
+  "wrap floor hrs/m2": ["wrapLabourFloorHoursPerM2"],
+  "wrap floor hrs m2": ["wrapLabourFloorHoursPerM2"],
+  "wrap labour taper": ["wrapLabourTaper"],
+  "1 section factor": ["sectionFactors", "one"],
+  "one section factor": ["sectionFactors", "one"],
+  "2-3 sections factor": ["sectionFactors", "twoToThree"],
+  "2 3 sections factor": ["sectionFactors", "twoToThree"],
+  "4-5 sections factor": ["sectionFactors", "fourToFive"],
+  "4 5 sections factor": ["sectionFactors", "fourToFive"],
+  "6+ sections factor": ["sectionFactors", "moreThanFive"],
+  "6 sections factor": ["sectionFactors", "moreThanFive"],
+  "flat difficulty": ["difficultyFactors", "flat"],
+  "light curve difficulty": ["difficultyFactors", "light_curve"],
+  "normal wrap difficulty": ["difficultyFactors", "normal_wrap_curve"],
+  "deep recess difficulty": ["difficultyFactors", "deep_recess"],
+  "labour sell/hr": ["labourSellRate"],
+  "labour sell hr": ["labourSellRate"],
+  "labor sell/hr": ["labourSellRate"],
+  "anchor 0%": ["marketAnchors", "c0"],
+  "anchor 0": ["marketAnchors", "c0"],
+  "anchor 5%": ["marketAnchors", "c05"],
+  "anchor 5": ["marketAnchors", "c05"],
+  "anchor 10%": ["marketAnchors", "c10"],
+  "anchor 10": ["marketAnchors", "c10"],
+  "anchor 15%": ["marketAnchors", "c15"],
+  "anchor 15": ["marketAnchors", "c15"],
+  "anchor 22%": ["marketAnchors", "c22"],
+  "anchor 22": ["marketAnchors", "c22"],
+  "anchor 35%": ["marketAnchors", "c35"],
+  "anchor 35": ["marketAnchors", "c35"],
+  "anchor 55%": ["marketAnchors", "c55"],
+  "anchor 55": ["marketAnchors", "c55"],
+  "anchor 85%": ["marketAnchors", "c85"],
+  "anchor 85": ["marketAnchors", "c85"],
+  "anchor 100%": ["marketAnchors", "c100"],
+  "anchor 100": ["marketAnchors", "c100"],
+  "no-wrap calc weight": ["blendWeights", "noWrap", "calculated"],
+  "no wrap calc weight": ["blendWeights", "noWrap", "calculated"],
+  "no-wrap anchor weight": ["blendWeights", "noWrap", "anchor"],
+  "no wrap anchor weight": ["blendWeights", "noWrap", "anchor"],
+  "wrap <35 calc weight": ["blendWeights", "wrapUnder35", "calculated"],
+  "wrap 35 calc weight": ["blendWeights", "wrapUnder35", "calculated"],
+  "wrap <35 anchor weight": ["blendWeights", "wrapUnder35", "anchor"],
+  "wrap 35 anchor weight": ["blendWeights", "wrapUnder35", "anchor"],
+  "wrap <70 calc weight": ["blendWeights", "wrapUnder70", "calculated"],
+  "wrap <70 anchor weight": ["blendWeights", "wrapUnder70", "anchor"],
+  "wrap 70%+ calc weight": ["blendWeights", "wrapFull", "calculated"],
+  "wrap 70+ calc weight": ["blendWeights", "wrapFull", "calculated"],
+  "wrap 70%+ anchor weight": ["blendWeights", "wrapFull", "anchor"],
+  "wrap 70+ anchor weight": ["blendWeights", "wrapFull", "anchor"],
+  "absolute minimum": ["minPrice"],
+  "any wrap minimum": ["minAnyWrapPrice"],
+  "partial wrap minimum": ["minPartialWrapPrice"],
+  "full wrap minimum": ["minFullWrapPrice"]
+};
+
+function normalizeSmartPriceLabel(label = "") {
+  return String(label)
+    .toLowerCase()
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/\s*<\s*/g, " <")
+    .replace(/\s*>\s*/g, " >")
+    .trim();
+}
+
+function setNestedPricingValue(settings, path, value) {
+  const next = { ...settings };
+  let target = next;
+  path.slice(0, -1).forEach((key) => {
+    target[key] = { ...target[key] };
+    target = target[key];
+  });
+  target[path[path.length - 1]] = value;
+  return next;
+}
+
+function getSmartPriceImportSection(line = "") {
+  const normalizedLine = normalizeSmartPriceLabel(line);
+  if (normalizedLine.includes("medium van")) return "medium";
+  if (normalizedLine.includes("large van")) return "large";
+  return "";
+}
+
+function getTemplateSmartPriceSection(template) {
+  return normalizeSmartPriceLabel(template?.sizeName).includes("large") ? "large" : "medium";
+}
+
+function parseSmartPriceImport(text, template) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const hasSectionHeaders = lines.some((line) => getSmartPriceImportSection(line));
+  const targetSection = getTemplateSmartPriceSection(template);
+  let activeSection = hasSectionHeaders ? "" : targetSection;
+  const updates = [];
+  const unknown = [];
+
+  lines.forEach((line) => {
+    const nextSection = getSmartPriceImportSection(line);
+    if (nextSection) {
+      activeSection = nextSection;
+      return;
+    }
+    if (hasSectionHeaders && activeSection !== targetSection) return;
+
+    const match = line.match(/^(.+?)\s+(-?£?[\d,.]+)\s*$/i);
+    if (!match) return;
+
+    const label = normalizeSmartPriceLabel(match[1].replace(/:$/, ""));
+    const path = SMART_PRICE_IMPORT_FIELDS[label];
+    const value = Number(match[2].replace(/[£,]/g, ""));
+    if (!path || !Number.isFinite(value)) {
+      unknown.push(match[1].trim());
+      return;
+    }
+    updates.push({ label: match[1].trim(), path, value });
+  });
+
+  return { updates, unknown, targetSection };
+}
+
 function mergeVehiclePricingSettings(settings = {}) {
   return {
     ...VEHICLE_GRAPHICS_PRICING,
@@ -3380,6 +3520,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   );
   const [pricingDraftSettings, setPricingDraftSettings] = useState(() => pricingSettings);
   const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
+  const [smartPriceImportOpen, setSmartPriceImportOpen] = useState(false);
+  const [smartPriceImportText, setSmartPriceImportText] = useState("");
+  const [smartPriceImportStatus, setSmartPriceImportStatus] = useState("");
   const [activeScaleFactor, setActiveScaleFactor] = useState(selectedTemplate.scaleFactor);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [materialMode, setMaterialMode] = useState("standard");
@@ -4758,16 +4901,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function updatePricingValue(path, value) {
     const numericValue = Number(value);
     if (Number.isNaN(numericValue)) return;
-    setPricingDraftSettings((current) => {
-      const next = { ...current };
-      let target = next;
-      path.slice(0, -1).forEach((key) => {
-        target[key] = { ...target[key] };
-        target = target[key];
-      });
-      target[path[path.length - 1]] = numericValue;
-      return next;
-    });
+    setPricingDraftSettings((current) => setNestedPricingValue(current, path, numericValue));
   }
 
   function updatePricingToggle(path, checked) {
@@ -4792,6 +4926,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         </span>
         <input type="number" step={step} value={value} onChange={(event) => updatePricingValue(path, event.target.value)} />
       </label>
+    );
+  }
+
+  function importSmartPrices() {
+    const result = parseSmartPriceImport(smartPriceImportText, selectedTemplate);
+    if (!result.updates.length) {
+      setSmartPriceImportStatus(`No matching ${selectedTemplate.sizeName} pricing lines found.`);
+      return;
+    }
+
+    setPricingDraftSettings((current) =>
+      result.updates.reduce((nextSettings, update) => setNestedPricingValue(nextSettings, update.path, update.value), current)
+    );
+    setSmartPriceImportStatus(
+      `Imported ${result.updates.length} ${selectedTemplate.sizeName} value${result.updates.length === 1 ? "" : "s"}. Press Save to keep them.`
     );
   }
 
@@ -5206,6 +5355,43 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <p className="vinyl-pricing-context">
                     Editing pricing for <strong>{selectedTemplate.sizeName}</strong> ({selectedTemplate.exampleName}).
                   </p>
+                  <div className="smart-price-import">
+                    <button
+                      className="ghost-button smart-price-import-toggle"
+                      type="button"
+                      onClick={() => {
+                        setSmartPriceImportOpen((isOpen) => !isOpen);
+                        setSmartPriceImportStatus("");
+                      }}
+                    >
+                      Import smart prices
+                    </button>
+                    {smartPriceImportOpen ? (
+                      <div className="smart-price-import-panel">
+                        <label>
+                          <span>Paste pricing list</span>
+                          <textarea
+                            rows="7"
+                            value={smartPriceImportText}
+                            onChange={(event) => {
+                              setSmartPriceImportText(event.target.value);
+                              setSmartPriceImportStatus("");
+                            }}
+                            placeholder="Standard vinyl rate 84&#10;Wrap start rate 107&#10;Anchor 100% 3750"
+                          />
+                        </label>
+                        <div className="smart-price-import-actions">
+                          <button className="ghost-button" type="button" onClick={() => setSmartPriceImportText("")}>
+                            Clear
+                          </button>
+                          <button className="primary-button" type="button" onClick={importSmartPrices}>
+                            Import into {selectedTemplate.sizeName}
+                          </button>
+                        </div>
+                        {smartPriceImportStatus ? <p className="smart-price-import-status">{smartPriceImportStatus}</p> : null}
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="vinyl-pricing-grid">
                     {renderPricingNumber("Standard vinyl rate", ["standardVinylRate"], 1, "Standard vinyl sell per m2. Raise it and all flat vinyl jobs rise.")}
                     {renderPricingNumber("Contra multiplier", ["materialMultipliers", "contra"], 0.05, "Multiplier for Contra-vision shapes. These stay standard vinyl, ignore wrap lines, and multiply the standard vinyl material sell.")}

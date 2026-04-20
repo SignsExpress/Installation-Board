@@ -1146,6 +1146,61 @@ button {
   color: #0f172a;
 }
 
+.smart-price-import {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.smart-price-import-toggle {
+  justify-self: start;
+}
+
+.smart-price-import-panel {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(104, 62, 132, 0.2);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px;
+}
+
+.smart-price-import-panel label {
+  display: grid;
+  gap: 6px;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.smart-price-import-panel textarea {
+  width: 100%;
+  min-height: 128px;
+  resize: vertical;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 12px;
+  padding: 10px;
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #0f172a;
+  background: #fff;
+}
+
+.smart-price-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.smart-price-import-status {
+  margin: 0;
+  color: #683e84;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
 .vinyl-pricing-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
