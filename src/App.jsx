@@ -226,6 +226,7 @@ const VEHICLE_GRAPHICS_PRICING = {
 };
 
 const VEHICLE_PRICING_STORAGE_KEY = "vehicle-pricing-settings-formula-v2";
+const VEHICLE_PRICE_TRAINING_BANK_STORAGE_KEY = "vehicle-price-training-bank-v1";
 
 const SMART_PRICE_IMPORT_FIELDS = {
   "standard vinyl rate": ["standardVinylRate"],
@@ -255,10 +256,7 @@ const SMART_PRICE_IMPORT_FIELDS = {
   "4 5 sections factor": ["sectionFactors", "fourToFive"],
   "6+ sections factor": ["sectionFactors", "moreThanFive"],
   "6 sections factor": ["sectionFactors", "moreThanFive"],
-  "flat difficulty": ["difficultyFactors", "flat"],
-  "light curve difficulty": ["difficultyFactors", "light_curve"],
   "normal wrap difficulty": ["difficultyFactors", "normal_wrap_curve"],
-  "deep recess difficulty": ["difficultyFactors", "deep_recess"],
   "labour sell/hr": ["labourSellRate"],
   "labour sell hr": ["labourSellRate"],
   "labor sell/hr": ["labourSellRate"],
@@ -319,6 +317,26 @@ function setNestedPricingValue(settings, path, value) {
   });
   target[path[path.length - 1]] = value;
   return next;
+}
+
+function getStoredVehiclePriceTrainingBank() {
+  if (typeof window === "undefined") return [];
+  try {
+    const storedBank = window.localStorage.getItem(VEHICLE_PRICE_TRAINING_BANK_STORAGE_KEY);
+    const parsedBank = JSON.parse(storedBank || "[]");
+    return Array.isArray(parsedBank) ? parsedBank : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveVehiclePriceTrainingBank(bank) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VEHICLE_PRICE_TRAINING_BANK_STORAGE_KEY, JSON.stringify(bank));
+  } catch (error) {
+    // Training examples still work for the current session if storage is unavailable.
+  }
 }
 
 function getSmartPriceImportSection(line = "") {
@@ -3523,6 +3541,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [smartPriceImportOpen, setSmartPriceImportOpen] = useState(false);
   const [smartPriceImportText, setSmartPriceImportText] = useState("");
   const [smartPriceImportStatus, setSmartPriceImportStatus] = useState("");
+  const [priceTrainingBank, setPriceTrainingBank] = useState(getStoredVehiclePriceTrainingBank);
+  const [trainingTargetPrice, setTrainingTargetPrice] = useState("");
+  const [trainingStatus, setTrainingStatus] = useState("");
+  const [trainingSuggestion, setTrainingSuggestion] = useState(null);
   const [activeScaleFactor, setActiveScaleFactor] = useState(selectedTemplate.scaleFactor);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [materialMode, setMaterialMode] = useState("standard");
@@ -3538,6 +3560,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const overlaySvgRef = useRef(null);
   const vehicleBodyPathsRef = useRef([]);
   const wrapLinesRef = useRef([]);
+
+  const selectedTemplateTrainingBank = useMemo(
+    () => priceTrainingBank.filter((sample) => sample.templateId === selectedTemplate.id),
+    [priceTrainingBank, selectedTemplate.id]
+  );
 
   useEffect(() => {
     let active = true;
@@ -3596,7 +3623,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   useEffect(() => {
     setPricingDraftSettings(pricingSettings);
+    setTrainingSuggestion(null);
+    setTrainingStatus("");
   }, [selectedTemplate.id]);
+
+  useEffect(() => {
+    saveVehiclePriceTrainingBank(priceTrainingBank);
+  }, [priceTrainingBank]);
 
   useEffect(() => {
     if (!svgMarkup || !inlineSvgRef.current) return;
@@ -4432,6 +4465,79 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setShapes([]);
   }
 
+  function calculateEstimateFromMetrics(metrics, settings) {
+    const standardPrintArea = Number(metrics.standardPrintArea) || 0;
+    const contraArea = Number(metrics.contraArea) || 0;
+    const reflectiveArea = Number(metrics.reflectiveArea) || 0;
+    const wrapArea = Number(metrics.wrapArea) || 0;
+    const standardArea = standardPrintArea + contraArea + reflectiveArea;
+    const totalArea = standardArea + wrapArea;
+    const vehicleArea = Number(metrics.vehicleArea) || 0;
+    const wrapSectionCount = Number(metrics.wrapSectionCount) || 0;
+    const wrapSectionFactor = wrapArea > 0 ? getWrapSectionFactor(wrapSectionCount, settings) : 1;
+    const weightedDifficulty = Number(metrics.weightedDifficulty) || 1;
+
+    if (totalArea <= 0) return 0;
+
+    function calculateScaledEstimate(scale = 1) {
+      const scaledStandardArea = standardArea * scale;
+      const scaledStandardMaterialMultiplierArea =
+        (standardPrintArea * (settings.materialMultipliers.standard || 1) +
+          contraArea * (settings.materialMultipliers.contra || 1) +
+          reflectiveArea * (settings.materialMultipliers.reflective || 1)) *
+        scale;
+      const scaledWrapArea = wrapArea * scale;
+      const scaledTotalArea = totalArea * scale;
+      const scaledCoverage = vehicleArea > 0 ? scaledTotalArea / vehicleArea : 0;
+      const scaledWrapCoverage = vehicleArea > 0 ? scaledWrapArea / vehicleArea : 0;
+      const standardSell = scaledStandardMaterialMultiplierArea * settings.standardVinylRate;
+      const wrapSell = scaledWrapArea * getFormulaWrapRate(scaledWrapCoverage, settings);
+      const standardLabourHours =
+        scaledStandardArea <= 0
+          ? 0
+          : scaledCoverage < 0.15
+            ? clampNumber(
+                scaledStandardArea * settings.standardSmallHoursPerM2,
+                settings.standardSmallMinHours,
+                settings.standardSmallMaxHours
+              )
+            : scaledStandardArea * settings.standardLargeHoursPerM2;
+      const wrapLabourHours =
+        scaledWrapArea * getFormulaWrapLabourHours(scaledWrapCoverage, settings) * wrapSectionFactor * weightedDifficulty;
+      const basePrice = standardSell + wrapSell + (standardLabourHours + wrapLabourHours) * settings.labourSellRate;
+      const blend = getBlendWeights(scaledCoverage, scaledWrapArea, settings);
+      let estimate = blend.calculated * basePrice + blend.anchor * getMarketAnchor(scaledCoverage, settings);
+
+      estimate = Math.max(estimate, settings.minPrice);
+      if (scaledWrapArea > 0) estimate = Math.max(estimate, settings.minAnyWrapPrice);
+      if (scaledWrapArea > 0 && scaledCoverage >= 0.15) estimate = Math.max(estimate, settings.minPartialWrapPrice);
+      if (scaledWrapArea > 0 && scaledCoverage >= 0.85) estimate = Math.max(estimate, settings.minFullWrapPrice);
+      return estimate;
+    }
+
+    const currentPrice = calculateScaledEstimate(1);
+    const monotonicFloor = Array.from({ length: 80 }, (_, index) => (index + 1) / 80).reduce(
+      (highest, scale) => Math.max(highest, calculateScaledEstimate(scale)),
+      currentPrice
+    );
+    return Math.round(Math.max(currentPrice, monotonicFloor) / 50) * 50;
+  }
+
+  function getTrainingMetricsFromTotals() {
+    return {
+      standardPrintArea: totals.standardPrintArea,
+      contraArea: totals.contraArea,
+      reflectiveArea: totals.reflectiveArea,
+      wrapArea: totals.wrapArea,
+      totalArea: totals.totalArea,
+      vehicleArea: totals.vehicleArea,
+      coverage: totals.coverage,
+      wrapCoverage: totals.wrapCoverage,
+      wrapSectionCount: totals.wrapSectionCount,
+      weightedDifficulty: totals.weightedDifficulty
+    };
+  }
+
   const totals = useMemo(() => {
     const settings = pricingSettingsOpen ? pricingDraftSettings : pricingSettings;
     const classifiedShapes = shapes.map((shape) => {
@@ -4904,19 +5010,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setPricingDraftSettings((current) => setNestedPricingValue(current, path, numericValue));
   }
 
-  function updatePricingToggle(path, checked) {
-    setPricingDraftSettings((current) => {
-      const next = { ...current };
-      let target = next;
-      path.slice(0, -1).forEach((key) => {
-        target[key] = { ...target[key] };
-        target = target[key];
-      });
-      target[path[path.length - 1]] = checked;
-      return next;
-    });
-  }
-
   function renderPricingNumber(label, path, step = 1, help = "") {
     const value = path.reduce((target, key) => target?.[key], pricingDraftSettings);
     return (
@@ -4942,6 +5035,133 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setSmartPriceImportStatus(
       `Imported ${result.updates.length} ${selectedTemplate.sizeName} value${result.updates.length === 1 ? "" : "s"}. Press Save to keep them.`
     );
+  }
+
+  function addTrainingExample() {
+    const targetPrice = Number(trainingTargetPrice);
+    if (!shapes.length || totals.totalArea <= 0) {
+      setTrainingStatus("Draw at least one priced area first.");
+      return;
+    }
+    if (!Number.isFinite(targetPrice) || targetPrice <= 0) {
+      setTrainingStatus("Enter the manual price you would charge for this layout.");
+      return;
+    }
+
+    const example = {
+      id: `training-${Date.now()}-${Math.round(targetPrice)}`,
+      templateId: selectedTemplate.id,
+      templateName: selectedTemplate.sizeName,
+      targetPrice,
+      currentEstimate: totals.estimate,
+      metrics: getTrainingMetricsFromTotals(),
+      createdAt: new Date().toISOString()
+    };
+
+    setPriceTrainingBank((current) => [example, ...current]);
+    setTrainingTargetPrice("");
+    setTrainingSuggestion(null);
+    setTrainingStatus(`Added ${currencyFormatter.format(targetPrice)} example to the ${selectedTemplate.sizeName} bank.`);
+  }
+
+  function removeTrainingExample(exampleId) {
+    setPriceTrainingBank((current) => current.filter((example) => example.id !== exampleId));
+    setTrainingSuggestion(null);
+  }
+
+  function getWeightedTrainingRatio(samples, sourceSettings) {
+    let weightedRatio = 0;
+    let totalWeight = 0;
+
+    samples.forEach((sample) => {
+      const estimate = calculateEstimateFromMetrics(sample.metrics, sourceSettings);
+      const target = Number(sample.targetPrice) || 0;
+      if (!estimate || !target) return;
+      const weight = Math.max(0.25, Number(sample.metrics?.totalArea) || 0.25);
+      weightedRatio += (target / estimate) * weight;
+      totalWeight += weight;
+    });
+
+    return totalWeight > 0 ? weightedRatio / totalWeight : 1;
+  }
+
+  function getSettingsFitScore(samples, candidateSettings) {
+    if (!samples.length) return 0;
+    const totalError = samples.reduce((sum, sample) => {
+      const estimate = calculateEstimateFromMetrics(sample.metrics, candidateSettings);
+      const target = Number(sample.targetPrice) || 0;
+      if (!target) return sum;
+      return sum + Math.abs(estimate - target) / target;
+    }, 0);
+    return totalError / samples.length;
+  }
+
+  function scaleSettingGroup(settings, keys, ratio) {
+    return keys.reduce((nextSettings, path) => {
+      const currentValue = path.reduce((target, key) => target?.[key], nextSettings);
+      if (!Number.isFinite(Number(currentValue))) return nextSettings;
+      return setNestedPricingValue(nextSettings, path, Math.round(Number(currentValue) * ratio * 100) / 100);
+    }, settings);
+  }
+
+  function calculateTrainingSuggestion() {
+    const samples = selectedTemplateTrainingBank;
+    if (!samples.length) {
+      setTrainingStatus(`Add at least one ${selectedTemplate.sizeName} example first.`);
+      return;
+    }
+
+    const ratio = clampNumber(getWeightedTrainingRatio(samples, pricingDraftSettings), 0.5, 1.8);
+    const anchorPaths = [
+      ["marketAnchors", "c05"],
+      ["marketAnchors", "c10"],
+      ["marketAnchors", "c15"],
+      ["marketAnchors", "c22"],
+      ["marketAnchors", "c35"],
+      ["marketAnchors", "c55"],
+      ["marketAnchors", "c85"],
+      ["marketAnchors", "c100"]
+    ];
+    const ratePaths = [
+      ["standardVinylRate"],
+      ["wrapRateStart"],
+      ["wrapRateFloor"],
+      ["labourSellRate"],
+      ["minPrice"],
+      ["minAnyWrapPrice"],
+      ["minPartialWrapPrice"],
+      ["minFullWrapPrice"]
+    ];
+    const balancedRatio = ratio;
+    const candidates = [
+      {
+        label: "Balanced",
+        settings: scaleSettingGroup(scaleSettingGroup(pricingDraftSettings, anchorPaths, balancedRatio), ratePaths, balancedRatio)
+      },
+      { label: "Anchors only", settings: scaleSettingGroup(pricingDraftSettings, anchorPaths, ratio) },
+      { label: "Rates & minimums", settings: scaleSettingGroup(pricingDraftSettings, ratePaths, ratio) }
+    ].map((candidate) => ({
+      ...candidate,
+      score: getSettingsFitScore(samples, candidate.settings)
+    }));
+    const bestCandidate = candidates.sort((left, right) => left.score - right.score)[0];
+    const beforeScore = getSettingsFitScore(samples, pricingDraftSettings);
+
+    setTrainingSuggestion({
+      ...bestCandidate,
+      beforeScore,
+      ratio,
+      samples: samples.length
+    });
+    setTrainingStatus(
+      `${bestCandidate.label} suggestion ready from ${samples.length} example${samples.length === 1 ? "" : "s"}. Review it, then apply if it looks right.`
+    );
+  }
+
+  function applyTrainingSuggestion() {
+    if (!trainingSuggestion?.settings) return;
+    setPricingDraftSettings(mergeVehiclePricingSettings(trainingSuggestion.settings));
+    setTrainingStatus("Suggested values applied to the draft pricing settings. Press Save to keep them.");
   }
 
   function savePricingSettings() {
@@ -5410,10 +5630,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     {renderPricingNumber("2-3 sections factor", ["sectionFactors", "twoToThree"], 0.01, "Section factor for 2 to 3 separate wrap sections. Raise it and broken-up wrap jobs rise.")}
                     {renderPricingNumber("4-5 sections factor", ["sectionFactors", "fourToFive"], 0.01, "Section factor for 4 to 5 separate wrap sections. Raise it and broken-up wrap jobs rise.")}
                     {renderPricingNumber("6+ sections factor", ["sectionFactors", "moreThanFive"], 0.01, "Section factor for 6 or more separate wrap sections. Raise it and broken-up wrap jobs rise.")}
-                    {renderPricingNumber("Flat difficulty", ["difficultyFactors", "flat"], 0.01, "Difficulty factor for flat zones. Raise it and flat zones rise.")}
-                    {renderPricingNumber("Light curve difficulty", ["difficultyFactors", "light_curve"], 0.01, "Difficulty factor for light curves. Raise it and lightly curved zones rise.")}
                     {renderPricingNumber("Normal wrap difficulty", ["difficultyFactors", "normal_wrap_curve"], 0.01, "Difficulty factor for normal wrap curves. Raise it and curved wrap zones rise.")}
-                    {renderPricingNumber("Deep recess difficulty", ["difficultyFactors", "deep_recess"], 0.01, "Difficulty factor for deep recess, bumper corner or awkward return zones. Raise it and awkward curved zones rise.")}
                     {renderPricingNumber("Labour sell/hr", ["labourSellRate"], 1, "Labour sell per hour. Raise it and labour-heavy jobs rise.")}
                     {renderPricingNumber("Anchor 0%", ["marketAnchors", "c0"], 1, "Market anchor at 0 percent total coverage.")}
                     {renderPricingNumber("Anchor 5%", ["marketAnchors", "c05"], 1, "Market anchor at 5 percent total coverage. Raise it and jobs around this coverage rise.")}
@@ -5447,6 +5664,76 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                     <button className="primary-button" type="button" onClick={savePricingSettings}>
                       Save
                     </button>
+                  </div>
+                  <div className="price-training-bank">
+                    <div>
+                      <p className="eyebrow">Smart calibration</p>
+                      <h4>Training bank</h4>
+                      <p>
+                        Draw the boxes, enter the price you would actually charge, then add it to the bank. The suggestion
+                        uses your saved examples for this vehicle size only.
+                      </p>
+                    </div>
+                    <div className="price-training-add">
+                      <label>
+                        <span>Your price ex VAT</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="50"
+                          value={trainingTargetPrice}
+                          onChange={(event) => {
+                            setTrainingTargetPrice(event.target.value);
+                            setTrainingStatus("");
+                          }}
+                          placeholder="e.g. 1400"
+                        />
+                      </label>
+                      <button className="ghost-button" type="button" onClick={addTrainingExample}>
+                        Add current drawing to bank
+                      </button>
+                    </div>
+                    {selectedTemplateTrainingBank.length ? (
+                      <div className="price-training-list">
+                        {selectedTemplateTrainingBank.slice(0, 8).map((sample) => {
+                          const sampleEstimate = calculateEstimateFromMetrics(sample.metrics, pricingDraftSettings);
+                          return (
+                            <div className="price-training-row" key={sample.id}>
+                              <div>
+                                <strong>{currencyFormatter.format(sample.targetPrice)}</strong>
+                                <span>
+                                  {formatM2(sample.metrics.totalArea)} total, {formatM2(sample.metrics.wrapArea)} wrap
+                                </span>
+                              </div>
+                              <span>{currencyFormatter.format(sampleEstimate)} now</span>
+                              <button className="text-button danger" type="button" onClick={() => removeTrainingExample(sample.id)}>
+                                Delete
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="price-training-empty">No banked examples for this vehicle yet.</p>
+                    )}
+                    <div className="price-training-actions">
+                      <button className="ghost-button" type="button" onClick={calculateTrainingSuggestion}>
+                        Work out suggested variables
+                      </button>
+                      <button className="primary-button" type="button" onClick={applyTrainingSuggestion} disabled={!trainingSuggestion}>
+                        Apply suggestion
+                      </button>
+                    </div>
+                    {trainingSuggestion ? (
+                      <div className="price-training-suggestion">
+                        <strong>{trainingSuggestion.label}</strong>
+                        <span>
+                          Average error: {Math.round(trainingSuggestion.beforeScore * 100)}% now to{" "}
+                          {Math.round(trainingSuggestion.score * 100)}% suggested
+                        </span>
+                      </div>
+                    ) : null}
+                    {trainingStatus ? <p className="smart-price-import-status">{trainingStatus}</p> : null}
                   </div>
                 </details>
               ) : null}
