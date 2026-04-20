@@ -4553,6 +4553,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                         <polygon
                           points={pointsToSvg(shape.points)}
                           className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                          clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
                         />
                       ) : (
                         <rect
@@ -4561,6 +4562,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                           width={shape.width}
                           height={shape.height}
                           className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                          clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
                         />
                       )}
                       <g
