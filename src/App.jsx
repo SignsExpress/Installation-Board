@@ -4586,12 +4586,19 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       year: "2-digit"
     }).format(new Date());
     const designerName = String(currentUser?.displayName || currentUser?.name || currentUser?.username || "Matt").trim().split(/\s+/)[0] || "Matt";
+    Array.from(artBoardDocument.querySelectorAll("text")).forEach((textNode) => {
+      const label = String(textNode.textContent || "").trim().toLowerCase();
+      if (["draft", "date", "designer"].includes(label)) {
+        textNode.setAttribute("font-family", "Faricy, 'Faricy New', Arial, sans-serif");
+        textNode.setAttribute("font-weight", "700");
+      }
+    });
     const metaGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
     metaGroup.setAttribute("id", "Draft_x2C__Date_x2C__Designer");
     metaGroup.innerHTML = `
-      <text x="717.68" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">1</text>
-      <text x="748.55" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">${escapeSvgText(exportDate)}</text>
-      <text x="797.46" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">${escapeSvgText(designerName)}</text>
+      <text x="721.99" y="556.64" text-anchor="middle" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5" font-weight="700">1</text>
+      <text x="764.28" y="556.64" text-anchor="middle" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5" font-weight="700">${escapeSvgText(exportDate)}</text>
+      <text x="806.57" y="556.64" text-anchor="middle" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5" font-weight="700">${escapeSvgText(designerName)}</text>
     `;
     artBoardSvg.appendChild(metaGroup);
 
