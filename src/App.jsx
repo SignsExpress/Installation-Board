@@ -99,7 +99,8 @@ const VAN_ESTIMATOR_TEMPLATE = {
   exampleName: "Ford Transit Custom",
   src: "/vans/ford-transit-custom-swb.svg",
   scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
-  viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
+  viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 },
+  pricingDefaultsVersion: 1
 };
 
 const VEHICLE_TEMPLATE_OPTIONS = [
@@ -115,81 +116,108 @@ const VEHICLE_TEMPLATE_OPTIONS = [
     tyreReferenceDiameterMm: 743,
     artworkScale: 0.1,
     viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 },
-    pricingDefaultsVersion: 1,
+    pricingDefaultsVersion: 2,
     pricingSettings: {
-      wrapRateStart: 105,
-      wrapRateFloor: 75,
-      wrapRateTaper: 36,
-      wrapLabourStartHoursPerM2: 0.92,
-      wrapLabourFloorHoursPerM2: 0.58,
-      wrapLabourTaper: 0.48,
+      standardVinylRate: 86,
+      wrapRateStart: 110,
+      wrapRateFloor: 80,
+      wrapRateTaper: 32,
+      labourSellRate: 160,
+      standardSmallHoursPerM2: 0.7,
+      standardSmallMinHours: 1,
+      standardSmallMaxHours: 1.7,
+      standardLargeHoursPerM2: 0.52,
+      wrapLabourStartHoursPerM2: 1.02,
+      wrapLabourFloorHoursPerM2: 0.66,
+      wrapLabourTaper: 0.42,
+      sectionFactors: {
+        one: 0.92,
+        twoToThree: 1.03,
+        fourToFive: 1.12,
+        moreThanFive: 1.2
+      },
+      difficultyFactors: {
+        flat: 1,
+        light_curve: 1.1,
+        normal_wrap_curve: 1.2,
+        deep_recess: 1.32
+      },
       marketAnchors: {
         c0: 0,
-        c05: 250,
-        c10: 400,
-        c15: 650,
-        c22: 1100,
-        c35: 1500,
-        c55: 2100,
-        c85: 2750,
-        c100: 3000
+        c05: 300,
+        c10: 500,
+        c15: 800,
+        c22: 1300,
+        c35: 1900,
+        c55: 2850,
+        c85: 3850,
+        c100: 4100
+      },
+      materialMultipliers: {
+        standard: 1,
+        contra: 1.2,
+        reflective: 2
       },
       blendWeights: {
-        noWrap: { calculated: 0.65, anchor: 0.35 },
-        wrapUnder35: { calculated: 0.5, anchor: 0.5 },
-        wrapUnder70: { calculated: 0.35, anchor: 0.65 },
-        wrapFull: { calculated: 0.2, anchor: 0.8 }
-      }
+        noWrap: { calculated: 0.46, anchor: 0.54 },
+        wrapUnder35: { calculated: 0.42, anchor: 0.58 },
+        wrapUnder70: { calculated: 0.28, anchor: 0.72 },
+        wrapFull: { calculated: 0.15, anchor: 0.85 }
+      },
+      minPrice: 300,
+      minAnyWrapPrice: 700,
+      minPartialWrapPrice: 1050,
+      minFullWrapPrice: 2500
     }
   }
 ];
 
 const VEHICLE_GRAPHICS_PRICING = {
-  standardVinylRate: 85,
-  wrapRateStart: 110,
-  wrapRateFloor: 78,
-  wrapRateTaper: 32,
+  standardVinylRate: 84,
+  wrapRateStart: 107,
+  wrapRateFloor: 77,
+  wrapRateTaper: 34,
   labourSellRate: 160,
-  standardSmallHoursPerM2: 0.65,
+  standardSmallHoursPerM2: 0.68,
   standardSmallMinHours: 1,
-  standardSmallMaxHours: 1.5,
-  standardLargeHoursPerM2: 0.55,
-  wrapLabourStartHoursPerM2: 1.05,
-  wrapLabourFloorHoursPerM2: 0.65,
-  wrapLabourTaper: 0.4,
+  standardSmallMaxHours: 1.6,
+  standardLargeHoursPerM2: 0.5,
+  wrapLabourStartHoursPerM2: 0.98,
+  wrapLabourFloorHoursPerM2: 0.62,
+  wrapLabourTaper: 0.44,
   sectionFactors: {
     one: 0.92,
-    twoToThree: 1,
-    fourToFive: 1.08,
-    moreThanFive: 1.15
+    twoToThree: 1.02,
+    fourToFive: 1.1,
+    moreThanFive: 1.18
   },
   difficultyFactors: {
     flat: 1,
-    light_curve: 1.08,
-    normal_wrap_curve: 1.15,
-    deep_recess: 1.25
+    light_curve: 1.09,
+    normal_wrap_curve: 1.18,
+    deep_recess: 1.3
   },
   marketAnchors: {
     c0: 0,
-    c05: 250,
-    c10: 400,
-    c15: 650,
-    c22: 1100,
-    c35: 1600,
-    c55: 2300,
-    c85: 3000,
-    c100: 3300
+    c05: 275,
+    c10: 450,
+    c15: 725,
+    c22: 1175,
+    c35: 1750,
+    c55: 2600,
+    c85: 3500,
+    c100: 3750
   },
   blendWeights: {
-    noWrap: { calculated: 0.65, anchor: 0.35 },
-    wrapUnder35: { calculated: 0.55, anchor: 0.45 },
-    wrapUnder70: { calculated: 0.45, anchor: 0.55 },
-    wrapFull: { calculated: 0.3, anchor: 0.7 }
+    noWrap: { calculated: 0.48, anchor: 0.52 },
+    wrapUnder35: { calculated: 0.44, anchor: 0.56 },
+    wrapUnder70: { calculated: 0.32, anchor: 0.68 },
+    wrapFull: { calculated: 0.18, anchor: 0.82 }
   },
-  minPrice: 250,
-  minAnyWrapPrice: 600,
-  minPartialWrapPrice: 900,
-  minFullWrapPrice: 1800,
+  minPrice: 275,
+  minAnyWrapPrice: 675,
+  minPartialWrapPrice: 975,
+  minFullWrapPrice: 2250,
   materialMultipliers: {
     standard: 1,
     contra: 1.2,
@@ -252,12 +280,7 @@ function getStoredVehiclePricingSettingsByTemplate() {
     if (!storedSettings) return defaultSettings;
     const parsedSettings = JSON.parse(storedSettings);
 
-    if (looksLikeVehiclePricingSettings(parsedSettings)) {
-      return {
-        ...defaultSettings,
-        [VAN_ESTIMATOR_TEMPLATE.id]: mergeVehiclePricingSettings(parsedSettings)
-      };
-    }
+    if (looksLikeVehiclePricingSettings(parsedSettings)) return defaultSettings;
 
     return Object.fromEntries(
       VEHICLE_TEMPLATE_OPTIONS.map((template) => {
@@ -266,7 +289,7 @@ function getStoredVehiclePricingSettingsByTemplate() {
         const storedVersion = Number(storedTemplateSettings.__defaultsVersion || 0);
         const shouldRefreshTemplateDefaults = defaultsVersion > storedVersion;
         const mergedSettings = shouldRefreshTemplateDefaults
-          ? mergeVehiclePricingSettings({ ...storedTemplateSettings, ...template.pricingSettings })
+          ? mergeVehiclePricingSettings(template.pricingSettings || {})
           : mergeVehiclePricingSettings(storedTemplateSettings || template.pricingSettings || {});
         return [
           template.id,
