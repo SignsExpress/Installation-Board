@@ -4514,6 +4514,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       .join("");
   }
 
+  function svgToDataUri(svg) {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.trim())}`;
+  }
+
   function buildVehicleExportSvg() {
     const sourceSvg = inlineSvgRef.current?.querySelector("svg");
     if (!sourceSvg) return "";
@@ -4561,13 +4565,18 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     const height = viewBox.height * scale;
     const x = area.x + (area.width - width) / 2;
     const y = area.y + (area.height - height) / 2;
-    const vehicleGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
-    vehicleGroup.setAttribute("id", "Exported_Van");
-    vehicleGroup.setAttribute("transform", `translate(${x} ${y}) scale(${scale}) translate(${-viewBox.x} ${-viewBox.y})`);
-    vehicleGroup.innerHTML = vehicleSvg.trim().replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+    const vehicleImage = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "image");
+    vehicleImage.setAttribute("id", "Exported_Van");
+    vehicleImage.setAttribute("x", String(x));
+    vehicleImage.setAttribute("y", String(y));
+    vehicleImage.setAttribute("width", String(width));
+    vehicleImage.setAttribute("height", String(height));
+    vehicleImage.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    vehicleImage.setAttribute("href", svgToDataUri(vehicleSvg));
+    vehicleImage.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", svgToDataUri(vehicleSvg));
 
     const detailBox = artBoardDocument.querySelector("#Detail_Box");
-    artBoardSvg.insertBefore(vehicleGroup, detailBox || null);
+    artBoardSvg.insertBefore(vehicleImage, detailBox || null);
 
     artBoardDocument.querySelector("#Draft_x2C__Date_x2C__Designer")?.remove();
 
