@@ -3335,8 +3335,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       setActiveScaleFactor(selectedTemplate.scaleFactor);
     }
 
+    const edgeLayer = inlineSvgRef.current.querySelector("#Van_Edges");
     const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
-    const vehicleBodyPaths = Array.from(artworkLayer?.querySelectorAll("path") || [])
+    const vehicleBodyLayer = edgeLayer || artworkLayer;
+    const vehicleBodyPaths = Array.from(vehicleBodyLayer?.querySelectorAll("path") || [])
       .map((element) => {
         try {
           const box = element.getBBox();
