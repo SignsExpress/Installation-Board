@@ -109,8 +109,9 @@ const VEHICLE_TEMPLATE_OPTIONS = [
     sizeName: "Large Van",
     exampleName: "Ford Transit Panel Van LWB",
     src: "/vans/ford-transit-panel-lwb.svg",
-    scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
+    scaleFactor: 742 / 210.56,
     scaleReferenceLayer: "742mm_Dia",
+    artworkScale: 0.1,
     viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 }
   }
 ];
@@ -196,6 +197,30 @@ function decodeSvgLayerId(value = "") {
 function getScaleReferenceMm(value = "") {
   const match = decodeSvgLayerId(value).match(/(\d+(?:\.\d+)?)\s*mm/i);
   return match ? Number(match[1]) : 0;
+}
+
+function normalizeVehicleScaleFactor(computedScale, fallbackScale, artworkScale = 1) {
+  const computed = Number(computedScale);
+  const fallback = Number(fallbackScale);
+  if (!Number.isFinite(computed) || computed <= 0) return fallback;
+  if (!Number.isFinite(fallback) || fallback <= 0) return computed;
+
+  const scaleAdjustment = Number(artworkScale) > 0 && Number(artworkScale) < 1 ? 1 / Number(artworkScale) : 1;
+  const adjustedForArtworkScale = computed * scaleAdjustment;
+
+  if (
+    computed < fallback * 0.5 &&
+    adjustedForArtworkScale >= fallback * 0.5 &&
+    adjustedForArtworkScale <= fallback * 1.5
+  ) {
+    return adjustedForArtworkScale;
+  }
+
+  if (computed > fallback * 2 && computed / scaleAdjustment >= fallback * 0.5 && computed / scaleAdjustment <= fallback * 1.5) {
+    return computed / scaleAdjustment;
+  }
+
+  return computed;
 }
 
 function getStoredVehiclePricingSettings() {
@@ -3295,7 +3320,13 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         const box = scaleReferenceLayer.element.getBBox();
         const referenceUnits = Math.max(box.width || 0, box.height || 0);
         if (referenceUnits > 0) {
-          setActiveScaleFactor(scaleReferenceLayer.referenceMm / referenceUnits);
+          setActiveScaleFactor(
+            normalizeVehicleScaleFactor(
+              scaleReferenceLayer.referenceMm / referenceUnits,
+              selectedTemplate.scaleFactor,
+              selectedTemplate.artworkScale
+            )
+          );
         }
       } catch (error) {
         setActiveScaleFactor(selectedTemplate.scaleFactor);
@@ -3790,6 +3821,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       isWrapFilm: zoneMetadata.material_type === "wrap_film"
     };
   }
+
+  useEffect(() => {
+    setShapes((current) => current.map((shape) => refreshShapeMetrics(shape)));
+  }, [activeScaleFactor]);
 
   function updateShapeCorner(shape, dragState, point) {
     if (shape.type === "polygon") {
