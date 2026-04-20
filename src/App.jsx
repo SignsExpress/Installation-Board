@@ -109,8 +109,10 @@ const VEHICLE_TEMPLATE_OPTIONS = [
     sizeName: "Large Van",
     exampleName: "Ford Transit Panel Van LWB",
     src: "/vans/ford-transit-panel-lwb.svg",
-    scaleFactor: 742 / 210.56,
+    scaleFactor: 743 / 210.56,
     scaleReferenceLayer: "742mm_Dia",
+    tyreReferenceSelector: "#Artwork path.st6",
+    tyreReferenceDiameterMm: 743,
     artworkScale: 0.1,
     viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 }
   }
@@ -3308,31 +3310,51 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       svg.classList.add("van-template-svg");
     }
 
-    const scaleReferenceLayer = Array.from(inlineSvgRef.current.querySelectorAll("g[id]"))
-      .map((element) => {
-        const referenceMm = getScaleReferenceMm(element.id);
-        return referenceMm ? { element, referenceMm } : null;
-      })
-      .filter(Boolean)
-      .sort((left, right) => right.referenceMm - left.referenceMm)[0];
-    if (scaleReferenceLayer) {
-      try {
-        const box = scaleReferenceLayer.element.getBBox();
-        const referenceUnits = Math.max(box.width || 0, box.height || 0);
-        if (referenceUnits > 0) {
-          setActiveScaleFactor(
-            normalizeVehicleScaleFactor(
-              scaleReferenceLayer.referenceMm / referenceUnits,
-              selectedTemplate.scaleFactor,
-              selectedTemplate.artworkScale
-            )
-          );
+    const tyreReference = selectedTemplate.tyreReferenceSelector
+      ? Array.from(inlineSvgRef.current.querySelectorAll(selectedTemplate.tyreReferenceSelector))
+          .map((element) => {
+            try {
+              const box = element.getBBox();
+              const diameterUnits = Math.max(box.width || 0, box.height || 0);
+              const aspectRatio = box.width && box.height ? box.width / box.height : 0;
+              return diameterUnits > 50 && aspectRatio > 0.75 && aspectRatio < 1.33 ? { element, diameterUnits } : null;
+            } catch (error) {
+              return null;
+            }
+          })
+          .filter(Boolean)
+          .sort((left, right) => right.diameterUnits - left.diameterUnits)[0]
+      : null;
+
+    if (tyreReference && selectedTemplate.tyreReferenceDiameterMm) {
+      setActiveScaleFactor(selectedTemplate.tyreReferenceDiameterMm / tyreReference.diameterUnits);
+    } else {
+      const scaleReferenceLayer = Array.from(inlineSvgRef.current.querySelectorAll("g[id]"))
+        .map((element) => {
+          const referenceMm = getScaleReferenceMm(element.id);
+          return referenceMm ? { element, referenceMm } : null;
+        })
+        .filter(Boolean)
+        .sort((left, right) => right.referenceMm - left.referenceMm)[0];
+      if (scaleReferenceLayer) {
+        try {
+          const box = scaleReferenceLayer.element.getBBox();
+          const referenceUnits = Math.max(box.width || 0, box.height || 0);
+          if (referenceUnits > 0) {
+            setActiveScaleFactor(
+              normalizeVehicleScaleFactor(
+                scaleReferenceLayer.referenceMm / referenceUnits,
+                selectedTemplate.scaleFactor,
+                selectedTemplate.artworkScale
+              )
+            );
+          }
+        } catch (error) {
+          setActiveScaleFactor(selectedTemplate.scaleFactor);
         }
-      } catch (error) {
+      } else {
         setActiveScaleFactor(selectedTemplate.scaleFactor);
       }
-    } else {
-      setActiveScaleFactor(selectedTemplate.scaleFactor);
     }
 
     const edgeLayer = inlineSvgRef.current.querySelector("#Van_Edges");
@@ -3347,7 +3369,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
           return null;
         }
       })
-      .filter((entry) => entry?.area > 100000)
+      .filter(Boolean)
+      .filter((entry) => entry.area > 100000)
       .map((entry) => entry.element);
     vehicleBodyPathsRef.current = vehicleBodyPaths;
     setVehicleClipPathsD(vehicleBodyPaths.map((element) => element.getAttribute("d")).filter(Boolean));
