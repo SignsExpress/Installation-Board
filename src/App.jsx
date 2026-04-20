@@ -102,7 +102,18 @@ const VAN_ESTIMATOR_TEMPLATE = {
   viewBox: { x: 0, y: 0, width: 2280.56, height: 1298.24 }
 };
 
-const VEHICLE_TEMPLATE_OPTIONS = [VAN_ESTIMATOR_TEMPLATE];
+const VEHICLE_TEMPLATE_OPTIONS = [
+  VAN_ESTIMATOR_TEMPLATE,
+  {
+    id: "large-van-ford-transit-panel-lwb",
+    sizeName: "Large Van",
+    exampleName: "Ford Transit Panel Van LWB",
+    src: "/vans/ford-transit-panel-lwb.svg",
+    scaleFactor: VAN_REFERENCE_TYRE_DIAMETER_MM / VAN_REFERENCE_TYRE_DIAMETER_UNITS,
+    scaleReferenceLayer: "742mm_Dia",
+    viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 }
+  }
+];
 
 const VEHICLE_GRAPHICS_PRICING = {
   standardVinylRate: 85,
@@ -174,6 +185,17 @@ function mergeVehiclePricingSettings(settings = {}) {
       wrapFull: { ...VEHICLE_GRAPHICS_PRICING.blendWeights.wrapFull, ...settings.blendWeights?.wrapFull }
     }
   };
+}
+
+function decodeSvgLayerId(value = "") {
+  return String(value || "").replace(/_x([0-9a-fA-F]{4})_/g, (_, hex) =>
+    String.fromCharCode(parseInt(hex, 16))
+  );
+}
+
+function getScaleReferenceMm(value = "") {
+  const match = decodeSvgLayerId(value).match(/(\d+(?:\.\d+)?)\s*mm/i);
+  return match ? Number(match[1]) : 0;
 }
 
 function getStoredVehiclePricingSettings() {
@@ -3199,6 +3221,9 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [pricingDraftSettings, setPricingDraftSettings] = useState(() => getStoredVehiclePricingSettings());
   const [pricingSettingsOpen, setPricingSettingsOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
+  const selectedTemplate =
+    VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
+  const [activeScaleFactor, setActiveScaleFactor] = useState(selectedTemplate.scaleFactor);
   const [drawMode, setDrawMode] = useState("rectangle");
   const [materialMode, setMaterialMode] = useState("standard");
   const [drawingRect, setDrawingRect] = useState(null);
@@ -3215,9 +3240,23 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 
   useEffect(() => {
     let active = true;
-    fetch(VAN_ESTIMATOR_TEMPLATE.src)
+    setSvgMarkup("");
+    setSvgError("");
+    setShapes([]);
+    setDrawingRect(null);
+    setDrawStart(null);
+    setPolygonPoints([]);
+    setPolygonPreviewPoint(null);
+    setLassoPoints([]);
+    setEditDrag(null);
+    setVehicleClipPathsD([]);
+    setActiveScaleFactor(selectedTemplate.scaleFactor);
+    vehicleBodyPathsRef.current = [];
+    wrapLinesRef.current = [];
+
+    fetch(selectedTemplate.src)
       .then((response) => {
-        if (!response.ok) throw new Error("Could not load the van SVG.");
+        if (!response.ok) throw new Error("Could not load the vehicle SVG.");
         return response.text();
       })
       .then((text) => {
@@ -3232,7 +3271,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [selectedTemplate]);
 
   useEffect(() => {
     if (!svgMarkup || !inlineSvgRef.current) return;
@@ -3244,8 +3283,29 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       svg.classList.add("van-template-svg");
     }
 
+    const scaleReferenceLayer = Array.from(inlineSvgRef.current.querySelectorAll("g[id]"))
+      .map((element) => {
+        const referenceMm = getScaleReferenceMm(element.id);
+        return referenceMm ? { element, referenceMm } : null;
+      })
+      .filter(Boolean)
+      .sort((left, right) => right.referenceMm - left.referenceMm)[0];
+    if (scaleReferenceLayer) {
+      try {
+        const box = scaleReferenceLayer.element.getBBox();
+        const referenceUnits = Math.max(box.width || 0, box.height || 0);
+        if (referenceUnits > 0) {
+          setActiveScaleFactor(scaleReferenceLayer.referenceMm / referenceUnits);
+        }
+      } catch (error) {
+        setActiveScaleFactor(selectedTemplate.scaleFactor);
+      }
+    } else {
+      setActiveScaleFactor(selectedTemplate.scaleFactor);
+    }
+
     const artworkLayer = inlineSvgRef.current.querySelector("#Artwork");
-    const vehicleBodyPaths = Array.from(artworkLayer?.querySelectorAll("path.st18,path.st2") || [])
+    const vehicleBodyPaths = Array.from(artworkLayer?.querySelectorAll("path") || [])
       .map((element) => {
         try {
           const box = element.getBBox();
@@ -3298,7 +3358,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         }
       })
       .filter((line) => line?.points?.length);
-  }, [svgMarkup]);
+  }, [svgMarkup, selectedTemplate]);
 
   function getPointerPoint(event) {
     const svg = overlaySvgRef.current;
@@ -3374,7 +3434,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     } catch (error) {
       // Fall back to the full drawing viewBox if the SVG is not ready yet.
     }
-    return VAN_ESTIMATOR_TEMPLATE.viewBox;
+    return selectedTemplate.viewBox;
   }
 
   function rectsIntersect(left, right) {
@@ -3573,10 +3633,10 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function getVehicleDrawableAreaM2() {
     if (!vehicleBodyPathsRef.current.length) {
       return (
-        (VAN_ESTIMATOR_TEMPLATE.viewBox.width *
-          VAN_ESTIMATOR_TEMPLATE.viewBox.height *
-          VAN_ESTIMATOR_TEMPLATE.scaleFactor *
-          VAN_ESTIMATOR_TEMPLATE.scaleFactor) /
+        (selectedTemplate.viewBox.width *
+          selectedTemplate.viewBox.height *
+          activeScaleFactor *
+          activeScaleFactor) /
         1000000
       );
     }
@@ -3597,7 +3657,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     }
 
     const unitsArea = bounds.width * bounds.height * (insideVehicle / (columns * rows));
-    const scaleFactor = VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    const scaleFactor = activeScaleFactor;
     return (unitsArea * scaleFactor * scaleFactor) / 1000000;
   }
 
@@ -3668,8 +3728,8 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   }
 
   function getRectAreaM2(rect) {
-    const widthMm = rect.width * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
-    const heightMm = rect.height * VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    const widthMm = rect.width * activeScaleFactor;
+    const heightMm = rect.height * activeScaleFactor;
     return (widthMm / 1000) * (heightMm / 1000);
   }
 
@@ -3681,7 +3741,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
           return sum + point.x * nextPoint.y - nextPoint.x * point.y;
         }, 0)
       ) / 2;
-    const scaleFactor = VAN_ESTIMATOR_TEMPLATE.scaleFactor;
+    const scaleFactor = activeScaleFactor;
     return (areaUnits * scaleFactor * scaleFactor) / 1000000;
   }
 
@@ -4122,7 +4182,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       packageType: currentPrice.packageType,
       estimate
     };
-  }, [pricingDraftSettings, pricingSettings, pricingSettingsOpen, shapes, vehicleClipPathsD.length]);
+  }, [activeScaleFactor, pricingDraftSettings, pricingSettings, pricingSettingsOpen, selectedTemplate.id, shapes, vehicleClipPathsD.length]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -4220,9 +4280,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       // Defaults still apply for this browser session if storage is unavailable.
     }
   }
-
-  const selectedTemplate =
-    VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
 
   return (
     <div className="app-shell">
@@ -4369,7 +4426,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 <svg
                   ref={overlaySvgRef}
                   className="vinyl-drawing-layer"
-                  viewBox={`${VAN_ESTIMATOR_TEMPLATE.viewBox.x} ${VAN_ESTIMATOR_TEMPLATE.viewBox.y} ${VAN_ESTIMATOR_TEMPLATE.viewBox.width} ${VAN_ESTIMATOR_TEMPLATE.viewBox.height}`}
+                  viewBox={`${selectedTemplate.viewBox.x} ${selectedTemplate.viewBox.y} ${selectedTemplate.viewBox.width} ${selectedTemplate.viewBox.height}`}
                   preserveAspectRatio="xMidYMid meet"
                   onPointerDown={startDrawing}
                   onPointerMove={updateDrawing}
