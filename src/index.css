@@ -873,31 +873,45 @@ button {
   cursor: grabbing;
 }
 
-.vinyl-shape-delete {
+.vinyl-shape-controls,
+.vinyl-shape-control {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
 }
 
-.vinyl-shape-delete circle {
+.vinyl-shape-control circle {
   vector-effect: non-scaling-stroke;
   fill: #fff;
-  stroke: #be123c;
+  stroke: #683e84;
   stroke-width: 2.5;
 }
 
-.vinyl-shape-delete line {
+.vinyl-shape-control line,
+.vinyl-shape-control polyline {
   vector-effect: non-scaling-stroke;
-  stroke: #be123c;
+  fill: none;
+  stroke: #683e84;
   stroke-linecap: round;
+  stroke-linejoin: round;
   stroke-width: 3;
   pointer-events: none;
 }
 
+.vinyl-shape-delete circle {
+  stroke: #be123c;
+}
+
+.vinyl-shape-delete line {
+  stroke: #be123c;
+}
+
 .vinyl-shape-group:hover .vinyl-corner-handle,
-.vinyl-shape-group:hover .vinyl-shape-delete,
+.vinyl-shape-group:hover .vinyl-shape-controls,
+.vinyl-shape-group:hover .vinyl-shape-control,
 .vinyl-shape-group:focus-within .vinyl-corner-handle,
-.vinyl-shape-group:focus-within .vinyl-shape-delete {
+.vinyl-shape-group:focus-within .vinyl-shape-controls,
+.vinyl-shape-group:focus-within .vinyl-shape-control {
   opacity: 1;
   pointer-events: all;
 }

@@ -3737,6 +3737,22 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
+  function getForcedWrapZoneMetadata(area) {
+    const bounds = area.bounds || area;
+    const bodyBounds = getVehicleBodyBounds();
+    const centerX = bounds.x + bounds.width / 2;
+    const frontThreshold = bodyBounds.x + bodyBounds.width * 0.62;
+    const rearThreshold = bodyBounds.x + bodyBounds.width * 0.38;
+    const installGroup = centerX >= frontThreshold ? "front_end" : centerX <= rearThreshold ? "rear_half" : "main_face";
+
+    return {
+      material_type: "wrap_film",
+      surface_type: "normal_wrap_curve",
+      complexity_factor: 1.15,
+      install_group: installGroup
+    };
+  }
+
   function getShapeMaterialVariant(shape) {
     return ["contra", "reflective"].includes(shape.materialVariant) ? shape.materialVariant : "standard";
   }
@@ -3912,7 +3928,11 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     if (shape.type === "polygon") {
       const bounds = getPolygonBounds(shape.points);
       const zoneMetadata =
-        materialVariant === "standard"
+        shape.materialOverride === "wrap"
+          ? getForcedWrapZoneMetadata({ points: shape.points, bounds })
+          : shape.materialOverride === "standard"
+          ? getForcedStandardZoneMetadata("standard")
+          : materialVariant === "standard"
           ? getVehicleZoneMetadata({ points: shape.points, bounds })
           : getForcedStandardZoneMetadata(materialVariant);
       const rawAreaM2 = getPolygonAreaM2(shape.points);
@@ -3923,6 +3943,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
         bounds,
         width: bounds.width,
         height: bounds.height,
+        materialOverride: shape.materialOverride || "",
         rawAreaM2,
         clipRatio,
         areaM2: rawAreaM2 * clipRatio,
@@ -3937,13 +3958,21 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
       width: shape.width,
       height: shape.height
     };
-    const zoneMetadata = materialVariant === "standard" ? getVehicleZoneMetadata(rect) : getForcedStandardZoneMetadata(materialVariant);
+    const zoneMetadata =
+      shape.materialOverride === "wrap"
+        ? getForcedWrapZoneMetadata(rect)
+        : shape.materialOverride === "standard"
+        ? getForcedStandardZoneMetadata("standard")
+        : materialVariant === "standard"
+        ? getVehicleZoneMetadata(rect)
+        : getForcedStandardZoneMetadata(materialVariant);
     const rawAreaM2 = getRectAreaM2(rect);
     const clipRatio = getVehicleClipRatio(rect);
 
     return {
       ...shape,
       materialVariant,
+      materialOverride: shape.materialOverride || "",
       bounds: rect,
       rawAreaM2,
       clipRatio,
@@ -4156,6 +4185,23 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     event.preventDefault();
     clearTextSelection();
     setShapes((current) => current.filter((shape) => shape.id !== shapeId));
+  }
+
+  function toggleShapeMaterial(event, shapeId) {
+    event.stopPropagation();
+    event.preventDefault();
+    clearTextSelection();
+    setShapes((current) =>
+      current.map((shape) => {
+        if (shape.id !== shapeId) return shape;
+        const nextOverride = shape.isWrapFilm ? "standard" : "wrap";
+        return refreshShapeMetrics({
+          ...shape,
+          materialVariant: "standard",
+          materialOverride: nextOverride
+        });
+      })
+    );
   }
 
   function selectDrawMode(nextMode) {
@@ -4371,6 +4417,14 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   function getShapeVisualClass(shape) {
     if (shape.isWrapFilm) return "wrap";
     return getShapeMaterialVariant(shape);
+  }
+
+  function getShapeCenter(shape) {
+    const bounds = shape.bounds || shape;
+    return {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height / 2
+    };
   }
 
   function updatePricingValue(path, value) {
@@ -4629,13 +4683,41 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                       ))}
                     </defs>
                   ) : null}
-                  {shapes.map((shape) => (
-                    <g key={shape.id} className="vinyl-shape-group">
-                      <g clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}>
+                  {shapes.map((shape) => {
+                    const shapeCenter = getShapeCenter(shape);
+                    return (
+                      <g key={shape.id} className="vinyl-shape-group">
+                        <g clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}>
+                          {shape.type === "polygon" ? (
+                            <polygon
+                              points={pointsToSvg(shape.points)}
+                              className={`vinyl-shape ${getShapeVisualClass(shape)}`}
+                            />
+                          ) : (
+                            <rect
+                              x={shape.x}
+                              y={shape.y}
+                              width={shape.width}
+                              height={shape.height}
+                              className={`vinyl-shape ${getShapeVisualClass(shape)}`}
+                            />
+                          )}
+                        </g>
+                        {vehicleEdgePathsD.length ? (
+                          <g
+                            className={`vinyl-vehicle-edge ${getShapeVisualClass(shape)}`}
+                            clipPath={`url(#${getShapeClipId(shape.id)})`}
+                          >
+                            {vehicleEdgePathsD.map((pathD, index) => (
+                              <path key={`${shape.id}-edge-${index}`} d={pathD} />
+                            ))}
+                          </g>
+                        ) : null}
                         {shape.type === "polygon" ? (
                           <polygon
                             points={pointsToSvg(shape.points)}
-                            className={`vinyl-shape ${getShapeVisualClass(shape)}`}
+                            className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                            clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
                           />
                         ) : (
                           <rect
@@ -4643,75 +4725,58 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                             y={shape.y}
                             width={shape.width}
                             height={shape.height}
-                            className={`vinyl-shape ${getShapeVisualClass(shape)}`}
+                            className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
+                            clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
                           />
                         )}
-                      </g>
-                      {vehicleEdgePathsD.length ? (
-                        <g
-                          className={`vinyl-vehicle-edge ${getShapeVisualClass(shape)}`}
-                          clipPath={`url(#${getShapeClipId(shape.id)})`}
-                        >
-                          {vehicleEdgePathsD.map((pathD, index) => (
-                            <path key={`${shape.id}-edge-${index}`} d={pathD} />
-                          ))}
+                        <g className="vinyl-shape-controls" transform={`translate(${shapeCenter.x} ${shapeCenter.y})`}>
+                          <g
+                            className="vinyl-shape-control vinyl-shape-material-toggle"
+                            role="button"
+                            tabIndex="0"
+                            aria-label={shape.isWrapFilm ? "Change drawn area to standard vinyl" : "Change drawn area to wrap film"}
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                              event.preventDefault();
+                            }}
+                            onClick={(event) => toggleShapeMaterial(event, shape.id)}
+                          >
+                            <circle cx="-16" cy="0" r="13" />
+                            <line x1="-23" y1="0" x2="-9" y2="0" />
+                            <polyline points="-19,-5 -24,0 -19,5" />
+                            <polyline points="-13,-5 -8,0 -13,5" />
+                          </g>
+                          <g
+                            className="vinyl-shape-control vinyl-shape-delete"
+                            role="button"
+                            tabIndex="0"
+                            aria-label="Delete drawn area"
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                              event.preventDefault();
+                            }}
+                            onClick={(event) => deleteShape(event, shape.id)}
+                          >
+                            <circle cx="16" cy="0" r="13" />
+                            <line x1="11" y1="-5" x2="21" y2="5" />
+                            <line x1="21" y1="-5" x2="11" y2="5" />
+                          </g>
                         </g>
-                      ) : null}
-                      {shape.type === "polygon" ? (
-                        <polygon
-                          points={pointsToSvg(shape.points)}
-                          className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
-                          clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
-                        />
-                      ) : (
-                        <rect
-                          x={shape.x}
-                          y={shape.y}
-                          width={shape.width}
-                          height={shape.height}
-                          className={`vinyl-shape-cutline ${getShapeVisualClass(shape)}`}
-                          clipPath={vehicleClipPathsD.length ? "url(#vinyl-vehicle-body-clip)" : undefined}
-                        />
-                      )}
-                      <g
-                        className="vinyl-shape-delete"
-                        role="button"
-                        tabIndex="0"
-                        aria-label="Delete drawn area"
-                        onPointerDown={(event) => {
-                          event.stopPropagation();
-                          event.preventDefault();
-                        }}
-                        onClick={(event) => deleteShape(event, shape.id)}
-                      >
-                        <circle cx={(shape.bounds || shape).x + (shape.bounds || shape).width - 16} cy={(shape.bounds || shape).y + 16} r="13" />
-                        <line
-                          x1={(shape.bounds || shape).x + (shape.bounds || shape).width - 21}
-                          y1={(shape.bounds || shape).y + 11}
-                          x2={(shape.bounds || shape).x + (shape.bounds || shape).width - 11}
-                          y2={(shape.bounds || shape).y + 21}
-                        />
-                        <line
-                          x1={(shape.bounds || shape).x + (shape.bounds || shape).width - 11}
-                          y1={(shape.bounds || shape).y + 11}
-                          x2={(shape.bounds || shape).x + (shape.bounds || shape).width - 21}
-                          y2={(shape.bounds || shape).y + 21}
-                        />
+                        {(shape.type === "polygon" ? shape.points : getRectanglePoints(shape.bounds || shape)).map((point, pointIndex) => (
+                          <circle
+                            key={`${shape.id}-handle-${pointIndex}`}
+                            cx={point.x}
+                            cy={point.y}
+                            r="8"
+                            className="vinyl-corner-handle"
+                            onPointerDown={(event) =>
+                              startShapeCornerDrag(event, shape, shape.type === "polygon" ? pointIndex : point.corner)
+                            }
+                          />
+                        ))}
                       </g>
-                      {(shape.type === "polygon" ? shape.points : getRectanglePoints(shape.bounds || shape)).map((point, pointIndex) => (
-                        <circle
-                          key={`${shape.id}-handle-${pointIndex}`}
-                          cx={point.x}
-                          cy={point.y}
-                          r="8"
-                          className="vinyl-corner-handle"
-                          onPointerDown={(event) =>
-                            startShapeCornerDrag(event, shape, shape.type === "polygon" ? pointIndex : point.corner)
-                          }
-                        />
-                      ))}
-                    </g>
-                  ))}
+                    );
+                  })}
                   {drawingRect ? (
                     <rect
                       x={drawingRect.x}
