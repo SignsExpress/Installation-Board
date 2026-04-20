@@ -114,7 +114,33 @@ const VEHICLE_TEMPLATE_OPTIONS = [
     tyreReferenceSelector: "#Artwork path.st6",
     tyreReferenceDiameterMm: 743,
     artworkScale: 0.1,
-    viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 }
+    viewBox: { x: 0, y: 0, width: 2595.02, height: 1624.19 },
+    pricingDefaultsVersion: 1,
+    pricingSettings: {
+      wrapRateStart: 105,
+      wrapRateFloor: 75,
+      wrapRateTaper: 36,
+      wrapLabourStartHoursPerM2: 0.92,
+      wrapLabourFloorHoursPerM2: 0.58,
+      wrapLabourTaper: 0.48,
+      marketAnchors: {
+        c0: 0,
+        c05: 250,
+        c10: 400,
+        c15: 650,
+        c22: 1100,
+        c35: 1500,
+        c55: 2100,
+        c85: 2750,
+        c100: 3000
+      },
+      blendWeights: {
+        noWrap: { calculated: 0.65, anchor: 0.35 },
+        wrapUnder35: { calculated: 0.5, anchor: 0.5 },
+        wrapUnder70: { calculated: 0.35, anchor: 0.65 },
+        wrapFull: { calculated: 0.2, anchor: 0.8 }
+      }
+    }
   }
 ];
 
@@ -202,11 +228,18 @@ function looksLikeVehiclePricingSettings(value) {
   );
 }
 
+function getTemplatePricingDefaultsVersion(template) {
+  return template.pricingDefaultsVersion || 0;
+}
+
 function getDefaultVehiclePricingSettingsByTemplate() {
   return Object.fromEntries(
     VEHICLE_TEMPLATE_OPTIONS.map((template) => [
       template.id,
-      mergeVehiclePricingSettings(template.pricingSettings || {})
+      {
+        ...mergeVehiclePricingSettings(template.pricingSettings || {}),
+        __defaultsVersion: getTemplatePricingDefaultsVersion(template)
+      }
     ])
   );
 }
@@ -227,10 +260,22 @@ function getStoredVehiclePricingSettingsByTemplate() {
     }
 
     return Object.fromEntries(
-      VEHICLE_TEMPLATE_OPTIONS.map((template) => [
-        template.id,
-        mergeVehiclePricingSettings(parsedSettings?.[template.id] || template.pricingSettings || {})
-      ])
+      VEHICLE_TEMPLATE_OPTIONS.map((template) => {
+        const storedTemplateSettings = parsedSettings?.[template.id] || {};
+        const defaultsVersion = getTemplatePricingDefaultsVersion(template);
+        const storedVersion = Number(storedTemplateSettings.__defaultsVersion || 0);
+        const shouldRefreshTemplateDefaults = defaultsVersion > storedVersion;
+        const mergedSettings = shouldRefreshTemplateDefaults
+          ? mergeVehiclePricingSettings({ ...storedTemplateSettings, ...template.pricingSettings })
+          : mergeVehiclePricingSettings(storedTemplateSettings || template.pricingSettings || {});
+        return [
+          template.id,
+          {
+            ...mergedSettings,
+            __defaultsVersion: defaultsVersion
+          }
+        ];
+      })
     );
   } catch (error) {
     return defaultSettings;
