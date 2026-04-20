@@ -725,6 +725,13 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function escapeSvgText(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -3333,8 +3340,12 @@ function AttendancePage({
 
 function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [svgMarkup, setSvgMarkup] = useState("");
+  const [artBoardMarkup, setArtBoardMarkup] = useState("");
   const [svgError, setSvgError] = useState("");
   const [shapes, setShapes] = useState([]);
+  const [pdfExportOpen, setPdfExportOpen] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
+  const [pdfExportForm, setPdfExportForm] = useState({ customerName: "", notes: "" });
   const [selectedTemplateId, setSelectedTemplateId] = useState(VAN_ESTIMATOR_TEMPLATE.id);
   const selectedTemplate =
     VEHICLE_TEMPLATE_OPTIONS.find((template) => template.id === selectedTemplateId) || VAN_ESTIMATOR_TEMPLATE;
@@ -3360,6 +3371,25 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const overlaySvgRef = useRef(null);
   const vehicleBodyPathsRef = useRef([]);
   const wrapLinesRef = useRef([]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/vans/art-board.svg")
+      .then((response) => {
+        if (!response.ok) throw new Error("Could not load the art board SVG.");
+        return response.text();
+      })
+      .then((text) => {
+        if (active) setArtBoardMarkup(text);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -4427,6 +4457,219 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     };
   }
 
+  function getExportShapeColours(shape) {
+    const visualClass = getShapeVisualClass(shape);
+    if (visualClass === "wrap") return { fill: "rgba(249, 115, 22, 0.2)", stroke: "#ea580c" };
+    if (visualClass === "contra") return { fill: "rgba(15, 23, 42, 0.18)", stroke: "#0f172a" };
+    if (visualClass === "reflective") return { fill: "rgba(255, 255, 255, 0.72)", stroke: "#64748b" };
+    return { fill: "rgba(14, 165, 233, 0.18)", stroke: "#0284c7" };
+  }
+
+  function wrapSvgText(value, maxLength = 24, maxLines = 10) {
+    const words = String(value || "-").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+    const lines = [];
+    let currentLine = "";
+
+    words.forEach((word) => {
+      const nextLine = currentLine ? `${currentLine} ${word}` : word;
+      if (nextLine.length <= maxLength) {
+        currentLine = nextLine;
+        return;
+      }
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    });
+
+    if (currentLine) lines.push(currentLine);
+    const trimmedLines = lines.slice(0, maxLines);
+    if (lines.length > maxLines && trimmedLines.length) {
+      trimmedLines[trimmedLines.length - 1] = `${trimmedLines[trimmedLines.length - 1].slice(0, Math.max(0, maxLength - 3))}...`;
+    }
+    return trimmedLines.length ? trimmedLines : ["-"];
+  }
+
+  function createExportTextBlock({ x, y, title, value, maxLength = 24, maxLines = 3 }) {
+    const valueLines = wrapSvgText(value, maxLength, maxLines);
+    const titleMarkup = `<text x="${x}" y="${y}" fill="#5f3c74" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5" font-weight="700">${escapeSvgText(title)}</text>`;
+    const valueMarkup = valueLines
+      .map(
+        (line, index) =>
+          `<text x="${x}" y="${y + 11 + index * 9}" fill="#172033" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.2">${escapeSvgText(line)}</text>`
+      )
+      .join("");
+    return { markup: `${titleMarkup}${valueMarkup}`, height: 14 + valueLines.length * 9 };
+  }
+
+  function buildExportShapeMarkup() {
+    return shapes
+      .map((shape) => {
+        const colours = getExportShapeColours(shape);
+        const common = `fill="${colours.fill}" stroke="${colours.stroke}" stroke-width="4" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"`;
+        if (shape.type === "polygon") {
+          return `<polygon points="${pointsToSvg(shape.points)}" ${common} />`;
+        }
+        return `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="10" ${common} />`;
+      })
+      .join("");
+  }
+
+  function buildVehicleExportSvg() {
+    const sourceSvg = inlineSvgRef.current?.querySelector("svg");
+    if (!sourceSvg) return "";
+    const viewBox = selectedTemplate.viewBox;
+    return `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}">
+        <svg x="${viewBox.x}" y="${viewBox.y}" width="${viewBox.width}" height="${viewBox.height}" viewBox="${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMidYMid meet">
+          ${sourceSvg.innerHTML}
+        </svg>
+        <g id="export-drawn-shapes">${buildExportShapeMarkup()}</g>
+      </svg>
+    `;
+  }
+
+  function buildArtBoardExportSvg(customerName, notes) {
+    if (!artBoardMarkup) throw new Error("The art board SVG has not loaded yet.");
+    const vehicleSvg = buildVehicleExportSvg();
+    if (!vehicleSvg) throw new Error("The vehicle artwork has not loaded yet.");
+
+    const parser = new DOMParser();
+    const artBoardDocument = parser.parseFromString(artBoardMarkup, "image/svg+xml");
+    const parseError = artBoardDocument.querySelector("parsererror");
+    if (parseError) throw new Error("Could not read the art board SVG.");
+
+    const artBoardSvg = artBoardDocument.querySelector("svg");
+    const vehicleArea = artBoardDocument.querySelector("#Area_to_put_van rect");
+    if (!artBoardSvg || !vehicleArea) throw new Error("The art board is missing the van placement area.");
+
+    const area = {
+      x: Number(vehicleArea.getAttribute("x") || 0),
+      y: Number(vehicleArea.getAttribute("y") || 0),
+      width: Number(vehicleArea.getAttribute("width") || 0),
+      height: Number(vehicleArea.getAttribute("height") || 0)
+    };
+    const viewBox = selectedTemplate.viewBox;
+    const scale = Math.min(area.width / viewBox.width, area.height / viewBox.height);
+    const width = viewBox.width * scale;
+    const height = viewBox.height * scale;
+    const x = area.x + (area.width - width) / 2;
+    const y = area.y + (area.height - height) / 2;
+    const vehicleGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
+    vehicleGroup.setAttribute("id", "Exported_Van");
+    vehicleGroup.setAttribute("transform", `translate(${x} ${y}) scale(${scale}) translate(${-viewBox.x} ${-viewBox.y})`);
+    vehicleGroup.innerHTML = vehicleSvg.trim().replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+
+    const detailBox = artBoardDocument.querySelector("#Detail_Box");
+    artBoardSvg.insertBefore(vehicleGroup, detailBox || null);
+
+    artBoardDocument.querySelector("#Draft_x2C__Date_x2C__Designer")?.remove();
+
+    const exportDate = new Intl.DateTimeFormat("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit"
+    }).format(new Date());
+    const designerName = String(currentUser?.displayName || currentUser?.name || currentUser?.username || "Matt").trim().split(/\s+/)[0] || "Matt";
+    const metaGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
+    metaGroup.setAttribute("id", "Draft_x2C__Date_x2C__Designer");
+    metaGroup.innerHTML = `
+      <text x="717.68" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">1</text>
+      <text x="748.55" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">${escapeSvgText(exportDate)}</text>
+      <text x="797.46" y="556.64" fill="#fff" font-family="Faricy, 'Faricy New', Arial, sans-serif" font-size="8.5">${escapeSvgText(designerName)}</text>
+    `;
+    artBoardSvg.appendChild(metaGroup);
+
+    const details = [
+      ["Customer", customerName || "-"],
+      ["Price", currencyFormatter.format(totals.estimate || 0)],
+      ["Std. print vinyl", formatArea(totals.standardPrintArea)],
+      ["Wrap film", formatArea(totals.wrapArea)],
+      ["Contra-vision", formatArea(totals.contraArea)],
+      ["Reflective", formatArea(totals.reflectiveArea)],
+      ["Total coverage", formatArea(totals.totalArea)],
+      ["% coverage", formatPercent(totals.coverage)],
+      ["Est. application", `${(Number(totals.labourHours) || 0).toFixed(1)} hours`]
+    ];
+    let detailY = 108;
+    const detailMarkup = details
+      .map(([title, value]) => {
+        const block = createExportTextBlock({ x: 708, y: detailY, title, value, maxLength: 22, maxLines: 2 });
+        detailY += block.height + 3;
+        return block.markup;
+      })
+      .join("");
+    const notesBlock = createExportTextBlock({
+      x: 708,
+      y: 432,
+      title: "Notes",
+      value: notes || "-",
+      maxLength: 23,
+      maxLines: 7
+    });
+    const detailTextGroup = artBoardDocument.createElementNS("http://www.w3.org/2000/svg", "g");
+    detailTextGroup.setAttribute("id", "Export_Detail_Text");
+    detailTextGroup.innerHTML = `${detailMarkup}${notesBlock.markup}`;
+    artBoardSvg.appendChild(detailTextGroup);
+
+    return new XMLSerializer().serializeToString(artBoardSvg);
+  }
+
+  function openPdfExport() {
+    setPdfExportForm({ customerName: "", notes: "" });
+    setPdfExportOpen(true);
+  }
+
+  async function exportVehiclePdf(event) {
+    event.preventDefault();
+    setPdfExporting(true);
+    setSvgError("");
+    try {
+      const exportSvg = buildArtBoardExportSvg(pdfExportForm.customerName, pdfExportForm.notes);
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) throw new Error("Please allow pop-ups so the PDF export can open.");
+      printWindow.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(pdfExportForm.customerName || "Vehicle Proposal")}</title>
+    <style>
+      @font-face {
+        font-family: 'Faricy';
+        src: url('${window.location.origin}/fonts/FARICYNEW-MEDIUM.TTF') format('truetype');
+        font-weight: 400;
+      }
+      @font-face {
+        font-family: 'Faricy';
+        src: url('${window.location.origin}/fonts/FARICYNEW-BOLD.TTF') format('truetype');
+        font-weight: 700;
+      }
+      @page { size: A4 landscape; margin: 0; }
+      html, body { margin: 0; width: 100%; min-height: 100%; background: #fff; font-family: Faricy, Arial, sans-serif; }
+      .sheet { width: 297mm; height: 210mm; margin: 0 auto; overflow: hidden; }
+      .sheet svg { display: block; width: 297mm; height: 210mm; }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">${exportSvg}</div>
+    <script>
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          window.focus();
+          window.print();
+        }, 250);
+      });
+    </script>
+  </body>
+</html>`);
+      printWindow.document.close();
+      setPdfExportOpen(false);
+    } catch (error) {
+      console.error(error);
+      setSvgError(error.message || "Could not export the vehicle PDF.");
+    } finally {
+      setPdfExporting(false);
+    }
+  }
+
   function updatePricingValue(path, value) {
     const numericValue = Number(value);
     if (Number.isNaN(numericValue)) return;
@@ -4518,6 +4761,16 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             <div className="vinyl-canvas-card">
               {svgError ? <div className="flash error">{svgError}</div> : null}
               <div className="vinyl-canvas">
+                <button
+                  className="vinyl-pdf-button"
+                  type="button"
+                  onClick={openPdfExport}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
+                  PDF
+                </button>
                 <div
                   className="vinyl-canvas-toolbar"
                   aria-label="Drawing tools"
@@ -4930,6 +5183,51 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
             </aside>
           </div>
         </section>
+
+        {pdfExportOpen ? (
+          <div className="modal-backdrop" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setPdfExportOpen(false);
+          }}>
+            <form className="modal-card vehicle-pdf-modal" onSubmit={exportVehiclePdf}>
+              <div className="modal-header">
+                <div>
+                  <p className="eyebrow">Vehicle PDF</p>
+                  <h2>Export proposal</h2>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setPdfExportOpen(false)}>
+                  x
+                </button>
+              </div>
+              <label>
+                Customer name
+                <input
+                  type="text"
+                  value={pdfExportForm.customerName}
+                  onChange={(event) => setPdfExportForm((current) => ({ ...current, customerName: event.target.value }))}
+                  required
+                  autoFocus
+                />
+              </label>
+              <label>
+                Notes
+                <textarea
+                  rows="6"
+                  value={pdfExportForm.notes}
+                  onChange={(event) => setPdfExportForm((current) => ({ ...current, notes: event.target.value }))}
+                  placeholder="Anything you want shown at the bottom of the detail box..."
+                />
+              </label>
+              <div className="modal-actions">
+                <button className="ghost-button" type="button" onClick={() => setPdfExportOpen(false)} disabled={pdfExporting}>
+                  Cancel
+                </button>
+                <button className="primary-button" type="submit" disabled={pdfExporting}>
+                  {pdfExporting ? "Creating..." : "Create PDF"}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </div>
     </div>
   );
