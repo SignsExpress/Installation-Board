@@ -1280,18 +1280,23 @@ function PermissionsPanel({
 
                     <div className="permissions-app-row">
                       <span className="permissions-app-label">Vehicle Pricing Calculator</span>
-                      <div className="permission-segment">
-                        {PERMISSION_OPTIONS.map((option) => (
-                          <button
-                            key={`${user.id}-vanEstimator-${option.value}`}
-                            type="button"
-                            className={`permission-chip ${vanEstimatorPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
-                            onClick={() => onChangePermission(user.id, "vanEstimator", option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
+                      <div className="permission-segment permission-toggle-segment">
+                        <button
+                          type="button"
+                          className={`permission-chip permission-toggle-chip ${vanEstimatorPermission !== "none" ? "active active-state" : ""}`}
+                          disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
+                          onClick={() => onChangePermission(user.id, "vanEstimator", "admin")}
+                        >
+                          Active
+                        </button>
+                        <button
+                          type="button"
+                          className={`permission-chip permission-toggle-chip ${vanEstimatorPermission === "none" ? "active inactive-state" : ""}`}
+                          disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
+                          onClick={() => onChangePermission(user.id, "vanEstimator", "none")}
+                        >
+                          Inactive
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -5765,7 +5770,18 @@ export default function App() {
   }
 
   async function cancelHolidayRequest() {
-    const targetHolidayRequest = cancellableHolidayRequests.find(
+    const currentPerson = getHolidayStaffPersonForUser(currentUser);
+    const currentPersonKey = getHolidayStaffIdentityKey(currentPerson);
+    const currentUserId = String(currentUser?.id || "");
+    const cancellableRequests = approvedHolidayRequests.filter((request) => {
+      const requestStatus = String(request.status || "").trim().toLowerCase();
+      const requestAction = String(request.action || "book").trim().toLowerCase();
+      const sameUser =
+        (currentUserId && String(request.requestedByUserId || "") === currentUserId) ||
+        getHolidayStaffIdentityKey(request.person) === currentPersonKey;
+      return sameUser && requestStatus === "approved" && requestAction === "book";
+    });
+    const targetHolidayRequest = cancellableRequests.find(
       (request) => String(request.id || "") === String(holidayCancelForm.requestId || "")
     );
     if (!targetHolidayRequest) {

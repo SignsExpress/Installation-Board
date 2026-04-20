@@ -2909,6 +2909,8 @@ button {
 }
 
 .holidays-toolbar {
+  position: relative;
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: start;
@@ -2916,6 +2918,8 @@ button {
 }
 
 .holidays-toolbar-actions {
+  position: relative;
+  z-index: 6;
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -4122,6 +4126,28 @@ button {
   background: var(--sx-main-soft);
   border-color: #c7b7d2;
   color: var(--sx-main);
+}
+
+.permission-toggle-segment {
+  padding: 3px;
+  border: 1px solid #d7cbdd;
+  border-radius: 999px;
+  background: #f8fafc;
+}
+
+.permission-toggle-chip {
+  border-color: transparent;
+  background: transparent;
+}
+
+.permission-toggle-chip.active-state {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.permission-toggle-chip.inactive-state {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .permissions-user-actions {
