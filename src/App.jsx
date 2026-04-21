@@ -4338,11 +4338,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
                   <div className="rams-method-prep-grid">
-                    <div className="rams-method-info-card is-blue">
+                    <div className="rams-method-info-card">
                       <h5>Tools</h5>
                       <p>{renderEditable("tools", displayedTools || "-")}</p>
                     </div>
-                    <div className="rams-method-info-card is-blue">
+                    <div className="rams-method-info-card">
                       <h5>Access Methods</h5>
                       <p>{renderEditable("access", displayedAccess || "-")}</p>
                     </div>
@@ -4451,10 +4451,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                           </select>
                         </label>
                       ) : null}
-                      <label>
-                        Operatives
-                        <input value={questions.operatives} onChange={(event) => updateQuestion("operatives", event.target.value)} />
-                      </label>
                       <label>
                         Duration
                         <input value={questions.duration} onChange={(event) => updateQuestion("duration", event.target.value)} />

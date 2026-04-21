@@ -192,11 +192,11 @@
 .rams-setup-modal {
   width: min(1120px, calc(100vw - 36px));
   max-height: min(860px, calc(100vh - 36px));
-  border-radius: 22px;
-  padding: 18px;
+  border-radius: 18px;
+  padding: 14px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 12px;
+  gap: 10px;
 }
 
 .rams-setup-backdrop {
@@ -222,7 +222,7 @@
 }
 
 .rams-setup-modal .modal-head p {
-  font-size: 0.86rem;
+  font-size: 0.78rem;
 }
 
 .rams-setup-modal-body {
@@ -283,23 +283,23 @@
 
 .rams-setup-card {
   border: 1px solid #dbe3ef;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .rams-setup-card h3 {
   color: #334155;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
 }
 
 .rams-setup-grid,
 .rams-first-aid-input-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   align-items: start;
 }
 
@@ -312,7 +312,7 @@
   display: grid;
   gap: 5px;
   color: #334155;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   font-weight: 800;
 }
 
@@ -321,11 +321,11 @@
 .rams-setup-card textarea {
   width: 100%;
   border: 1px solid #cbd5e1;
-  border-radius: 9px;
+  border-radius: 8px;
   background: #fff;
   color: #0f172a;
-  padding: 7px 9px;
-  font-size: 0.86rem;
+  padding: 6px 8px;
+  font-size: 0.78rem;
 }
 
 .rams-setup-card .rams-check-grid {
@@ -335,13 +335,13 @@
 
 .rams-setup-card .rams-check {
   display: flex !important;
-  min-height: 42px;
+  min-height: 36px;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px !important;
-  padding: 7px 9px;
+  gap: 7px !important;
+  padding: 6px 8px;
   color: #1f2937;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   line-height: 1.18;
   cursor: pointer;
 }
@@ -364,12 +364,12 @@
 }
 
 .rams-setup-card .rams-ppe-picker .rams-check {
-  min-height: 44px;
-  padding: 7px 8px;
+  min-height: 38px;
+  padding: 6px 8px;
 }
 
 .rams-setup-card textarea {
-  min-height: 118px;
+  min-height: 96px;
   line-height: 1.35;
   white-space: pre-wrap;
   resize: vertical;
@@ -1416,11 +1416,6 @@
   align-content: start;
 }
 
-.rams-method-info-card.is-blue {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-}
-
 .rams-method-info-card h4,
 .rams-method-info-card h5 {
   margin: 0;
@@ -1430,12 +1425,6 @@
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-}
-
-.rams-method-info-card.is-blue h4,
-.rams-method-info-card.is-blue h5 {
-  background: #dbeafe;
-  color: #1d4ed8;
 }
 
 .rams-method-info-card p {
@@ -1458,7 +1447,7 @@
   gap: 8px;
   min-width: 0;
   color: #0f172a;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -1862,23 +1851,12 @@
     min-height: 15mm !important;
   }
 
-  .rams-method-info-card.is-blue {
-    border-color: #bfdbfe !important;
-    background: #eff6ff !important;
-  }
-
   .rams-method-info-card h4,
   .rams-method-info-card h5 {
     background: #dcfce7 !important;
     color: #166534 !important;
     padding: 1.2mm 2mm !important;
     font-size: 7.5pt !important;
-  }
-
-  .rams-method-info-card.is-blue h4,
-  .rams-method-info-card.is-blue h5 {
-    background: #dbeafe !important;
-    color: #1d4ed8 !important;
   }
 
   .rams-method-info-card p {
