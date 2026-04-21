@@ -127,7 +127,7 @@ const RAMS_DEFAULT_QUESTIONS = {
 
 const RAMS_CARD_LIBRARY = {
   induction: {
-    title: "Site Induction, Permits and Coordination",
+    title: "Arrive, Sign In and Confirm Site Controls",
     type: "Method",
     trigger: "Always included",
     initialRisk: "Medium",
@@ -136,6 +136,66 @@ const RAMS_CARD_LIBRARY = {
       "All operatives sign in, attend site induction where required and follow client or principal contractor rules.",
       "Confirm working area, emergency arrangements, welfare, permit requirements and any live restrictions before work starts.",
       "Stop work and report to the site contact if conditions differ from the agreed RAMS."
+    ]
+  },
+  siteSetup: {
+    title: "Set Up Working Area",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Park and unload in the agreed area without blocking fire routes, access routes or live work areas.",
+      "Move materials to the work face and keep packaging, tools and fixings organised.",
+      "Create a neat working zone before installation starts so the task can be completed without unnecessary movement around site."
+    ]
+  },
+  surveyCheck: {
+    title: "Check Artwork, Position and Substrate",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Confirm location, sizes, artwork orientation and fixing positions against the job details before installation.",
+      "Check the substrate is suitable, clean, dry and ready to accept fixings, vinyl or adhesive.",
+      "Raise any mismatch, damaged surface or access restriction before committing materials."
+    ]
+  },
+  accessSetup: {
+    title: "Prepare Access Equipment",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Choose the agreed access method for the task and check it is suitable for the surface, height and duration.",
+      "Inspect steps, podiums, ladders or platform equipment before use.",
+      "Keep access equipment within the controlled work area and reposition it instead of overreaching."
+    ]
+  },
+  installSequence: {
+    title: "Install Signage or Graphics",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Offer up, align and temporarily position materials before final fixing or application.",
+      "Use suitable fixings, tapes, adhesives or application methods for the surface and product type.",
+      "Keep blades, drills and small tools controlled while working and avoid leaving loose items at height."
+    ]
+  },
+  qualityCheck: {
+    title: "Quality Check and Make Good",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Check alignment, finish, adhesion, fixings and visible marks before leaving the work face.",
+      "Clean down the installed area where required and remove application marks or debris.",
+      "Photograph completed works where required for job records or client sign-off."
     ]
   },
   public: {
@@ -296,7 +356,16 @@ const RAMS_CARD_LIBRARY = {
   }
 };
 
-const RAMS_BASE_CARD_IDS = ["induction", "tools", "completion"];
+const RAMS_BASE_CARD_IDS = [
+  "induction",
+  "siteSetup",
+  "surveyCheck",
+  "accessSetup",
+  "installSequence",
+  "qualityCheck",
+  "completion",
+  "tools"
+];
 
 const ATTENDANCE_WEEKDAYS = [
   ["monday", "Mon"],
@@ -2489,6 +2558,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const selectedCards = cardOrder
     .map((cardId) => ({ id: cardId, ...RAMS_CARD_LIBRARY[cardId] }))
     .filter((card) => card.title);
+  const methodCards = selectedCards.filter((card) => card.type === "Method");
+  const riskCards = selectedCards.filter((card) => card.type !== "Method");
   const selectedActivity = RAMS_ACTIVITY_OPTIONS.find((option) => option.value === questions.activity)?.label || questions.activity;
   const selectedAccess = RAMS_ACCESS_OPTIONS.find((option) => option.value === questions.access)?.label || questions.access;
   const selectedWorkArea = RAMS_WORK_AREA_OPTIONS.find((option) => option.value === questions.workArea)?.label || questions.workArea;
@@ -2635,8 +2706,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
               <section className="rams-card-board">
                 <div className="rams-card-board-head">
                   <div>
-                    <h3>Auto-selected RAMS cards</h3>
-                    <p>{selectedCards.length} cards selected from the answers. Drag or use arrows to reorder.</p>
+                    <h3>RAMS cards</h3>
+                    <p>{methodCards.length} method cards are preselected. {riskCards.length} risk cards have been added from the answers.</p>
                   </div>
                 </div>
 
@@ -2644,7 +2715,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   {selectedCards.map((card, index) => (
                     <article
                       key={card.id}
-                      className="rams-risk-card"
+                      className={`rams-risk-card ${card.type === "Method" ? "method-card" : "assessment-card"}`}
                       draggable
                       onDragStart={() => setDraggingCardId(card.id)}
                       onDragEnd={() => setDraggingCardId("")}
@@ -2666,10 +2737,12 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                           </button>
                         </div>
                       </div>
-                      <div className="rams-risk-rating">
-                        <span>Initial risk: <strong>{card.initialRisk}</strong></span>
-                        <span>Residual risk: <strong>{card.residualRisk}</strong></span>
-                      </div>
+                      {card.type !== "Method" ? (
+                        <div className="rams-risk-rating">
+                          <span>Initial risk: <strong>{card.initialRisk}</strong></span>
+                          <span>Residual risk: <strong>{card.residualRisk}</strong></span>
+                        </div>
+                      ) : null}
                       <ul>
                         {card.content.map((line) => (
                           <li key={line}>{line}</li>
@@ -2711,10 +2784,26 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <p><strong>Emergency:</strong> {questions.emergency}</p>
                   {questions.notes ? <p><strong>Notes:</strong> {questions.notes}</p> : null}
                 </div>
-                <div className="rams-doc-section">
-                  <h4>Risk Assessment and Method Controls</h4>
-                  {selectedCards.map((card) => (
+                <div className="rams-doc-section rams-doc-method-section">
+                  <h4>Method Statement</h4>
+                  {methodCards.map((card) => (
                     <div key={`doc-${card.id}`} className="rams-doc-card">
+                      <div>
+                        <strong>{card.title}</strong>
+                        <span>{card.type}</span>
+                      </div>
+                      <ul>
+                        {card.content.map((line) => (
+                          <li key={`doc-${card.id}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="rams-doc-section rams-doc-risk-section">
+                  <h4>Risk Assessment</h4>
+                  {riskCards.map((card) => (
+                    <div key={`doc-risk-${card.id}`} className="rams-doc-card">
                       <div>
                         <strong>{card.title}</strong>
                         <span>{card.type}</span>
@@ -2722,7 +2811,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       <p>Initial risk: {card.initialRisk} | Residual risk: {card.residualRisk}</p>
                       <ul>
                         {card.content.map((line) => (
-                          <li key={`doc-${card.id}-${line}`}>{line}</li>
+                          <li key={`doc-risk-${card.id}-${line}`}>{line}</li>
                         ))}
                       </ul>
                     </div>

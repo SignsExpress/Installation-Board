@@ -7,6 +7,9 @@
 
 .rams-panel {
   padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+  border-radius: 22px;
 }
 
 .rams-header {
@@ -15,6 +18,10 @@
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  background: #fff;
 }
 
 .rams-header h2,
@@ -29,7 +36,7 @@
 
 .rams-builder-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -47,8 +54,9 @@
   top: 116px;
   padding: 18px;
   border: 1px solid #dbe3ef;
-  border-radius: 18px;
-  background: #f8fafc;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .rams-question-panel label,
@@ -129,7 +137,7 @@
   min-height: 88px;
   padding: 14px;
   border: 1px solid #dbe3ef;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #fff;
   display: grid;
   gap: 6px;
@@ -147,7 +155,7 @@
 .rams-card-board,
 .rams-document-preview {
   border: 1px solid #dbe3ef;
-  border-radius: 18px;
+  border-radius: 16px;
   background: #fff;
   padding: 18px;
 }
@@ -184,6 +192,20 @@
   border-radius: 14px;
   background: #f8fafc;
   padding: 14px;
+  border-left: 6px solid #64748b;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.rams-risk-card.method-card {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+}
+
+.rams-risk-card.assessment-card {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  border-left-color: #ea580c;
 }
 
 .rams-risk-card-head {
@@ -203,6 +225,16 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.method-card .rams-card-type {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.assessment-card .rams-card-type {
+  background: #ffedd5;
+  color: #9a3412;
 }
 
 .rams-card-actions {
@@ -233,6 +265,7 @@
 .rams-document-preview {
   display: grid;
   gap: 14px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .rams-doc-title {
@@ -268,16 +301,41 @@
 
 .rams-doc-section h4 {
   margin: 0;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 6px 12px;
   color: #4f365f;
+  background: #f1ecf4;
+}
+
+.rams-doc-method-section h4 {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.rams-doc-risk-section h4 {
+  color: #9a3412;
+  background: #ffedd5;
 }
 
 .rams-doc-card {
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 12px;
   display: grid;
   gap: 6px;
   break-inside: avoid;
+  border-left: 5px solid #d7cbdd;
+}
+
+.rams-doc-method-section .rams-doc-card {
+  border-left-color: #16a34a;
+  background: #f8fff9;
+}
+
+.rams-doc-risk-section .rams-doc-card {
+  border-left-color: #ea580c;
+  background: #fffaf5;
 }
 
 .rams-doc-card > div {
