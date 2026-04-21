@@ -120,6 +120,7 @@ const RAMS_DEFAULT_QUESTIONS = {
   tools: ["hand-tools"],
   operatives: "2",
   duration: "1 day",
+  ppe: ["boots", "gloves", "hi-vis", "eye", "hard-hat"],
   welfare: "Client welfare facilities to be confirmed at induction.",
   emergency: "Follow site emergency arrangements and report incidents to the site contact and Signs Express.",
   notes: ""
@@ -127,6 +128,7 @@ const RAMS_DEFAULT_QUESTIONS = {
 
 const RAMS_PPE_ITEMS = [
   {
+    value: "boots",
     label: "Safety Boots",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -136,6 +138,7 @@ const RAMS_PPE_ITEMS = [
     )
   },
   {
+    value: "gloves",
     label: "Safety Gloves",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -144,6 +147,7 @@ const RAMS_PPE_ITEMS = [
     )
   },
   {
+    value: "hi-vis",
     label: "Hi-Viz Jackets / Vests",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -153,6 +157,7 @@ const RAMS_PPE_ITEMS = [
     )
   },
   {
+    value: "eye",
     label: "Eye Protection",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -162,11 +167,22 @@ const RAMS_PPE_ITEMS = [
     )
   },
   {
+    value: "hard-hat",
     label: "Hard Hats",
     icon: (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M5 14.5a7 7 0 0 1 14 0v2H5v-2Z" />
         <path d="M3.5 17h17M10 7.7v5.4M14 7.7v5.4" />
+      </svg>
+    )
+  },
+  {
+    value: "respiratory",
+    label: "Respiratory Protection",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 10.5c0-3 2-5.2 5-5.2s5 2.2 5 5.2v2.8c0 3.5-2.1 5.7-5 5.7s-5-2.2-5-5.7v-2.8Z" />
+        <path d="M8.2 11.7c2.4 1.6 5.2 1.6 7.6 0M9 15.2h6M5.2 13.2H7M17 13.2h1.8M9.2 8.7c.7-.5 1.6-.8 2.8-.8s2.1.3 2.8.8" />
       </svg>
     )
   }
@@ -1533,7 +1549,8 @@ function normalizeRamsQuestions(questions) {
   return {
     ...RAMS_DEFAULT_QUESTIONS,
     ...questions,
-    tools: Array.isArray(questions?.tools) && questions.tools.length ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools
+    tools: Array.isArray(questions?.tools) && questions.tools.length ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools,
+    ppe: Array.isArray(questions?.ppe) ? questions.ppe : RAMS_DEFAULT_QUESTIONS.ppe
   };
 }
 
@@ -3923,6 +3940,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const selectedAccess = ramsLogic.optionGroups.find((group) => group.key === "access")?.options.find((option) => option.value === questions.access)?.label || questions.access;
   const selectedWorkArea = ramsLogic.optionGroups.find((group) => group.key === "workArea")?.options.find((option) => option.value === questions.workArea)?.label || questions.workArea;
   const selectedTools = (ramsLogic.optionGroups.find((group) => group.key === "tools")?.options || []).filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
+  const selectedPpe = RAMS_PPE_ITEMS.filter((item) => (Array.isArray(questions.ppe) ? questions.ppe : []).includes(item.value));
   const activeSavedRams = Array.isArray(selectedJob?.ramsDocuments)
     ? selectedJob.ramsDocuments.find((entry) => String(entry.id || "") === String(savedRamsId || ""))
     : null;
@@ -4049,6 +4067,23 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
               </label>
 
+              <div className="rams-question-group">
+                <span>PPE requirements</span>
+                <div className="rams-check-grid rams-ppe-picker">
+                  {RAMS_PPE_ITEMS.map((item) => (
+                    <label key={item.value} className="rams-check">
+                      <input
+                        type="checkbox"
+                        checked={Array.isArray(questions.ppe) && questions.ppe.includes(item.value)}
+                        onChange={() => updateMultiQuestion("ppe", item.value)}
+                      />
+                      <span className="rams-ppe-mini-icon">{item.icon}</span>
+                      {item.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               <button className="ghost-button rams-logic-launch" type="button" onClick={() => window.location.assign("/rams/logic")}>
                 Open RAMS logic editor
               </button>
@@ -4073,17 +4108,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <span><strong>Access:</strong> {renderEditable("access", displayedAccess)}</span>
                   <span><strong>Work area:</strong> {renderEditable("workArea", displayedWorkArea)}</span>
                   <span className="meta-full"><strong>Tools:</strong> {renderEditable("tools", displayedTools)}</span>
-                </div>
-                <div className="rams-ppe-section">
-                  <h4>4. PPE Required:</h4>
-                  <div className="rams-ppe-grid">
-                    {RAMS_PPE_ITEMS.map((item) => (
-                      <span key={item.label} className="rams-ppe-item">
-                        <span className="rams-ppe-icon">{item.icon}</span>
-                        {item.label}
-                      </span>
-                    ))}
-                  </div>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>
@@ -4186,6 +4210,19 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
+                  {selectedPpe.length ? (
+                    <div className="rams-ppe-section">
+                      <h5>PPE Required</h5>
+                      <div className="rams-ppe-grid">
+                        {selectedPpe.map((item) => (
+                          <span key={item.value} className="rams-ppe-item">
+                            <span className="rams-ppe-icon">{item.icon}</span>
+                            {item.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {methodCards.map((card) => {
                     const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
                     return (
