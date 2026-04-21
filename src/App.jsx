@@ -210,6 +210,18 @@ const RAMS_CARD_LIBRARY = {
       "Suspend work if the exclusion zone cannot be maintained."
     ]
   },
+  slipsTrips: {
+    title: "Slips, Trips and Housekeeping",
+    type: "Risk",
+    trigger: "Always included",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Keep walkways, access routes and the working area clear of tools, packaging, trailing leads and loose materials.",
+      "Clean up debris as work progresses and remove waste from site or place it in the agreed waste area.",
+      "Do not leave materials where they could fall, blow away or create a trip hazard."
+    ]
+  },
   traffic: {
     title: "Vehicle Movement and Deliveries",
     type: "Risk",
@@ -358,13 +370,15 @@ const RAMS_CARD_LIBRARY = {
 
 const RAMS_BASE_CARD_IDS = [
   "induction",
+  "slipsTrips",
+  "tools",
+  "lifting",
   "siteSetup",
   "surveyCheck",
   "accessSetup",
   "installSequence",
   "qualityCheck",
-  "completion",
-  "tools"
+  "completion"
 ];
 
 const ATTENDANCE_WEEKDAYS = [
@@ -1176,6 +1190,20 @@ function buildRamsReference(job, questions) {
   const date = String(job?.date || getLocalTodayIso()).replaceAll("-", "");
   const activity = String(questions?.activity || "works").toUpperCase();
   return `${reference}-${date}-${activity}`;
+}
+
+function getRamsLcr(card, phase = "initial") {
+  const fallback = phase === "initial"
+    ? { low: [1, 2, 2], medium: [2, 3, 6], high: [3, 4, 12] }
+    : { low: [1, 1, 1], medium: [1, 2, 2], high: [2, 2, 4] };
+  const riskLabel = String(phase === "initial" ? card?.initialRisk : card?.residualRisk || "Low").toLowerCase();
+  const [likelihood, consequence, rating] = fallback[riskLabel] || fallback.low;
+  return {
+    likelihood,
+    consequence,
+    rating,
+    label: phase === "initial" ? card?.initialRisk || "Low" : card?.residualRisk || "Low"
+  };
 }
 
 function formatNotificationDate(value) {
@@ -2784,6 +2812,58 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <p><strong>Emergency:</strong> {questions.emergency}</p>
                   {questions.notes ? <p><strong>Notes:</strong> {questions.notes}</p> : null}
                 </div>
+                <div className="rams-doc-section rams-doc-risk-section">
+                  <h4>Risk Assessment</h4>
+                  <div className="rams-risk-table-wrap">
+                    <table className="rams-risk-table">
+                      <thead>
+                        <tr>
+                          <th rowSpan="2">Hazard</th>
+                          <th rowSpan="2">Who may be harmed</th>
+                          <th colSpan="3">Initial risk</th>
+                          <th rowSpan="2">Control measures</th>
+                          <th colSpan="3">Residual risk</th>
+                        </tr>
+                        <tr>
+                          <th>L</th>
+                          <th>C</th>
+                          <th>R</th>
+                          <th>L</th>
+                          <th>C</th>
+                          <th>R</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {riskCards.map((card) => {
+                          const initial = getRamsLcr(card, "initial");
+                          const residual = getRamsLcr(card, "residual");
+                          return (
+                            <tr key={`risk-row-${card.id}`}>
+                              <td>
+                                <strong>{card.title}</strong>
+                                <span>{card.type}</span>
+                              </td>
+                              <td>Operatives, client staff, visitors and members of the public where present.</td>
+                              <td>{initial.likelihood}</td>
+                              <td>{initial.consequence}</td>
+                              <td><strong>{initial.rating}</strong></td>
+                              <td>
+                                <ul>
+                                  {card.content.map((line) => (
+                                    <li key={`risk-control-${card.id}-${line}`}>{line}</li>
+                                  ))}
+                                </ul>
+                              </td>
+                              <td>{residual.likelihood}</td>
+                              <td>{residual.consequence}</td>
+                              <td><strong>{residual.rating}</strong></td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
                   {methodCards.map((card) => (
@@ -2795,23 +2875,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       <ul>
                         {card.content.map((line) => (
                           <li key={`doc-${card.id}-${line}`}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-                <div className="rams-doc-section rams-doc-risk-section">
-                  <h4>Risk Assessment</h4>
-                  {riskCards.map((card) => (
-                    <div key={`doc-risk-${card.id}`} className="rams-doc-card">
-                      <div>
-                        <strong>{card.title}</strong>
-                        <span>{card.type}</span>
-                      </div>
-                      <p>Initial risk: {card.initialRisk} | Residual risk: {card.residualRisk}</p>
-                      <ul>
-                        {card.content.map((line) => (
-                          <li key={`doc-risk-${card.id}-${line}`}>{line}</li>
                         ))}
                       </ul>
                     </div>

@@ -6,21 +6,21 @@
 }
 
 .rams-panel {
-  padding: 24px;
+  padding: 14px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
-  border-radius: 22px;
+  border-radius: 18px;
 }
 
 .rams-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-  padding: 18px;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
   border: 1px solid #e2e8f0;
-  border-radius: 18px;
+  border-radius: 12px;
   background: #fff;
 }
 
@@ -31,13 +31,14 @@
 
 .rams-header p {
   color: #64748b;
-  margin-top: 4px;
+  margin-top: 2px;
+  font-size: 0.92rem;
 }
 
 .rams-builder-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
+  gap: 12px;
   align-items: start;
 }
 
@@ -46,15 +47,18 @@
 .rams-question-panel label,
 .rams-question-group {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .rams-question-panel {
   position: sticky;
   top: 116px;
-  padding: 18px;
+  max-height: calc(100vh - 132px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
   border: 1px solid #dbe3ef;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #ffffff;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
@@ -70,29 +74,29 @@
 .rams-question-panel textarea {
   width: 100%;
   border: 1px solid #cbd5e1;
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 10px;
+  padding: 8px 10px;
   background: #fff;
   color: #0f172a;
 }
 
 .rams-question-panel textarea {
-  min-height: 84px;
+  min-height: 58px;
   resize: vertical;
 }
 
 .rams-option-stack,
 .rams-check-grid {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rams-choice {
   border: 1px solid #d7cbdd;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #fff;
   color: #4f365f;
-  padding: 10px 12px;
+  padding: 8px 10px;
   text-align: left;
   font-weight: 700;
 }
@@ -107,7 +111,7 @@
   display: flex !important;
   align-items: center;
   gap: 9px !important;
-  padding: 9px 10px;
+  padding: 7px 9px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fff;
@@ -124,18 +128,18 @@
 }
 
 .rams-main {
-  gap: 16px;
+  gap: 10px;
 }
 
 .rams-summary-card {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .rams-summary-card > div {
-  min-height: 88px;
-  padding: 14px;
+  min-height: 66px;
+  padding: 10px;
   border: 1px solid #dbe3ef;
   border-radius: 12px;
   background: #fff;
@@ -155,16 +159,16 @@
 .rams-card-board,
 .rams-document-preview {
   border: 1px solid #dbe3ef;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #fff;
-  padding: 18px;
+  padding: 12px;
 }
 
 .rams-card-board-head {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .rams-card-board-head h3,
@@ -184,14 +188,14 @@
 
 .rams-card-list {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .rams-risk-card {
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
+  border-radius: 10px;
   background: #f8fafc;
-  padding: 14px;
+  padding: 10px;
   border-left: 6px solid #64748b;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
 }
@@ -218,7 +222,7 @@
   display: inline-flex;
   width: fit-content;
   border-radius: 999px;
-  padding: 4px 9px;
+  padding: 3px 8px;
   background: #e6e2e9;
   color: #4f365f;
   font-size: 0.78rem;
@@ -246,14 +250,14 @@
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 12px 0;
+  margin: 8px 0;
 }
 
 .rams-risk-rating span {
   border-radius: 10px;
   background: #fff;
   border: 1px solid #e2e8f0;
-  padding: 7px 9px;
+  padding: 5px 8px;
   color: #475569;
 }
 
@@ -264,46 +268,46 @@
 
 .rams-document-preview {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .rams-doc-title {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 12px;
   border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 14px;
+  padding-bottom: 10px;
 }
 
 .rams-doc-title img {
-  width: 150px;
+  width: 126px;
   height: auto;
 }
 
 .rams-doc-meta {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
 }
 
 .rams-doc-meta span {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 9px;
+  border-radius: 8px;
+  padding: 7px;
   overflow-wrap: anywhere;
 }
 
 .rams-doc-section {
   display: grid;
-  gap: 8px;
+  gap: 7px;
 }
 
 .rams-doc-section h4 {
   margin: 0;
   width: fit-content;
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   color: #4f365f;
   background: #f1ecf4;
 }
@@ -321,7 +325,7 @@
 .rams-doc-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 12px;
+  padding: 9px;
   display: grid;
   gap: 6px;
   break-inside: avoid;
@@ -336,6 +340,75 @@
 .rams-doc-risk-section .rams-doc-card {
   border-left-color: #ea580c;
   background: #fffaf5;
+}
+
+.rams-risk-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+}
+
+.rams-risk-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.rams-risk-table th,
+.rams-risk-table td {
+  border-right: 1px solid #ffedd5;
+  border-bottom: 1px solid #ffedd5;
+  padding: 7px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.rams-risk-table th {
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.rams-risk-table th[colspan] {
+  text-align: center;
+}
+
+.rams-risk-table th:nth-child(3),
+.rams-risk-table th:nth-child(4),
+.rams-risk-table th:nth-child(5),
+.rams-risk-table th:nth-child(7),
+.rams-risk-table th:nth-child(8),
+.rams-risk-table th:nth-child(9),
+.rams-risk-table td:nth-child(3),
+.rams-risk-table td:nth-child(4),
+.rams-risk-table td:nth-child(5),
+.rams-risk-table td:nth-child(7),
+.rams-risk-table td:nth-child(8),
+.rams-risk-table td:nth-child(9) {
+  width: 42px;
+  text-align: center;
+}
+
+.rams-risk-table td:first-child {
+  width: 180px;
+}
+
+.rams-risk-table td:first-child span {
+  display: block;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
+  margin-top: 4px;
+  text-transform: uppercase;
+}
+
+.rams-risk-table ul {
+  margin: 0;
+  padding-left: 18px;
 }
 
 .rams-doc-card > div {
@@ -410,6 +483,20 @@
     border: 0 !important;
     border-radius: 0 !important;
     padding: 0 !important;
+  }
+
+  .rams-risk-table-wrap {
+    overflow: visible !important;
+  }
+
+  .rams-risk-table {
+    min-width: 0 !important;
+    font-size: 8pt !important;
+  }
+
+  .rams-risk-table th,
+  .rams-risk-table td {
+    padding: 4px !important;
   }
 }
 
