@@ -206,6 +206,105 @@
   font-weight: 800;
 }
 
+.rams-logic-allocation-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.42fr) minmax(620px, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.rams-logic-bank-panel {
+  position: sticky;
+  top: 92px;
+  max-height: calc(100vh - 112px);
+  overflow: auto;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.rams-logic-help {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.rams-bank-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rams-bank-card {
+  position: relative;
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-left: 6px solid #ea580c;
+  border-radius: 10px;
+  background: #fff7ed;
+  color: #0f172a;
+  padding: 10px 44px 10px 10px;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.rams-bank-card.type-method {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.rams-bank-card.active {
+  border-color: var(--sx-main);
+  box-shadow: inset 4px 0 0 var(--sx-main), 0 10px 24px rgba(79, 54, 95, 0.1);
+}
+
+.rams-bank-card span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.rams-mini-risk {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 28px;
+  border-radius: 8px;
+  padding: 5px 7px;
+  text-align: center;
+  font-weight: 900;
+}
+
+.rams-mini-risk.risk-none {
+  background: #008c2e;
+  color: #fff;
+}
+
+.rams-mini-risk.risk-low {
+  background: #ffd400;
+  color: #422006;
+}
+
+.rams-mini-risk.risk-medium {
+  background: #f28c18;
+  color: #fff;
+}
+
+.rams-mini-risk.risk-high {
+  background: #bd1230;
+  color: #fff;
+}
+
+.rams-logic-allocation-editor {
+  min-width: 0;
+}
+
 .rams-logic-full-card {
   border: 1px solid #dbe3ef;
   border-radius: 14px;
@@ -419,6 +518,22 @@
   gap: 9px;
 }
 
+.rams-trigger-helper {
+  display: grid;
+  gap: 3px;
+  padding: 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.rams-trigger-helper p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
 .rams-trigger-chip-list {
   display: flex;
   gap: 7px;
@@ -434,10 +549,18 @@
   font-weight: 800;
 }
 
+.rams-clear-tags {
+  justify-self: start;
+}
+
 .rams-tag-matrix {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.rams-tag-matrix-large {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .rams-tag-matrix fieldset {
@@ -449,9 +572,29 @@
 }
 
 .rams-tag-matrix legend {
+  width: calc(100% - 8px);
   padding: 0 5px;
   color: #334155;
   font-size: 0.78rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rams-tag-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.rams-tag-actions button {
+  border: 1px solid #d7cbdd;
+  border-radius: 999px;
+  background: #fff;
+  color: #4f365f;
+  padding: 2px 6px;
+  font-size: 0.68rem;
   font-weight: 900;
 }
 
@@ -466,6 +609,27 @@
 .rams-tag-matrix input {
   width: auto;
   min-height: auto;
+}
+
+.rams-tag-admin-drawer {
+  margin-top: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.rams-tag-admin-drawer summary {
+  cursor: pointer;
+  color: #4f365f;
+  font-weight: 900;
+}
+
+.rams-tag-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.45fr) minmax(260px, 0.55fr) minmax(360px, 1fr);
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .rams-field-wide {
