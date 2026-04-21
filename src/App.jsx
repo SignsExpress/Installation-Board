@@ -125,6 +125,217 @@ const RAMS_DEFAULT_QUESTIONS = {
   notes: ""
 };
 
+const RAMS_STANDARD_RISK_CARDS = {
+  accessEgress: {
+    title: "Access & Egress",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 3,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "An agreed route to and from place of work will be kept to. Traffic movement will be done in a safe and orderly manner in conjunction with site manager's instruction.",
+    content: ["An agreed route to and from place of work will be kept to. Traffic movement will be done in a safe and orderly manner in conjunction with site manager's instruction."]
+  },
+  injuryIncident: {
+    title: "Risk of Injury or Incident",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 3,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Matt Carroll",
+    controlMeasure: "All fitters undergo training for work positioning and correct use of tools and equipment. In compliance with current guidelines, a safety rescue plan is discussed and decided prior to any work being carried out. First aid facilities available. An accident report will be filed after any incident.",
+    content: ["All fitters undergo training for work positioning and correct use of tools and equipment.", "Safety rescue plan to be discussed before works start.", "First aid facilities available and accident report completed after any incident."]
+  },
+  musculoskeletal: {
+    title: "Musculoskeletal Disorders",
+    type: "Risk",
+    trigger: "Heavy or awkward lifting selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Matt Carroll",
+    controlMeasure: "All fitters undergo training for correct manual handling techniques which are to be adhered to at all times.",
+    content: ["All fitters undergo training for correct manual handling techniques which are to be adhered to at all times."]
+  },
+  ppeUnsuitable: {
+    title: "Injury to Fitters Due to PPE Unsuitable for the Environment Being Worked In",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 3,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Matt Carroll",
+    controlMeasure: "PPE is provided and worn by fitters. PPE will be appropriate not only to the job being undertaken but also meeting the requirements of the site as a whole.",
+    content: ["PPE is provided and worn by fitters.", "PPE will be appropriate to the job and the requirements of the site as a whole."]
+  },
+  poorLighting: {
+    title: "Risk of Injury Due to Poor Lighting",
+    type: "Risk",
+    trigger: "Internal or low light works",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Matt Carroll",
+    controlMeasure: "External work to be carried out in daylight. Site lighting to be used for internal work where required.",
+    content: ["External work to be carried out in daylight.", "Site lighting to be used for internal work where required."]
+  },
+  height: {
+    title: "Falls from Height",
+    type: "Risk",
+    trigger: "Steps, ladders or MEWP",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 4,
+    residualLikelihood: 1,
+    residualConsequence: 4,
+    responsibility: "Matt Carroll",
+    controlMeasure: "All work to be carried out by competent fitters who have undertaken ladder and step-up training. Fitters will not erect scaffolds and will supervise any other colleagues when erecting or using scaffold.",
+    content: ["Use the lowest-risk access method suitable for the task and inspect access equipment before use.", "Competent fitters only to work at height and avoid overreaching.", "Do not work at height in unsafe weather, poor ground conditions or uncontrolled public areas."]
+  },
+  public: {
+    title: "Injury to the General Public During Course of Work",
+    type: "Risk",
+    trigger: "Public or occupied area",
+    whoAtRisk: "Third parties",
+    initialLikelihood: 2,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Report all hazardous activity to site management. Ensure a fitter is present with the ability to communicate with workers and emergency services.",
+    content: ["Set a clear exclusion zone using cones, barriers or signage suitable for the work area.", "Keep tools, materials and waste within the controlled area and maintain safe pedestrian routes.", "Suspend work if the exclusion zone cannot be maintained."]
+  },
+  fallingObjects: {
+    title: "Falling Objects",
+    type: "Risk",
+    trigger: "Steps, ladders or MEWP",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 2,
+    initialConsequence: 5,
+    residualLikelihood: 1,
+    residualConsequence: 5,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Area cordoned off with cones and safety barriers. Provision to be made to allow building occupants to escape if blocking escape route. All small tools and materials will be carried in a bag or on a belt. All large tools should have carry straps. All scaffold to have toe boards.",
+    content: ["Area cordoned off with cones and safety barriers.", "Small tools and materials to be carried in a bag or on a belt.", "Large tools should have carry straps and scaffold should have toe boards."]
+  },
+  electricalEquipment: {
+    title: "Electric Shock from Equipment",
+    type: "Risk",
+    trigger: "Power tools / drilling selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 0,
+    initialConsequence: 0,
+    residualLikelihood: 0,
+    residualConsequence: 0,
+    responsibility: "Matt Carroll",
+    controlMeasure: "No electrical equipment will be used and no work will be done on fixed electrical system. All drills etc are battery operated or powered by 110v generator.",
+    content: ["No electrical equipment will be used and no work will be done on fixed electrical system.", "All drills etc are battery operated or powered by 110v generator."]
+  },
+  equipmentFailure: {
+    title: "Equipment Failure",
+    type: "Risk",
+    trigger: "Power tools / drilling selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Ensure equipment is routinely checked. Routine inspection of all equipment prior to commencement of job. Routine testing and maintenance schedule established and in operation. All electrical equipment has been PAT tested.",
+    content: ["Ensure equipment is routinely checked.", "Routine inspection of all equipment prior to commencement of job.", "Routine testing and maintenance schedule established and in operation."]
+  },
+  fittersFatigue: {
+    title: "Fitters Feeling Fatigue",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees",
+    initialLikelihood: 1,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "The supervisor will keep in contact with the fitters regularly. If they become tired another fitter will take over.",
+    content: ["The supervisor will keep in contact with the fitters regularly.", "If they become tired another fitter will take over."]
+  },
+  slipsTrips: {
+    title: "Slips, Trips & Falls",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 2,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Area to be inspected for hazards and any objects removed if possible. If not, advise others. All areas of work to be coned off.",
+    content: ["Area to be inspected for hazards and any objects removed if possible.", "If hazards cannot be removed, advise others.", "All areas of work to be coned off."]
+  },
+  badWeather: {
+    title: "Bad Weather",
+    type: "Risk",
+    trigger: "External works",
+    whoAtRisk: "Employees",
+    initialLikelihood: 1,
+    initialConsequence: 1,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Work to be called off if weather conditions become unsafe.",
+    content: ["Work to be called off if weather conditions become unsafe."]
+  },
+  diggingHoles: {
+    title: "Digging Holes",
+    type: "Risk",
+    trigger: "Ground works",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 1,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Area to be CAT scanned prior to any digging.",
+    content: ["Area to be CAT scanned prior to any digging."]
+  },
+  windowBreakage: {
+    title: "Accidental Breakage of Windows",
+    type: "Risk",
+    trigger: "Window graphics selected",
+    whoAtRisk: "Employees\nThird parties",
+    initialLikelihood: 2,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 3,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Care to be taken to ensure that materials and tools are kept away from any glass.",
+    content: ["Care to be taken to ensure that materials and tools are kept away from any glass."]
+  },
+  emergencyIncidents: {
+    title: "Emergency Incidents on Site",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 3,
+    responsibility: "Matt Carroll",
+    controlMeasure: "Procedures for emergency incidents on site to be agreed with Signs Express personnel and site manager prior to operation.",
+    content: ["Procedures for emergency incidents on site to be agreed with Signs Express personnel and site manager prior to operation."]
+  }
+};
+
 const RAMS_CARD_LIBRARY = {
   induction: {
     title: "Arrive, Sign In and Confirm Site Controls",
@@ -382,7 +593,12 @@ const RAMS_CARD_LIBRARY = {
 
 const RAMS_BASE_CARD_IDS = [
   "induction",
+  "accessEgress",
+  "injuryIncident",
   "slipsTrips",
+  "ppeUnsuitable",
+  "fittersFatigue",
+  "emergencyIncidents",
   "tools",
   "lifting",
   "siteSetup",
@@ -423,11 +639,11 @@ const RAMS_DEFAULT_LOGIC = {
         ...option,
         cardIds:
           option.value === "steps"
-            ? ["height"]
+            ? ["height", "fallingObjects"]
             : option.value === "ladders"
-              ? ["height", "ladders"]
+              ? ["height", "fallingObjects", "ladders"]
               : option.value === "mewp"
-                ? ["height", "mewp"]
+                ? ["height", "fallingObjects", "mewp"]
                 : []
       }))
     },
@@ -457,18 +673,21 @@ const RAMS_DEFAULT_LOGIC = {
         ...option,
         cardIds:
           option.value === "power-tools"
-            ? ["tools", "electricalEquipment"]
+            ? ["tools", "electricalEquipment", "equipmentFailure"]
             : option.value === "adhesives"
               ? ["substances"]
-              : option.value === "lifting"
-                ? ["lifting"]
+            : option.value === "lifting"
+                ? ["lifting", "musculoskeletal"]
                 : option.value === "electrical"
                   ? ["electrical"]
                   : []
       }))
     }
   ],
-  cards: RAMS_CARD_LIBRARY,
+  cards: {
+    ...RAMS_CARD_LIBRARY,
+    ...RAMS_STANDARD_RISK_CARDS
+  },
   baseCardIds: RAMS_BASE_CARD_IDS
 };
 
@@ -1256,9 +1475,63 @@ function normalizeRamsQuestions(questions) {
   };
 }
 
+function toRamsScore(value, fallback = 1) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(5, Math.round(parsed)));
+}
+
+function calculateRamsRisk(likelihood, consequence) {
+  return toRamsScore(likelihood, 0) * toRamsScore(consequence, 0);
+}
+
+function getRamsRiskBand(rating) {
+  const value = Number(rating) || 0;
+  if (value >= 16) return { code: "H", label: "High risk", className: "risk-high" };
+  if (value >= 11) return { code: "M", label: "Medium risk", className: "risk-medium" };
+  if (value >= 5) return { code: "L", label: "Low risk / monitor", className: "risk-low" };
+  return { code: "N", label: "No further action required", className: "risk-none" };
+}
+
+function normalizeRamsCard(card = {}, fallback = {}) {
+  const merged = { ...fallback, ...card };
+  const content = Array.isArray(merged.content)
+    ? merged.content.map((line) => String(line)).filter(Boolean)
+    : String(merged.content || merged.controlMeasure || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  const type = String(merged.type || fallback.type || "Risk");
+  const isRisk = type !== "Method";
+  const normalized = {
+    ...merged,
+    title: String(merged.title || fallback.title || "RAMS card"),
+    type,
+    trigger: String(merged.trigger || fallback.trigger || "Custom"),
+    content: content.length ? content : ["Write the control measure or method step here."]
+  };
+  if (!isRisk) return normalized;
+  return {
+    ...normalized,
+    whoAtRisk: String(merged.whoAtRisk || fallback.whoAtRisk || "Employees\nThird parties"),
+    responsibility: String(merged.responsibility || fallback.responsibility || "Matt Carroll"),
+    controlMeasure: String(merged.controlMeasure || fallback.controlMeasure || normalized.content.join("\n")),
+    initialLikelihood: toRamsScore(merged.initialLikelihood ?? fallback.initialLikelihood ?? getRamsLcr(merged, "initial").likelihood, 2),
+    initialConsequence: toRamsScore(merged.initialConsequence ?? fallback.initialConsequence ?? getRamsLcr(merged, "initial").consequence, 3),
+    residualLikelihood: toRamsScore(merged.residualLikelihood ?? fallback.residualLikelihood ?? getRamsLcr(merged, "residual").likelihood, 1),
+    residualConsequence: toRamsScore(merged.residualConsequence ?? fallback.residualConsequence ?? getRamsLcr(merged, "residual").consequence, 1)
+  };
+}
+
 function normalizeRamsLogic(logic = {}) {
   const defaultGroups = RAMS_DEFAULT_LOGIC.optionGroups;
   const incomingGroups = Array.isArray(logic.optionGroups) ? logic.optionGroups : defaultGroups;
+  const defaultCards = {
+    ...RAMS_DEFAULT_LOGIC.cards,
+    ...RAMS_STANDARD_RISK_CARDS
+  };
+  const incomingCards = logic.cards && typeof logic.cards === "object" ? logic.cards : {};
+  const cardEntries = Object.entries({ ...defaultCards, ...incomingCards }).map(([cardId, card]) => [
+    cardId,
+    normalizeRamsCard(card, defaultCards[cardId])
+  ]);
   return {
     optionGroups: incomingGroups.map((group, groupIndex) => {
       const fallback = defaultGroups[groupIndex] || {};
@@ -1274,10 +1547,7 @@ function normalizeRamsLogic(logic = {}) {
         }))
       };
     }),
-    cards: {
-      ...RAMS_CARD_LIBRARY,
-      ...(logic.cards && typeof logic.cards === "object" ? logic.cards : {})
-    },
+    cards: Object.fromEntries(cardEntries),
     baseCardIds: Array.isArray(logic.baseCardIds)
       ? logic.baseCardIds.map(String).filter(Boolean)
       : RAMS_BASE_CARD_IDS
@@ -1328,6 +1598,18 @@ function buildRamsReference(job, questions) {
 }
 
 function getRamsLcr(card, phase = "initial") {
+  const explicitLikelihood = phase === "initial" ? card?.initialLikelihood : card?.residualLikelihood;
+  const explicitConsequence = phase === "initial" ? card?.initialConsequence : card?.residualConsequence;
+  if (explicitLikelihood !== undefined || explicitConsequence !== undefined) {
+    const likelihood = toRamsScore(explicitLikelihood, phase === "initial" ? 2 : 1);
+    const consequence = toRamsScore(explicitConsequence, phase === "initial" ? 3 : 1);
+    return {
+      likelihood,
+      consequence,
+      rating: calculateRamsRisk(likelihood, consequence),
+      label: getRamsRiskBand(calculateRamsRisk(likelihood, consequence)).label
+    };
+  }
   const fallback = phase === "initial"
     ? { low: [1, 2, 2], medium: [2, 3, 6], high: [3, 4, 12] }
     : { low: [1, 1, 1], medium: [1, 2, 2], high: [2, 2, 4] };
@@ -2646,18 +2928,37 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState("");
+  const [logicSection, setLogicSection] = useState("risk");
 
   const activeGroup = ramsLogicDraft.optionGroups[selectedGroupIndex] || ramsLogicDraft.optionGroups[0] || null;
   const activeGroupIndex = Math.max(0, ramsLogicDraft.optionGroups.indexOf(activeGroup));
   const activeOption = activeGroup?.options?.[selectedOptionIndex] || activeGroup?.options?.[0] || null;
   const activeOptionIndex = activeGroup && activeOption ? Math.max(0, activeGroup.options.indexOf(activeOption)) : 0;
   const linkedCardIds = activeOption?.cardIds || [];
-  const linkedCards = sortRamsCardEntries(linkedCardIds.map((cardId) => [cardId, ramsLogicDraft.cards[cardId]]).filter(([, card]) => card));
-  const unlinkedCards = sortRamsCardEntries(Object.entries(ramsLogicDraft.cards).filter(([cardId]) => !linkedCardIds.includes(cardId)));
+  const sectionMatchesCard = (card) => logicSection === "risk" ? card?.type !== "Method" : card?.type === "Method";
+  const sectionCards = sortRamsCardEntries(Object.entries(ramsLogicDraft.cards).filter(([, card]) => sectionMatchesCard(card)));
+  const linkedCards = sortRamsCardEntries(linkedCardIds.map((cardId) => [cardId, ramsLogicDraft.cards[cardId]]).filter(([, card]) => card && sectionMatchesCard(card)));
+  const unlinkedCards = sortRamsCardEntries(Object.entries(ramsLogicDraft.cards).filter(([cardId, card]) => !linkedCardIds.includes(cardId) && sectionMatchesCard(card)));
   const activeCardId = selectedCardId && ramsLogicDraft.cards[selectedCardId]
+    && sectionMatchesCard(ramsLogicDraft.cards[selectedCardId])
     ? selectedCardId
-    : linkedCards[0]?.[0] || Object.keys(ramsLogicDraft.cards)[0] || "";
+    : linkedCards[0]?.[0] || sectionCards[0]?.[0] || "";
   const activeCard = activeCardId ? ramsLogicDraft.cards[activeCardId] : null;
+  const riskBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type !== "Method").length;
+  const methodBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type === "Method").length;
+  const linkedTagLabels = activeCardId
+    ? ramsLogicDraft.optionGroups.flatMap((group, groupIndex) =>
+      group.options
+        .map((option, optionIndex) => ({ group, groupIndex, option, optionIndex }))
+        .filter(({ option }) => option.cardIds.includes(activeCardId))
+        .map(({ group, groupIndex, option, optionIndex }) => ({
+          key: `${group.key}-${option.value}-${optionIndex}`,
+          label: `${group.label}: ${option.label}`,
+          groupIndex,
+          optionIndex
+        }))
+    )
+    : [];
 
   useEffect(() => {
     if (!activeGroup) {
@@ -2759,17 +3060,25 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
 
   function addRamsCard() {
     const cardId = `custom-${Date.now()}`;
+    const isMethod = logicSection === "method";
     updateRamsLogicDraft((current) => ({
       ...current,
       cards: {
         ...current.cards,
         [cardId]: {
-          title: "New RAMS card",
-          type: "Risk",
+          title: isMethod ? "New method step" : "New risk assessment item",
+          type: isMethod ? "Method" : "Risk",
           trigger: "Custom",
           initialRisk: "Medium",
           residualRisk: "Low",
-          content: ["Write the control measure or method step here."]
+          whoAtRisk: "Employees\nThird parties",
+          initialLikelihood: 2,
+          initialConsequence: 3,
+          residualLikelihood: 1,
+          residualConsequence: 1,
+          responsibility: "Matt Carroll",
+          controlMeasure: "Write the required control measure here.",
+          content: [isMethod ? "Write the method step here." : "Write the required control measure here."]
         }
       }
     }));
@@ -2783,7 +3092,10 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
         ...current.cards,
         [cardId]: {
           ...current.cards[cardId],
-          [key]: key === "content" ? String(value).split("\n").map((line) => line.trim()).filter(Boolean) : value
+          [key]: key === "content" ? String(value).split("\n").map((line) => line.trim()).filter(Boolean) : value,
+          ...(key === "controlMeasure"
+            ? { content: String(value).split("\n").map((line) => line.trim()).filter(Boolean) }
+            : {})
         }
       }
     }));
@@ -2832,7 +3144,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
             <div>
               <span className="panel-kicker">Admin module</span>
               <h2>RAMS Logic</h2>
-              <p>Edit the question buttons, link them to cards, and manage the RAMS card library.</p>
+              <p>Manage the Risk Assessment bank and Method Statement bank, then tag each item to the job buttons that should trigger it.</p>
             </div>
             <div className="rams-logic-actions">
               <button className="ghost-button" type="button" onClick={() => window.location.assign("/rams")}>
@@ -2848,9 +3160,34 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
           </div>
           {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
 
+          <div className="rams-logic-section-tabs" role="tablist" aria-label="RAMS logic section">
+            <button
+              type="button"
+              className={logicSection === "risk" ? "active" : ""}
+              onClick={() => {
+                setLogicSection("risk");
+                setSelectedCardId("");
+              }}
+            >
+              <strong>Risk Assessment</strong>
+              <span>{riskBankCount} hazards</span>
+            </button>
+            <button
+              type="button"
+              className={logicSection === "method" ? "active" : ""}
+              onClick={() => {
+                setLogicSection("method");
+                setSelectedCardId("");
+              }}
+            >
+              <strong>Method Statement</strong>
+              <span>{methodBankCount} steps</span>
+            </button>
+          </div>
+
           <div className="rams-logic-workbench">
             <aside className="rams-logic-picker">
-              <h3>1. Choose a question</h3>
+              <h3>1. Job tag group</h3>
               {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
                 <button
                   key={group.key}
@@ -2869,7 +3206,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
 
             <section className="rams-logic-choice-panel">
               <div className="rams-logic-heading">
-                <h3>2. Choose a button</h3>
+                <h3>2. Job type tag</h3>
                 {activeGroup ? (
                   <button className="ghost-button" type="button" onClick={() => addRamsOption(activeGroupIndex)}>
                     Add button
@@ -2924,7 +3261,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
 
             <section className="rams-logic-linked-panel">
               <div className="rams-logic-heading">
-                <h3>3. Cards used by this button</h3>
+                <h3>3. {logicSection === "risk" ? "Risks" : "Methods"} triggered by this tag</h3>
               </div>
               <div className="rams-linked-card-list">
                 {linkedCards.length ? linkedCards.map(([cardId, card]) => (
@@ -2939,12 +3276,12 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                     <small>{card.trigger}</small>
                   </button>
                 )) : (
-                  <p className="rams-logic-empty">No cards linked yet.</p>
+                  <p className="rams-logic-empty">No {logicSection === "risk" ? "risks" : "methods"} linked yet.</p>
                 )}
               </div>
 
               <details className="rams-add-card-drawer">
-                <summary>Add existing card to this button</summary>
+                <summary>Add existing {logicSection === "risk" ? "risk" : "method"} to this tag</summary>
                 <div className="rams-available-card-list">
                   {unlinkedCards.map(([cardId, card]) => (
                     <button
@@ -2966,8 +3303,8 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
 
             <section className="rams-logic-editor-panel">
               <div className="rams-logic-heading">
-                <h3>4. Edit selected card</h3>
-                <button className="ghost-button" type="button" onClick={addRamsCard}>Add new card</button>
+                <h3>4. Edit selected {logicSection === "risk" ? "risk" : "method"}</h3>
+                <button className="ghost-button" type="button" onClick={addRamsCard}>Add new {logicSection === "risk" ? "risk" : "method"}</button>
               </div>
 
               {activeCard ? (
@@ -2989,50 +3326,115 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                     ) : null}
                   </div>
                   <label className="rams-field-wide">
-                    Card title
+                    {activeCard.type === "Method" ? "Method title" : "Hazard"}
                     <input value={activeCard.title || ""} onChange={(event) => updateRamsCard(activeCardId, "title", event.target.value)} />
                   </label>
-                  <div className="rams-logic-card-row rams-editor-two-col">
-                    <label>
-                      Type
-                      <select value={activeCard.type || "Risk"} onChange={(event) => updateRamsCard(activeCardId, "type", event.target.value)}>
-                        <option value="Risk">Risk</option>
-                        <option value="Method">Method</option>
-                        <option value="COSHH">COSHH</option>
-                      </select>
-                    </label>
-                    <label>
-                      Trigger
-                      <input value={activeCard.trigger || ""} onChange={(event) => updateRamsCard(activeCardId, "trigger", event.target.value)} />
-                    </label>
+                  {activeCard.type === "Method" ? (
+                    <>
+                      <label className="rams-field-wide">
+                        Trigger note
+                        <input value={activeCard.trigger || ""} onChange={(event) => updateRamsCard(activeCardId, "trigger", event.target.value)} />
+                      </label>
+                      <label className="rams-field-wide">
+                        Method statement lines
+                        <textarea
+                          value={(Array.isArray(activeCard.content) ? activeCard.content : []).join("\n")}
+                          onChange={(event) => updateRamsCard(activeCardId, "content", event.target.value)}
+                        />
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <div className="rams-logic-card-row rams-editor-two-col">
+                        <label>
+                          Who is at risk
+                          <textarea
+                            className="rams-small-textarea"
+                            value={activeCard.whoAtRisk || ""}
+                            onChange={(event) => updateRamsCard(activeCardId, "whoAtRisk", event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          Responsibility
+                          <input value={activeCard.responsibility || ""} onChange={(event) => updateRamsCard(activeCardId, "responsibility", event.target.value)} />
+                        </label>
+                      </div>
+                      <div className="rams-risk-score-editor">
+                        <div>
+                          <strong>Initial LCR</strong>
+                          <div className="rams-score-inputs">
+                            <label>
+                              L
+                              <input type="number" min="0" max="5" value={activeCard.initialLikelihood ?? 2} onChange={(event) => updateRamsCard(activeCardId, "initialLikelihood", event.target.value)} />
+                            </label>
+                            <label>
+                              C
+                              <input type="number" min="0" max="5" value={activeCard.initialConsequence ?? 3} onChange={(event) => updateRamsCard(activeCardId, "initialConsequence", event.target.value)} />
+                            </label>
+                            <span>R {calculateRamsRisk(activeCard.initialLikelihood, activeCard.initialConsequence)}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <strong>Residual LCR</strong>
+                          <div className="rams-score-inputs">
+                            <label>
+                              L
+                              <input type="number" min="0" max="5" value={activeCard.residualLikelihood ?? 1} onChange={(event) => updateRamsCard(activeCardId, "residualLikelihood", event.target.value)} />
+                            </label>
+                            <label>
+                              C
+                              <input type="number" min="0" max="5" value={activeCard.residualConsequence ?? 1} onChange={(event) => updateRamsCard(activeCardId, "residualConsequence", event.target.value)} />
+                            </label>
+                            <span>R {calculateRamsRisk(activeCard.residualLikelihood, activeCard.residualConsequence)}</span>
+                          </div>
+                        </div>
+                        <div className={`rams-risk-band ${getRamsRiskBand(calculateRamsRisk(activeCard.residualLikelihood, activeCard.residualConsequence)).className}`}>
+                          <strong>{getRamsRiskBand(calculateRamsRisk(activeCard.residualLikelihood, activeCard.residualConsequence)).code}</strong>
+                          <span>{getRamsRiskBand(calculateRamsRisk(activeCard.residualLikelihood, activeCard.residualConsequence)).label}</span>
+                        </div>
+                      </div>
+                      <label className="rams-field-wide">
+                        Required control measure
+                        <textarea
+                          value={activeCard.controlMeasure || (Array.isArray(activeCard.content) ? activeCard.content.join("\n") : "")}
+                          onChange={(event) => updateRamsCard(activeCardId, "controlMeasure", event.target.value)}
+                        />
+                      </label>
+                    </>
+                  )}
+                  <div className="rams-editor-tags">
+                    <strong>Triggered by job type tags</strong>
+                    {linkedTagLabels.length ? (
+                      <div className="rams-trigger-chip-list">
+                        {linkedTagLabels.map((tag) => (
+                          <button key={tag.key} type="button" onClick={() => toggleOptionCard(tag.groupIndex, tag.optionIndex, activeCardId)}>
+                            {tag.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>No tags linked yet. Tick tags below or make it always included.</span>
+                    )}
+                    <div className="rams-tag-matrix">
+                      {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
+                        <fieldset key={`tag-group-${group.key}`}>
+                          <legend>{group.label}</legend>
+                          {group.options.map((option, optionIndex) => (
+                            <label key={`${group.key}-${option.value}-${optionIndex}`}>
+                              <input
+                                type="checkbox"
+                                checked={option.cardIds.includes(activeCardId)}
+                                onChange={() => toggleOptionCard(groupIndex, optionIndex, activeCardId)}
+                              />
+                              {option.label}
+                            </label>
+                          ))}
+                        </fieldset>
+                      ))}
+                    </div>
                   </div>
-                  <div className="rams-logic-card-row rams-editor-two-col">
-                    <label>
-                      Initial risk
-                      <select value={activeCard.initialRisk || "Medium"} onChange={(event) => updateRamsCard(activeCardId, "initialRisk", event.target.value)}>
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
-                      </select>
-                    </label>
-                    <label>
-                      Residual risk
-                      <select value={activeCard.residualRisk || "Low"} onChange={(event) => updateRamsCard(activeCardId, "residualRisk", event.target.value)}>
-                        <option>Low</option>
-                        <option>Medium</option>
-                        <option>High</option>
-                      </select>
-                    </label>
-                  </div>
-                  <label className="rams-field-wide">
-                    Content lines
-                    <textarea
-                      value={(Array.isArray(activeCard.content) ? activeCard.content : []).join("\n")}
-                      onChange={(event) => updateRamsCard(activeCardId, "content", event.target.value)}
-                    />
-                  </label>
                   <button className="text-button danger" type="button" onClick={() => removeRamsCard(activeCardId)}>
-                    Delete card
+                    Delete {activeCard.type === "Method" ? "method" : "risk"}
                   </button>
                 </article>
               ) : (
@@ -3486,6 +3888,15 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
+                  <div className="rams-risk-key">
+                    <span><strong>L</strong> Likelihood</span>
+                    <span><strong>C</strong> Consequence</span>
+                    <span><strong>R</strong> Risk = L x C</span>
+                    <span className="risk-none">0-4 N</span>
+                    <span className="risk-low">5-10 L</span>
+                    <span className="risk-medium">11-15 M</span>
+                    <span className="risk-high">16+ H</span>
+                  </div>
                   <div className="rams-risk-table-wrap">
                     <table className="rams-risk-table">
                       <colgroup>
@@ -3495,17 +3906,21 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                         <col className="rams-col-score" />
                         <col className="rams-col-score" />
                         <col className="rams-col-controls" />
+                        <col className="rams-col-responsibility" />
                         <col className="rams-col-score" />
                         <col className="rams-col-score" />
                         <col className="rams-col-score" />
+                        <col className="rams-col-final-risk" />
                       </colgroup>
                       <thead>
                         <tr>
                           <th rowSpan="2">Hazard</th>
                           <th rowSpan="2">Who may be harmed</th>
                           <th colSpan="3">Initial risk</th>
-                          <th rowSpan="2">Control measures</th>
+                          <th rowSpan="2">Req'd control measure</th>
+                          <th rowSpan="2">Responsibility</th>
                           <th colSpan="3">Residual risk</th>
+                          <th rowSpan="2">Risk</th>
                         </tr>
                         <tr>
                           <th>L</th>
@@ -3520,26 +3935,32 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                         {riskCards.map((card) => {
                           const initial = getRamsLcr(card, "initial");
                           const residual = getRamsLcr(card, "residual");
+                          const riskBand = getRamsRiskBand(residual.rating);
+                          const controlLines = String(card.controlMeasure || (Array.isArray(card.content) ? card.content.join("\n") : "")).split("\n").filter(Boolean);
                           return (
                             <tr key={`risk-row-${card.id}`}>
                               <td>
                                 <strong>{renderEditable(`risk-${card.id}-title`, card.title)}</strong>
                                 <span>{card.type}</span>
                               </td>
-                              <td>{renderEditable(`risk-${card.id}-harmed`, "Operatives, client staff, visitors and members of the public where present.")}</td>
+                              <td>{renderEditable(`risk-${card.id}-harmed`, card.whoAtRisk || "Employees\nThird parties")}</td>
                               <td>{renderEditable(`risk-${card.id}-initial-l`, initial.likelihood)}</td>
                               <td>{renderEditable(`risk-${card.id}-initial-c`, initial.consequence)}</td>
-                              <td><strong>{renderEditable(`risk-${card.id}-initial-r`, initial.rating)}</strong></td>
+                              <td><strong>{initial.rating}</strong></td>
                               <td>
                                 <ul>
-                                  {card.content.map((line, lineIndex) => (
+                                  {controlLines.map((line, lineIndex) => (
                                     <li key={`risk-control-${card.id}-${line}`}>{renderEditable(`risk-${card.id}-control-${lineIndex}`, line)}</li>
                                   ))}
                                 </ul>
                               </td>
+                              <td>{renderEditable(`risk-${card.id}-responsibility`, card.responsibility || "Matt Carroll")}</td>
                               <td>{renderEditable(`risk-${card.id}-residual-l`, residual.likelihood)}</td>
                               <td>{renderEditable(`risk-${card.id}-residual-c`, residual.consequence)}</td>
-                              <td><strong>{renderEditable(`risk-${card.id}-residual-r`, residual.rating)}</strong></td>
+                              <td><strong>{residual.rating}</strong></td>
+                              <td className={`rams-risk-final ${riskBand.className}`}>
+                                <strong>{riskBand.code}</strong>
+                              </td>
                             </tr>
                           );
                         })}
