@@ -82,6 +82,222 @@ const EMPTY_ATTENDANCE_NOTE_FORM = {
   note: ""
 };
 
+const RAMS_ACTIVITY_OPTIONS = [
+  { value: "internal", label: "Internal signs / wall graphics" },
+  { value: "external", label: "External signs / fascia" },
+  { value: "vehicle", label: "Vehicle graphics" },
+  { value: "window", label: "Window graphics" },
+  { value: "survey", label: "Survey / measurements only" }
+];
+
+const RAMS_ACCESS_OPTIONS = [
+  { value: "ground", label: "Ground level" },
+  { value: "steps", label: "Steps / podium" },
+  { value: "ladders", label: "Ladders" },
+  { value: "mewp", label: "MEWP / powered access" }
+];
+
+const RAMS_WORK_AREA_OPTIONS = [
+  { value: "quiet", label: "Quiet controlled area" },
+  { value: "public", label: "Public / occupied area" },
+  { value: "traffic", label: "Near vehicles / deliveries" },
+  { value: "construction", label: "Construction site" }
+];
+
+const RAMS_TOOL_OPTIONS = [
+  { value: "hand-tools", label: "Hand tools" },
+  { value: "power-tools", label: "Power tools / drilling" },
+  { value: "adhesives", label: "Adhesives / cleaners" },
+  { value: "lifting", label: "Heavy or awkward lifting" },
+  { value: "electrical", label: "Electrical isolation nearby" }
+];
+
+const RAMS_DEFAULT_QUESTIONS = {
+  jobId: "",
+  activity: "external",
+  access: "ground",
+  workArea: "quiet",
+  tools: ["hand-tools"],
+  operatives: "2",
+  duration: "1 day",
+  welfare: "Client welfare facilities to be confirmed at induction.",
+  emergency: "Follow site emergency arrangements and report incidents to the site contact and Signs Express.",
+  notes: ""
+};
+
+const RAMS_CARD_LIBRARY = {
+  induction: {
+    title: "Site Induction, Permits and Coordination",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "All operatives sign in, attend site induction where required and follow client or principal contractor rules.",
+      "Confirm working area, emergency arrangements, welfare, permit requirements and any live restrictions before work starts.",
+      "Stop work and report to the site contact if conditions differ from the agreed RAMS."
+    ]
+  },
+  public: {
+    title: "Public, Staff and Third-Party Interface",
+    type: "Risk",
+    trigger: "Public or occupied area",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Set a clear exclusion zone using cones, barriers or signage suitable for the work area.",
+      "Keep tools, materials and waste within the controlled area and maintain safe pedestrian routes.",
+      "Suspend work if the exclusion zone cannot be maintained."
+    ]
+  },
+  traffic: {
+    title: "Vehicle Movement and Deliveries",
+    type: "Risk",
+    trigger: "Vehicle movement nearby",
+    initialRisk: "High",
+    residualRisk: "Low",
+    content: [
+      "Agree safe parking, unloading and working positions with site before work starts.",
+      "Use a banksman where visibility is restricted or materials are moved near vehicle routes.",
+      "Wear hi-vis PPE and do not work in live traffic routes without suitable segregation."
+    ]
+  },
+  construction: {
+    title: "Construction Site Controls",
+    type: "Method",
+    trigger: "Construction site",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Follow principal contractor rules, daily briefings and permit systems.",
+      "Wear site-required PPE as a minimum and keep the work area tidy.",
+      "Coordinate with other trades before drilling, lifting or closing access routes."
+    ]
+  },
+  height: {
+    title: "Working at Height",
+    type: "Risk",
+    trigger: "Steps, ladders or MEWP",
+    initialRisk: "High",
+    residualRisk: "Low",
+    content: [
+      "Use the lowest-risk access method suitable for the task and inspect access equipment before use.",
+      "Maintain three points of contact where applicable and avoid overreaching.",
+      "Do not work at height in unsafe weather, poor ground conditions or uncontrolled public areas."
+    ]
+  },
+  ladders: {
+    title: "Ladders and Step Ladders",
+    type: "Method",
+    trigger: "Ladders selected",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Use ladders only for short-duration light work where a safer platform is not reasonably practicable.",
+      "Set ladders on firm, level ground and secure or foot them where required.",
+      "Keep both hands free while climbing and raise materials separately where needed."
+    ]
+  },
+  mewp: {
+    title: "MEWP / Powered Access",
+    type: "Method",
+    trigger: "MEWP selected",
+    initialRisk: "High",
+    residualRisk: "Low",
+    content: [
+      "MEWP to be operated only by trained, authorised operatives.",
+      "Complete pre-use checks, confirm ground conditions and establish an exclusion zone.",
+      "Wear harness and lanyard where required by the platform type and site rules."
+    ]
+  },
+  tools: {
+    title: "Hand Tools, Cutting and Drilling",
+    type: "Risk",
+    trigger: "Tools selected",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Use the correct tool for the task and check tools before use.",
+      "Wear eye protection when drilling, cutting or fixing.",
+      "Control dust and debris, and check for hidden services before drilling."
+    ]
+  },
+  substances: {
+    title: "Adhesives, Cleaners and Substances",
+    type: "COSHH",
+    trigger: "Adhesives / cleaners selected",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Use only required quantities and follow product safety data sheets.",
+      "Maintain ventilation, avoid ignition sources and wear suitable gloves where needed.",
+      "Store containers securely and remove waste from site."
+    ]
+  },
+  lifting: {
+    title: "Manual Handling and Material Movement",
+    type: "Risk",
+    trigger: "Heavy or awkward lifting selected",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Assess size, weight, route and fixing position before lifting.",
+      "Use team lifts, trolleys or mechanical aids for heavy or awkward items.",
+      "Keep routes clear and avoid twisting while carrying materials."
+    ]
+  },
+  electrical: {
+    title: "Electrical Services and Isolation",
+    type: "Risk",
+    trigger: "Electrical work nearby",
+    initialRisk: "High",
+    residualRisk: "Low",
+    content: [
+      "Signs Express operatives must not work on live electrical systems unless specifically competent and authorised.",
+      "Confirm isolation or safe routing before drilling near lighting, cables or illuminated sign supplies.",
+      "Stop work if unknown services are found."
+    ]
+  },
+  vehicle: {
+    title: "Vehicle Graphics Installation",
+    type: "Method",
+    trigger: "Vehicle graphics selected",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Confirm vehicle is parked safely with adequate space around the work area.",
+      "Clean and prepare surfaces using approved products before applying graphics.",
+      "Keep blades controlled and dispose of backing paper, application tape and waste safely."
+    ]
+  },
+  weather: {
+    title: "Weather and External Conditions",
+    type: "Risk",
+    trigger: "External works",
+    initialRisk: "Medium",
+    residualRisk: "Low",
+    content: [
+      "Check weather conditions before external installation starts.",
+      "Do not install in high wind, heavy rain, icy conditions or temperatures unsuitable for the materials.",
+      "Secure loose materials and postpone work if conditions become unsafe."
+    ]
+  },
+  completion: {
+    title: "Completion, Handover and Waste",
+    type: "Method",
+    trigger: "Always included",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Inspect finished work, remove waste and leave the area tidy.",
+      "Return access routes and barriers to the agreed arrangement.",
+      "Report completion, issues or snagging items to the site contact."
+    ]
+  }
+};
+
+const RAMS_BASE_CARD_IDS = ["induction", "tools", "completion"];
+
 const ATTENDANCE_WEEKDAYS = [
   ["monday", "Mon"],
   ["tuesday", "Tue"],
@@ -840,6 +1056,59 @@ function formatHolidayRequestDateRange(startDate, endDate) {
   return end && end !== start ? `${start} to ${end}` : start;
 }
 
+function getRamsJobTitle(job) {
+  return [job?.orderReference, job?.customerName, job?.description].filter(Boolean).join(" - ") || "Untitled job";
+}
+
+function getRamsJobAddress(job) {
+  return String(job?.address || "").trim() || "Site address to be confirmed";
+}
+
+function getRamsContact(job) {
+  return [job?.contact, job?.number].filter(Boolean).join(" - ") || "Site contact to be confirmed";
+}
+
+function getInstallerNamesForRams(job) {
+  const names = Array.isArray(job?.installers) ? job.installers.filter((entry) => entry && entry !== "Custom") : [];
+  if (job?.installers?.includes?.("Custom") && job?.customInstaller) names.push(job.customInstaller);
+  return names.length ? names.join(", ") : "To be allocated";
+}
+
+function normalizeRamsQuestions(questions) {
+  return {
+    ...RAMS_DEFAULT_QUESTIONS,
+    ...questions,
+    tools: Array.isArray(questions?.tools) && questions.tools.length ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools
+  };
+}
+
+function getRamsCardIdsForQuestions(questions) {
+  const normalized = normalizeRamsQuestions(questions);
+  const selected = new Set(RAMS_BASE_CARD_IDS);
+
+  if (normalized.workArea === "public") selected.add("public");
+  if (normalized.workArea === "traffic") selected.add("traffic");
+  if (normalized.workArea === "construction") selected.add("construction");
+  if (["external", "window"].includes(normalized.activity)) selected.add("weather");
+  if (normalized.activity === "vehicle") selected.add("vehicle");
+  if (["steps", "ladders", "mewp"].includes(normalized.access)) selected.add("height");
+  if (normalized.access === "ladders") selected.add("ladders");
+  if (normalized.access === "mewp") selected.add("mewp");
+  if (normalized.tools.includes("power-tools")) selected.add("tools");
+  if (normalized.tools.includes("adhesives")) selected.add("substances");
+  if (normalized.tools.includes("lifting")) selected.add("lifting");
+  if (normalized.tools.includes("electrical")) selected.add("electrical");
+
+  return Object.keys(RAMS_CARD_LIBRARY).filter((cardId) => selected.has(cardId));
+}
+
+function buildRamsReference(job, questions) {
+  const reference = String(job?.orderReference || job?.id || "RAMS").trim();
+  const date = String(job?.date || getLocalTodayIso()).replaceAll("-", "");
+  const activity = String(questions?.activity || "works").toUpperCase();
+  return `${reference}-${date}-${activity}`;
+}
+
 function formatNotificationDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
@@ -1181,10 +1450,14 @@ function canAccessVanEstimator(user) {
   return getPermissionForApp(user, "vanEstimator") !== "none";
 }
 
+function canAccessRams(user) {
+  return canEditBoard(user);
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || user.canManagePermissions)
   );
 }
 
@@ -1240,6 +1513,14 @@ function VanEstimatorIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M4.5 8.5 6.2 5h8.9a2 2 0 0 1 1.7.94l1.58 2.56H20a1 1 0 0 1 1 1v5.25a1.25 1.25 0 0 1-1.25 1.25h-.85a2.5 2.5 0 0 1-4.8 0H9.9a2.5 2.5 0 0 1-4.8 0h-.85A1.25 1.25 0 0 1 3 14.75V10a1.5 1.5 0 0 1 1.5-1.5Zm3-1.5-.75 1.5h4.75V7Zm6 0v1.5h2.55L15.11 7Zm-6 10a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" />
+    </svg>
+  );
+}
+
+function RamsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 3h8.25L20 7.75V19a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm7 1.8V9h4.2ZM8 11h8v1.6H8Zm0 3.2h8v1.6H8Zm0 3.2h5v1.6H8Z" />
     </svg>
   );
 }
@@ -1317,6 +1598,7 @@ function MainNavBar({
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
+  const ramsAllowed = canAccessRams(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -1324,6 +1606,7 @@ function MainNavBar({
   const holidaysPath = "/holidays";
   const mileagePath = "/mileage";
   const vanEstimatorPath = "/van-estimator";
+  const ramsPath = "/rams";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -1388,6 +1671,15 @@ function MainNavBar({
             >
               <span className="host-nav-link-label">Vehicle Pricing Calculator</span>
             </button>
+            {ramsAllowed ? (
+              <button
+                type="button"
+                className={`host-nav-link ${active === "rams" ? "active" : ""}`}
+                onClick={() => goTo(ramsPath)}
+              >
+                <span className="host-nav-link-label">RAMS</span>
+              </button>
+            ) : null}
             {installerAllowed ? (
               <button
                 type="button"
@@ -1982,6 +2274,11 @@ function HostLandingPage({
               <strong>Vehicle Pricing Calculator</strong>
               {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
             </button>
+            {canAccessRams(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/rams")}>
+                <strong>RAMS</strong>
+              </button>
+            ) : null}
             {canAccessInstaller(currentUser) ? (
               <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
                 <strong>Subcontractor Database</strong>
@@ -2090,6 +2387,357 @@ function ClientLandingPage({
           </div>
         </section>
 
+      </div>
+    </div>
+  );
+}
+
+function RamsPage({ currentUser, onLogout, notifications }) {
+  const [jobs, setJobs] = useState([]);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [jobError, setJobError] = useState("");
+  const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
+  const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS));
+  const [draggingCardId, setDraggingCardId] = useState("");
+  const todayIso = getLocalTodayIso();
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadJobs() {
+      try {
+        setLoadingJobs(true);
+        const response = await fetch("/api/jobs");
+        if (!response.ok) throw new Error("Could not load installation jobs.");
+        const payload = await response.json();
+        if (!active) return;
+        const futureJobs = (Array.isArray(payload) ? payload : [])
+          .filter((job) => String(job.date || "") >= todayIso)
+          .sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")));
+        setJobs(futureJobs);
+        setQuestions((current) => {
+          if (current.jobId || !futureJobs.length) return current;
+          return { ...current, jobId: String(futureJobs[0].id || "") };
+        });
+      } catch (error) {
+        console.error(error);
+        if (active) setJobError(error.message || "Could not load installation jobs.");
+      } finally {
+        if (active) setLoadingJobs(false);
+      }
+    }
+
+    loadJobs();
+    return () => {
+      active = false;
+    };
+  }, [todayIso]);
+
+  const selectedJob = useMemo(
+    () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
+    [jobs, questions.jobId]
+  );
+
+  const suggestedCardIds = useMemo(() => getRamsCardIdsForQuestions(questions), [questions]);
+  const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
+
+  useEffect(() => {
+    setCardOrder((current) => {
+      const existing = current.filter((cardId) => suggestedCardIds.includes(cardId));
+      const missing = suggestedCardIds.filter((cardId) => !existing.includes(cardId));
+      return [...existing, ...missing];
+    });
+  }, [suggestedCardIds]);
+
+  function updateQuestion(key, value) {
+    setQuestions((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleTool(value) {
+    setQuestions((current) => {
+      const existing = Array.isArray(current.tools) ? current.tools : [];
+      const nextTools = existing.includes(value)
+        ? existing.filter((entry) => entry !== value)
+        : [...existing, value];
+      return { ...current, tools: nextTools.length ? nextTools : ["hand-tools"] };
+    });
+  }
+
+  function moveCard(cardId, direction) {
+    setCardOrder((current) => {
+      const index = current.indexOf(cardId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      const [card] = next.splice(index, 1);
+      next.splice(nextIndex, 0, card);
+      return next;
+    });
+  }
+
+  function handleCardDrop(targetCardId) {
+    if (!draggingCardId || draggingCardId === targetCardId) return;
+    setCardOrder((current) => {
+      const next = current.filter((cardId) => cardId !== draggingCardId);
+      const targetIndex = next.indexOf(targetCardId);
+      next.splice(targetIndex < 0 ? next.length : targetIndex, 0, draggingCardId);
+      return next;
+    });
+    setDraggingCardId("");
+  }
+
+  const selectedCards = cardOrder
+    .map((cardId) => ({ id: cardId, ...RAMS_CARD_LIBRARY[cardId] }))
+    .filter((card) => card.title);
+  const selectedActivity = RAMS_ACTIVITY_OPTIONS.find((option) => option.value === questions.activity)?.label || questions.activity;
+  const selectedAccess = RAMS_ACCESS_OPTIONS.find((option) => option.value === questions.access)?.label || questions.access;
+  const selectedWorkArea = RAMS_WORK_AREA_OPTIONS.find((option) => option.value === questions.workArea)?.label || questions.workArea;
+  const selectedTools = RAMS_TOOL_OPTIONS.filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
+
+  return (
+    <div className="app-shell rams-shell">
+      <div className="page rams-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="rams"
+          onLogout={onLogout}
+          notifications={notifications}
+        />
+
+        <section className="panel rams-panel">
+          <div className="rams-header">
+            <div>
+              <span className="panel-kicker">Admin module</span>
+              <h2>RAMS Builder</h2>
+              <p>Select a live board job, answer the basics, then reorder the cards before printing.</p>
+            </div>
+            <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
+              Print / Save PDF
+            </button>
+          </div>
+
+          {jobError ? <div className="flash error">{jobError}</div> : null}
+
+          <div className="rams-builder-grid">
+            <aside className="rams-question-panel">
+              <label>
+                Installation job
+                <select
+                  value={questions.jobId}
+                  onChange={(event) => updateQuestion("jobId", event.target.value)}
+                  disabled={loadingJobs || !jobs.length}
+                >
+                  {loadingJobs ? <option>Loading jobs...</option> : null}
+                  {!loadingJobs && !jobs.length ? <option>No future jobs on the board</option> : null}
+                  {jobs.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      {formatJobDate(job.date)} - {getRamsJobTitle(job)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="rams-question-group">
+                <span>Work type</span>
+                <div className="rams-option-stack">
+                  {RAMS_ACTIVITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      className={`rams-choice ${questions.activity === option.value ? "active" : ""}`}
+                      type="button"
+                      onClick={() => updateQuestion("activity", option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <label>
+                Access method
+                <select value={questions.access} onChange={(event) => updateQuestion("access", event.target.value)}>
+                  {RAMS_ACCESS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label>
+                Work area
+                <select value={questions.workArea} onChange={(event) => updateQuestion("workArea", event.target.value)}>
+                  {RAMS_WORK_AREA_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="rams-question-group">
+                <span>Tools and conditions</span>
+                <div className="rams-check-grid">
+                  {RAMS_TOOL_OPTIONS.map((option) => (
+                    <label key={option.value} className="rams-check">
+                      <input
+                        type="checkbox"
+                        checked={questions.tools.includes(option.value)}
+                        onChange={() => toggleTool(option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rams-mini-fields">
+                <label>
+                  Operatives
+                  <input value={questions.operatives} onChange={(event) => updateQuestion("operatives", event.target.value)} />
+                </label>
+                <label>
+                  Duration
+                  <input value={questions.duration} onChange={(event) => updateQuestion("duration", event.target.value)} />
+                </label>
+              </div>
+
+              <label>
+                Welfare
+                <textarea value={questions.welfare} onChange={(event) => updateQuestion("welfare", event.target.value)} />
+              </label>
+              <label>
+                Emergency arrangements
+                <textarea value={questions.emergency} onChange={(event) => updateQuestion("emergency", event.target.value)} />
+              </label>
+              <label>
+                Extra notes
+                <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
+              </label>
+            </aside>
+
+            <main className="rams-main">
+              <section className="rams-summary-card">
+                <div>
+                  <span>Reference</span>
+                  <strong>{ramsReference}</strong>
+                </div>
+                <div>
+                  <span>Customer</span>
+                  <strong>{selectedJob?.customerName || "Select a job"}</strong>
+                </div>
+                <div>
+                  <span>Site</span>
+                  <strong>{selectedJob ? getRamsJobAddress(selectedJob) : "Select a job"}</strong>
+                </div>
+                <div>
+                  <span>Contact</span>
+                  <strong>{selectedJob ? getRamsContact(selectedJob) : "Select a job"}</strong>
+                </div>
+              </section>
+
+              <section className="rams-card-board">
+                <div className="rams-card-board-head">
+                  <div>
+                    <h3>Auto-selected RAMS cards</h3>
+                    <p>{selectedCards.length} cards selected from the answers. Drag or use arrows to reorder.</p>
+                  </div>
+                </div>
+
+                <div className="rams-card-list">
+                  {selectedCards.map((card, index) => (
+                    <article
+                      key={card.id}
+                      className="rams-risk-card"
+                      draggable
+                      onDragStart={() => setDraggingCardId(card.id)}
+                      onDragEnd={() => setDraggingCardId("")}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => handleCardDrop(card.id)}
+                    >
+                      <div className="rams-risk-card-head">
+                        <div>
+                          <span className="rams-card-type">{card.type}</span>
+                          <h4>{card.title}</h4>
+                          <small>{card.trigger}</small>
+                        </div>
+                        <div className="rams-card-actions">
+                          <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={index === 0} aria-label="Move card up">
+                            ^
+                          </button>
+                          <button type="button" className="icon-button" onClick={() => moveCard(card.id, 1)} disabled={index === selectedCards.length - 1} aria-label="Move card down">
+                            v
+                          </button>
+                        </div>
+                      </div>
+                      <div className="rams-risk-rating">
+                        <span>Initial risk: <strong>{card.initialRisk}</strong></span>
+                        <span>Residual risk: <strong>{card.residualRisk}</strong></span>
+                      </div>
+                      <ul>
+                        {card.content.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rams-document-preview">
+                <div className="rams-doc-title">
+                  <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
+                  <div>
+                    <h3>Risk Assessment and Method Statement</h3>
+                    <p>{selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document"}</p>
+                  </div>
+                </div>
+                <div className="rams-doc-meta">
+                  <span><strong>Date:</strong> {formatJobDate(selectedJob?.date)}</span>
+                  <span><strong>Operatives:</strong> {questions.operatives}</span>
+                  <span><strong>Duration:</strong> {questions.duration}</span>
+                  <span><strong>Installers:</strong> {selectedJob ? getInstallerNamesForRams(selectedJob) : "To be allocated"}</span>
+                  <span><strong>Activity:</strong> {selectedActivity}</span>
+                  <span><strong>Access:</strong> {selectedAccess}</span>
+                  <span><strong>Work area:</strong> {selectedWorkArea}</span>
+                  <span><strong>Tools:</strong> {selectedTools.join(", ")}</span>
+                </div>
+                <div className="rams-doc-section">
+                  <h4>Site Details</h4>
+                  <p><strong>Customer:</strong> {selectedJob?.customerName || "-"}</p>
+                  <p><strong>Site address:</strong> {selectedJob ? getRamsJobAddress(selectedJob) : "-"}</p>
+                  <p><strong>Contact:</strong> {selectedJob ? getRamsContact(selectedJob) : "-"}</p>
+                  <p><strong>Scope:</strong> {selectedJob?.description || selectedActivity}</p>
+                </div>
+                <div className="rams-doc-section">
+                  <h4>Arrangements</h4>
+                  <p><strong>Welfare:</strong> {questions.welfare}</p>
+                  <p><strong>Emergency:</strong> {questions.emergency}</p>
+                  {questions.notes ? <p><strong>Notes:</strong> {questions.notes}</p> : null}
+                </div>
+                <div className="rams-doc-section">
+                  <h4>Risk Assessment and Method Controls</h4>
+                  {selectedCards.map((card) => (
+                    <div key={`doc-${card.id}`} className="rams-doc-card">
+                      <div>
+                        <strong>{card.title}</strong>
+                        <span>{card.type}</span>
+                      </div>
+                      <p>Initial risk: {card.initialRisk} | Residual risk: {card.residualRisk}</p>
+                      <ul>
+                        {card.content.map((line) => (
+                          <li key={`doc-${card.id}-${line}`}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="rams-signoff">
+                  <span>Prepared by: {currentUser?.displayName || "Signs Express"}</span>
+                  <span>Accepted by site:</span>
+                  <span>Signature:</span>
+                  <span>Date:</span>
+                </div>
+              </section>
+            </main>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -5802,6 +6450,7 @@ export default function App() {
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
+  const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
   const [board, setBoard] = useState(null);
@@ -5887,14 +6536,15 @@ export default function App() {
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
+  const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -6195,6 +6845,11 @@ export default function App() {
       return;
     }
 
+    if (isRamsRoute && !canAccessRams(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isNotificationsRoute && !currentUser) {
       window.location.replace("/");
       return;
@@ -6215,7 +6870,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -6223,7 +6878,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -7893,6 +8548,16 @@ export default function App() {
   if (showVanEstimator) {
     return (
       <VinylEstimatorPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showRams) {
+    return (
+      <RamsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
