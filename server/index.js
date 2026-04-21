@@ -993,6 +993,91 @@ async function estimateDrivingMiles(from, to) {
   };
 }
 
+function getDistanceKmBetween(left, right) {
+  const earthRadiusKm = 6371;
+  const leftLat = Number(left?.lat);
+  const leftLon = Number(left?.lon);
+  const rightLat = Number(right?.lat);
+  const rightLon = Number(right?.lon);
+  if (![leftLat, leftLon, rightLat, rightLon].every(Number.isFinite)) return 0;
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const dLat = toRadians(rightLat - leftLat);
+  const dLon = toRadians(rightLon - leftLon);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(leftLat)) * Math.cos(toRadians(rightLat)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatHospitalAddress(tags = {}) {
+  return [
+    tags["addr:housename"],
+    tags["addr:housenumber"],
+    tags["addr:street"],
+    tags["addr:city"],
+    tags["addr:postcode"]
+  ].filter(Boolean).join(", ");
+}
+
+async function findNearestHospitals(address) {
+  const origin = await geocodeMileageLocation(address);
+  if (!origin) {
+    return { origin: null, hospitals: [], message: "Could not resolve the installation address." };
+  }
+
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["amenity"="hospital"](around:40000,${origin.lat},${origin.lon});
+      way["amenity"="hospital"](around:40000,${origin.lat},${origin.lon});
+      relation["amenity"="hospital"](around:40000,${origin.lat},${origin.lon});
+    );
+    out center tags;
+  `;
+
+  const response = await fetch("https://overpass-api.de/api/interpreter", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+      Accept: "application/json",
+      "User-Agent": "sxpreston-rams/1.0 (https://www.sxpreston.com)"
+    },
+    body: new URLSearchParams({ data: query })
+  });
+  if (!response.ok) {
+    return { origin, hospitals: [], message: "Could not load nearby hospitals." };
+  }
+
+  const payload = await response.json();
+  const seen = new Set();
+  const hospitals = (Array.isArray(payload?.elements) ? payload.elements : [])
+    .map((element) => {
+      const tags = element.tags || {};
+      const lat = Number(element.lat ?? element.center?.lat);
+      const lon = Number(element.lon ?? element.center?.lon);
+      const name = String(tags.name || tags.operator || "Hospital").trim();
+      if (!name || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      const dedupeKey = `${name.toLowerCase()}-${Math.round(lat * 1000)}-${Math.round(lon * 1000)}`;
+      if (seen.has(dedupeKey)) return null;
+      seen.add(dedupeKey);
+      const distanceKm = getDistanceKmBetween(origin, { lat, lon });
+      const addressLabel = formatHospitalAddress(tags);
+      return {
+        id: String(element.id || dedupeKey),
+        name,
+        address: addressLabel,
+        distanceKm: Math.round(distanceKm * 10) / 10,
+        label: `${name}${addressLabel ? ` - ${addressLabel}` : ""}${distanceKm ? ` (${Math.round(distanceKm * 10) / 10} km)` : ""}`
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.distanceKm - right.distanceKm)
+    .slice(0, 5);
+
+  return { origin, hospitals };
+}
+
 function buildMonthNavigation(today = getTodayInLondon()) {
   const currentMonth = getStartOfMonth(today);
   const previousMonths = [];
@@ -4113,6 +4198,21 @@ function createServer() {
     if (!requireBoardAccess(request, response)) return;
     const store = await readStore();
     response.json(toPublicJobs(store.jobs));
+  });
+
+  app.get("/api/rams/hospitals", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const address = String(request.query.address || "").trim();
+    if (!address) {
+      response.status(400).json({ error: "Installation address is required." });
+      return;
+    }
+    try {
+      response.json(await findNearestHospitals(address));
+    } catch (error) {
+      console.error("RAMS hospital lookup failed.", error);
+      response.status(500).json({ error: "Could not load nearby hospitals." });
+    }
   });
 
   app.get("/api/installers", async (request, response) => {

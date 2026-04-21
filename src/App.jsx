@@ -121,6 +121,8 @@ const RAMS_DEFAULT_QUESTIONS = {
   operatives: "2",
   duration: "1 day",
   ppe: ["boots", "gloves", "hi-vis", "eye", "hard-hat"],
+  firstAidFacility: "",
+  firstAidBoxLocation: "Signs Express Van",
   welfare: "Client welfare facilities to be confirmed at induction.",
   emergency: "Follow site emergency arrangements and report incidents to the site contact and Signs Express.",
   notes: ""
@@ -3591,6 +3593,10 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const [saveStatus, setSaveStatus] = useState("");
   const [savingRams, setSavingRams] = useState(false);
   const [savedRamsId, setSavedRamsId] = useState("");
+  const [ramsSetupOpen, setRamsSetupOpen] = useState(false);
+  const [hospitalOptions, setHospitalOptions] = useState([]);
+  const [hospitalLookupStatus, setHospitalLookupStatus] = useState("");
+  const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
   const [ramsLogic, setRamsLogic] = useState(() => getStoredRamsLogic());
   const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
@@ -3647,6 +3653,49 @@ function RamsPage({ currentUser, onLogout, notifications }) {
     () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
     [jobs, questions.jobId]
   );
+
+  useEffect(() => {
+    let active = true;
+    const address = selectedJob ? getRamsJobAddress(selectedJob) : "";
+    if (!address || address === "-") {
+      setHospitalOptions([]);
+      setHospitalLookupStatus("");
+      return () => {
+        active = false;
+      };
+    }
+
+    async function loadHospitals() {
+      try {
+        setLoadingHospitals(true);
+        setHospitalLookupStatus("");
+        const response = await fetch(`/api/rams/hospitals?address=${encodeURIComponent(address)}`);
+        const payload = await response.json();
+        if (!active) return;
+        if (!response.ok) throw new Error(payload.error || "Could not load nearby hospitals.");
+        const hospitals = Array.isArray(payload.hospitals) ? payload.hospitals : [];
+        setHospitalOptions(hospitals);
+        setHospitalLookupStatus(payload.message || (hospitals.length ? "" : "No nearby hospitals found automatically."));
+        setQuestions((current) => {
+          if (current.firstAidFacility || !hospitals.length) return current;
+          return { ...current, firstAidFacility: hospitals[0].label || hospitals[0].name || "" };
+        });
+      } catch (error) {
+        console.error(error);
+        if (active) {
+          setHospitalOptions([]);
+          setHospitalLookupStatus(error.message || "Could not load nearby hospitals.");
+        }
+      } finally {
+        if (active) setLoadingHospitals(false);
+      }
+    }
+
+    loadHospitals();
+    return () => {
+      active = false;
+    };
+  }, [selectedJob?.id, selectedJob?.address]);
 
   const suggestedCardIds = useMemo(() => getRamsCardIdsForQuestions(questions, ramsLogic), [questions, ramsLogic]);
   const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
@@ -3953,6 +4002,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const displayedAccess = getRamsEdit("access", selectedAccess);
   const displayedWorkArea = getRamsEdit("workArea", selectedWorkArea);
   const displayedTools = getRamsEdit("tools", selectedTools.join(", "));
+  const displayedFirstAidFacility = getRamsEdit("firstAidFacility", questions.firstAidFacility || "To be selected");
+  const displayedFirstAidBoxLocation = getRamsEdit("firstAidBoxLocation", questions.firstAidBoxLocation || "Signs Express Van");
 
   return (
     <div className="app-shell rams-shell">
@@ -3990,7 +4041,16 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 Installation job
                 <select
                   value={questions.jobId}
-                  onChange={(event) => updateQuestion("jobId", event.target.value)}
+                  onChange={(event) => {
+                    setSavedRamsId("");
+                    setRamsEdits({});
+                    setSaveStatus("");
+                    setQuestions((current) => ({
+                      ...current,
+                      jobId: event.target.value,
+                      firstAidFacility: ""
+                    }));
+                  }}
                   disabled={loadingJobs || !jobs.length}
                 >
                   {loadingJobs ? <option>Loading jobs...</option> : null}
@@ -4002,87 +4062,17 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   ))}
                 </select>
               </label>
-
-              {ramsLogic.optionGroups.map((group) => (
-                group.input === "select" && !group.multi ? (
-                  <label key={group.key}>
-                    {group.label}
-                    <select value={questions[group.key] || ""} onChange={(event) => updateQuestion(group.key, event.target.value)}>
-                      {group.options.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <div key={group.key} className="rams-question-group">
-                    <span>{group.label}</span>
-                    <div className={group.multi ? "rams-check-grid" : "rams-option-stack"}>
-                      {group.options.map((option) => (
-                        group.multi ? (
-                          <label key={option.value} className="rams-check">
-                            <input
-                              type="checkbox"
-                              checked={Array.isArray(questions[group.key]) && questions[group.key].includes(option.value)}
-                              onChange={() => updateMultiQuestion(group.key, option.value)}
-                            />
-                            {option.label}
-                          </label>
-                        ) : (
-                          <button
-                            key={option.value}
-                            className={`rams-choice ${questions[group.key] === option.value ? "active" : ""}`}
-                            type="button"
-                            onClick={() => updateQuestion(group.key, option.value)}
-                          >
-                            {option.label}
-                          </button>
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )
-              ))}
-
-              <div className="rams-mini-fields">
-                <label>
-                  Operatives
-                  <input value={questions.operatives} onChange={(event) => updateQuestion("operatives", event.target.value)} />
-                </label>
-                <label>
-                  Duration
-                  <input value={questions.duration} onChange={(event) => updateQuestion("duration", event.target.value)} />
-                </label>
+              <div className="rams-setup-summary">
+                <span><strong>Work:</strong> {selectedActivity}</span>
+                <span><strong>Access:</strong> {selectedAccess}</span>
+                <span><strong>Area:</strong> {selectedWorkArea}</span>
+                <span><strong>PPE:</strong> {selectedPpe.length} selected</span>
+                <span><strong>First aid:</strong> {questions.firstAidFacility || "To be selected"}</span>
               </div>
 
-              <label>
-                Welfare
-                <textarea value={questions.welfare} onChange={(event) => updateQuestion("welfare", event.target.value)} />
-              </label>
-              <label>
-                Emergency arrangements
-                <textarea value={questions.emergency} onChange={(event) => updateQuestion("emergency", event.target.value)} />
-              </label>
-              <label>
-                Extra notes
-                <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
-              </label>
-
-              <div className="rams-question-group">
-                <span>PPE requirements</span>
-                <div className="rams-check-grid rams-ppe-picker">
-                  {RAMS_PPE_ITEMS.map((item) => (
-                    <label key={item.value} className="rams-check">
-                      <input
-                        type="checkbox"
-                        checked={Array.isArray(questions.ppe) && questions.ppe.includes(item.value)}
-                        onChange={() => updateMultiQuestion("ppe", item.value)}
-                      />
-                      <span className="rams-ppe-mini-icon">{item.icon}</span>
-                      {item.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <button className="primary-button rams-logic-launch" type="button" onClick={() => setRamsSetupOpen(true)}>
+                Edit RAMS setup
+              </button>
 
               <button className="ghost-button rams-logic-launch" type="button" onClick={() => window.location.assign("/rams/logic")}>
                 Open RAMS logic editor
@@ -4122,6 +4112,16 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <p><strong>Welfare:</strong> {renderEditable("welfare", questions.welfare)}</p>
                   <p><strong>Emergency:</strong> {renderEditable("emergency", questions.emergency)}</p>
                   <p><strong>Notes:</strong> {renderEditable("notes", questions.notes || "-")}</p>
+                </div>
+                <div className="rams-first-aid-section">
+                  <div>
+                    <h4>First Aid Facilities</h4>
+                    <p>{renderEditable("firstAidFacility", displayedFirstAidFacility)}</p>
+                  </div>
+                  <div>
+                    <h4>First Aid Box Location</h4>
+                    <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
+                  </div>
                 </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
@@ -4260,6 +4260,146 @@ function RamsPage({ currentUser, onLogout, notifications }) {
               </section>
             </main>
           </div>
+          {ramsSetupOpen ? (
+            <div className="modal-backdrop rams-setup-backdrop" role="dialog" aria-modal="true">
+              <div className="modal rams-setup-modal">
+                <div className="modal-head">
+                  <div>
+                    <span className="panel-kicker">RAMS setup</span>
+                    <h2>Build the RAMS options</h2>
+                    <p>Choose the job conditions, PPE and first aid details. The document updates behind this window.</p>
+                  </div>
+                  <button className="icon-button" type="button" onClick={() => setRamsSetupOpen(false)} aria-label="Close RAMS setup">
+                    X
+                  </button>
+                </div>
+
+                <div className="rams-setup-modal-body">
+                  <section className="rams-setup-card">
+                    <h3>Job Basics</h3>
+                    <div className="rams-setup-grid">
+                      {ramsLogic.optionGroups.map((group) => (
+                        group.input === "select" && !group.multi ? (
+                          <label key={group.key}>
+                            {group.label}
+                            <select value={questions[group.key] || ""} onChange={(event) => updateQuestion(group.key, event.target.value)}>
+                              {group.options.map((option) => (
+                                <option key={option.value} value={option.value}>{option.label}</option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <div key={group.key} className="rams-question-group">
+                            <span>{group.label}</span>
+                            <div className={group.multi ? "rams-check-grid" : "rams-option-stack"}>
+                              {group.options.map((option) => (
+                                group.multi ? (
+                                  <label key={option.value} className="rams-check">
+                                    <input
+                                      type="checkbox"
+                                      checked={Array.isArray(questions[group.key]) && questions[group.key].includes(option.value)}
+                                      onChange={() => updateMultiQuestion(group.key, option.value)}
+                                    />
+                                    {option.label}
+                                  </label>
+                                ) : (
+                                  <button
+                                    key={option.value}
+                                    className={`rams-choice ${questions[group.key] === option.value ? "active" : ""}`}
+                                    type="button"
+                                    onClick={() => updateQuestion(group.key, option.value)}
+                                  >
+                                    {option.label}
+                                  </button>
+                                )
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      ))}
+                      <label>
+                        Operatives
+                        <input value={questions.operatives} onChange={(event) => updateQuestion("operatives", event.target.value)} />
+                      </label>
+                      <label>
+                        Duration
+                        <input value={questions.duration} onChange={(event) => updateQuestion("duration", event.target.value)} />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="rams-setup-card">
+                    <h3>PPE Requirements</h3>
+                    <div className="rams-check-grid rams-ppe-picker">
+                      {RAMS_PPE_ITEMS.map((item) => (
+                        <label key={item.value} className="rams-check">
+                          <input
+                            type="checkbox"
+                            checked={Array.isArray(questions.ppe) && questions.ppe.includes(item.value)}
+                            onChange={() => updateMultiQuestion("ppe", item.value)}
+                          />
+                          <span className="rams-ppe-mini-icon">{item.icon}</span>
+                          {item.label}
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rams-setup-card">
+                    <h3>First Aid</h3>
+                    <div className="rams-first-aid-input-grid">
+                      <label>
+                        First Aid Facilities
+                        <select
+                          value={questions.firstAidFacility || ""}
+                          onChange={(event) => updateQuestion("firstAidFacility", event.target.value)}
+                        >
+                          <option value="">{loadingHospitals ? "Loading nearest hospitals..." : "Select nearest hospital"}</option>
+                          {hospitalOptions.map((hospital) => (
+                            <option key={hospital.id} value={hospital.label}>{hospital.label}</option>
+                          ))}
+                          {questions.firstAidFacility && !hospitalOptions.some((hospital) => hospital.label === questions.firstAidFacility) ? (
+                            <option value={questions.firstAidFacility}>{questions.firstAidFacility}</option>
+                          ) : null}
+                        </select>
+                        {hospitalLookupStatus ? <small>{hospitalLookupStatus}</small> : null}
+                      </label>
+                      <label>
+                        First Aid Box Location
+                        <input
+                          value={questions.firstAidBoxLocation || "Signs Express Van"}
+                          onChange={(event) => updateQuestion("firstAidBoxLocation", event.target.value)}
+                        />
+                      </label>
+                    </div>
+                  </section>
+
+                  <section className="rams-setup-card">
+                    <h3>Arrangements</h3>
+                    <div className="rams-setup-grid">
+                      <label>
+                        Welfare
+                        <textarea value={questions.welfare} onChange={(event) => updateQuestion("welfare", event.target.value)} />
+                      </label>
+                      <label>
+                        Emergency arrangements
+                        <textarea value={questions.emergency} onChange={(event) => updateQuestion("emergency", event.target.value)} />
+                      </label>
+                      <label className="rams-setup-wide">
+                        Extra notes
+                        <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
+                      </label>
+                    </div>
+                  </section>
+                </div>
+
+                <div className="modal-actions rams-setup-actions">
+                  <button className="ghost-button" type="button" onClick={() => setRamsSetupOpen(false)}>Close</button>
+                  <button className="primary-button" type="button" onClick={() => setRamsSetupOpen(false)}>Apply to RAMS</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>
