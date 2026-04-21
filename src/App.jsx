@@ -2624,6 +2624,309 @@ function ClientLandingPage({
   );
 }
 
+function RamsLogicPage({ currentUser, onLogout, notifications }) {
+  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
+  const [logicStatus, setLogicStatus] = useState("");
+
+  function updateRamsLogicDraft(updater) {
+    setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
+    setLogicStatus("");
+  }
+
+  function saveRamsLogicDraft() {
+    const nextLogic = normalizeRamsLogic(ramsLogicDraft);
+    setRamsLogicDraft(nextLogic);
+    saveRamsLogic(nextLogic);
+    setLogicStatus("RAMS logic saved.");
+  }
+
+  function restoreDefaultRamsLogic() {
+    const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+    setRamsLogicDraft(nextLogic);
+    saveRamsLogic(nextLogic);
+    setLogicStatus("Default RAMS logic restored.");
+  }
+
+  function addRamsOption(groupIndex) {
+    updateRamsLogicDraft((current) => {
+      const optionGroups = current.optionGroups.map((group, index) => {
+        if (index !== groupIndex) return group;
+        const nextIndex = group.options.length + 1;
+        return {
+          ...group,
+          options: [
+            ...group.options,
+            { value: `${group.key}-${Date.now()}`, label: `New option ${nextIndex}`, cardIds: [] }
+          ]
+        };
+      });
+      return { ...current, optionGroups };
+    });
+  }
+
+  function updateRamsOption(groupIndex, optionIndex, key, value) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        return {
+          ...group,
+          options: group.options.map((option, currentOptionIndex) =>
+            currentOptionIndex === optionIndex ? { ...option, [key]: value } : option
+          )
+        };
+      })
+    }));
+  }
+
+  function removeRamsOption(groupIndex, optionIndex) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) =>
+        currentGroupIndex === groupIndex
+          ? { ...group, options: group.options.filter((_, currentOptionIndex) => currentOptionIndex !== optionIndex) }
+          : group
+      )
+    }));
+  }
+
+  function toggleOptionCard(groupIndex, optionIndex, cardId) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        return {
+          ...group,
+          options: group.options.map((option, currentOptionIndex) => {
+            if (currentOptionIndex !== optionIndex) return option;
+            const cardIds = option.cardIds.includes(cardId)
+              ? option.cardIds.filter((entry) => entry !== cardId)
+              : [...option.cardIds, cardId];
+            return { ...option, cardIds };
+          })
+        };
+      })
+    }));
+  }
+
+  function addRamsCard() {
+    const cardId = `custom-${Date.now()}`;
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      cards: {
+        ...current.cards,
+        [cardId]: {
+          title: "New RAMS card",
+          type: "Risk",
+          trigger: "Custom",
+          initialRisk: "Medium",
+          residualRisk: "Low",
+          content: ["Write the control measure or method step here."]
+        }
+      }
+    }));
+  }
+
+  function updateRamsCard(cardId, key, value) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      cards: {
+        ...current.cards,
+        [cardId]: {
+          ...current.cards[cardId],
+          [key]: key === "content" ? String(value).split("\n").map((line) => line.trim()).filter(Boolean) : value
+        }
+      }
+    }));
+  }
+
+  function removeRamsCard(cardId) {
+    updateRamsLogicDraft((current) => {
+      const nextCards = { ...current.cards };
+      delete nextCards[cardId];
+      return {
+        ...current,
+        cards: nextCards,
+        baseCardIds: current.baseCardIds.filter((entry) => entry !== cardId),
+        optionGroups: current.optionGroups.map((group) => ({
+          ...group,
+          options: group.options.map((option) => ({
+            ...option,
+            cardIds: option.cardIds.filter((entry) => entry !== cardId)
+          }))
+        }))
+      };
+    });
+  }
+
+  function toggleBaseRamsCard(cardId) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      baseCardIds: current.baseCardIds.includes(cardId)
+        ? current.baseCardIds.filter((entry) => entry !== cardId)
+        : [...current.baseCardIds, cardId]
+    }));
+  }
+
+  return (
+    <div className="app-shell rams-shell rams-logic-shell">
+      <div className="page rams-page rams-logic-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="rams"
+          onLogout={onLogout}
+          notifications={notifications}
+        />
+
+        <section className="panel rams-panel rams-logic-full-panel">
+          <div className="rams-header rams-logic-full-header">
+            <div>
+              <span className="panel-kicker">Admin module</span>
+              <h2>RAMS Logic</h2>
+              <p>Edit the question buttons, link them to cards, and manage the RAMS card library.</p>
+            </div>
+            <div className="rams-logic-actions">
+              <button className="ghost-button" type="button" onClick={() => window.location.assign("/rams")}>
+                Back to RAMS
+              </button>
+              <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>
+                Restore defaults
+              </button>
+              <button className="primary-button" type="button" onClick={saveRamsLogicDraft}>
+                Save logic
+              </button>
+            </div>
+          </div>
+          {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
+
+          <div className="rams-logic-layout">
+            <section className="rams-logic-full-card">
+              <div className="rams-logic-heading">
+                <h3>Buttons and Triggers</h3>
+              </div>
+              <div className="rams-logic-options-grid">
+                {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
+                  <article key={group.key} className="rams-logic-card">
+                    <div className="rams-logic-card-head">
+                      <strong>{group.label}</strong>
+                      <span>{group.input}{group.multi ? " / multi-select" : ""}</span>
+                    </div>
+                    {group.options.map((option, optionIndex) => (
+                      <div key={`${group.key}-${option.value}-${optionIndex}`} className="rams-logic-option">
+                        <div className="rams-logic-option-fields">
+                          <label>
+                            Button text
+                            <input
+                              value={option.label}
+                              onChange={(event) => updateRamsOption(groupIndex, optionIndex, "label", event.target.value)}
+                            />
+                          </label>
+                          <label>
+                            Value
+                            <input
+                              value={option.value}
+                              onChange={(event) => updateRamsOption(groupIndex, optionIndex, "value", event.target.value)}
+                            />
+                          </label>
+                        </div>
+                        <div className="rams-card-link-list">
+                          {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
+                            <label key={`${group.key}-${option.value}-${cardId}`} className="rams-card-link">
+                              <input
+                                type="checkbox"
+                                checked={option.cardIds.includes(cardId)}
+                                onChange={() => toggleOptionCard(groupIndex, optionIndex, cardId)}
+                              />
+                              {card.title}
+                            </label>
+                          ))}
+                        </div>
+                        <button className="text-button danger" type="button" onClick={() => removeRamsOption(groupIndex, optionIndex)}>
+                          Remove option
+                        </button>
+                      </div>
+                    ))}
+                    <button className="ghost-button" type="button" onClick={() => addRamsOption(groupIndex)}>
+                      Add option
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="rams-logic-full-card">
+              <div className="rams-logic-heading">
+                <h3>Cards</h3>
+                <button className="ghost-button" type="button" onClick={addRamsCard}>Add card</button>
+              </div>
+              <div className="rams-logic-cards-grid">
+                {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
+                  <article key={cardId} className="rams-logic-card rams-logic-editor-card">
+                    <label className="rams-check">
+                      <input
+                        type="checkbox"
+                        checked={ramsLogicDraft.baseCardIds.includes(cardId)}
+                        onChange={() => toggleBaseRamsCard(cardId)}
+                      />
+                      Always include
+                    </label>
+                    <label>
+                      Card title
+                      <input value={card.title || ""} onChange={(event) => updateRamsCard(cardId, "title", event.target.value)} />
+                    </label>
+                    <div className="rams-logic-card-row">
+                      <label>
+                        Type
+                        <select value={card.type || "Risk"} onChange={(event) => updateRamsCard(cardId, "type", event.target.value)}>
+                          <option value="Risk">Risk</option>
+                          <option value="Method">Method</option>
+                          <option value="COSHH">COSHH</option>
+                        </select>
+                      </label>
+                      <label>
+                        Trigger
+                        <input value={card.trigger || ""} onChange={(event) => updateRamsCard(cardId, "trigger", event.target.value)} />
+                      </label>
+                    </div>
+                    <div className="rams-logic-card-row">
+                      <label>
+                        Initial risk
+                        <select value={card.initialRisk || "Medium"} onChange={(event) => updateRamsCard(cardId, "initialRisk", event.target.value)}>
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                        </select>
+                      </label>
+                      <label>
+                        Residual risk
+                        <select value={card.residualRisk || "Low"} onChange={(event) => updateRamsCard(cardId, "residualRisk", event.target.value)}>
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label>
+                      Content lines
+                      <textarea
+                        value={(Array.isArray(card.content) ? card.content : []).join("\n")}
+                        onChange={(event) => updateRamsCard(cardId, "content", event.target.value)}
+                      />
+                    </label>
+                    <button className="text-button danger" type="button" onClick={() => removeRamsCard(cardId)}>
+                      Delete card
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function RamsPage({ currentUser, onLogout, notifications }) {
   const [jobs, setJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -3024,106 +3327,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
               </label>
 
-              <details className="rams-logic-panel">
-                <summary>RAMS logic</summary>
-                <div className="rams-logic-actions">
-                  <button className="primary-button" type="button" onClick={saveRamsLogicDraft}>Save logic</button>
-                  <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>Restore defaults</button>
-                </div>
-                {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
-
-                <div className="rams-logic-section">
-                  <h4>Buttons and triggers</h4>
-                  {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
-                    <article key={group.key} className="rams-logic-card">
-                      <strong>{group.label}</strong>
-                      {group.options.map((option, optionIndex) => (
-                        <div key={`${group.key}-${option.value}-${optionIndex}`} className="rams-logic-option">
-                          <input
-                            value={option.label}
-                            onChange={(event) => updateRamsOption(groupIndex, optionIndex, "label", event.target.value)}
-                            aria-label={`${group.label} option label`}
-                          />
-                          <input
-                            value={option.value}
-                            onChange={(event) => updateRamsOption(groupIndex, optionIndex, "value", event.target.value)}
-                            aria-label={`${group.label} option value`}
-                          />
-                          <div className="rams-card-link-list">
-                            {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
-                              <label key={`${group.key}-${option.value}-${cardId}`} className="rams-card-link">
-                                <input
-                                  type="checkbox"
-                                  checked={option.cardIds.includes(cardId)}
-                                  onChange={() => toggleOptionCard(groupIndex, optionIndex, cardId)}
-                                />
-                                {card.title}
-                              </label>
-                            ))}
-                          </div>
-                          <button className="text-button danger" type="button" onClick={() => removeRamsOption(groupIndex, optionIndex)}>
-                            Remove option
-                          </button>
-                        </div>
-                      ))}
-                      <button className="ghost-button" type="button" onClick={() => addRamsOption(groupIndex)}>
-                        Add option
-                      </button>
-                    </article>
-                  ))}
-                </div>
-
-                <div className="rams-logic-section">
-                  <div className="rams-logic-heading">
-                    <h4>Cards</h4>
-                    <button className="ghost-button" type="button" onClick={addRamsCard}>Add card</button>
-                  </div>
-                  {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
-                    <article key={cardId} className="rams-logic-card">
-                      <label className="rams-check">
-                        <input
-                          type="checkbox"
-                          checked={ramsLogicDraft.baseCardIds.includes(cardId)}
-                          onChange={() => toggleBaseRamsCard(cardId)}
-                        />
-                        Always include
-                      </label>
-                      <input value={card.title || ""} onChange={(event) => updateRamsCard(cardId, "title", event.target.value)} />
-                      <select value={card.type || "Risk"} onChange={(event) => updateRamsCard(cardId, "type", event.target.value)}>
-                        <option value="Risk">Risk</option>
-                        <option value="Method">Method</option>
-                        <option value="COSHH">COSHH</option>
-                      </select>
-                      <input value={card.trigger || ""} onChange={(event) => updateRamsCard(cardId, "trigger", event.target.value)} />
-                      <div className="rams-mini-fields">
-                        <label>
-                          Initial
-                          <select value={card.initialRisk || "Medium"} onChange={(event) => updateRamsCard(cardId, "initialRisk", event.target.value)}>
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                          </select>
-                        </label>
-                        <label>
-                          Residual
-                          <select value={card.residualRisk || "Low"} onChange={(event) => updateRamsCard(cardId, "residualRisk", event.target.value)}>
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                          </select>
-                        </label>
-                      </div>
-                      <textarea
-                        value={(Array.isArray(card.content) ? card.content : []).join("\n")}
-                        onChange={(event) => updateRamsCard(cardId, "content", event.target.value)}
-                      />
-                      <button className="text-button danger" type="button" onClick={() => removeRamsCard(cardId)}>
-                        Delete card
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              </details>
+              <button className="ghost-button rams-logic-launch" type="button" onClick={() => window.location.assign("/rams/logic")}>
+                Open RAMS logic editor
+              </button>
             </aside>
 
             <main className="rams-main">
@@ -6975,6 +7181,7 @@ export default function App() {
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
+  const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
@@ -7061,7 +7268,8 @@ export default function App() {
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
-  const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute);
+  const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
+  const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
@@ -7403,7 +7611,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -9073,6 +9281,16 @@ export default function App() {
   if (showVanEstimator) {
     return (
       <VinylEstimatorPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showRamsLogic) {
+    return (
+      <RamsLogicPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}

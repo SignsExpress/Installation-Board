@@ -129,6 +129,126 @@
   padding: 7px;
 }
 
+.rams-logic-launch {
+  width: 100%;
+}
+
+.rams-logic-page {
+  max-width: 1900px;
+}
+
+.rams-logic-shell .app-shell,
+.rams-logic-shell {
+  min-height: 100vh;
+}
+
+.rams-logic-full-panel {
+  min-height: calc(100vh - 132px);
+}
+
+.rams-logic-full-header {
+  align-items: center;
+}
+
+.rams-logic-full-header h2 {
+  margin: 0;
+}
+
+.rams-logic-full-header .rams-logic-actions {
+  margin-top: 0;
+}
+
+.rams-logic-layout {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.9fr) minmax(620px, 1.25fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.rams-logic-full-card {
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.rams-logic-full-card .rams-logic-heading {
+  margin-top: 0;
+}
+
+.rams-logic-full-card .rams-logic-heading h3 {
+  margin: 0;
+}
+
+.rams-logic-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.rams-logic-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.rams-logic-full-card .rams-logic-card {
+  padding: 12px;
+}
+
+.rams-logic-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.rams-logic-card-head span {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rams-logic-option-fields,
+.rams-logic-card-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: 8px;
+}
+
+.rams-logic-full-card input,
+.rams-logic-full-card select,
+.rams-logic-full-card textarea {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  padding: 8px 10px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.rams-logic-full-card textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.rams-logic-full-card label {
+  display: grid;
+  gap: 5px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.rams-logic-full-card .rams-card-link-list {
+  max-height: 220px;
+}
+
+.rams-logic-editor-card {
+  align-content: start;
+}
+
 .rams-logic-panel summary {
   color: #4f365f;
   cursor: pointer;
