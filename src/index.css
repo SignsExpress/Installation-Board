@@ -228,8 +228,18 @@
 .rams-setup-modal-body {
   overflow: auto;
   display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  align-items: start;
   gap: 10px;
   padding-right: 4px;
+}
+
+.rams-setup-modal-body .rams-setup-card:first-child {
+  grid-row: span 2;
+}
+
+.rams-setup-modal-body .rams-setup-card:nth-child(4) {
+  grid-column: 1 / -1;
 }
 
 .rams-setup-card {
@@ -249,9 +259,13 @@
 .rams-setup-grid,
 .rams-first-aid-input-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   align-items: start;
+}
+
+.rams-first-aid-input-grid {
+  grid-template-columns: 1fr;
 }
 
 .rams-setup-card label,
@@ -275,6 +289,46 @@
   font-size: 0.86rem;
 }
 
+.rams-setup-card .rams-check-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 7px;
+}
+
+.rams-setup-card .rams-check {
+  display: flex !important;
+  min-height: 42px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px !important;
+  padding: 7px 9px;
+  color: #1f2937;
+  font-size: 0.82rem;
+  line-height: 1.18;
+  cursor: pointer;
+}
+
+.rams-setup-card .rams-check:has(input:checked) {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
+}
+
+.rams-setup-card .rams-check input {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+}
+
+.rams-setup-card .rams-ppe-picker {
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+}
+
+.rams-setup-card .rams-ppe-picker .rams-check {
+  min-height: 44px;
+  padding: 7px 8px;
+}
+
 .rams-setup-card textarea {
   min-height: 72px;
   resize: vertical;
@@ -294,6 +348,22 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .rams-setup-modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .rams-setup-modal-body .rams-setup-card:first-child,
+  .rams-setup-modal-body .rams-setup-card:nth-child(4) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .rams-setup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .rams-logic-panel {
