@@ -235,11 +235,22 @@
 }
 
 .rams-setup-modal-body .rams-setup-card:first-child {
-  grid-row: span 2;
+  grid-column: 1 / -1;
 }
 
-.rams-setup-modal-body .rams-setup-card:nth-child(4) {
+.rams-access-tools-card {
   grid-column: 1 / -1;
+}
+
+.rams-access-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.rams-site-hazards-card textarea {
+  min-height: 118px;
 }
 
 .rams-setup-card {
@@ -356,12 +367,13 @@
   }
 
   .rams-setup-modal-body .rams-setup-card:first-child,
-  .rams-setup-modal-body .rams-setup-card:nth-child(4) {
+  .rams-access-tools-card {
     grid-column: auto;
     grid-row: auto;
   }
 
-  .rams-setup-grid {
+  .rams-setup-grid,
+  .rams-access-tools-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1356,6 +1368,39 @@
   gap: 6px;
 }
 
+.rams-method-prep-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.rams-method-prep-grid > div {
+  border: 1px solid #bfdbfe;
+  border-left: 5px solid #2563eb;
+  border-radius: 8px;
+  background: #eff6ff;
+  padding: 7px 9px;
+  display: grid;
+  gap: 5px;
+}
+
+.rams-method-prep-grid h5,
+.rams-method-prep-grid p {
+  margin: 0;
+}
+
+.rams-method-prep-grid h5 {
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rams-method-prep-grid p {
+  font-size: 0.82rem;
+  line-height: 1.24;
+}
+
 .rams-first-aid-section > div {
   border: 1px solid #dbe3ef;
   border-left: 5px solid #16a34a;
@@ -1430,6 +1475,12 @@
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.client-rams-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .rams-doc-section {
@@ -1830,6 +1881,29 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
+  }
+
+  .rams-method-prep-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.4mm !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-method-prep-grid > div {
+    background: #eff6ff !important;
+    border-color: #bfdbfe !important;
+    box-shadow: inset 1mm 0 0 #2563eb !important;
+    padding: 1.5mm 2mm !important;
+  }
+
+  .rams-method-prep-grid h5 {
+    color: #1d4ed8 !important;
+    font-size: 6.8pt !important;
+  }
+
+  .rams-method-prep-grid p {
+    font-size: 7.2pt !important;
+    line-height: 1.14 !important;
   }
 
   .rams-first-aid-section > div {

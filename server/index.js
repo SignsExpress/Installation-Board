@@ -111,6 +111,16 @@ async function ensureJobUploadsDir() {
   return directory;
 }
 
+function getRamsUploadsDir() {
+  return path.join(path.dirname(getDataFile()), "rams-pdfs");
+}
+
+async function ensureRamsUploadsDir() {
+  const directory = getRamsUploadsDir();
+  await fsp.mkdir(directory, { recursive: true });
+  return directory;
+}
+
 function parseCookies(headerValue) {
   return String(headerValue || "")
     .split(";")
@@ -1011,11 +1021,16 @@ function getDistanceKmBetween(left, right) {
 }
 
 function formatHospitalAddress(tags = {}) {
+  const explicit = String(tags["addr:full"] || tags.address || tags["contact:address"] || "").trim();
+  if (explicit) return explicit;
   return [
     tags["addr:housename"],
     tags["addr:housenumber"],
     tags["addr:street"],
+    tags["addr:place"],
+    tags["addr:suburb"],
     tags["addr:city"],
+    tags["addr:county"],
     tags["addr:postcode"]
   ].filter(Boolean).join(", ");
 }
@@ -1359,6 +1374,9 @@ function sanitizeRamsDocument(payload = {}) {
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: String(payload.updatedAt || new Date().toISOString()),
     createdByName: String(payload.createdByName || "").trim(),
+    pdfStorageName: String(payload.pdfStorageName || "").trim(),
+    pdfFileName: String(payload.pdfFileName || "").trim(),
+    pdfSize: Math.max(0, Number(payload.pdfSize) || 0),
     questions: payload.questions && typeof payload.questions === "object" ? payload.questions : {},
     cardOrder: Array.isArray(payload.cardOrder) ? payload.cardOrder.map(String).filter(Boolean) : [],
     edits: payload.edits && typeof payload.edits === "object" ? payload.edits : {}
@@ -1372,6 +1390,12 @@ function toPublicJob(job) {
     photos: normalized.photos.map((photo) => ({
       ...photo,
       url: `/api/jobs/${encodeURIComponent(normalized.id)}/photos/${encodeURIComponent(photo.id)}`
+    })),
+    ramsDocuments: normalized.ramsDocuments.map((document) => ({
+      ...document,
+      pdfUrl: document.pdfStorageName
+        ? `/api/jobs/${encodeURIComponent(normalized.id)}/rams/${encodeURIComponent(document.id)}/pdf`
+        : ""
     }))
   };
 }
@@ -1423,6 +1447,170 @@ function formatJobDateForPdf(value) {
     year: "numeric",
     timeZone: TIME_ZONE
   }).format(parsed);
+}
+
+function sanitizePdfLine(value, fallback = "-") {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text || fallback;
+}
+
+function buildSimpleTextPdf(title, lines = []) {
+  const pageWidth = 595.28;
+  const pageHeight = 841.89;
+  const margin = 42;
+  const bottomMargin = 42;
+  const lineHeight = 12;
+  const objects = [];
+  const pages = [];
+  let currentLines = [];
+  let y = pageHeight - margin;
+
+  function addObject(body) {
+    objects.push(body);
+    return objects.length;
+  }
+
+  function makeStream(bodyText) {
+    const content = Buffer.from(String(bodyText || ""), "utf8");
+    return Buffer.concat([
+      Buffer.from(`<< /Length ${content.length} >>\nstream\n`, "utf8"),
+      content,
+      Buffer.from("\nendstream", "utf8")
+    ]);
+  }
+
+  function addPage() {
+    pages.push(currentLines);
+    currentLines = [];
+    y = pageHeight - margin;
+  }
+
+  function writeLine(text, options = {}) {
+    const size = options.size || 9;
+    const font = options.bold ? "F2" : "F1";
+    const gap = options.gap ?? 3;
+    const maxLength = options.maxLength || (size >= 13 ? 60 : 88);
+    const segments = wrapPdfText(text, maxLength);
+    segments.forEach((segment) => {
+      if (y < bottomMargin) addPage();
+      currentLines.push({ text: segment, x: margin + (options.indent || 0), y, size, font });
+      y -= lineHeight;
+    });
+    y -= gap;
+  }
+
+  writeLine(title || "RAMS Document", { bold: true, size: 16, gap: 8, maxLength: 58 });
+  lines.forEach((line) => {
+    if (line === "__GAP__") {
+      y -= 8;
+      return;
+    }
+    if (typeof line === "string") {
+      writeLine(line);
+      return;
+    }
+    writeLine(line.text, line);
+  });
+  if (currentLines.length) addPage();
+
+  const pagesId = addObject("");
+  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  const fontRegularId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+  const fontBoldId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>");
+  const pageIds = [];
+
+  pages.forEach((pageLines, pageIndex) => {
+    const commands = [
+      "BT",
+      "/F2 8 Tf",
+      `${pageWidth - margin - 122} ${pageHeight - margin + 10} Td`,
+      "(SX SIGNS EXPRESS) Tj",
+      "ET"
+    ];
+    pageLines.forEach((line) => {
+      commands.push("BT");
+      commands.push(`/${line.font} ${line.size} Tf`);
+      commands.push(`${line.x} ${line.y} Td`);
+      commands.push(`(${escapePdfText(line.text)}) Tj`);
+      commands.push("ET");
+    });
+    commands.push("BT");
+    commands.push("/F1 7 Tf");
+    commands.push(`${pageWidth - margin - 45} ${bottomMargin - 20} Td`);
+    commands.push(`(Page ${pageIndex + 1} of ${pages.length}) Tj`);
+    commands.push("ET");
+    const contentId = addObject(makeStream(commands.join("\n")));
+    const pageId = addObject(
+      `<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`
+    );
+    pageIds.push(pageId);
+  });
+
+  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
+
+  const chunks = [Buffer.from("%PDF-1.4\n", "utf8")];
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.concat(chunks).length);
+    chunks.push(Buffer.from(`${index + 1} 0 obj\n`, "utf8"));
+    chunks.push(Buffer.isBuffer(object) ? object : Buffer.from(String(object), "utf8"));
+    chunks.push(Buffer.from("\nendobj\n", "utf8"));
+  });
+  const xrefOffset = Buffer.concat(chunks).length;
+  chunks.push(Buffer.from(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`, "utf8"));
+  offsets.slice(1).forEach((offset) => {
+    chunks.push(Buffer.from(`${String(offset).padStart(10, "0")} 00000 n \n`, "utf8"));
+  });
+  chunks.push(Buffer.from(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`, "utf8"));
+  return Buffer.concat(chunks);
+}
+
+function buildRamsPdfDocument(job, document, payload = {}) {
+  const lines = [];
+  const meta = Array.isArray(payload.meta) ? payload.meta : [];
+  const site = Array.isArray(payload.site) ? payload.site : [];
+  const arrangements = Array.isArray(payload.arrangements) ? payload.arrangements : [];
+  const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
+  const tools = Array.isArray(payload.tools) ? payload.tools : [];
+  const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
+  const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
+  const risks = Array.isArray(payload.risks) ? payload.risks : [];
+  const methods = Array.isArray(payload.methods) ? payload.methods : [];
+
+  lines.push({ text: `Reference: ${sanitizePdfLine(document.reference || payload.reference || job.orderReference)}`, bold: true, size: 10 });
+  meta.forEach((item) => lines.push(`${sanitizePdfLine(item.label)}: ${sanitizePdfLine(item.value)}`));
+  lines.push("__GAP__");
+  lines.push({ text: "Site Details", bold: true, size: 12 });
+  site.forEach((item) => lines.push(`${sanitizePdfLine(item.label)}: ${sanitizePdfLine(item.value)}`));
+  lines.push("__GAP__");
+  lines.push({ text: "Access, Tools and PPE", bold: true, size: 12 });
+  lines.push(`Tools: ${tools.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
+  lines.push(`Access: ${accessMethods.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
+  lines.push(`PPE: ${ppe.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
+  lines.push(`First Aid Facilities: ${sanitizePdfLine(firstAid.facility)}`);
+  lines.push(`First Aid Box Location: ${sanitizePdfLine(firstAid.boxLocation || "Signs Express Van")}`);
+  lines.push("__GAP__");
+  lines.push({ text: "Arrangements", bold: true, size: 12 });
+  arrangements.forEach((item) => lines.push(`${sanitizePdfLine(item.label)}: ${sanitizePdfLine(item.value)}`));
+  lines.push("__GAP__");
+  lines.push({ text: "Risk Assessment", bold: true, size: 12 });
+  risks.forEach((risk) => {
+    lines.push({ text: sanitizePdfLine(risk.title), bold: true, size: 10 });
+    lines.push(`Who may be harmed: ${sanitizePdfLine(risk.whoAtRisk)}`);
+    lines.push(`Initial L/C/R: ${sanitizePdfLine(risk.initialL)}/${sanitizePdfLine(risk.initialC)}/${sanitizePdfLine(risk.initialR)}   Residual L/C/R: ${sanitizePdfLine(risk.residualL)}/${sanitizePdfLine(risk.residualC)}/${sanitizePdfLine(risk.residualR)}   Risk: ${sanitizePdfLine(risk.risk)}`);
+    lines.push(`Responsibility: ${sanitizePdfLine(risk.responsibility)}`);
+    (Array.isArray(risk.controls) ? risk.controls : []).forEach((control) => lines.push({ text: `- ${sanitizePdfLine(control, "")}`, indent: 12 }));
+    lines.push("__GAP__");
+  });
+  lines.push({ text: "Method Statement", bold: true, size: 12 });
+  methods.forEach((method) => {
+    lines.push({ text: sanitizePdfLine(method.title), bold: true, size: 10 });
+    (Array.isArray(method.lines) ? method.lines : []).forEach((line) => lines.push({ text: `- ${sanitizePdfLine(line, "")}`, indent: 12 }));
+    lines.push("__GAP__");
+  });
+
+  return buildSimpleTextPdf(payload.title || "Risk Assessment and Method Statement", lines);
 }
 
 function parseJpegDimensions(buffer) {
@@ -1717,6 +1905,26 @@ async function deleteJobPhotoFiles(job) {
         } catch (error) {
           if (error?.code !== "ENOENT") {
             console.error(`Could not remove photo file ${storageName}.`, error);
+          }
+        }
+      })
+  );
+}
+
+async function deleteRamsPdfFiles(job) {
+  const documents = Array.isArray(job?.ramsDocuments) ? job.ramsDocuments : [];
+  if (!documents.length) return;
+  const uploadDir = getRamsUploadsDir();
+  await Promise.all(
+    documents
+      .map((document) => String(document?.pdfStorageName || "").trim())
+      .filter(Boolean)
+      .map(async (storageName) => {
+        try {
+          await fsp.unlink(path.join(uploadDir, storageName));
+        } catch (error) {
+          if (error?.code !== "ENOENT") {
+            console.error("Could not delete RAMS PDF.", error);
           }
         }
       })
@@ -4419,6 +4627,17 @@ app.get("/api/corebridge/orders", async (request, response) => {
       createdByName: existingRams?.createdByName || incoming.createdByName || request.user?.displayName || "",
       updatedAt: new Date().toISOString()
     });
+    try {
+      const pdfBuffer = buildRamsPdfDocument(existing, nextDocument, request.body?.pdf || {});
+      const storageName = `${String(request.params.id || "").trim()}-${nextDocument.id}.pdf`;
+      const uploadDir = await ensureRamsUploadsDir();
+      await fsp.writeFile(path.join(uploadDir, storageName), pdfBuffer);
+      nextDocument.pdfStorageName = storageName;
+      nextDocument.pdfFileName = `${nextDocument.reference || "RAMS"}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
+      nextDocument.pdfSize = pdfBuffer.length;
+    } catch (error) {
+      console.error("Could not generate RAMS PDF.", error);
+    }
     const ramsDocuments = existing.ramsDocuments.some((entry) => String(entry.id || "") === String(nextDocument.id || ""))
       ? existing.ramsDocuments.map((entry) => String(entry.id || "") === String(nextDocument.id || "") ? nextDocument : entry)
       : [nextDocument, ...existing.ramsDocuments];
@@ -4435,6 +4654,64 @@ app.get("/api/corebridge/orders", async (request, response) => {
       board: buildBoardRowsFromStore(savedStore),
       job: toPublicJob(nextJob),
       ramsDocument: nextDocument
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.get("/api/jobs/:jobId/rams/:ramsId/pdf", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    const job = store.jobs.find((entry) => String(entry.id || "") === String(request.params.jobId || ""));
+    const document = Array.isArray(job?.ramsDocuments)
+      ? job.ramsDocuments.map(sanitizeRamsDocument).find((entry) => String(entry.id || "") === String(request.params.ramsId || ""))
+      : null;
+    if (!job || !document?.pdfStorageName) {
+      response.status(404).json({ error: "RAMS PDF not found." });
+      return;
+    }
+    const filePath = path.join(getRamsUploadsDir(), document.pdfStorageName);
+    if (!fs.existsSync(filePath)) {
+      response.status(404).json({ error: "RAMS PDF file not found." });
+      return;
+    }
+    response.setHeader("Content-Type", "application/pdf");
+    response.setHeader("Content-Disposition", `inline; filename="${(document.pdfFileName || "RAMS.pdf").replace(/"/g, "")}"`);
+    fs.createReadStream(filePath).pipe(response);
+  });
+
+  app.delete("/api/jobs/:jobId/rams/:ramsId", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((entry) => String(entry.id || "") === String(request.params.jobId || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+    const existing = sanitizeJob(store.jobs[index]);
+    const document = existing.ramsDocuments.find((entry) => String(entry.id || "") === String(request.params.ramsId || ""));
+    if (!document) {
+      response.status(404).json({ error: "RAMS document not found." });
+      return;
+    }
+    if (document.pdfStorageName) {
+      try {
+        await fsp.unlink(path.join(getRamsUploadsDir(), document.pdfStorageName));
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+      }
+    }
+    const nextJob = sanitizeJob({
+      ...existing,
+      ramsDocuments: existing.ramsDocuments.filter((entry) => String(entry.id || "") !== String(request.params.ramsId || ""))
+    });
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob)
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
@@ -4766,6 +5043,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
     store.jobs = store.jobs.filter((job) => job.id !== request.params.id);
     if (removedJob) {
       await deleteJobPhotoFiles(removedJob);
+      await deleteRamsPdfFiles(removedJob);
     }
     const savedStore = await writeStore(store);
     const payload = {

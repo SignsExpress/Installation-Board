@@ -115,7 +115,7 @@ const RAMS_TOOL_OPTIONS = [
 const RAMS_DEFAULT_QUESTIONS = {
   jobId: "",
   activity: "external",
-  access: "ground",
+  access: ["ground"],
   workArea: "quiet",
   tools: ["hand-tools"],
   operatives: "2",
@@ -698,8 +698,8 @@ const RAMS_DEFAULT_LOGIC = {
     {
       key: "access",
       label: "Access method",
-      input: "select",
-      multi: false,
+      input: "checkboxes",
+      multi: true,
       options: RAMS_ACCESS_OPTIONS.map((option) => ({
         ...option,
         cardIds:
@@ -1548,9 +1548,15 @@ function formatRamsCreatedDate(value) {
 }
 
 function normalizeRamsQuestions(questions) {
+  const access = Array.isArray(questions?.access)
+    ? questions.access
+    : questions?.access
+      ? [questions.access]
+      : RAMS_DEFAULT_QUESTIONS.access;
   return {
     ...RAMS_DEFAULT_QUESTIONS,
     ...questions,
+    access,
     tools: Array.isArray(questions?.tools) && questions.tools.length ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools,
     ppe: Array.isArray(questions?.ppe) ? questions.ppe : RAMS_DEFAULT_QUESTIONS.ppe
   };
@@ -1617,11 +1623,12 @@ function normalizeRamsLogic(logic = {}) {
   return {
     optionGroups: incomingGroups.map((group, groupIndex) => {
       const fallback = defaultGroups[groupIndex] || {};
+      const key = String(group.key || fallback.key || `group-${groupIndex}`);
       return {
-        key: String(group.key || fallback.key || `group-${groupIndex}`),
+        key,
         label: String(group.label || fallback.label || "Question"),
-        input: ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
-        multi: Boolean(group.multi ?? fallback.multi),
+        input: key === "access" ? "checkboxes" : ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
+        multi: key === "access" ? true : Boolean(group.multi ?? fallback.multi),
         options: (Array.isArray(group.options) ? group.options : []).map((option, optionIndex) => ({
           value: String(option.value || `option-${optionIndex}`),
           label: String(option.label || option.value || "Option"),
@@ -1933,10 +1940,14 @@ function renderJobCardContent({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                if (isClientMode && latestRams.pdfUrl) {
+                  window.open(latestRams.pdfUrl, "_blank", "noopener,noreferrer");
+                } else {
+                  window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                }
               }}
             >
-              RAMS saved
+              {isClientMode && latestRams.pdfUrl ? "RAMS PDF" : "RAMS saved"}
             </button>
           ) : null}
           {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
@@ -1970,16 +1981,23 @@ function renderJobCardContent({
                     Edit
                   </button>
                   {latestRams ? (
-                    <button
-                      className="text-button"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
-                      }}
-                    >
-                      Open RAMS
-                    </button>
+                    <>
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                        }}
+                      >
+                        Open RAMS
+                      </button>
+                      {latestRams.pdfUrl ? (
+                        <a className="text-button" href={latestRams.pdfUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                          PDF
+                        </a>
+                      ) : null}
+                    </>
                   ) : null}
                   <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
                     Delete
@@ -3712,7 +3730,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
       return;
     }
     setSavedRamsId(savedDocument.id || "");
-    setQuestions((current) => ({
+    setQuestions((current) => normalizeRamsQuestions({
       ...current,
       ...(savedDocument.questions || {}),
       jobId: String(selectedJob.id || "")
@@ -3960,7 +3978,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
         createdAt: existingDocument?.createdAt || new Date().toISOString(),
         questions,
         cardOrder,
-        edits: ramsEdits
+        edits: ramsEdits,
+        pdf: buildCurrentRamsPdfPayload()
       };
       const response = await fetch(`/api/jobs/${encodeURIComponent(selectedJob.id)}/rams`, {
         method: "POST",
@@ -3986,9 +4005,12 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const methodCards = selectedCards.filter((card) => card.type === "Method");
   const riskCards = selectedCards.filter((card) => card.type !== "Method");
   const selectedActivity = ramsLogic.optionGroups.find((group) => group.key === "activity")?.options.find((option) => option.value === questions.activity)?.label || questions.activity;
-  const selectedAccess = ramsLogic.optionGroups.find((group) => group.key === "access")?.options.find((option) => option.value === questions.access)?.label || questions.access;
+  const selectedAccessValues = Array.isArray(questions.access) ? questions.access : questions.access ? [questions.access] : [];
+  const selectedAccess = (ramsLogic.optionGroups.find((group) => group.key === "access")?.options || [])
+    .filter((option) => selectedAccessValues.includes(option.value))
+    .map((option) => option.label);
   const selectedWorkArea = ramsLogic.optionGroups.find((group) => group.key === "workArea")?.options.find((option) => option.value === questions.workArea)?.label || questions.workArea;
-  const selectedTools = (ramsLogic.optionGroups.find((group) => group.key === "tools")?.options || []).filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
+  const selectedTools = (ramsLogic.optionGroups.find((group) => group.key === "tools")?.options || []).filter((option) => (Array.isArray(questions.tools) ? questions.tools : []).includes(option.value)).map((option) => option.label);
   const selectedPpe = RAMS_PPE_ITEMS.filter((item) => (Array.isArray(questions.ppe) ? questions.ppe : []).includes(item.value));
   const activeSavedRams = Array.isArray(selectedJob?.ramsDocuments)
     ? selectedJob.ramsDocuments.find((entry) => String(entry.id || "") === String(savedRamsId || ""))
@@ -3999,11 +4021,99 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const displayedDuration = getRamsEdit("duration", questions.duration);
   const displayedInstallers = getRamsEdit("installers", selectedJob ? getInstallerNamesForRams(selectedJob) : "To be allocated");
   const displayedActivity = getRamsEdit("activity", selectedActivity);
-  const displayedAccess = getRamsEdit("access", selectedAccess);
+  const displayedAccess = getRamsEdit("access", selectedAccess.join(", "));
   const displayedWorkArea = getRamsEdit("workArea", selectedWorkArea);
   const displayedTools = getRamsEdit("tools", selectedTools.join(", "));
   const displayedFirstAidFacility = getRamsEdit("firstAidFacility", questions.firstAidFacility || "To be selected");
   const displayedFirstAidBoxLocation = getRamsEdit("firstAidBoxLocation", questions.firstAidBoxLocation || "Signs Express Van");
+  const activityGroup = ramsLogic.optionGroups.find((group) => group.key === "activity");
+  const workAreaGroup = ramsLogic.optionGroups.find((group) => group.key === "workArea");
+  const toolsGroup = ramsLogic.optionGroups.find((group) => group.key === "tools");
+  const accessGroup = ramsLogic.optionGroups.find((group) => group.key === "access");
+
+  function buildCurrentRamsPdfPayload() {
+    return {
+      title: "Risk Assessment and Method Statement",
+      reference: getRamsEdit("reference", ramsReference),
+      meta: [
+        { label: "Installation date", value: displayedInstallDate },
+        { label: "RAMS created", value: displayedCreatedDate },
+        { label: "Operatives", value: displayedOperatives },
+        { label: "Duration", value: displayedDuration },
+        { label: "Installers", value: displayedInstallers },
+        { label: "Activity", value: displayedActivity },
+        { label: "Work area", value: displayedWorkArea }
+      ],
+      site: [
+        { label: "Customer", value: getRamsEdit("customerName", selectedJob?.customerName || "-") },
+        { label: "Site address", value: getRamsEdit("siteAddress", selectedJob ? getRamsJobAddress(selectedJob) : "-") },
+        { label: "Contact name", value: getRamsEdit("contactName", selectedJob?.contact || "-") },
+        { label: "Contact number", value: getRamsEdit("contactNumber", selectedJob?.number || "-") },
+        { label: "Scope", value: getRamsEdit("scope", selectedJob?.description || selectedActivity) }
+      ],
+      arrangements: [
+        { label: "Welfare", value: getRamsEdit("welfare", questions.welfare) },
+        { label: "Emergency", value: getRamsEdit("emergency", questions.emergency) },
+        { label: "Site specific hazards or information", value: getRamsEdit("notes", questions.notes || "-") }
+      ],
+      tools: selectedTools,
+      accessMethods: selectedAccess,
+      ppe: selectedPpe.map((item) => item.label),
+      firstAid: {
+        facility: displayedFirstAidFacility,
+        boxLocation: displayedFirstAidBoxLocation
+      },
+      risks: riskCards.map((card) => {
+        const initial = getRamsLcr(card, "initial");
+        const residual = getRamsLcr(card, "residual");
+        const riskBand = getRamsRiskBand(residual.rating);
+        const controlLines = String(card.controlMeasure || (Array.isArray(card.content) ? card.content.join("\n") : "")).split("\n").filter(Boolean);
+        const responsibility = !card.responsibility || card.responsibility === "Matt Carroll" || card.responsibility === "Installers from selected job"
+          ? displayedInstallers
+          : card.responsibility;
+        return {
+          title: getRamsEdit(`risk-${card.id}-title`, card.title),
+          whoAtRisk: getRamsEdit(`risk-${card.id}-harmed`, card.whoAtRisk || "Employees\nThird parties"),
+          initialL: getRamsEdit(`risk-${card.id}-initial-l`, initial.likelihood),
+          initialC: getRamsEdit(`risk-${card.id}-initial-c`, initial.consequence),
+          initialR: initial.rating,
+          residualL: getRamsEdit(`risk-${card.id}-residual-l`, residual.likelihood),
+          residualC: getRamsEdit(`risk-${card.id}-residual-c`, residual.consequence),
+          residualR: residual.rating,
+          risk: riskBand.code,
+          responsibility: getRamsEdit(`risk-${card.id}-responsibility`, responsibility),
+          controls: controlLines.map((line, lineIndex) => getRamsEdit(`risk-${card.id}-control-${lineIndex}`, line))
+        };
+      }),
+      methods: methodCards.map((card) => ({
+        title: getRamsEdit(`method-${card.id}-title`, card.title),
+        lines: card.content.map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
+      }))
+    };
+  }
+
+  async function deleteSavedRams() {
+    if (!selectedJob || !savedRamsId) return;
+    if (!window.confirm("Remove this saved RAMS document from the installation job?")) return;
+    try {
+      setSavingRams(true);
+      setSaveStatus("");
+      const response = await fetch(`/api/jobs/${encodeURIComponent(selectedJob.id)}/rams/${encodeURIComponent(savedRamsId)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not remove RAMS.");
+      if (Array.isArray(payload.jobs)) setJobs(payload.jobs.filter((job) => String(job.date || "") >= todayIso || String(job.id || "") === String(selectedJob.id || "")));
+      setSavedRamsId("");
+      setRamsEdits({});
+      setSaveStatus("RAMS removed from this installation job.");
+    } catch (error) {
+      console.error(error);
+      setSaveStatus(error.message || "Could not remove RAMS.");
+    } finally {
+      setSavingRams(false);
+    }
+  }
 
   return (
     <div className="app-shell rams-shell">
@@ -4026,9 +4136,19 @@ function RamsPage({ currentUser, onLogout, notifications }) {
               <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
                 Print / Save PDF
               </button>
+              {activeSavedRams?.pdfUrl ? (
+                <a className="ghost-button" href={activeSavedRams.pdfUrl} target="_blank" rel="noreferrer">
+                  Open fitter PDF
+                </a>
+              ) : null}
               <button className="ghost-button" type="button" onClick={saveCurrentRams} disabled={!selectedJob || savingRams}>
                 {savingRams ? "Saving..." : savedRamsId ? "Save RAMS changes" : "Save RAMS to job"}
               </button>
+              {savedRamsId ? (
+                <button className="text-button danger" type="button" onClick={deleteSavedRams} disabled={savingRams}>
+                  Remove RAMS
+                </button>
+              ) : null}
             </div>
           </div>
 
@@ -4064,7 +4184,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
               </label>
               <div className="rams-setup-summary">
                 <span><strong>Work:</strong> {selectedActivity}</span>
-                <span><strong>Access:</strong> {selectedAccess}</span>
+                <span><strong>Access:</strong> {selectedAccess.join(", ") || "None selected"}</span>
                 <span><strong>Area:</strong> {selectedWorkArea}</span>
                 <span><strong>PPE:</strong> {selectedPpe.length} selected</span>
                 <span><strong>First aid:</strong> {questions.firstAidFacility || "To be selected"}</span>
@@ -4111,7 +4231,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <h4>Arrangements</h4>
                   <p><strong>Welfare:</strong> {renderEditable("welfare", questions.welfare)}</p>
                   <p><strong>Emergency:</strong> {renderEditable("emergency", questions.emergency)}</p>
-                  <p><strong>Notes:</strong> {renderEditable("notes", questions.notes || "-")}</p>
+                  <p><strong>Site specific hazards or information:</strong> {renderEditable("notes", questions.notes || "-")}</p>
                 </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
@@ -4200,6 +4320,16 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
+                  <div className="rams-method-prep-grid">
+                    <div>
+                      <h5>Tools</h5>
+                      <p>{renderEditable("tools", displayedTools || "-")}</p>
+                    </div>
+                    <div>
+                      <h5>Access Methods</h5>
+                      <p>{renderEditable("access", displayedAccess || "-")}</p>
+                    </div>
+                  </div>
                   {selectedPpe.length ? (
                     <div className="rams-ppe-section">
                       <h5>PPE Required</h5>
@@ -4278,45 +4408,26 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <section className="rams-setup-card">
                     <h3>Job Basics</h3>
                     <div className="rams-setup-grid">
-                      {ramsLogic.optionGroups.map((group) => (
-                        group.input === "select" && !group.multi ? (
-                          <label key={group.key}>
-                            {group.label}
-                            <select value={questions[group.key] || ""} onChange={(event) => updateQuestion(group.key, event.target.value)}>
-                              {group.options.map((option) => (
-                                <option key={option.value} value={option.value}>{option.label}</option>
-                              ))}
-                            </select>
-                          </label>
-                        ) : (
-                          <div key={group.key} className="rams-question-group">
-                            <span>{group.label}</span>
-                            <div className={group.multi ? "rams-check-grid" : "rams-option-stack"}>
-                              {group.options.map((option) => (
-                                group.multi ? (
-                                  <label key={option.value} className="rams-check">
-                                    <input
-                                      type="checkbox"
-                                      checked={Array.isArray(questions[group.key]) && questions[group.key].includes(option.value)}
-                                      onChange={() => updateMultiQuestion(group.key, option.value)}
-                                    />
-                                    {option.label}
-                                  </label>
-                                ) : (
-                                  <button
-                                    key={option.value}
-                                    className={`rams-choice ${questions[group.key] === option.value ? "active" : ""}`}
-                                    type="button"
-                                    onClick={() => updateQuestion(group.key, option.value)}
-                                  >
-                                    {option.label}
-                                  </button>
-                                )
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      ))}
+                      {activityGroup ? (
+                        <label>
+                          {activityGroup.label}
+                          <select value={questions.activity || ""} onChange={(event) => updateQuestion("activity", event.target.value)}>
+                            {activityGroup.options.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
+                      {workAreaGroup ? (
+                        <label>
+                          {workAreaGroup.label}
+                          <select value={questions.workArea || ""} onChange={(event) => updateQuestion("workArea", event.target.value)}>
+                            {workAreaGroup.options.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                      ) : null}
                       <label>
                         Operatives
                         <input value={questions.operatives} onChange={(event) => updateQuestion("operatives", event.target.value)} />
@@ -4325,6 +4436,46 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                         Duration
                         <input value={questions.duration} onChange={(event) => updateQuestion("duration", event.target.value)} />
                       </label>
+                    </div>
+                  </section>
+
+                  <section className="rams-setup-card rams-access-tools-card">
+                    <h3>Tools and Access</h3>
+                    <div className="rams-access-tools-grid">
+                      {toolsGroup ? (
+                        <div className="rams-question-group">
+                          <span>Tools installers will use</span>
+                          <div className="rams-check-grid">
+                            {toolsGroup.options.map((option) => (
+                              <label key={option.value} className="rams-check">
+                                <input
+                                  type="checkbox"
+                                  checked={Array.isArray(questions.tools) && questions.tools.includes(option.value)}
+                                  onChange={() => updateMultiQuestion("tools", option.value)}
+                                />
+                                {option.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {accessGroup ? (
+                        <div className="rams-question-group">
+                          <span>Access methods</span>
+                          <div className="rams-check-grid">
+                            {accessGroup.options.map((option) => (
+                              <label key={option.value} className="rams-check">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAccessValues.includes(option.value)}
+                                  onChange={() => updateMultiQuestion("access", option.value)}
+                                />
+                                {option.label}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </section>
 
@@ -4343,6 +4494,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                         </label>
                       ))}
                     </div>
+                  </section>
+
+                  <section className="rams-setup-card rams-site-hazards-card">
+                    <h3>Site Specific Hazards or Information</h3>
+                    <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
                   </section>
 
                   <section className="rams-setup-card">
@@ -4384,10 +4540,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       <label>
                         Emergency arrangements
                         <textarea value={questions.emergency} onChange={(event) => updateQuestion("emergency", event.target.value)} />
-                      </label>
-                      <label className="rams-setup-wide">
-                        Extra notes
-                        <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
                       </label>
                     </div>
                   </section>
@@ -11083,6 +11235,24 @@ export default function App() {
                 <div className="detail-card detail-card-wide">
                   <strong>Notes</strong>
                   <p>{activeClientJob.notes || "-"}</p>
+                </div>
+                <div className="detail-card detail-card-wide">
+                  <strong>RAMS</strong>
+                  {Array.isArray(activeClientJob.ramsDocuments) && activeClientJob.ramsDocuments.length ? (
+                    <div className="client-rams-links">
+                      {activeClientJob.ramsDocuments.map((document) => (
+                        document.pdfUrl ? (
+                          <a key={document.id} className="ghost-button" href={document.pdfUrl} target="_blank" rel="noreferrer">
+                            {document.reference || "Open RAMS PDF"}
+                          </a>
+                        ) : (
+                          <span key={document.id}>{document.reference || "RAMS saved"}</span>
+                        )
+                      ))}
+                    </div>
+                  ) : (
+                    <p>No RAMS uploaded yet.</p>
+                  )}
                 </div>
                 <div className="detail-card detail-card-wide">
                   <strong>Photos</strong>
