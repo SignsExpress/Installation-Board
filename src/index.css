@@ -122,6 +122,100 @@
   width: auto;
 }
 
+.rams-logic-panel {
+  border: 1px solid #d7cbdd;
+  border-radius: 10px;
+  background: #fbf8fd;
+  padding: 7px;
+}
+
+.rams-logic-panel summary {
+  color: #4f365f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.rams-logic-actions,
+.rams-logic-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.rams-logic-actions .primary-button,
+.rams-logic-actions .ghost-button,
+.rams-logic-heading .ghost-button,
+.rams-logic-card .ghost-button {
+  min-height: 30px;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+}
+
+.rams-logic-status {
+  margin: 6px 0 0;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.rams-logic-section {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.rams-logic-section h4 {
+  margin: 0;
+  color: #334155;
+  font-size: 0.84rem;
+}
+
+.rams-logic-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 7px;
+}
+
+.rams-logic-card > strong {
+  color: #0f172a;
+}
+
+.rams-logic-option {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid #eef2f7;
+  padding-top: 6px;
+}
+
+.rams-card-link-list {
+  display: grid;
+  gap: 3px;
+  max-height: 132px;
+  overflow: auto;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  padding: 5px;
+}
+
+.rams-card-link {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 6px !important;
+  color: #475569 !important;
+  font-size: 0.76rem;
+  font-weight: 600 !important;
+}
+
+.rams-card-link input {
+  width: auto;
+  margin-top: 2px;
+}
+
 .rams-mini-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;

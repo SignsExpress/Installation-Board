@@ -393,6 +393,85 @@ const RAMS_BASE_CARD_IDS = [
   "completion"
 ];
 
+const RAMS_LOGIC_STORAGE_KEY = "rams-builder-logic-v1";
+
+const RAMS_DEFAULT_LOGIC = {
+  optionGroups: [
+    {
+      key: "activity",
+      label: "Work type",
+      input: "buttons",
+      multi: false,
+      options: RAMS_ACTIVITY_OPTIONS.map((option) => ({
+        ...option,
+        cardIds:
+          option.value === "external"
+            ? ["weather"]
+            : option.value === "window"
+              ? ["weather"]
+              : option.value === "vehicle"
+                ? ["vehicle"]
+                : []
+      }))
+    },
+    {
+      key: "access",
+      label: "Access method",
+      input: "select",
+      multi: false,
+      options: RAMS_ACCESS_OPTIONS.map((option) => ({
+        ...option,
+        cardIds:
+          option.value === "steps"
+            ? ["height"]
+            : option.value === "ladders"
+              ? ["height", "ladders"]
+              : option.value === "mewp"
+                ? ["height", "mewp"]
+                : []
+      }))
+    },
+    {
+      key: "workArea",
+      label: "Work area",
+      input: "select",
+      multi: false,
+      options: RAMS_WORK_AREA_OPTIONS.map((option) => ({
+        ...option,
+        cardIds:
+          option.value === "public"
+            ? ["public"]
+            : option.value === "traffic"
+              ? ["traffic"]
+              : option.value === "construction"
+                ? ["construction"]
+                : []
+      }))
+    },
+    {
+      key: "tools",
+      label: "Tools and conditions",
+      input: "checkboxes",
+      multi: true,
+      options: RAMS_TOOL_OPTIONS.map((option) => ({
+        ...option,
+        cardIds:
+          option.value === "power-tools"
+            ? ["tools", "electricalEquipment"]
+            : option.value === "adhesives"
+              ? ["substances"]
+              : option.value === "lifting"
+                ? ["lifting"]
+                : option.value === "electrical"
+                  ? ["electrical"]
+                  : []
+      }))
+    }
+  ],
+  cards: RAMS_CARD_LIBRARY,
+  baseCardIds: RAMS_BASE_CARD_IDS
+};
+
 const ATTENDANCE_WEEKDAYS = [
   ["monday", "Mon"],
   ["tuesday", "Tue"],
@@ -1177,27 +1256,68 @@ function normalizeRamsQuestions(questions) {
   };
 }
 
-function getRamsCardIdsForQuestions(questions) {
-  const normalized = normalizeRamsQuestions(questions);
-  const selected = new Set(RAMS_BASE_CARD_IDS);
+function normalizeRamsLogic(logic = {}) {
+  const defaultGroups = RAMS_DEFAULT_LOGIC.optionGroups;
+  const incomingGroups = Array.isArray(logic.optionGroups) ? logic.optionGroups : defaultGroups;
+  return {
+    optionGroups: incomingGroups.map((group, groupIndex) => {
+      const fallback = defaultGroups[groupIndex] || {};
+      return {
+        key: String(group.key || fallback.key || `group-${groupIndex}`),
+        label: String(group.label || fallback.label || "Question"),
+        input: ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
+        multi: Boolean(group.multi ?? fallback.multi),
+        options: (Array.isArray(group.options) ? group.options : []).map((option, optionIndex) => ({
+          value: String(option.value || `option-${optionIndex}`),
+          label: String(option.label || option.value || "Option"),
+          cardIds: Array.isArray(option.cardIds) ? option.cardIds.map(String).filter(Boolean) : []
+        }))
+      };
+    }),
+    cards: {
+      ...RAMS_CARD_LIBRARY,
+      ...(logic.cards && typeof logic.cards === "object" ? logic.cards : {})
+    },
+    baseCardIds: Array.isArray(logic.baseCardIds)
+      ? logic.baseCardIds.map(String).filter(Boolean)
+      : RAMS_BASE_CARD_IDS
+  };
+}
 
-  if (normalized.workArea === "public") selected.add("public");
-  if (normalized.workArea === "traffic") selected.add("traffic");
-  if (normalized.workArea === "construction") selected.add("construction");
-  if (["external", "window"].includes(normalized.activity)) selected.add("weather");
-  if (normalized.activity === "vehicle") selected.add("vehicle");
-  if (["steps", "ladders", "mewp"].includes(normalized.access)) selected.add("height");
-  if (normalized.access === "ladders") selected.add("ladders");
-  if (normalized.access === "mewp") selected.add("mewp");
-  if (normalized.tools.includes("power-tools")) {
-    selected.add("tools");
-    selected.add("electricalEquipment");
+function getStoredRamsLogic() {
+  if (typeof window === "undefined") return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+  try {
+    const stored = window.localStorage.getItem(RAMS_LOGIC_STORAGE_KEY);
+    if (!stored) return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+    return normalizeRamsLogic(JSON.parse(stored));
+  } catch (error) {
+    console.error(error);
+    return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
   }
-  if (normalized.tools.includes("adhesives")) selected.add("substances");
-  if (normalized.tools.includes("lifting")) selected.add("lifting");
-  if (normalized.tools.includes("electrical")) selected.add("electrical");
+}
 
-  return Object.keys(RAMS_CARD_LIBRARY).filter((cardId) => selected.has(cardId));
+function saveRamsLogic(logic) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(RAMS_LOGIC_STORAGE_KEY, JSON.stringify(normalizeRamsLogic(logic)));
+}
+
+function getRamsCardIdsForQuestions(questions, logic = RAMS_DEFAULT_LOGIC) {
+  const normalized = normalizeRamsQuestions(questions);
+  const activeLogic = normalizeRamsLogic(logic);
+  const selected = new Set(activeLogic.baseCardIds);
+
+  activeLogic.optionGroups.forEach((group) => {
+    const answer = normalized[group.key];
+    const selectedValues = group.multi
+      ? Array.isArray(answer) ? answer.map(String) : []
+      : [String(answer || "")];
+    group.options.forEach((option) => {
+      if (!selectedValues.includes(String(option.value))) return;
+      option.cardIds.forEach((cardId) => selected.add(cardId));
+    });
+  });
+
+  return Object.keys(activeLogic.cards).filter((cardId) => selected.has(cardId));
 }
 
 function buildRamsReference(job, questions) {
@@ -2509,7 +2629,10 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobError, setJobError] = useState("");
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
-  const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS));
+  const [ramsLogic, setRamsLogic] = useState(() => getStoredRamsLogic());
+  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
+  const [logicStatus, setLogicStatus] = useState("");
+  const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS, getStoredRamsLogic()));
   const [draggingCardId, setDraggingCardId] = useState("");
   const [ramsEdits, setRamsEdits] = useState({});
   const todayIso = getLocalTodayIso();
@@ -2551,7 +2674,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
     [jobs, questions.jobId]
   );
 
-  const suggestedCardIds = useMemo(() => getRamsCardIdsForQuestions(questions), [questions]);
+  const suggestedCardIds = useMemo(() => getRamsCardIdsForQuestions(questions, ramsLogic), [questions, ramsLogic]);
   const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
 
   useEffect(() => {
@@ -2578,6 +2701,158 @@ function RamsPage({ currentUser, onLogout, notifications }) {
         : [...existing, value];
       return { ...current, tools: nextTools.length ? nextTools : ["hand-tools"] };
     });
+  }
+
+  function updateMultiQuestion(key, value) {
+    setQuestions((current) => {
+      const existing = Array.isArray(current[key]) ? current[key] : [];
+      const nextValues = existing.includes(value)
+        ? existing.filter((entry) => entry !== value)
+        : [...existing, value];
+      return { ...current, [key]: nextValues };
+    });
+  }
+
+  function updateRamsLogicDraft(updater) {
+    setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
+    setLogicStatus("");
+  }
+
+  function saveRamsLogicDraft() {
+    const nextLogic = normalizeRamsLogic(ramsLogicDraft);
+    setRamsLogic(nextLogic);
+    setRamsLogicDraft(nextLogic);
+    saveRamsLogic(nextLogic);
+    setLogicStatus("RAMS logic saved.");
+  }
+
+  function restoreDefaultRamsLogic() {
+    const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+    setRamsLogic(nextLogic);
+    setRamsLogicDraft(nextLogic);
+    saveRamsLogic(nextLogic);
+    setLogicStatus("Default RAMS logic restored.");
+  }
+
+  function addRamsOption(groupIndex) {
+    updateRamsLogicDraft((current) => {
+      const optionGroups = current.optionGroups.map((group, index) => {
+        if (index !== groupIndex) return group;
+        const nextIndex = group.options.length + 1;
+        return {
+          ...group,
+          options: [
+            ...group.options,
+            { value: `${group.key}-${Date.now()}`, label: `New option ${nextIndex}`, cardIds: [] }
+          ]
+        };
+      });
+      return { ...current, optionGroups };
+    });
+  }
+
+  function updateRamsOption(groupIndex, optionIndex, key, value) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        return {
+          ...group,
+          options: group.options.map((option, currentOptionIndex) =>
+            currentOptionIndex === optionIndex ? { ...option, [key]: value } : option
+          )
+        };
+      })
+    }));
+  }
+
+  function removeRamsOption(groupIndex, optionIndex) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) =>
+        currentGroupIndex === groupIndex
+          ? { ...group, options: group.options.filter((_, currentOptionIndex) => currentOptionIndex !== optionIndex) }
+          : group
+      )
+    }));
+  }
+
+  function toggleOptionCard(groupIndex, optionIndex, cardId) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      optionGroups: current.optionGroups.map((group, currentGroupIndex) => {
+        if (currentGroupIndex !== groupIndex) return group;
+        return {
+          ...group,
+          options: group.options.map((option, currentOptionIndex) => {
+            if (currentOptionIndex !== optionIndex) return option;
+            const cardIds = option.cardIds.includes(cardId)
+              ? option.cardIds.filter((entry) => entry !== cardId)
+              : [...option.cardIds, cardId];
+            return { ...option, cardIds };
+          })
+        };
+      })
+    }));
+  }
+
+  function addRamsCard() {
+    const cardId = `custom-${Date.now()}`;
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      cards: {
+        ...current.cards,
+        [cardId]: {
+          title: "New RAMS card",
+          type: "Risk",
+          trigger: "Custom",
+          initialRisk: "Medium",
+          residualRisk: "Low",
+          content: ["Write the control measure or method step here."]
+        }
+      }
+    }));
+  }
+
+  function updateRamsCard(cardId, key, value) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      cards: {
+        ...current.cards,
+        [cardId]: {
+          ...current.cards[cardId],
+          [key]: key === "content" ? String(value).split("\n").map((line) => line.trim()).filter(Boolean) : value
+        }
+      }
+    }));
+  }
+
+  function removeRamsCard(cardId) {
+    updateRamsLogicDraft((current) => {
+      const nextCards = { ...current.cards };
+      delete nextCards[cardId];
+      return {
+        ...current,
+        cards: nextCards,
+        baseCardIds: current.baseCardIds.filter((entry) => entry !== cardId),
+        optionGroups: current.optionGroups.map((group) => ({
+          ...group,
+          options: group.options.map((option) => ({
+            ...option,
+            cardIds: option.cardIds.filter((entry) => entry !== cardId)
+          }))
+        }))
+      };
+    });
+  }
+
+  function toggleBaseRamsCard(cardId) {
+    updateRamsLogicDraft((current) => ({
+      ...current,
+      baseCardIds: current.baseCardIds.includes(cardId)
+        ? current.baseCardIds.filter((entry) => entry !== cardId)
+        : [...current.baseCardIds, cardId]
+    }));
   }
 
   function getRamsEdit(key, fallback = "") {
@@ -2625,14 +2900,14 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   }
 
   const selectedCards = cardOrder
-    .map((cardId) => ({ id: cardId, ...RAMS_CARD_LIBRARY[cardId] }))
+    .map((cardId) => ({ id: cardId, ...ramsLogic.cards[cardId] }))
     .filter((card) => card.title);
   const methodCards = selectedCards.filter((card) => card.type === "Method");
   const riskCards = selectedCards.filter((card) => card.type !== "Method");
-  const selectedActivity = RAMS_ACTIVITY_OPTIONS.find((option) => option.value === questions.activity)?.label || questions.activity;
-  const selectedAccess = RAMS_ACCESS_OPTIONS.find((option) => option.value === questions.access)?.label || questions.access;
-  const selectedWorkArea = RAMS_WORK_AREA_OPTIONS.find((option) => option.value === questions.workArea)?.label || questions.workArea;
-  const selectedTools = RAMS_TOOL_OPTIONS.filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
+  const selectedActivity = ramsLogic.optionGroups.find((group) => group.key === "activity")?.options.find((option) => option.value === questions.activity)?.label || questions.activity;
+  const selectedAccess = ramsLogic.optionGroups.find((group) => group.key === "access")?.options.find((option) => option.value === questions.access)?.label || questions.access;
+  const selectedWorkArea = ramsLogic.optionGroups.find((group) => group.key === "workArea")?.options.find((option) => option.value === questions.workArea)?.label || questions.workArea;
+  const selectedTools = (ramsLogic.optionGroups.find((group) => group.key === "tools")?.options || []).filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
   const displayedDate = getRamsEdit("date", formatJobDate(selectedJob?.date));
   const displayedOperatives = getRamsEdit("operatives", questions.operatives);
   const displayedDuration = getRamsEdit("duration", questions.duration);
@@ -2685,55 +2960,45 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </select>
               </label>
 
-              <div className="rams-question-group">
-                <span>Work type</span>
-                <div className="rams-option-stack">
-                  {RAMS_ACTIVITY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      className={`rams-choice ${questions.activity === option.value ? "active" : ""}`}
-                      type="button"
-                      onClick={() => updateQuestion("activity", option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <label>
-                Access method
-                <select value={questions.access} onChange={(event) => updateQuestion("access", event.target.value)}>
-                  {RAMS_ACCESS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                Work area
-                <select value={questions.workArea} onChange={(event) => updateQuestion("workArea", event.target.value)}>
-                  {RAMS_WORK_AREA_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="rams-question-group">
-                <span>Tools and conditions</span>
-                <div className="rams-check-grid">
-                  {RAMS_TOOL_OPTIONS.map((option) => (
-                    <label key={option.value} className="rams-check">
-                      <input
-                        type="checkbox"
-                        checked={questions.tools.includes(option.value)}
-                        onChange={() => toggleTool(option.value)}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {ramsLogic.optionGroups.map((group) => (
+                group.input === "select" && !group.multi ? (
+                  <label key={group.key}>
+                    {group.label}
+                    <select value={questions[group.key] || ""} onChange={(event) => updateQuestion(group.key, event.target.value)}>
+                      {group.options.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <div key={group.key} className="rams-question-group">
+                    <span>{group.label}</span>
+                    <div className={group.multi ? "rams-check-grid" : "rams-option-stack"}>
+                      {group.options.map((option) => (
+                        group.multi ? (
+                          <label key={option.value} className="rams-check">
+                            <input
+                              type="checkbox"
+                              checked={Array.isArray(questions[group.key]) && questions[group.key].includes(option.value)}
+                              onChange={() => updateMultiQuestion(group.key, option.value)}
+                            />
+                            {option.label}
+                          </label>
+                        ) : (
+                          <button
+                            key={option.value}
+                            className={`rams-choice ${questions[group.key] === option.value ? "active" : ""}`}
+                            type="button"
+                            onClick={() => updateQuestion(group.key, option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )
+              ))}
 
               <div className="rams-mini-fields">
                 <label>
@@ -2758,6 +3023,107 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 Extra notes
                 <textarea value={questions.notes} onChange={(event) => updateQuestion("notes", event.target.value)} placeholder="Anything unusual about the site or task." />
               </label>
+
+              <details className="rams-logic-panel">
+                <summary>RAMS logic</summary>
+                <div className="rams-logic-actions">
+                  <button className="primary-button" type="button" onClick={saveRamsLogicDraft}>Save logic</button>
+                  <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>Restore defaults</button>
+                </div>
+                {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
+
+                <div className="rams-logic-section">
+                  <h4>Buttons and triggers</h4>
+                  {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
+                    <article key={group.key} className="rams-logic-card">
+                      <strong>{group.label}</strong>
+                      {group.options.map((option, optionIndex) => (
+                        <div key={`${group.key}-${option.value}-${optionIndex}`} className="rams-logic-option">
+                          <input
+                            value={option.label}
+                            onChange={(event) => updateRamsOption(groupIndex, optionIndex, "label", event.target.value)}
+                            aria-label={`${group.label} option label`}
+                          />
+                          <input
+                            value={option.value}
+                            onChange={(event) => updateRamsOption(groupIndex, optionIndex, "value", event.target.value)}
+                            aria-label={`${group.label} option value`}
+                          />
+                          <div className="rams-card-link-list">
+                            {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
+                              <label key={`${group.key}-${option.value}-${cardId}`} className="rams-card-link">
+                                <input
+                                  type="checkbox"
+                                  checked={option.cardIds.includes(cardId)}
+                                  onChange={() => toggleOptionCard(groupIndex, optionIndex, cardId)}
+                                />
+                                {card.title}
+                              </label>
+                            ))}
+                          </div>
+                          <button className="text-button danger" type="button" onClick={() => removeRamsOption(groupIndex, optionIndex)}>
+                            Remove option
+                          </button>
+                        </div>
+                      ))}
+                      <button className="ghost-button" type="button" onClick={() => addRamsOption(groupIndex)}>
+                        Add option
+                      </button>
+                    </article>
+                  ))}
+                </div>
+
+                <div className="rams-logic-section">
+                  <div className="rams-logic-heading">
+                    <h4>Cards</h4>
+                    <button className="ghost-button" type="button" onClick={addRamsCard}>Add card</button>
+                  </div>
+                  {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
+                    <article key={cardId} className="rams-logic-card">
+                      <label className="rams-check">
+                        <input
+                          type="checkbox"
+                          checked={ramsLogicDraft.baseCardIds.includes(cardId)}
+                          onChange={() => toggleBaseRamsCard(cardId)}
+                        />
+                        Always include
+                      </label>
+                      <input value={card.title || ""} onChange={(event) => updateRamsCard(cardId, "title", event.target.value)} />
+                      <select value={card.type || "Risk"} onChange={(event) => updateRamsCard(cardId, "type", event.target.value)}>
+                        <option value="Risk">Risk</option>
+                        <option value="Method">Method</option>
+                        <option value="COSHH">COSHH</option>
+                      </select>
+                      <input value={card.trigger || ""} onChange={(event) => updateRamsCard(cardId, "trigger", event.target.value)} />
+                      <div className="rams-mini-fields">
+                        <label>
+                          Initial
+                          <select value={card.initialRisk || "Medium"} onChange={(event) => updateRamsCard(cardId, "initialRisk", event.target.value)}>
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                          </select>
+                        </label>
+                        <label>
+                          Residual
+                          <select value={card.residualRisk || "Low"} onChange={(event) => updateRamsCard(cardId, "residualRisk", event.target.value)}>
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                          </select>
+                        </label>
+                      </div>
+                      <textarea
+                        value={(Array.isArray(card.content) ? card.content : []).join("\n")}
+                        onChange={(event) => updateRamsCard(cardId, "content", event.target.value)}
+                      />
+                      <button className="text-button danger" type="button" onClick={() => removeRamsCard(cardId)}>
+                        Delete card
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              </details>
             </aside>
 
             <main className="rams-main">
@@ -2766,7 +3132,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
                   <div>
                     <h3>Risk Assessment and Method Statement</h3>
-                    <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")} · Ref: {renderEditable("reference", ramsReference)}</p>
+                    <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")} - Ref: {renderEditable("reference", ramsReference)}</p>
                   </div>
                 </div>
                 <div className="rams-doc-meta">
