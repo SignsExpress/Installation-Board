@@ -4113,16 +4113,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <p><strong>Emergency:</strong> {renderEditable("emergency", questions.emergency)}</p>
                   <p><strong>Notes:</strong> {renderEditable("notes", questions.notes || "-")}</p>
                 </div>
-                <div className="rams-first-aid-section">
-                  <div>
-                    <h4>First Aid Facilities</h4>
-                    <p>{renderEditable("firstAidFacility", displayedFirstAidFacility)}</p>
-                  </div>
-                  <div>
-                    <h4>First Aid Box Location</h4>
-                    <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
-                  </div>
-                </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
                   <div className="rams-risk-key">
@@ -4223,6 +4213,16 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       </div>
                     </div>
                   ) : null}
+                  <div className="rams-first-aid-section">
+                    <div>
+                      <h4>First Aid Facilities</h4>
+                      <p>{renderEditable("firstAidFacility", displayedFirstAidFacility)}</p>
+                    </div>
+                    <div>
+                      <h4>First Aid Box Location</h4>
+                      <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
+                    </div>
+                  </div>
                   {methodCards.map((card) => {
                     const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
                     return (

@@ -199,6 +199,22 @@
   gap: 12px;
 }
 
+.rams-setup-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 5000;
+}
+
+.rams-setup-backdrop .rams-setup-modal {
+  margin: auto;
+}
+
 .rams-setup-modal .modal-head h2,
 .rams-setup-modal .modal-head p,
 .rams-setup-card h3 {
