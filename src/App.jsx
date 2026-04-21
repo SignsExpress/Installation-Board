@@ -2712,81 +2712,12 @@ function RamsPage({ currentUser, onLogout, notifications }) {
             </aside>
 
             <main className="rams-main">
-              <section className="rams-summary-card">
-                <div>
-                  <span>Reference</span>
-                  <strong>{ramsReference}</strong>
-                </div>
-                <div>
-                  <span>Customer</span>
-                  <strong>{selectedJob?.customerName || "Select a job"}</strong>
-                </div>
-                <div>
-                  <span>Site</span>
-                  <strong>{selectedJob ? getRamsJobAddress(selectedJob) : "Select a job"}</strong>
-                </div>
-                <div>
-                  <span>Contact</span>
-                  <strong>{selectedJob ? getRamsContact(selectedJob) : "Select a job"}</strong>
-                </div>
-              </section>
-
-              <section className="rams-card-board">
-                <div className="rams-card-board-head">
-                  <div>
-                    <h3>RAMS cards</h3>
-                    <p>{methodCards.length} method cards are preselected. {riskCards.length} risk cards have been added from the answers.</p>
-                  </div>
-                </div>
-
-                <div className="rams-card-list">
-                  {selectedCards.map((card, index) => (
-                    <article
-                      key={card.id}
-                      className={`rams-risk-card ${card.type === "Method" ? "method-card" : "assessment-card"}`}
-                      draggable
-                      onDragStart={() => setDraggingCardId(card.id)}
-                      onDragEnd={() => setDraggingCardId("")}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => handleCardDrop(card.id)}
-                    >
-                      <div className="rams-risk-card-head">
-                        <div>
-                          <span className="rams-card-type">{card.type}</span>
-                          <h4>{card.title}</h4>
-                          <small>{card.trigger}</small>
-                        </div>
-                        <div className="rams-card-actions">
-                          <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={index === 0} aria-label="Move card up">
-                            ^
-                          </button>
-                          <button type="button" className="icon-button" onClick={() => moveCard(card.id, 1)} disabled={index === selectedCards.length - 1} aria-label="Move card down">
-                            v
-                          </button>
-                        </div>
-                      </div>
-                      {card.type !== "Method" ? (
-                        <div className="rams-risk-rating">
-                          <span>Initial risk: <strong>{card.initialRisk}</strong></span>
-                          <span>Residual risk: <strong>{card.residualRisk}</strong></span>
-                        </div>
-                      ) : null}
-                      <ul>
-                        {card.content.map((line) => (
-                          <li key={line}>{line}</li>
-                        ))}
-                      </ul>
-                    </article>
-                  ))}
-                </div>
-              </section>
-
               <section className="rams-document-preview">
                 <div className="rams-doc-title">
                   <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
                   <div>
                     <h3>Risk Assessment and Method Statement</h3>
-                    <p>{selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document"}</p>
+                    <p>{selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document"} · Ref: {ramsReference}</p>
                   </div>
                 </div>
                 <div className="rams-doc-meta">
@@ -2866,19 +2797,34 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
-                  {methodCards.map((card) => (
-                    <div key={`doc-${card.id}`} className="rams-doc-card">
-                      <div>
-                        <strong>{card.title}</strong>
-                        <span>{card.type}</span>
+                  {methodCards.map((card) => {
+                    const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
+                    return (
+                      <div
+                        key={`doc-${card.id}`}
+                        className="rams-doc-card"
+                        draggable
+                        onDragStart={() => setDraggingCardId(card.id)}
+                        onDragEnd={() => setDraggingCardId("")}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => handleCardDrop(card.id)}
+                      >
+                        <div>
+                          <strong>{card.title}</strong>
+                          <span>{card.trigger}</span>
+                          <span className="rams-card-actions no-print">
+                            <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">^</button>
+                            <button type="button" className="icon-button" onClick={() => moveCard(card.id, 1)} disabled={cardIndex === selectedCards.length - 1} aria-label="Move method down">v</button>
+                          </span>
+                        </div>
+                        <ul>
+                          {card.content.map((line) => (
+                            <li key={`doc-${card.id}-${line}`}>{line}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul>
-                        {card.content.map((line) => (
-                          <li key={`doc-${card.id}-${line}`}>{line}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="rams-signoff">
                   <span>Prepared by: {currentUser?.displayName || "Signs Express"}</span>

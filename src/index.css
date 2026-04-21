@@ -6,7 +6,8 @@
 }
 
 .rams-panel {
-  padding: 14px;
+  padding: 10px;
+  font-size: 0.88rem;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
   border-radius: 18px;
@@ -17,8 +18,8 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   background: #fff;
@@ -32,13 +33,13 @@
 .rams-header p {
   color: #64748b;
   margin-top: 2px;
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .rams-builder-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 310px) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(236px, 280px) minmax(0, 1fr);
+  gap: 8px;
   align-items: start;
 }
 
@@ -47,16 +48,16 @@
 .rams-question-panel label,
 .rams-question-group {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rams-question-panel {
   position: sticky;
-  top: 116px;
-  max-height: calc(100vh - 132px);
+  top: 92px;
+  max-height: calc(100vh - 104px);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 12px;
+  padding: 9px;
   border: 1px solid #dbe3ef;
   border-radius: 12px;
   background: #ffffff;
@@ -75,13 +76,13 @@
   width: 100%;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   background: #fff;
   color: #0f172a;
 }
 
 .rams-question-panel textarea {
-  min-height: 58px;
+  min-height: 44px;
   resize: vertical;
 }
 
@@ -96,7 +97,7 @@
   border-radius: 10px;
   background: #fff;
   color: #4f365f;
-  padding: 8px 10px;
+  padding: 6px 8px;
   text-align: left;
   font-weight: 700;
 }
@@ -111,7 +112,7 @@
   display: flex !important;
   align-items: center;
   gap: 9px !important;
-  padding: 7px 9px;
+  padding: 5px 7px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fff;
@@ -128,7 +129,7 @@
 }
 
 .rams-main {
-  gap: 10px;
+  gap: 8px;
 }
 
 .rams-summary-card {
@@ -161,7 +162,7 @@
   border: 1px solid #dbe3ef;
   border-radius: 12px;
   background: #fff;
-  padding: 12px;
+  padding: 10px;
 }
 
 .rams-card-board-head {
@@ -268,46 +269,72 @@
 
 .rams-document-preview {
   display: grid;
-  gap: 10px;
+  gap: 7px;
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
 }
 
 .rams-doc-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 10px;
+  padding-bottom: 7px;
 }
 
 .rams-doc-title img {
-  width: 126px;
+  width: 86px;
   height: auto;
+}
+
+.rams-doc-title h3 {
+  font-size: 1rem;
+  line-height: 1.05;
+}
+
+.rams-doc-title p {
+  font-size: 0.84rem;
+  line-height: 1.15;
 }
 
 .rams-doc-meta {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
 }
 
 .rams-doc-meta span {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 7px;
+  border-radius: 6px;
+  padding: 4px 5px;
+  font-size: 0.78rem;
+  line-height: 1.15;
   overflow-wrap: anywhere;
 }
 
 .rams-doc-section {
   display: grid;
-  gap: 7px;
+  gap: 4px;
+}
+
+.rams-doc-section:not(.rams-doc-risk-section):not(.rams-doc-method-section) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rams-doc-section:not(.rams-doc-risk-section):not(.rams-doc-method-section) h4 {
+  grid-column: 1 / -1;
+}
+
+.rams-doc-section p {
+  font-size: 0.82rem;
+  line-height: 1.22;
 }
 
 .rams-doc-section h4 {
   margin: 0;
   width: fit-content;
-  border-radius: 999px;
-  padding: 5px 10px;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 0.82rem;
   color: #4f365f;
   background: #f1ecf4;
 }
@@ -325,7 +352,7 @@
 .rams-doc-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 9px;
+  padding: 6px 8px;
   display: grid;
   gap: 6px;
   break-inside: avoid;
@@ -352,14 +379,14 @@
   width: 100%;
   min-width: 900px;
   border-collapse: collapse;
-  font-size: 0.88rem;
+  font-size: 0.78rem;
 }
 
 .rams-risk-table th,
 .rams-risk-table td {
   border-right: 1px solid #ffedd5;
   border-bottom: 1px solid #ffedd5;
-  padding: 7px;
+  padding: 4px 5px;
   text-align: left;
   vertical-align: top;
 }
@@ -367,7 +394,7 @@
 .rams-risk-table th {
   background: #fff7ed;
   color: #9a3412;
-  font-size: 0.75rem;
+  font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -394,13 +421,13 @@
 }
 
 .rams-risk-table td:first-child {
-  width: 180px;
+  width: 150px;
 }
 
 .rams-risk-table td:first-child span {
   display: block;
   color: #9a3412;
-  font-size: 0.78rem;
+  font-size: 0.66rem;
   font-weight: 800;
   margin-top: 4px;
   text-transform: uppercase;
@@ -408,7 +435,7 @@
 
 .rams-risk-table ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 14px;
 }
 
 .rams-doc-card > div {
@@ -420,6 +447,7 @@
 .rams-doc-card > div span {
   color: #64748b;
   font-weight: 700;
+  font-size: 0.72rem;
 }
 
 .rams-signoff {
@@ -430,10 +458,10 @@
 }
 
 .rams-signoff span {
-  min-height: 54px;
+  min-height: 34px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
-  padding: 10px;
+  padding: 6px;
 }
 
 @media (max-width: 1100px) {
@@ -450,6 +478,10 @@
 }
 
 @media print {
+  @page {
+    margin: 8mm 8mm 9mm;
+  }
+
   body {
     background: #fff !important;
   }
@@ -458,7 +490,8 @@
   .rams-header,
   .rams-question-panel,
   .rams-summary-card,
-  .rams-card-board {
+  .rams-card-board,
+  .no-print {
     display: none !important;
   }
 
@@ -483,6 +516,57 @@
     border: 0 !important;
     border-radius: 0 !important;
     padding: 0 !important;
+    gap: 3mm !important;
+    box-shadow: none !important;
+    font-size: 7.8pt !important;
+    line-height: 1.16 !important;
+  }
+
+  .rams-doc-title {
+    gap: 5mm !important;
+    padding-bottom: 2mm !important;
+  }
+
+  .rams-doc-title img {
+    width: 24mm !important;
+  }
+
+  .rams-doc-title h3 {
+    font-size: 11pt !important;
+  }
+
+  .rams-doc-title p {
+    font-size: 8pt !important;
+  }
+
+  .rams-doc-meta {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 1.5mm !important;
+  }
+
+  .rams-doc-meta span {
+    border-radius: 2mm !important;
+    padding: 1.2mm 1.5mm !important;
+    font-size: 7.2pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .rams-doc-section {
+    gap: 1.4mm !important;
+  }
+
+  .rams-doc-section:not(.rams-doc-risk-section):not(.rams-doc-method-section) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .rams-doc-section h4 {
+    padding: 1mm 1.8mm !important;
+    font-size: 7.5pt !important;
+  }
+
+  .rams-doc-section p {
+    font-size: 7.2pt !important;
+    line-height: 1.14 !important;
   }
 
   .rams-risk-table-wrap {
@@ -491,12 +575,36 @@
 
   .rams-risk-table {
     min-width: 0 !important;
-    font-size: 8pt !important;
+    font-size: 6.5pt !important;
   }
 
   .rams-risk-table th,
   .rams-risk-table td {
-    padding: 4px !important;
+    padding: 1.2mm !important;
+  }
+
+  .rams-risk-table th {
+    font-size: 5.8pt !important;
+  }
+
+  .rams-risk-table ul,
+  .rams-doc-card ul {
+    padding-left: 3mm !important;
+    margin: 0 !important;
+  }
+
+  .rams-doc-card {
+    padding: 1.4mm 2mm !important;
+    gap: 1mm !important;
+  }
+
+  .rams-signoff {
+    gap: 2mm !important;
+  }
+
+  .rams-signoff span {
+    min-height: 9mm !important;
+    padding: 1.5mm !important;
   }
 }
 
