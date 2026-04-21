@@ -2627,6 +2627,38 @@ function ClientLandingPage({
 function RamsLogicPage({ currentUser, onLogout, notifications }) {
   const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
   const [logicStatus, setLogicStatus] = useState("");
+  const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
+  const [selectedCardId, setSelectedCardId] = useState("");
+
+  const activeGroup = ramsLogicDraft.optionGroups[selectedGroupIndex] || ramsLogicDraft.optionGroups[0] || null;
+  const activeGroupIndex = Math.max(0, ramsLogicDraft.optionGroups.indexOf(activeGroup));
+  const activeOption = activeGroup?.options?.[selectedOptionIndex] || activeGroup?.options?.[0] || null;
+  const activeOptionIndex = activeGroup && activeOption ? Math.max(0, activeGroup.options.indexOf(activeOption)) : 0;
+  const linkedCardIds = activeOption?.cardIds || [];
+  const linkedCards = linkedCardIds.map((cardId) => [cardId, ramsLogicDraft.cards[cardId]]).filter(([, card]) => card);
+  const unlinkedCards = Object.entries(ramsLogicDraft.cards).filter(([cardId]) => !linkedCardIds.includes(cardId));
+  const activeCardId = selectedCardId && ramsLogicDraft.cards[selectedCardId]
+    ? selectedCardId
+    : linkedCards[0]?.[0] || Object.keys(ramsLogicDraft.cards)[0] || "";
+  const activeCard = activeCardId ? ramsLogicDraft.cards[activeCardId] : null;
+
+  useEffect(() => {
+    if (!activeGroup) {
+      setSelectedGroupIndex(0);
+      setSelectedOptionIndex(0);
+      return;
+    }
+    if (!activeOption) {
+      setSelectedOptionIndex(0);
+    }
+  }, [activeGroup, activeOption]);
+
+  useEffect(() => {
+    if (activeCardId && activeCardId !== selectedCardId) {
+      setSelectedCardId(activeCardId);
+    }
+  }, [activeCardId, selectedCardId]);
 
   function updateRamsLogicDraft(updater) {
     setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
@@ -2725,6 +2757,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
         }
       }
     }));
+    setSelectedCardId(cardId);
   }
 
   function updateRamsCard(cardId, key, value) {
@@ -2799,126 +2832,192 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
           </div>
           {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
 
-          <div className="rams-logic-layout">
-            <section className="rams-logic-full-card">
+          <div className="rams-logic-workbench">
+            <aside className="rams-logic-picker">
+              <h3>1. Choose a question</h3>
+              {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
+                <button
+                  key={group.key}
+                  type="button"
+                  className={`rams-logic-picker-button ${groupIndex === activeGroupIndex ? "active" : ""}`}
+                  onClick={() => {
+                    setSelectedGroupIndex(groupIndex);
+                    setSelectedOptionIndex(0);
+                  }}
+                >
+                  <strong>{group.label}</strong>
+                  <span>{group.options.length} option{group.options.length === 1 ? "" : "s"}</span>
+                </button>
+              ))}
+            </aside>
+
+            <section className="rams-logic-choice-panel">
               <div className="rams-logic-heading">
-                <h3>Buttons and Triggers</h3>
+                <h3>2. Choose a button</h3>
+                {activeGroup ? (
+                  <button className="ghost-button" type="button" onClick={() => addRamsOption(activeGroupIndex)}>
+                    Add button
+                  </button>
+                ) : null}
               </div>
-              <div className="rams-logic-options-grid">
-                {ramsLogicDraft.optionGroups.map((group, groupIndex) => (
-                  <article key={group.key} className="rams-logic-card">
-                    <div className="rams-logic-card-head">
-                      <strong>{group.label}</strong>
-                      <span>{group.input}{group.multi ? " / multi-select" : ""}</span>
-                    </div>
-                    {group.options.map((option, optionIndex) => (
-                      <div key={`${group.key}-${option.value}-${optionIndex}`} className="rams-logic-option">
-                        <div className="rams-logic-option-fields">
-                          <label>
-                            Button text
-                            <input
-                              value={option.label}
-                              onChange={(event) => updateRamsOption(groupIndex, optionIndex, "label", event.target.value)}
-                            />
-                          </label>
-                          <label>
-                            Value
-                            <input
-                              value={option.value}
-                              onChange={(event) => updateRamsOption(groupIndex, optionIndex, "value", event.target.value)}
-                            />
-                          </label>
-                        </div>
-                        <div className="rams-card-link-list">
-                          {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
-                            <label key={`${group.key}-${option.value}-${cardId}`} className="rams-card-link">
-                              <input
-                                type="checkbox"
-                                checked={option.cardIds.includes(cardId)}
-                                onChange={() => toggleOptionCard(groupIndex, optionIndex, cardId)}
-                              />
-                              {card.title}
-                            </label>
-                          ))}
-                        </div>
-                        <button className="text-button danger" type="button" onClick={() => removeRamsOption(groupIndex, optionIndex)}>
-                          Remove option
-                        </button>
-                      </div>
-                    ))}
-                    <button className="ghost-button" type="button" onClick={() => addRamsOption(groupIndex)}>
-                      Add option
+
+              {activeGroup ? (
+                <div className="rams-logic-choice-list">
+                  {activeGroup.options.map((option, optionIndex) => (
+                    <button
+                      key={`${activeGroup.key}-${option.value}-${optionIndex}`}
+                      type="button"
+                      className={`rams-logic-choice ${optionIndex === activeOptionIndex ? "active" : ""}`}
+                      onClick={() => {
+                        setSelectedOptionIndex(optionIndex);
+                        setSelectedCardId(option.cardIds[0] || "");
+                      }}
+                    >
+                      <strong>{option.label}</strong>
+                      <span>{option.cardIds.length} linked card{option.cardIds.length === 1 ? "" : "s"}</span>
                     </button>
-                  </article>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {activeGroup && activeOption ? (
+                <article className="rams-logic-selected-option">
+                  <h4>Edit selected button</h4>
+                  <div className="rams-logic-option-fields">
+                    <label>
+                      Button text
+                      <input
+                        value={activeOption.label}
+                        onChange={(event) => updateRamsOption(activeGroupIndex, activeOptionIndex, "label", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Value
+                      <input
+                        value={activeOption.value}
+                        onChange={(event) => updateRamsOption(activeGroupIndex, activeOptionIndex, "value", event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <button className="text-button danger" type="button" onClick={() => removeRamsOption(activeGroupIndex, activeOptionIndex)}>
+                    Remove this button
+                  </button>
+                </article>
+              ) : null}
             </section>
 
-            <section className="rams-logic-full-card">
+            <section className="rams-logic-linked-panel">
               <div className="rams-logic-heading">
-                <h3>Cards</h3>
-                <button className="ghost-button" type="button" onClick={addRamsCard}>Add card</button>
+                <h3>3. Cards used by this button</h3>
               </div>
-              <div className="rams-logic-cards-grid">
-                {Object.entries(ramsLogicDraft.cards).map(([cardId, card]) => (
-                  <article key={cardId} className="rams-logic-card rams-logic-editor-card">
-                    <label className="rams-check">
-                      <input
-                        type="checkbox"
-                        checked={ramsLogicDraft.baseCardIds.includes(cardId)}
-                        onChange={() => toggleBaseRamsCard(cardId)}
-                      />
-                      Always include
-                    </label>
-                    <label>
-                      Card title
-                      <input value={card.title || ""} onChange={(event) => updateRamsCard(cardId, "title", event.target.value)} />
-                    </label>
-                    <div className="rams-logic-card-row">
-                      <label>
-                        Type
-                        <select value={card.type || "Risk"} onChange={(event) => updateRamsCard(cardId, "type", event.target.value)}>
-                          <option value="Risk">Risk</option>
-                          <option value="Method">Method</option>
-                          <option value="COSHH">COSHH</option>
-                        </select>
-                      </label>
-                      <label>
-                        Trigger
-                        <input value={card.trigger || ""} onChange={(event) => updateRamsCard(cardId, "trigger", event.target.value)} />
-                      </label>
-                    </div>
-                    <div className="rams-logic-card-row">
-                      <label>
-                        Initial risk
-                        <select value={card.initialRisk || "Medium"} onChange={(event) => updateRamsCard(cardId, "initialRisk", event.target.value)}>
-                          <option>Low</option>
-                          <option>Medium</option>
-                          <option>High</option>
-                        </select>
-                      </label>
-                      <label>
-                        Residual risk
-                        <select value={card.residualRisk || "Low"} onChange={(event) => updateRamsCard(cardId, "residualRisk", event.target.value)}>
-                          <option>Low</option>
-                          <option>Medium</option>
-                          <option>High</option>
-                        </select>
-                      </label>
-                    </div>
-                    <label>
-                      Content lines
-                      <textarea
-                        value={(Array.isArray(card.content) ? card.content : []).join("\n")}
-                        onChange={(event) => updateRamsCard(cardId, "content", event.target.value)}
-                      />
-                    </label>
-                    <button className="text-button danger" type="button" onClick={() => removeRamsCard(cardId)}>
-                      Delete card
+              <div className="rams-linked-card-list">
+                {linkedCards.length ? linkedCards.map(([cardId, card]) => (
+                  <button
+                    key={cardId}
+                    type="button"
+                    className={`rams-linked-card ${cardId === activeCardId ? "active" : ""}`}
+                    onClick={() => setSelectedCardId(cardId)}
+                  >
+                    <span>{card.type}</span>
+                    <strong>{card.title}</strong>
+                    <small>{card.trigger}</small>
+                  </button>
+                )) : (
+                  <p className="rams-logic-empty">No cards linked yet.</p>
+                )}
+              </div>
+
+              <details className="rams-add-card-drawer">
+                <summary>Add existing card to this button</summary>
+                <div className="rams-available-card-list">
+                  {unlinkedCards.map(([cardId, card]) => (
+                    <button
+                      key={cardId}
+                      type="button"
+                      onClick={() => {
+                        toggleOptionCard(activeGroupIndex, activeOptionIndex, cardId);
+                        setSelectedCardId(cardId);
+                      }}
+                    >
+                      <strong>{card.title}</strong>
+                      <span>{card.type}</span>
                     </button>
-                  </article>
-                ))}
+                  ))}
+                </div>
+              </details>
+            </section>
+
+            <section className="rams-logic-editor-panel">
+              <div className="rams-logic-heading">
+                <h3>4. Edit selected card</h3>
+                <button className="ghost-button" type="button" onClick={addRamsCard}>Add new card</button>
               </div>
+
+              {activeCard ? (
+                <article className="rams-logic-card rams-logic-editor-card">
+                  <label className="rams-check">
+                    <input
+                      type="checkbox"
+                      checked={ramsLogicDraft.baseCardIds.includes(activeCardId)}
+                      onChange={() => toggleBaseRamsCard(activeCardId)}
+                    />
+                    Always include on every RAMS
+                  </label>
+                  {activeOption?.cardIds?.includes(activeCardId) ? (
+                    <button className="text-button" type="button" onClick={() => toggleOptionCard(activeGroupIndex, activeOptionIndex, activeCardId)}>
+                      Unlink from selected button
+                    </button>
+                  ) : null}
+                  <label>
+                    Card title
+                    <input value={activeCard.title || ""} onChange={(event) => updateRamsCard(activeCardId, "title", event.target.value)} />
+                  </label>
+                  <div className="rams-logic-card-row">
+                    <label>
+                      Type
+                      <select value={activeCard.type || "Risk"} onChange={(event) => updateRamsCard(activeCardId, "type", event.target.value)}>
+                        <option value="Risk">Risk</option>
+                        <option value="Method">Method</option>
+                        <option value="COSHH">COSHH</option>
+                      </select>
+                    </label>
+                    <label>
+                      Trigger
+                      <input value={activeCard.trigger || ""} onChange={(event) => updateRamsCard(activeCardId, "trigger", event.target.value)} />
+                    </label>
+                  </div>
+                  <div className="rams-logic-card-row">
+                    <label>
+                      Initial risk
+                      <select value={activeCard.initialRisk || "Medium"} onChange={(event) => updateRamsCard(activeCardId, "initialRisk", event.target.value)}>
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                      </select>
+                    </label>
+                    <label>
+                      Residual risk
+                      <select value={activeCard.residualRisk || "Low"} onChange={(event) => updateRamsCard(activeCardId, "residualRisk", event.target.value)}>
+                        <option>Low</option>
+                        <option>Medium</option>
+                        <option>High</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label>
+                    Content lines
+                    <textarea
+                      value={(Array.isArray(activeCard.content) ? activeCard.content : []).join("\n")}
+                      onChange={(event) => updateRamsCard(activeCardId, "content", event.target.value)}
+                    />
+                  </label>
+                  <button className="text-button danger" type="button" onClick={() => removeRamsCard(activeCardId)}>
+                    Delete card
+                  </button>
+                </article>
+              ) : (
+                <p className="rams-logic-empty">Select or add a card.</p>
+              )}
             </section>
           </div>
         </section>

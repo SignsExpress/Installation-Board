@@ -165,6 +165,13 @@
   align-items: start;
 }
 
+.rams-logic-workbench {
+  display: grid;
+  grid-template-columns: 250px 320px minmax(300px, 0.9fr) minmax(420px, 1.15fr);
+  gap: 12px;
+  align-items: start;
+}
+
 .rams-logic-full-card {
   border: 1px solid #dbe3ef;
   border-radius: 14px;
@@ -247,6 +254,103 @@
 
 .rams-logic-editor-card {
   align-content: start;
+}
+
+.rams-logic-picker,
+.rams-logic-choice-panel,
+.rams-logic-linked-panel,
+.rams-logic-editor-panel {
+  border: 1px solid #dbe3ef;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.rams-logic-picker h3,
+.rams-logic-choice-panel h3,
+.rams-logic-linked-panel h3,
+.rams-logic-editor-panel h3 {
+  margin: 0;
+}
+
+.rams-logic-picker-button,
+.rams-logic-choice,
+.rams-linked-card,
+.rams-available-card-list button {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 10px;
+  display: grid;
+  gap: 3px;
+  text-align: left;
+}
+
+.rams-logic-picker-button.active,
+.rams-logic-choice.active,
+.rams-linked-card.active {
+  border-color: var(--sx-main);
+  background: #f1ecf4;
+  box-shadow: inset 4px 0 0 var(--sx-main);
+}
+
+.rams-logic-picker-button span,
+.rams-logic-choice span,
+.rams-linked-card span,
+.rams-linked-card small,
+.rams-available-card-list span {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.rams-logic-choice-list,
+.rams-linked-card-list,
+.rams-available-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.rams-logic-selected-option {
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.rams-logic-selected-option h4 {
+  margin: 0;
+}
+
+.rams-add-card-drawer {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.rams-add-card-drawer summary {
+  color: #4f365f;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.rams-available-card-list {
+  margin-top: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.rams-logic-empty {
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #64748b;
+  margin: 0;
+  padding: 14px;
+  text-align: center;
 }
 
 .rams-logic-panel summary {
