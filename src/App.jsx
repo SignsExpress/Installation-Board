@@ -1341,6 +1341,22 @@ function getRamsLcr(card, phase = "initial") {
   };
 }
 
+function getRamsCardTypeRank(type = "") {
+  const normalized = String(type || "").toLowerCase();
+  if (normalized === "method") return 1;
+  if (normalized === "risk") return 2;
+  if (normalized === "coshh") return 3;
+  return 4;
+}
+
+function sortRamsCardEntries(entries) {
+  return [...entries].sort(([, left], [, right]) => {
+    const rankDifference = getRamsCardTypeRank(left?.type) - getRamsCardTypeRank(right?.type);
+    if (rankDifference) return rankDifference;
+    return String(left?.title || "").localeCompare(String(right?.title || ""));
+  });
+}
+
 function formatNotificationDate(value) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "";
@@ -2636,8 +2652,8 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   const activeOption = activeGroup?.options?.[selectedOptionIndex] || activeGroup?.options?.[0] || null;
   const activeOptionIndex = activeGroup && activeOption ? Math.max(0, activeGroup.options.indexOf(activeOption)) : 0;
   const linkedCardIds = activeOption?.cardIds || [];
-  const linkedCards = linkedCardIds.map((cardId) => [cardId, ramsLogicDraft.cards[cardId]]).filter(([, card]) => card);
-  const unlinkedCards = Object.entries(ramsLogicDraft.cards).filter(([cardId]) => !linkedCardIds.includes(cardId));
+  const linkedCards = sortRamsCardEntries(linkedCardIds.map((cardId) => [cardId, ramsLogicDraft.cards[cardId]]).filter(([, card]) => card));
+  const unlinkedCards = sortRamsCardEntries(Object.entries(ramsLogicDraft.cards).filter(([cardId]) => !linkedCardIds.includes(cardId)));
   const activeCardId = selectedCardId && ramsLogicDraft.cards[selectedCardId]
     ? selectedCardId
     : linkedCards[0]?.[0] || Object.keys(ramsLogicDraft.cards)[0] || "";
@@ -2915,10 +2931,10 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                   <button
                     key={cardId}
                     type="button"
-                    className={`rams-linked-card ${cardId === activeCardId ? "active" : ""}`}
+                    className={`rams-linked-card type-${String(card.type || "risk").toLowerCase()} ${cardId === activeCardId ? "active" : ""}`}
                     onClick={() => setSelectedCardId(cardId)}
                   >
-                    <span>{card.type}</span>
+                    <span className="rams-type-chip">{card.type}</span>
                     <strong>{card.title}</strong>
                     <small>{card.trigger}</small>
                   </button>
@@ -2934,13 +2950,14 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                     <button
                       key={cardId}
                       type="button"
+                      className={`type-${String(card.type || "risk").toLowerCase()}`}
                       onClick={() => {
                         toggleOptionCard(activeGroupIndex, activeOptionIndex, cardId);
                         setSelectedCardId(cardId);
                       }}
                     >
                       <strong>{card.title}</strong>
-                      <span>{card.type}</span>
+                      <span className="rams-type-chip">{card.type}</span>
                     </button>
                   ))}
                 </div>
@@ -2954,25 +2971,28 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
               </div>
 
               {activeCard ? (
-                <article className="rams-logic-card rams-logic-editor-card">
-                  <label className="rams-check">
-                    <input
-                      type="checkbox"
-                      checked={ramsLogicDraft.baseCardIds.includes(activeCardId)}
-                      onChange={() => toggleBaseRamsCard(activeCardId)}
-                    />
-                    Always include on every RAMS
-                  </label>
-                  {activeOption?.cardIds?.includes(activeCardId) ? (
-                    <button className="text-button" type="button" onClick={() => toggleOptionCard(activeGroupIndex, activeOptionIndex, activeCardId)}>
-                      Unlink from selected button
-                    </button>
-                  ) : null}
-                  <label>
+                <article className={`rams-logic-card rams-logic-editor-card type-${String(activeCard.type || "risk").toLowerCase()}`}>
+                  <div className="rams-editor-topline">
+                    <span className="rams-type-chip">{activeCard.type}</span>
+                    <label className="rams-check">
+                      <input
+                        type="checkbox"
+                        checked={ramsLogicDraft.baseCardIds.includes(activeCardId)}
+                        onChange={() => toggleBaseRamsCard(activeCardId)}
+                      />
+                      Always include on every RAMS
+                    </label>
+                    {activeOption?.cardIds?.includes(activeCardId) ? (
+                      <button className="text-button" type="button" onClick={() => toggleOptionCard(activeGroupIndex, activeOptionIndex, activeCardId)}>
+                        Unlink from selected button
+                      </button>
+                    ) : null}
+                  </div>
+                  <label className="rams-field-wide">
                     Card title
                     <input value={activeCard.title || ""} onChange={(event) => updateRamsCard(activeCardId, "title", event.target.value)} />
                   </label>
-                  <div className="rams-logic-card-row">
+                  <div className="rams-logic-card-row rams-editor-two-col">
                     <label>
                       Type
                       <select value={activeCard.type || "Risk"} onChange={(event) => updateRamsCard(activeCardId, "type", event.target.value)}>
@@ -2986,7 +3006,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       <input value={activeCard.trigger || ""} onChange={(event) => updateRamsCard(activeCardId, "trigger", event.target.value)} />
                     </label>
                   </div>
-                  <div className="rams-logic-card-row">
+                  <div className="rams-logic-card-row rams-editor-two-col">
                     <label>
                       Initial risk
                       <select value={activeCard.initialRisk || "Medium"} onChange={(event) => updateRamsCard(activeCardId, "initialRisk", event.target.value)}>
@@ -3004,7 +3024,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       </select>
                     </label>
                   </div>
-                  <label>
+                  <label className="rams-field-wide">
                     Content lines
                     <textarea
                       value={(Array.isArray(activeCard.content) ? activeCard.content : []).join("\n")}
