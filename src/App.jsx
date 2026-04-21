@@ -125,6 +125,53 @@ const RAMS_DEFAULT_QUESTIONS = {
   notes: ""
 };
 
+const RAMS_PPE_ITEMS = [
+  {
+    label: "Safety Boots",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 3h5l1 8 5 2.2c1.8.8 2.9 2.4 3 4.3V19H3v-4.2l2.8-.7L7 3Z" />
+        <path d="M7.2 14.1h6.6M8 6h4.4M8.3 8.6h4.4" />
+      </svg>
+    )
+  },
+  {
+    label: "Safety Gloves",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7 12V4.6a1.4 1.4 0 1 1 2.8 0V11M9.8 11V3.8a1.4 1.4 0 1 1 2.8 0V11M12.6 11V4.4a1.4 1.4 0 1 1 2.8 0v7.7M15.4 12.3V7.2a1.4 1.4 0 1 1 2.8 0v7.2c0 4.2-2.5 6.6-6.1 6.6h-.7C8 21 5.6 18.5 5.6 14.9v-2.1c0-1 .6-1.8 1.4-2.1Z" />
+      </svg>
+    )
+  },
+  {
+    label: "Hi-Viz Jackets / Vests",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 3h8l2.8 5.2-2.1 1.2V21H7.3V9.4L5.2 8.2 8 3Z" />
+        <path d="M10 3c0 2.2.8 3.6 2 4.7 1.2-1.1 2-2.5 2-4.7M9.5 10.5v8M14.5 10.5v8M7.5 15.5h9" />
+      </svg>
+    )
+  },
+  {
+    label: "Eye Protection",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3.5 11.5c2.2-2 4.8-2.9 8.5-2.9s6.3.9 8.5 2.9l-1.2 5.1c-.3 1.1-1.2 1.9-2.4 1.9h-2.1c-1.2 0-2.1-.7-2.5-1.8l-.8-2.2-.8 2.2c-.4 1.1-1.3 1.8-2.5 1.8H6.6c-1.2 0-2.1-.8-2.4-1.9l-.7-5.1Z" />
+        <path d="M10.2 13.6h3.6" />
+      </svg>
+    )
+  },
+  {
+    label: "Hard Hats",
+    icon: (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 14.5a7 7 0 0 1 14 0v2H5v-2Z" />
+        <path d="M3.5 17h17M10 7.7v5.4M14 7.7v5.4" />
+      </svg>
+    )
+  }
+];
+
 const RAMS_STANDARD_RISK_CARDS = {
   accessEgress: {
     title: "Access & Egress",
@@ -3906,12 +3953,14 @@ function RamsPage({ currentUser, onLogout, notifications }) {
               <h2>RAMS Builder</h2>
               <p>Select a live board job, answer the basics, then reorder the cards before printing.</p>
             </div>
-            <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
-              Print / Save PDF
-            </button>
-            <button className="ghost-button" type="button" onClick={saveCurrentRams} disabled={!selectedJob || savingRams}>
-              {savingRams ? "Saving..." : savedRamsId ? "Save RAMS changes" : "Save RAMS to job"}
-            </button>
+            <div className="rams-header-actions">
+              <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
+                Print / Save PDF
+              </button>
+              <button className="ghost-button" type="button" onClick={saveCurrentRams} disabled={!selectedJob || savingRams}>
+                {savingRams ? "Saving..." : savedRamsId ? "Save RAMS changes" : "Save RAMS to job"}
+              </button>
+            </div>
           </div>
 
           {jobError ? <div className="flash error">{jobError}</div> : null}
@@ -4011,7 +4060,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
                   <div>
                     <h3>Risk Assessment and Method Statement</h3>
-                    <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")} - Ref: {renderEditable("reference", ramsReference)}</p>
+                    <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")}</p>
                   </div>
                 </div>
                 <div className="rams-doc-meta">
@@ -4019,11 +4068,22 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
                   <span><strong>Operatives:</strong> {renderEditable("operatives", displayedOperatives)}</span>
                   <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
-                  <span><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
+                  <span className="meta-wide"><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
                   <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
                   <span><strong>Access:</strong> {renderEditable("access", displayedAccess)}</span>
                   <span><strong>Work area:</strong> {renderEditable("workArea", displayedWorkArea)}</span>
-                  <span><strong>Tools:</strong> {renderEditable("tools", displayedTools)}</span>
+                  <span className="meta-full"><strong>Tools:</strong> {renderEditable("tools", displayedTools)}</span>
+                </div>
+                <div className="rams-ppe-section">
+                  <h4>4. PPE Required:</h4>
+                  <div className="rams-ppe-grid">
+                    {RAMS_PPE_ITEMS.map((item) => (
+                      <span key={item.label} className="rams-ppe-item">
+                        <span className="rams-ppe-icon">{item.icon}</span>
+                        {item.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>

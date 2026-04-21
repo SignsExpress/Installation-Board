@@ -25,6 +25,25 @@
   background: #fff;
 }
 
+.rams-header > div:first-child {
+  min-width: 0;
+}
+
+.rams-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+
+.rams-header-actions .primary-button,
+.rams-header-actions .ghost-button {
+  min-height: 42px;
+  white-space: nowrap;
+}
+
 .rams-header h2,
 .rams-header p {
   margin: 0;
@@ -1085,9 +1104,74 @@
   white-space: normal;
 }
 
+.rams-doc-meta .meta-wide {
+  grid-column: span 2;
+}
+
+.rams-doc-meta .meta-full {
+  grid-column: 1 / -1;
+}
+
 .rams-doc-meta .rams-editable {
   white-space: normal;
   overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.rams-ppe-section {
+  border: 1px solid #b9d8dc;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #cfe4e7;
+}
+
+.rams-ppe-section h4 {
+  margin: 0;
+  background: #008c94;
+  color: #fff;
+  padding: 5px 9px;
+  font-size: 0.84rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rams-ppe-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 18px;
+  padding: 8px 10px 10px;
+}
+
+.rams-ppe-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #0f172a;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.rams-ppe-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #008c94;
+  color: #fff;
+  flex: 0 0 auto;
+}
+
+.rams-ppe-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .rams-doc-section {
@@ -1438,6 +1522,50 @@
     font-size: 7.2pt !important;
     line-height: 1.1 !important;
     background: #f8fafc !important;
+  }
+
+  .rams-doc-meta .meta-wide {
+    grid-column: span 2 !important;
+  }
+
+  .rams-doc-meta .meta-full {
+    grid-column: 1 / -1 !important;
+  }
+
+  .rams-ppe-section {
+    border-color: #b9d8dc !important;
+    border-radius: 2mm !important;
+    background: #cfe4e7 !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-ppe-section h4 {
+    background: #008c94 !important;
+    color: #fff !important;
+    padding: 1.2mm 2mm !important;
+    font-size: 7.5pt !important;
+  }
+
+  .rams-ppe-grid {
+    gap: 1.4mm 5mm !important;
+    padding: 1.6mm 2.4mm 2mm !important;
+  }
+
+  .rams-ppe-item {
+    font-size: 7.4pt !important;
+    gap: 1.6mm !important;
+  }
+
+  .rams-ppe-icon {
+    width: 6mm !important;
+    height: 6mm !important;
+    background: #008c94 !important;
+    color: #fff !important;
+  }
+
+  .rams-ppe-icon svg {
+    width: 4.3mm !important;
+    height: 4.3mm !important;
   }
 
   .rams-doc-section {
