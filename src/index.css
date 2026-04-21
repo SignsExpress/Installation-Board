@@ -1362,6 +1362,37 @@
   background: #f0fdf4;
 }
 
+.rams-method-safety-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 6px;
+  align-items: stretch;
+}
+
+.rams-site-hazards-section {
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f0fdf4;
+}
+
+.rams-site-hazards-section h5 {
+  margin: 0;
+  background: #dcfce7;
+  color: #166534;
+  padding: 5px 9px;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.rams-site-hazards-section p {
+  margin: 0;
+  padding: 8px 10px 10px;
+  font-size: 0.82rem;
+  line-height: 1.24;
+}
+
 .rams-first-aid-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1846,6 +1877,32 @@
     border-radius: 2mm !important;
     background: #f0fdf4 !important;
     break-inside: avoid !important;
+  }
+
+  .rams-method-safety-grid {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) !important;
+    gap: 1.4mm !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-site-hazards-section {
+    border-color: #bbf7d0 !important;
+    border-radius: 2mm !important;
+    background: #f0fdf4 !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-site-hazards-section h5 {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+    padding: 1.2mm 2mm !important;
+    font-size: 7.5pt !important;
+  }
+
+  .rams-site-hazards-section p {
+    padding: 1.6mm 2.4mm 2mm !important;
+    font-size: 7.4pt !important;
+    line-height: 1.14 !important;
   }
 
   .rams-ppe-section h5 {

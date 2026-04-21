@@ -1574,6 +1574,7 @@ function buildRamsPdfDocument(job, document, payload = {}) {
   const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
   const tools = Array.isArray(payload.tools) ? payload.tools : [];
   const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
+  const siteHazards = sanitizePdfLine(payload.siteHazards || "N/A");
   const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
   const risks = Array.isArray(payload.risks) ? payload.risks : [];
   const methods = Array.isArray(payload.methods) ? payload.methods : [];
@@ -1587,6 +1588,7 @@ function buildRamsPdfDocument(job, document, payload = {}) {
   lines.push({ text: "Access, Tools and PPE", bold: true, size: 12 });
   lines.push(`Tools: ${tools.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
   lines.push(`Access: ${accessMethods.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
+  lines.push(`Site Specific Hazards or Information: ${siteHazards}`);
   lines.push(`PPE: ${ppe.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
   lines.push(`First Aid Facilities: ${sanitizePdfLine(firstAid.facility)}`);
   lines.push(`First Aid Box Location: ${sanitizePdfLine(firstAid.boxLocation || "Signs Express Van")}`);

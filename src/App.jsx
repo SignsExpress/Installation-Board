@@ -91,10 +91,15 @@ const RAMS_ACTIVITY_OPTIONS = [
 ];
 
 const RAMS_ACCESS_OPTIONS = [
-  { value: "ground", label: "Ground level" },
-  { value: "steps", label: "Steps / podium" },
-  { value: "ladders", label: "Ladders" },
-  { value: "mewp", label: "MEWP / powered access" }
+  { value: "hop-up-600", label: "600x600mm Hop-Up", cardIds: ["height", "fallingObjects"] },
+  { value: "step-ladders", label: "Step Ladders", cardIds: ["height", "fallingObjects", "ladders"] },
+  { value: "triple-extension-ladder", label: "Triple Extension Section Ladder", cardIds: ["height", "fallingObjects", "ladders"] },
+  { value: "lyte-podium-guardrail", label: "Lyte glass fibre podium steps with guardrail", cardIds: ["height", "fallingObjects"] },
+  { value: "mobile-scaffolding", label: "Mobile Scaffolding", cardIds: ["height", "fallingObjects"] },
+  { value: "electric-scissor-lift", label: "Electric Scissor Lift", cardIds: ["height", "fallingObjects", "mewp"] },
+  { value: "diesel-scissor-lift", label: "Diesel Scissor Lift", cardIds: ["height", "fallingObjects", "mewp"] },
+  { value: "electric-boom-lift", label: "Electric Boom Lift", cardIds: ["height", "fallingObjects", "mewp"] },
+  { value: "diesel-boom-lift", label: "Diesel Boom Lift", cardIds: ["height", "fallingObjects", "mewp"] }
 ];
 
 const RAMS_WORK_AREA_OPTIONS = [
@@ -105,19 +110,29 @@ const RAMS_WORK_AREA_OPTIONS = [
 ];
 
 const RAMS_TOOL_OPTIONS = [
-  { value: "hand-tools", label: "Hand tools" },
-  { value: "power-tools", label: "Power tools / drilling" },
-  { value: "adhesives", label: "Adhesives / cleaners" },
-  { value: "lifting", label: "Heavy or awkward lifting" },
-  { value: "electrical", label: "Electrical isolation nearby" }
+  { value: "scalpel", label: "Scalpel", cardIds: ["tools"] },
+  { value: "felt-edge-squeegee", label: "Felt Edge Squeegee", cardIds: ["tools"] },
+  { value: "stanley-knife", label: "Stanley Knife", cardIds: ["tools"] },
+  { value: "18v-impact-driver", label: "18v Cordless Battery Powered Impact Driver", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "18v-sds-drill", label: "18v Cordless Battery Powered SDS Drill", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "petrol-generator", label: "Petrol Generator", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "230v-110v-breaker", label: "230v or 110v Breaker", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "corded-jigsaw", label: "Corded Jigsaw", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "18v-grinder", label: "18V Cordless Battery Powered Grinder", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "cat-scanner", label: "CAT Scanner", cardIds: ["tools", "equipmentFailure"] },
+  { value: "corded-heat-gun", label: "Corded Heat Gun", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "plunge-saw-guide-rail", label: "Plunge Saw with Guide Rail & Sawhorse", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "multi-tool", label: "Multi Tool", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
+  { value: "non-powered-digging-tools", label: "Non-Powered Digging Tools", cardIds: ["tools", "digging"] },
+  { value: "powered-belt-disc-sander", label: "Powered Belt or Disc Sander", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] }
 ];
 
 const RAMS_DEFAULT_QUESTIONS = {
   jobId: "",
   activity: "external",
-  access: ["ground"],
+  access: [],
   workArea: "quiet",
-  tools: ["hand-tools"],
+  tools: [],
   operatives: "2",
   duration: "1 day",
   ppe: ["boots", "gloves", "hi-vis", "eye", "hard-hat"],
@@ -702,14 +717,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: true,
       options: RAMS_ACCESS_OPTIONS.map((option) => ({
         ...option,
-        cardIds:
-          option.value === "steps"
-            ? ["height", "fallingObjects"]
-            : option.value === "ladders"
-              ? ["height", "fallingObjects", "ladders"]
-              : option.value === "mewp"
-                ? ["height", "fallingObjects", "mewp"]
-                : []
+        cardIds: option.cardIds || []
       }))
     },
     {
@@ -736,16 +744,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: true,
       options: RAMS_TOOL_OPTIONS.map((option) => ({
         ...option,
-        cardIds:
-          option.value === "power-tools"
-            ? ["tools", "electricalEquipment", "equipmentFailure"]
-            : option.value === "adhesives"
-              ? ["substances"]
-            : option.value === "lifting"
-                ? ["lifting", "musculoskeletal"]
-                : option.value === "electrical"
-                  ? ["electrical"]
-                  : []
+        cardIds: option.cardIds || []
       }))
     }
   ],
@@ -1557,7 +1556,7 @@ function normalizeRamsQuestions(questions) {
     ...RAMS_DEFAULT_QUESTIONS,
     ...questions,
     access,
-    tools: Array.isArray(questions?.tools) && questions.tools.length ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools,
+    tools: Array.isArray(questions?.tools) ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools,
     ppe: Array.isArray(questions?.ppe) ? questions.ppe : RAMS_DEFAULT_QUESTIONS.ppe
   };
 }
@@ -1624,12 +1623,30 @@ function normalizeRamsLogic(logic = {}) {
     optionGroups: incomingGroups.map((group, groupIndex) => {
       const fallback = defaultGroups[groupIndex] || {};
       const key = String(group.key || fallback.key || `group-${groupIndex}`);
+      const defaultOptions = Array.isArray(fallback.options) ? fallback.options : [];
+      const legacyOptionValues = new Set(
+        key === "tools"
+          ? ["hand-tools", "power-tools", "adhesives", "lifting", "electrical"]
+          : key === "access"
+            ? ["ground", "steps", "ladders", "mewp"]
+            : []
+      );
+      const incomingOptions = Array.isArray(group.options) ? group.options : [];
+      const mergedOptions = key === "tools" || key === "access"
+        ? [
+            ...defaultOptions,
+            ...incomingOptions.filter((option) => {
+              const value = String(option.value || "");
+              return value && !legacyOptionValues.has(value) && !defaultOptions.some((entry) => String(entry.value) === value);
+            })
+          ]
+        : incomingOptions;
       return {
         key,
         label: String(group.label || fallback.label || "Question"),
         input: key === "access" ? "checkboxes" : ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
         multi: key === "access" ? true : Boolean(group.multi ?? fallback.multi),
-        options: (Array.isArray(group.options) ? group.options : []).map((option, optionIndex) => ({
+        options: mergedOptions.map((option, optionIndex) => ({
           value: String(option.value || `option-${optionIndex}`),
           label: String(option.label || option.value || "Option"),
           cardIds: Array.isArray(option.cardIds) ? option.cardIds.map(String).filter(Boolean) : []
@@ -3760,7 +3777,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
       const nextTools = existing.includes(value)
         ? existing.filter((entry) => entry !== value)
         : [...existing, value];
-      return { ...current, tools: nextTools.length ? nextTools : ["hand-tools"] };
+      return { ...current, tools: nextTools };
     });
   }
 
@@ -4024,6 +4041,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const displayedAccess = getRamsEdit("access", selectedAccess.join(", "));
   const displayedWorkArea = getRamsEdit("workArea", selectedWorkArea);
   const displayedTools = getRamsEdit("tools", selectedTools.join(", "));
+  const displayedSiteHazards = getRamsEdit("notes", questions.notes?.trim() || "N/A");
   const displayedFirstAidFacility = getRamsEdit("firstAidFacility", questions.firstAidFacility || "To be selected");
   const displayedFirstAidBoxLocation = getRamsEdit("firstAidBoxLocation", questions.firstAidBoxLocation || "Signs Express Van");
   const activityGroup = ramsLogic.optionGroups.find((group) => group.key === "activity");
@@ -4053,11 +4071,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
       ],
       arrangements: [
         { label: "Welfare", value: getRamsEdit("welfare", questions.welfare) },
-        { label: "Emergency", value: getRamsEdit("emergency", questions.emergency) },
-        { label: "Site specific hazards or information", value: getRamsEdit("notes", questions.notes || "-") }
+        { label: "Emergency", value: getRamsEdit("emergency", questions.emergency) }
       ],
       tools: selectedTools,
       accessMethods: selectedAccess,
+      siteHazards: displayedSiteHazards,
       ppe: selectedPpe.map((item) => item.label),
       firstAid: {
         facility: displayedFirstAidFacility,
@@ -4231,7 +4249,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <h4>Arrangements</h4>
                   <p><strong>Welfare:</strong> {renderEditable("welfare", questions.welfare)}</p>
                   <p><strong>Emergency:</strong> {renderEditable("emergency", questions.emergency)}</p>
-                  <p><strong>Site specific hazards or information:</strong> {renderEditable("notes", questions.notes || "-")}</p>
                 </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
@@ -4330,19 +4347,25 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       <p>{renderEditable("access", displayedAccess || "-")}</p>
                     </div>
                   </div>
-                  {selectedPpe.length ? (
-                    <div className="rams-ppe-section">
-                      <h5>PPE Required</h5>
-                      <div className="rams-ppe-grid">
-                        {selectedPpe.map((item) => (
-                          <span key={item.value} className="rams-ppe-item">
-                            <span className="rams-ppe-icon">{item.icon}</span>
-                            {item.label}
-                          </span>
-                        ))}
-                      </div>
+                  <div className="rams-method-safety-grid">
+                    <div className="rams-site-hazards-section">
+                      <h5>Site Specific Hazards or Information</h5>
+                      <p>{renderEditable("notes", displayedSiteHazards)}</p>
                     </div>
-                  ) : null}
+                    {selectedPpe.length ? (
+                      <div className="rams-ppe-section">
+                        <h5>PPE Required</h5>
+                        <div className="rams-ppe-grid">
+                          {selectedPpe.map((item) => (
+                            <span key={item.value} className="rams-ppe-item">
+                              <span className="rams-ppe-icon">{item.icon}</span>
+                              {item.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                   <div className="rams-first-aid-section">
                     <div>
                       <h4>First Aid Facilities</h4>
