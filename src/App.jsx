@@ -330,6 +330,18 @@ const RAMS_CARD_LIBRARY = {
       "Stop work if unknown services are found."
     ]
   },
+  electricalEquipment: {
+    title: "Electric Shock from Equipment",
+    type: "Risk",
+    trigger: "Power tools / drilling selected",
+    initialRisk: "High",
+    residualRisk: "Low",
+    content: [
+      "Use battery-powered tools where reasonably practicable and check tools, chargers and leads before use.",
+      "Do not use damaged electrical equipment, exposed cables or improvised connections.",
+      "Keep electrical equipment away from wet surfaces and route leads to avoid damage or trip hazards."
+    ]
+  },
   vehicle: {
     title: "Vehicle Graphics Installation",
     type: "Method",
@@ -1177,7 +1189,10 @@ function getRamsCardIdsForQuestions(questions) {
   if (["steps", "ladders", "mewp"].includes(normalized.access)) selected.add("height");
   if (normalized.access === "ladders") selected.add("ladders");
   if (normalized.access === "mewp") selected.add("mewp");
-  if (normalized.tools.includes("power-tools")) selected.add("tools");
+  if (normalized.tools.includes("power-tools")) {
+    selected.add("tools");
+    selected.add("electricalEquipment");
+  }
   if (normalized.tools.includes("adhesives")) selected.add("substances");
   if (normalized.tools.includes("lifting")) selected.add("lifting");
   if (normalized.tools.includes("electrical")) selected.add("electrical");
@@ -2496,6 +2511,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
   const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS));
   const [draggingCardId, setDraggingCardId] = useState("");
+  const [ramsEdits, setRamsEdits] = useState({});
   const todayIso = getLocalTodayIso();
 
   useEffect(() => {
@@ -2539,6 +2555,10 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
 
   useEffect(() => {
+    setRamsEdits({});
+  }, [selectedJob?.id]);
+
+  useEffect(() => {
     setCardOrder((current) => {
       const existing = current.filter((cardId) => suggestedCardIds.includes(cardId));
       const missing = suggestedCardIds.filter((cardId) => !existing.includes(cardId));
@@ -2558,6 +2578,27 @@ function RamsPage({ currentUser, onLogout, notifications }) {
         : [...existing, value];
       return { ...current, tools: nextTools.length ? nextTools : ["hand-tools"] };
     });
+  }
+
+  function getRamsEdit(key, fallback = "") {
+    return ramsEdits[key] ?? String(fallback || "");
+  }
+
+  function updateRamsEdit(key, value) {
+    setRamsEdits((current) => ({ ...current, [key]: value }));
+  }
+
+  function renderEditable(key, fallback, className = "") {
+    return (
+      <span
+        className={`rams-editable ${className}`.trim()}
+        contentEditable
+        suppressContentEditableWarning
+        onBlur={(event) => updateRamsEdit(key, event.currentTarget.textContent || "")}
+      >
+        {getRamsEdit(key, fallback)}
+      </span>
+    );
   }
 
   function moveCard(cardId, direction) {
@@ -2592,6 +2633,14 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const selectedAccess = RAMS_ACCESS_OPTIONS.find((option) => option.value === questions.access)?.label || questions.access;
   const selectedWorkArea = RAMS_WORK_AREA_OPTIONS.find((option) => option.value === questions.workArea)?.label || questions.workArea;
   const selectedTools = RAMS_TOOL_OPTIONS.filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
+  const displayedDate = getRamsEdit("date", formatJobDate(selectedJob?.date));
+  const displayedOperatives = getRamsEdit("operatives", questions.operatives);
+  const displayedDuration = getRamsEdit("duration", questions.duration);
+  const displayedInstallers = getRamsEdit("installers", selectedJob ? getInstallerNamesForRams(selectedJob) : "To be allocated");
+  const displayedActivity = getRamsEdit("activity", selectedActivity);
+  const displayedAccess = getRamsEdit("access", selectedAccess);
+  const displayedWorkArea = getRamsEdit("workArea", selectedWorkArea);
+  const displayedTools = getRamsEdit("tools", selectedTools.join(", "));
 
   return (
     <div className="app-shell rams-shell">
@@ -2717,36 +2766,48 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
                   <div>
                     <h3>Risk Assessment and Method Statement</h3>
-                    <p>{selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document"} · Ref: {ramsReference}</p>
+                    <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")} · Ref: {renderEditable("reference", ramsReference)}</p>
                   </div>
                 </div>
                 <div className="rams-doc-meta">
-                  <span><strong>Date:</strong> {formatJobDate(selectedJob?.date)}</span>
-                  <span><strong>Operatives:</strong> {questions.operatives}</span>
-                  <span><strong>Duration:</strong> {questions.duration}</span>
-                  <span><strong>Installers:</strong> {selectedJob ? getInstallerNamesForRams(selectedJob) : "To be allocated"}</span>
-                  <span><strong>Activity:</strong> {selectedActivity}</span>
-                  <span><strong>Access:</strong> {selectedAccess}</span>
-                  <span><strong>Work area:</strong> {selectedWorkArea}</span>
-                  <span><strong>Tools:</strong> {selectedTools.join(", ")}</span>
+                  <span><strong>Date:</strong> {renderEditable("date", displayedDate)}</span>
+                  <span><strong>Operatives:</strong> {renderEditable("operatives", displayedOperatives)}</span>
+                  <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
+                  <span><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
+                  <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
+                  <span><strong>Access:</strong> {renderEditable("access", displayedAccess)}</span>
+                  <span><strong>Work area:</strong> {renderEditable("workArea", displayedWorkArea)}</span>
+                  <span><strong>Tools:</strong> {renderEditable("tools", displayedTools)}</span>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>
-                  <p><strong>Customer:</strong> {selectedJob?.customerName || "-"}</p>
-                  <p><strong>Site address:</strong> {selectedJob ? getRamsJobAddress(selectedJob) : "-"}</p>
-                  <p><strong>Contact:</strong> {selectedJob ? getRamsContact(selectedJob) : "-"}</p>
-                  <p><strong>Scope:</strong> {selectedJob?.description || selectedActivity}</p>
+                  <p><strong>Customer:</strong> {renderEditable("customerName", selectedJob?.customerName || "-")}</p>
+                  <p><strong>Site address:</strong> {renderEditable("siteAddress", selectedJob ? getRamsJobAddress(selectedJob) : "-")}</p>
+                  <p><strong>Contact name:</strong> {renderEditable("contactName", selectedJob?.contact || "-")}</p>
+                  <p><strong>Contact number:</strong> {renderEditable("contactNumber", selectedJob?.number || "-")}</p>
+                  <p><strong>Scope:</strong> {renderEditable("scope", selectedJob?.description || selectedActivity, "wide-edit")}</p>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Arrangements</h4>
-                  <p><strong>Welfare:</strong> {questions.welfare}</p>
-                  <p><strong>Emergency:</strong> {questions.emergency}</p>
-                  {questions.notes ? <p><strong>Notes:</strong> {questions.notes}</p> : null}
+                  <p><strong>Welfare:</strong> {renderEditable("welfare", questions.welfare)}</p>
+                  <p><strong>Emergency:</strong> {renderEditable("emergency", questions.emergency)}</p>
+                  <p><strong>Notes:</strong> {renderEditable("notes", questions.notes || "-")}</p>
                 </div>
                 <div className="rams-doc-section rams-doc-risk-section">
                   <h4>Risk Assessment</h4>
                   <div className="rams-risk-table-wrap">
                     <table className="rams-risk-table">
+                      <colgroup>
+                        <col className="rams-col-hazard" />
+                        <col className="rams-col-harmed" />
+                        <col className="rams-col-score" />
+                        <col className="rams-col-score" />
+                        <col className="rams-col-score" />
+                        <col className="rams-col-controls" />
+                        <col className="rams-col-score" />
+                        <col className="rams-col-score" />
+                        <col className="rams-col-score" />
+                      </colgroup>
                       <thead>
                         <tr>
                           <th rowSpan="2">Hazard</th>
@@ -2771,23 +2832,23 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                           return (
                             <tr key={`risk-row-${card.id}`}>
                               <td>
-                                <strong>{card.title}</strong>
+                                <strong>{renderEditable(`risk-${card.id}-title`, card.title)}</strong>
                                 <span>{card.type}</span>
                               </td>
-                              <td>Operatives, client staff, visitors and members of the public where present.</td>
-                              <td>{initial.likelihood}</td>
-                              <td>{initial.consequence}</td>
-                              <td><strong>{initial.rating}</strong></td>
+                              <td>{renderEditable(`risk-${card.id}-harmed`, "Operatives, client staff, visitors and members of the public where present.")}</td>
+                              <td>{renderEditable(`risk-${card.id}-initial-l`, initial.likelihood)}</td>
+                              <td>{renderEditable(`risk-${card.id}-initial-c`, initial.consequence)}</td>
+                              <td><strong>{renderEditable(`risk-${card.id}-initial-r`, initial.rating)}</strong></td>
                               <td>
                                 <ul>
-                                  {card.content.map((line) => (
-                                    <li key={`risk-control-${card.id}-${line}`}>{line}</li>
+                                  {card.content.map((line, lineIndex) => (
+                                    <li key={`risk-control-${card.id}-${line}`}>{renderEditable(`risk-${card.id}-control-${lineIndex}`, line)}</li>
                                   ))}
                                 </ul>
                               </td>
-                              <td>{residual.likelihood}</td>
-                              <td>{residual.consequence}</td>
-                              <td><strong>{residual.rating}</strong></td>
+                              <td>{renderEditable(`risk-${card.id}-residual-l`, residual.likelihood)}</td>
+                              <td>{renderEditable(`risk-${card.id}-residual-c`, residual.consequence)}</td>
+                              <td><strong>{renderEditable(`risk-${card.id}-residual-r`, residual.rating)}</strong></td>
                             </tr>
                           );
                         })}
@@ -2810,7 +2871,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                         onDrop={() => handleCardDrop(card.id)}
                       >
                         <div>
-                          <strong>{card.title}</strong>
+                          <strong>{renderEditable(`method-${card.id}-title`, card.title)}</strong>
                           <span>{card.trigger}</span>
                           <span className="rams-card-actions no-print">
                             <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">^</button>
@@ -2818,8 +2879,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                           </span>
                         </div>
                         <ul>
-                          {card.content.map((line) => (
-                            <li key={`doc-${card.id}-${line}`}>{line}</li>
+                          {card.content.map((line, lineIndex) => (
+                            <li key={`doc-${card.id}-${line}`}>{renderEditable(`method-${card.id}-line-${lineIndex}`, line)}</li>
                           ))}
                         </ul>
                       </div>

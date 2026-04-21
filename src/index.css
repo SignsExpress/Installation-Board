@@ -379,7 +379,24 @@
   width: 100%;
   min-width: 900px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.78rem;
+}
+
+.rams-col-hazard {
+  width: 15%;
+}
+
+.rams-col-harmed {
+  width: 15%;
+}
+
+.rams-col-score {
+  width: 3.7%;
+}
+
+.rams-col-controls {
+  width: 40%;
 }
 
 .rams-risk-table th,
@@ -421,7 +438,7 @@
 }
 
 .rams-risk-table td:first-child {
-  width: 150px;
+  width: auto;
 }
 
 .rams-risk-table td:first-child span {
@@ -436,6 +453,28 @@
 .rams-risk-table ul {
   margin: 0;
   padding-left: 14px;
+}
+
+.rams-editable {
+  display: inline;
+  min-width: 1.5em;
+  border-radius: 3px;
+  outline: 0;
+}
+
+.rams-editable:hover {
+  background: rgba(95, 60, 116, 0.08);
+  box-shadow: 0 0 0 2px rgba(95, 60, 116, 0.08);
+}
+
+.rams-editable:focus {
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(95, 60, 116, 0.22);
+}
+
+.rams-risk-table .rams-editable,
+.rams-doc-card .rams-editable {
+  display: inline;
 }
 
 .rams-doc-card > div {
@@ -578,6 +617,22 @@
     font-size: 6.5pt !important;
   }
 
+  .rams-col-hazard {
+    width: 15% !important;
+  }
+
+  .rams-col-harmed {
+    width: 14% !important;
+  }
+
+  .rams-col-score {
+    width: 3.5% !important;
+  }
+
+  .rams-col-controls {
+    width: 43% !important;
+  }
+
   .rams-risk-table th,
   .rams-risk-table td {
     padding: 1.2mm !important;
@@ -596,6 +651,12 @@
   .rams-doc-card {
     padding: 1.4mm 2mm !important;
     gap: 1mm !important;
+  }
+
+  .rams-editable:hover,
+  .rams-editable:focus {
+    background: transparent !important;
+    box-shadow: none !important;
   }
 
   .rams-signoff {
