@@ -95,6 +95,34 @@ function normalizeAttendanceProfile(profile) {
   return { mode, contractedHours };
 }
 
+function normalizeProfileText(value, maxLength = 120) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function normalizeQualifications(value) {
+  const entries = Array.isArray(value)
+    ? value
+    : String(value || "")
+      .split(",")
+      .map((entry) => entry.trim());
+  return [...new Set(entries.map((entry) => normalizeProfileText(entry, 80)).filter(Boolean))].slice(0, 30);
+}
+
+function normalizePhotoDataUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!/^data:image\/(png|jpe?g|webp);base64,/i.test(raw)) return "";
+  return raw.length <= 750000 ? raw : "";
+}
+
+function normalizeUserProfile(user) {
+  return {
+    jobTitle: normalizeProfileText(user?.jobTitle || ""),
+    qualifications: normalizeQualifications(user?.qualifications),
+    photoDataUrl: normalizePhotoDataUrl(user?.photoDataUrl)
+  };
+}
+
 function normalizePermissionValue(value, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return PERMISSION_VALUES.includes(normalized) ? normalized : fallback;
@@ -180,6 +208,10 @@ function normalizeStore(parsed, options = {}) {
   for (const user of users) {
     user.permissions = normalizePermissions(user.permissions, user.role);
     user.attendanceProfile = normalizeAttendanceProfile(user.attendanceProfile);
+    const profile = normalizeUserProfile(user);
+    user.jobTitle = profile.jobTitle;
+    user.qualifications = profile.qualifications;
+    user.photoDataUrl = profile.photoDataUrl;
     if (isOwnerUser(user)) {
       user.permissions = {
         board: "admin",
@@ -257,6 +289,7 @@ function sanitizeUser(user) {
     role: deriveRoleFromPermissions(permissions),
     permissions,
     attendanceProfile: normalizeAttendanceProfile(safeUser.attendanceProfile),
+    ...normalizeUserProfile(safeUser),
     hasPassword: Boolean(safeUser.passwordHash)
   };
 }
@@ -283,6 +316,9 @@ async function createUser({ displayName, role = "client", password = "" }) {
     role: normalizedRole,
     permissions: getDefaultPermissions(normalizedRole),
     attendanceProfile: getDefaultAttendanceProfile(),
+    jobTitle: "",
+    qualifications: [],
+    photoDataUrl: "",
     passwordSalt: "",
     passwordHash: "",
     passwordUpdatedAt: ""
@@ -382,6 +418,22 @@ async function updateUserAttendanceProfile(userId, attendanceProfile) {
   return sanitizeUser(user);
 }
 
+async function updateUserProfile(userId, profile) {
+  const store = await readUsersStore();
+  const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
+
+  if (!user) {
+    throw new Error(`No user found for id "${userId}".`);
+  }
+
+  const nextProfile = normalizeUserProfile(profile);
+  user.jobTitle = nextProfile.jobTitle;
+  user.qualifications = nextProfile.qualifications;
+  user.photoDataUrl = nextProfile.photoDataUrl;
+  await writeUsersStore(store);
+  return sanitizeUser(user);
+}
+
 async function deleteUser(userId) {
   const store = await readUsersStore();
   const user = store.users.find((entry) => String(entry.id || "") === String(userId || ""));
@@ -450,6 +502,7 @@ module.exports = {
   setUserPasswordById,
   updateUserAttendanceProfile,
   updateUserPermissions,
+  updateUserProfile,
   verifyPassword,
   writeUsersStore
 };

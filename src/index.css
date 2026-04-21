@@ -1398,6 +1398,73 @@
   gap: 6px;
 }
 
+.rams-installer-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px;
+}
+
+.rams-installer-contact-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 74px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.rams-installer-photo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 58px;
+  border-radius: 6px;
+  border: 1px solid #86efac;
+  background: #fff;
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 900;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.rams-installer-photo input {
+  display: none;
+}
+
+.rams-installer-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rams-installer-contact-card strong,
+.rams-installer-contact-card span,
+.rams-installer-contact-card small {
+  display: block;
+}
+
+.rams-installer-contact-card strong {
+  font-size: 0.86rem;
+}
+
+.rams-installer-contact-card span {
+  color: #334155;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.rams-installer-contact-card small {
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.2;
+}
+
 .rams-method-prep-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1473,6 +1540,10 @@
   stroke-linejoin: round;
 }
 
+.print-only {
+  display: none !important;
+}
+
 .client-rams-links {
   display: flex;
   flex-wrap: wrap;
@@ -1510,6 +1581,15 @@
 .rams-doc-method-section h4 {
   color: #166534;
   background: #dcfce7;
+}
+
+.rams-doc-method-section .rams-method-info-card h4,
+.rams-doc-method-section .rams-method-info-card h5 {
+  display: block;
+  width: auto;
+  border-radius: 0;
+  background: #dcfce7;
+  color: #166534;
 }
 
 .rams-doc-risk-section h4 {
@@ -1771,6 +1851,10 @@
     display: none !important;
   }
 
+  .print-only {
+    display: inline-flex !important;
+  }
+
   .app-shell,
   .app-shell:has(.host-nav-shell),
   .page,
@@ -1863,6 +1947,43 @@
     padding: 1.6mm 2.4mm 2mm !important;
     font-size: 7.2pt !important;
     line-height: 1.14 !important;
+  }
+
+  .rams-doc-method-section .rams-method-info-card h4,
+  .rams-doc-method-section .rams-method-info-card h5 {
+    display: block !important;
+    width: auto !important;
+    border-radius: 0 !important;
+  }
+
+  .rams-installer-contact-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 1.4mm !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-installer-contact-card {
+    grid-template-columns: 10mm minmax(0, 1fr) !important;
+    gap: 1.6mm !important;
+    min-height: 15mm !important;
+    padding: 1.5mm 2mm !important;
+    border-color: #bbf7d0 !important;
+    background: #f0fdf4 !important;
+  }
+
+  .rams-installer-photo {
+    width: 9mm !important;
+    height: 11mm !important;
+    border-radius: 1.3mm !important;
+  }
+
+  .rams-installer-contact-card strong {
+    font-size: 7.4pt !important;
+  }
+
+  .rams-installer-contact-card span,
+  .rams-installer-contact-card small {
+    font-size: 6.6pt !important;
   }
 
   .rams-ppe-grid {
@@ -6389,6 +6510,94 @@ button {
   font-weight: 700;
 }
 
+.permissions-profile-card {
+  display: grid;
+  grid-template-columns: 72px minmax(180px, 0.8fr) minmax(260px, 1.4fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid rgba(199, 183, 210, 0.45);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.permissions-photo-control {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.permissions-photo-control input {
+  display: none;
+}
+
+.permissions-photo-control img,
+.permissions-photo-control > span {
+  width: 58px;
+  height: 72px;
+  border-radius: 8px;
+  border: 1px solid #d7cbdd;
+  background: #f8fafc;
+  color: var(--sx-main);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  object-fit: cover;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.permissions-profile-field,
+.permissions-qualifications {
+  display: grid;
+  gap: 7px;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.permissions-profile-field input,
+.permissions-qualification-add input {
+  min-width: 0;
+  border: 1px solid var(--sx-border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 9px 11px;
+  font: inherit;
+}
+
+.permissions-qualification-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.permissions-qualification-list small {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.qualification-badge {
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #166534;
+  padding: 5px 9px;
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.permissions-qualification-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .permissions-owner-pill {
   padding: 6px 10px;
   border-radius: 999px;
@@ -7392,6 +7601,10 @@ button {
 
   .permissions-admin-tools,
   .permissions-user-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .permissions-profile-card {
     grid-template-columns: 1fr;
   }
 

@@ -14,6 +14,7 @@ const {
   setUserPasswordById,
   updateUserAttendanceProfile,
   updateUserPermissions,
+  updateUserProfile,
   verifyPassword
 } = require("./auth-store");
 
@@ -1573,6 +1574,7 @@ function buildRamsPdfDocument(job, document, payload = {}) {
   const arrangements = Array.isArray(payload.arrangements) ? payload.arrangements : [];
   const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
   const tools = Array.isArray(payload.tools) ? payload.tools : [];
+  const installers = Array.isArray(payload.installers) ? payload.installers : [];
   const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
   const siteHazards = sanitizePdfLine(payload.siteHazards || "N/A");
   const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
@@ -1586,6 +1588,14 @@ function buildRamsPdfDocument(job, document, payload = {}) {
   site.forEach((item) => lines.push(`${sanitizePdfLine(item.label)}: ${sanitizePdfLine(item.value)}`));
   lines.push("__GAP__");
   lines.push({ text: "Access, Tools and PPE", bold: true, size: 12 });
+  if (installers.length) {
+    lines.push(`Installers: ${installers.map((installer) => {
+      const name = sanitizePdfLine(installer?.name, "");
+      const title = sanitizePdfLine(installer?.jobTitle, "");
+      const qualifications = sanitizePdfLine(installer?.qualifications, "");
+      return [name, title, qualifications].filter(Boolean).join(" - ");
+    }).filter(Boolean).join("; ")}`);
+  }
   lines.push(`Tools: ${tools.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
   lines.push(`Access: ${accessMethods.map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(", ") || "-"}`);
   lines.push(`Site Specific Hazards or Information: ${siteHazards}`);
@@ -4298,6 +4308,25 @@ function createServer() {
     } catch (error) {
       console.error(error);
       response.status(400).json({ error: error.message || "Could not update attendance settings." });
+    }
+  });
+
+  app.patch("/api/auth/users/:id/profile", async (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
+    request.user = session.user;
+    if (!requirePermissionsManager(request, response)) return;
+
+    try {
+      const user = await updateUserProfile(request.params.id, request.body || {});
+      response.json({ user });
+    } catch (error) {
+      console.error(error);
+      response.status(400).json({ error: error.message || "Could not update user profile." });
     }
   });
 

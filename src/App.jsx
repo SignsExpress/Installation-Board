@@ -1535,6 +1535,51 @@ function getInstallerNamesForRams(job) {
   return names.length ? names.join(", ") : "To be allocated";
 }
 
+function normalizeLookupName(value) {
+  return String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getRamsInstallerRoster(job) {
+  const roster = Array.isArray(job?.installers)
+    ? job.installers
+      .filter((entry) => entry && entry !== "Custom")
+      .map((entry, index) => {
+        const staff = getHolidayStaffEntry(entry);
+        return {
+          key: `${entry}-${index}`,
+          code: entry,
+          name: staff?.fullName || entry,
+          isCustom: false
+        };
+      })
+    : [];
+
+  if (job?.installers?.includes?.("Custom") && job?.customInstaller) {
+    roster.push({
+      key: `custom-${roster.length}`,
+      code: "Custom",
+      name: job.customInstaller,
+      isCustom: true
+    });
+  }
+
+  return roster.length ? roster : [{ key: "unallocated", code: "", name: "To be allocated", isCustom: true }];
+}
+
+function getUserProfileForInstaller(installer, users) {
+  const installerName = normalizeLookupName(installer?.name);
+  return (Array.isArray(users) ? users : []).find((user) => normalizeLookupName(user.displayName) === installerName) || null;
+}
+
+function getInitials(name) {
+  return String(name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("") || "SE";
+}
+
 function formatRamsCreatedDate(value) {
   const parsed = value ? new Date(value) : new Date();
   if (Number.isNaN(parsed.getTime())) return formatJobDate(getLocalTodayIso());
@@ -2391,14 +2436,20 @@ function PermissionsPanel({
   savingKey,
   onChangePermission,
   onUpdateAttendanceProfile,
+  onUpdateUserProfile,
   onCreateUser,
   onResetPassword,
   onDeleteUser
 }) {
   const [createForm, setCreateForm] = useState({ displayName: "", role: "client", password: "" });
   const [passwordDrafts, setPasswordDrafts] = useState({});
+  const [qualificationDrafts, setQualificationDrafts] = useState({});
   const [attendanceDrafts, setAttendanceDrafts] = useState({});
   const visibleUsers = [...users].sort((left, right) => left.displayName.localeCompare(right.displayName));
+  const qualificationOptions = useMemo(
+    () => [...new Set(users.flatMap((user) => Array.isArray(user.qualifications) ? user.qualifications : []))].sort((left, right) => left.localeCompare(right)),
+    [users]
+  );
 
   useEffect(() => {
     setAttendanceDrafts(
@@ -2417,6 +2468,38 @@ function PermissionsPanel({
         [userId]: normalizeAttendanceDraft(nextValue)
       };
     });
+  }
+
+  function updateUserProfileValue(user, patch) {
+    if (!user || savingKey === `${user.id}:profile`) return;
+    onUpdateUserProfile(user.id, {
+      jobTitle: user.jobTitle || "",
+      qualifications: Array.isArray(user.qualifications) ? user.qualifications : [],
+      photoDataUrl: user.photoDataUrl || "",
+      ...patch
+    });
+  }
+
+  function addUserQualification(user, qualification) {
+    const nextQualification = String(qualification || "").trim();
+    if (!nextQualification) return;
+    const existing = Array.isArray(user.qualifications) ? user.qualifications : [];
+    if (existing.some((entry) => entry.toLowerCase() === nextQualification.toLowerCase())) return;
+    updateUserProfileValue(user, { qualifications: [...existing, nextQualification] });
+    setQualificationDrafts((current) => ({ ...current, [user.id]: "" }));
+  }
+
+  function removeUserQualification(user, qualification) {
+    updateUserProfileValue(user, {
+      qualifications: (Array.isArray(user.qualifications) ? user.qualifications : []).filter((entry) => entry !== qualification)
+    });
+  }
+
+  function handleUserPhotoUpload(user, file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateUserProfileValue(user, { photoDataUrl: String(reader.result || "") });
+    reader.readAsDataURL(file);
   }
 
   return (
@@ -2473,6 +2556,8 @@ function PermissionsPanel({
             const exemptFromClocking = attendanceMode === "exempt";
             const fixedHoursMode = attendanceMode === "fixed";
             const attendanceChanged = JSON.stringify(attendanceDraft) !== JSON.stringify(attendanceProfile);
+            const qualifications = Array.isArray(user.qualifications) ? user.qualifications : [];
+            const qualificationDraft = qualificationDrafts[user.id] || "";
 
             return (
               <article key={user.id} className="permissions-user-card">
@@ -2482,6 +2567,77 @@ function PermissionsPanel({
                   <span className="permissions-user-meta">{user.role === "host" ? "Host" : "Client"}</span>
                   </div>
                   {isSelf ? <span className="permissions-owner-pill">Owner</span> : null}
+                </div>
+
+                <div className="permissions-profile-card">
+                  <label className="permissions-photo-control">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      disabled={savingKey === `${user.id}:profile`}
+                      onChange={(event) => {
+                        handleUserPhotoUpload(user, event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                    {user.photoDataUrl ? (
+                      <img src={user.photoDataUrl} alt="" />
+                    ) : (
+                      <span>{getInitials(user.displayName)}</span>
+                    )}
+                    <small>Photo</small>
+                  </label>
+                  <label className="permissions-profile-field">
+                    Job title
+                    <input
+                      type="text"
+                      defaultValue={user.jobTitle || ""}
+                      placeholder="Installer"
+                      onBlur={(event) => updateUserProfileValue(user, { jobTitle: event.target.value })}
+                      disabled={savingKey === `${user.id}:profile`}
+                    />
+                  </label>
+                  <div className="permissions-qualifications">
+                    <span>Qualifications</span>
+                    <div className="permissions-qualification-list">
+                      {qualifications.map((qualification) => (
+                        <button
+                          key={`${user.id}-${qualification}`}
+                          type="button"
+                          className="qualification-badge"
+                          onClick={() => removeUserQualification(user, qualification)}
+                          disabled={savingKey === `${user.id}:profile`}
+                          title="Remove qualification"
+                        >
+                          {qualification}
+                        </button>
+                      ))}
+                      {!qualifications.length ? <small>No qualifications added</small> : null}
+                    </div>
+                    <div className="permissions-qualification-add">
+                      <input
+                        type="text"
+                        list={`qualification-options-${user.id}`}
+                        placeholder="Add qualification"
+                        value={qualificationDraft}
+                        onChange={(event) => setQualificationDrafts((current) => ({ ...current, [user.id]: event.target.value }))}
+                        disabled={savingKey === `${user.id}:profile`}
+                      />
+                      <datalist id={`qualification-options-${user.id}`}>
+                        {qualificationOptions.map((qualification) => (
+                          <option key={qualification} value={qualification} />
+                        ))}
+                      </datalist>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => addUserQualification(user, qualificationDraft)}
+                        disabled={!qualificationDraft.trim() || savingKey === `${user.id}:profile`}
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="permissions-user-body">
@@ -2899,6 +3055,7 @@ function HostLandingPage({
   savingKey,
   onChangePermission,
   onUpdateAttendanceProfile,
+  onUpdateUserProfile,
   onCreateUser,
   onResetPassword,
   onDeleteUser,
@@ -2990,6 +3147,7 @@ function HostLandingPage({
                 savingKey={savingKey}
                 onChangePermission={onChangePermission}
                 onUpdateAttendanceProfile={onUpdateAttendanceProfile}
+                onUpdateUserProfile={onUpdateUserProfile}
                 onCreateUser={onCreateUser}
                 onResetPassword={onResetPassword}
                 onDeleteUser={onDeleteUser}
@@ -3621,7 +3779,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   );
 }
 
-function RamsPage({ currentUser, onLogout, notifications }) {
+function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const [jobs, setJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobError, setJobError] = useState("");
@@ -3941,6 +4099,13 @@ function RamsPage({ currentUser, onLogout, notifications }) {
     setRamsEdits((current) => ({ ...current, [key]: value }));
   }
 
+  function updateRamsPhotoEdit(key, file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => updateRamsEdit(key, String(reader.result || ""));
+    reader.readAsDataURL(file);
+  }
+
   function renderEditable(key, fallback, className = "") {
     return (
       <span
@@ -4048,6 +4213,20 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const workAreaGroup = ramsLogic.optionGroups.find((group) => group.key === "workArea");
   const toolsGroup = ramsLogic.optionGroups.find((group) => group.key === "tools");
   const accessGroup = ramsLogic.optionGroups.find((group) => group.key === "access");
+  const installerContacts = getRamsInstallerRoster(selectedJob).map((installer, index) => {
+    const profile = getUserProfileForInstaller(installer, users);
+    const qualifications = Array.isArray(profile?.qualifications) ? profile.qualifications : [];
+    const qualificationFallback = qualifications.join(", ");
+    const fallbackTitle = profile?.jobTitle || (installer.isCustom ? "Installer" : "Installation operative");
+    return {
+      key: `${installer.key}-${index}`,
+      name: getRamsEdit(`installerContact-${index}-name`, installer.name),
+      jobTitle: getRamsEdit(`installerContact-${index}-jobTitle`, fallbackTitle),
+      qualifications: getRamsEdit(`installerContact-${index}-qualifications`, qualificationFallback || "Qualifications to be confirmed"),
+      photoDataUrl: getRamsEdit(`installerContact-${index}-photo`, profile?.photoDataUrl || ""),
+      isCustom: installer.isCustom || !profile
+    };
+  });
 
   function buildCurrentRamsPdfPayload() {
     return {
@@ -4056,11 +4235,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
       meta: [
         { label: "Installation date", value: displayedInstallDate },
         { label: "RAMS created", value: displayedCreatedDate },
-        { label: "Operatives", value: displayedOperatives },
         { label: "Duration", value: displayedDuration },
         { label: "Installers", value: displayedInstallers },
-        { label: "Activity", value: displayedActivity },
-        { label: "Work area", value: displayedWorkArea }
+        { label: "Activity", value: displayedActivity }
       ],
       site: [
         { label: "Customer", value: getRamsEdit("customerName", selectedJob?.customerName || "-") },
@@ -4075,6 +4252,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
       ],
       tools: selectedTools,
       accessMethods: selectedAccess,
+      installers: installerContacts.map((contact) => ({
+        name: contact.name,
+        jobTitle: contact.jobTitle,
+        qualifications: contact.qualifications
+      })),
       siteHazards: displayedSiteHazards,
       ppe: selectedPpe.map((item) => item.label),
       firstAid: {
@@ -4229,13 +4411,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 <div className="rams-doc-meta">
                   <span><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</span>
                   <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
-                  <span><strong>Operatives:</strong> {renderEditable("operatives", displayedOperatives)}</span>
                   <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
                   <span className="meta-wide"><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
                   <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
-                  <span><strong>Access:</strong> {renderEditable("access", displayedAccess)}</span>
-                  <span><strong>Work area:</strong> {renderEditable("workArea", displayedWorkArea)}</span>
-                  <span className="meta-full"><strong>Tools:</strong> {renderEditable("tools", displayedTools)}</span>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>
@@ -4337,6 +4515,35 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
+                  <div className="rams-installer-contact-grid">
+                    {installerContacts.map((contact, index) => (
+                      <article key={contact.key} className="rams-installer-contact-card">
+                        <label className="rams-installer-photo no-print">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={(event) => {
+                              updateRamsPhotoEdit(`installerContact-${index}-photo`, event.target.files?.[0]);
+                              event.target.value = "";
+                            }}
+                          />
+                          {contact.photoDataUrl ? (
+                            <img src={contact.photoDataUrl} alt="" />
+                          ) : (
+                            <span>{getInitials(contact.name)}</span>
+                          )}
+                        </label>
+                        <div className="rams-installer-photo print-only">
+                          {contact.photoDataUrl ? <img src={contact.photoDataUrl} alt="" /> : <span>{getInitials(contact.name)}</span>}
+                        </div>
+                        <div>
+                          <strong>{renderEditable(`installerContact-${index}-name`, contact.name)}</strong>
+                          <span>{renderEditable(`installerContact-${index}-jobTitle`, contact.jobTitle)}</span>
+                          <small>{renderEditable(`installerContact-${index}-qualifications`, contact.qualifications)}</small>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                   <div className="rams-method-prep-grid">
                     <div className="rams-method-info-card">
                       <h5>Tools</h5>
@@ -8989,6 +9196,39 @@ export default function App() {
     }
   }
 
+  async function handleUpdateUserProfile(userId, profile) {
+    const targetUser = loginUsers.find((entry) => entry.id === userId);
+    if (!targetUser || !currentUser?.canManagePermissions) return;
+
+    setPermissionSavingKey(`${userId}:profile`);
+
+    try {
+      const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile)
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not update user profile.");
+      }
+
+      setLoginUsers((current) =>
+        current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
+      );
+      if (currentUser?.id === userId) {
+        setCurrentUser((existing) => ({ ...existing, ...payload.user }));
+      }
+      setMessage(createMessage(`Updated ${targetUser.displayName}'s profile.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update user profile.", "error"));
+    } finally {
+      setPermissionSavingKey("");
+    }
+  }
+
   async function handleCreateUser({ displayName, role, password }) {
     setPermissionSavingKey("create-user");
     try {
@@ -10335,6 +10575,7 @@ export default function App() {
           savingKey={permissionSavingKey}
           onChangePermission={handlePermissionChange}
           onUpdateAttendanceProfile={handleUpdateAttendanceProfile}
+          onUpdateUserProfile={handleUpdateUserProfile}
           onCreateUser={handleCreateUser}
           onResetPassword={handleResetUserPassword}
           onDeleteUser={handleDeleteUser}
@@ -10403,6 +10644,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
+        users={loginUsers}
       />
     );
   }
