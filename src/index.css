@@ -1355,42 +1355,11 @@
   word-break: normal;
 }
 
-.rams-ppe-section {
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f0fdf4;
-}
-
 .rams-method-safety-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   align-items: stretch;
-}
-
-.rams-site-hazards-section {
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f0fdf4;
-}
-
-.rams-site-hazards-section h5 {
-  margin: 0;
-  background: #dcfce7;
-  color: #166534;
-  padding: 5px 9px;
-  font-size: 0.82rem;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.rams-site-hazards-section p {
-  margin: 0;
-  padding: 8px 10px 10px;
-  font-size: 0.82rem;
-  line-height: 1.24;
 }
 
 .rams-first-aid-section {
@@ -1403,77 +1372,54 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+  align-items: stretch;
 }
 
-.rams-method-prep-grid > div {
-  border: 1px solid #bfdbfe;
-  border-left: 5px solid #2563eb;
+.rams-method-info-card {
+  min-height: 68px;
+  border: 1px solid #bbf7d0;
   border-radius: 8px;
+  overflow: hidden;
+  background: #f0fdf4;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: start;
+}
+
+.rams-method-info-card.is-blue {
+  border-color: #bfdbfe;
   background: #eff6ff;
-  padding: 7px 9px;
-  display: grid;
-  gap: 5px;
 }
 
-.rams-method-prep-grid h5,
-.rams-method-prep-grid p {
-  margin: 0;
-}
-
-.rams-method-prep-grid h5 {
-  color: #1d4ed8;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.rams-method-prep-grid p {
-  font-size: 0.82rem;
-  line-height: 1.24;
-}
-
-.rams-first-aid-section > div {
-  border: 1px solid #dbe3ef;
-  border-left: 5px solid #16a34a;
-  border-radius: 8px;
-  background: #f8fff9;
-  padding: 7px 9px;
-  display: grid;
-  gap: 5px;
-}
-
-.rams-first-aid-section h4,
-.rams-first-aid-section p {
-  margin: 0;
-}
-
-.rams-first-aid-section h4 {
-  color: #166534;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.rams-first-aid-section p {
-  font-size: 0.82rem;
-  line-height: 1.24;
-}
-
-.rams-ppe-section h5 {
+.rams-method-info-card h4,
+.rams-method-info-card h5 {
   margin: 0;
   background: #dcfce7;
   color: #166534;
-  padding: 5px 9px;
-  font-size: 0.82rem;
-  letter-spacing: 0.03em;
+  padding: 6px 10px;
+  font-size: 0.78rem;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rams-method-info-card.is-blue h4,
+.rams-method-info-card.is-blue h5 {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.rams-method-info-card p {
+  margin: 0;
+  padding: 9px 11px 11px;
+  font-size: 0.82rem;
+  line-height: 1.24;
 }
 
 .rams-ppe-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px 18px;
-  padding: 8px 10px 10px;
+  gap: 7px 14px;
+  padding: 9px 11px 11px;
 }
 
 .rams-ppe-item {
@@ -1872,44 +1818,43 @@
     grid-column: 1 / -1 !important;
   }
 
-  .rams-ppe-section {
-    border-color: #bbf7d0 !important;
-    border-radius: 2mm !important;
-    background: #f0fdf4 !important;
-    break-inside: avoid !important;
-  }
-
   .rams-method-safety-grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr) !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
   }
 
-  .rams-site-hazards-section {
+  .rams-method-info-card {
     border-color: #bbf7d0 !important;
     border-radius: 2mm !important;
     background: #f0fdf4 !important;
     break-inside: avoid !important;
+    min-height: 15mm !important;
   }
 
-  .rams-site-hazards-section h5 {
+  .rams-method-info-card.is-blue {
+    border-color: #bfdbfe !important;
+    background: #eff6ff !important;
+  }
+
+  .rams-method-info-card h4,
+  .rams-method-info-card h5 {
     background: #dcfce7 !important;
     color: #166534 !important;
     padding: 1.2mm 2mm !important;
     font-size: 7.5pt !important;
   }
 
-  .rams-site-hazards-section p {
+  .rams-method-info-card.is-blue h4,
+  .rams-method-info-card.is-blue h5 {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+  }
+
+  .rams-method-info-card p {
     padding: 1.6mm 2.4mm 2mm !important;
-    font-size: 7.4pt !important;
+    font-size: 7.2pt !important;
     line-height: 1.14 !important;
-  }
-
-  .rams-ppe-section h5 {
-    background: #dcfce7 !important;
-    color: #166534 !important;
-    padding: 1.2mm 2mm !important;
-    font-size: 7.5pt !important;
   }
 
   .rams-ppe-grid {
@@ -1944,40 +1889,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
-  }
-
-  .rams-method-prep-grid > div {
-    background: #eff6ff !important;
-    border-color: #bfdbfe !important;
-    box-shadow: inset 1mm 0 0 #2563eb !important;
-    padding: 1.5mm 2mm !important;
-  }
-
-  .rams-method-prep-grid h5 {
-    color: #1d4ed8 !important;
-    font-size: 6.8pt !important;
-  }
-
-  .rams-method-prep-grid p {
-    font-size: 7.2pt !important;
-    line-height: 1.14 !important;
-  }
-
-  .rams-first-aid-section > div {
-    background: #f8fff9 !important;
-    border-color: #bbf7d0 !important;
-    box-shadow: inset 1mm 0 0 #16a34a !important;
-    padding: 1.5mm 2mm !important;
-  }
-
-  .rams-first-aid-section h4 {
-    color: #166534 !important;
-    font-size: 6.8pt !important;
-  }
-
-  .rams-first-aid-section p {
-    font-size: 7.2pt !important;
-    line-height: 1.14 !important;
   }
 
   .rams-doc-section {

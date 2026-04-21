@@ -4338,22 +4338,22 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
                   <div className="rams-method-prep-grid">
-                    <div>
+                    <div className="rams-method-info-card is-blue">
                       <h5>Tools</h5>
                       <p>{renderEditable("tools", displayedTools || "-")}</p>
                     </div>
-                    <div>
+                    <div className="rams-method-info-card is-blue">
                       <h5>Access Methods</h5>
                       <p>{renderEditable("access", displayedAccess || "-")}</p>
                     </div>
                   </div>
                   <div className="rams-method-safety-grid">
-                    <div className="rams-site-hazards-section">
+                    <div className="rams-method-info-card rams-site-hazards-section is-green">
                       <h5>Site Specific Hazards or Information</h5>
                       <p>{renderEditable("notes", displayedSiteHazards)}</p>
                     </div>
                     {selectedPpe.length ? (
-                      <div className="rams-ppe-section">
+                      <div className="rams-method-info-card rams-ppe-section is-green">
                         <h5>PPE Required</h5>
                         <div className="rams-ppe-grid">
                           {selectedPpe.map((item) => (
@@ -4367,11 +4367,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                     ) : null}
                   </div>
                   <div className="rams-first-aid-section">
-                    <div>
+                    <div className="rams-method-info-card is-green">
                       <h4>First Aid Facilities</h4>
                       <p>{renderEditable("firstAidFacility", displayedFirstAidFacility)}</p>
                     </div>
-                    <div>
+                    <div className="rams-method-info-card is-green">
                       <h4>First Aid Box Location</h4>
                       <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
                     </div>
