@@ -390,8 +390,8 @@
 }
 
 .rams-logic-editor-panel .rams-logic-editor-card {
-  gap: 14px;
-  padding: 18px;
+  gap: 10px;
+  padding: 14px;
   border-left-width: 8px;
 }
 
@@ -410,6 +410,9 @@
 }
 
 .rams-logic-editor-card label {
+  display: grid;
+  gap: 5px;
+  align-content: start;
   color: #334155;
   font-weight: 800;
 }
@@ -417,44 +420,48 @@
 .rams-logic-editor-card input,
 .rams-logic-editor-card select,
 .rams-logic-editor-card textarea {
-  min-height: 46px;
+  min-height: 38px;
   border: 1px solid #cbd5e1;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
   color: #0f172a;
-  padding: 10px 12px;
-  font-size: 0.98rem;
+  padding: 8px 10px;
+  font-size: 0.92rem;
 }
 
 .rams-logic-editor-card textarea {
-  min-height: 240px;
-  line-height: 1.45;
+  min-height: 132px;
+  line-height: 1.35;
 }
 
 .rams-logic-editor-card .rams-small-textarea {
-  min-height: 72px;
+  min-height: 70px;
+}
+
+.rams-logic-editor-card .rams-control-textarea {
+  min-height: 108px;
 }
 
 .rams-risk-score-editor {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .rams-risk-score-editor > div {
   border: 1px solid #e2e8f0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #f8fafc;
-  padding: 10px;
+  padding: 8px;
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .rams-score-inputs {
   display: grid;
   grid-template-columns: 1fr 1fr auto;
-  gap: 8px;
+  gap: 6px;
   align-items: end;
 }
 
@@ -463,17 +470,17 @@
 }
 
 .rams-score-inputs input {
-  min-height: 38px;
-  padding: 7px 8px;
+  min-height: 34px;
+  padding: 6px 7px;
   text-align: center;
 }
 
 .rams-score-inputs span {
-  min-width: 58px;
+  min-width: 48px;
   border-radius: 9px;
   background: #fff;
   border: 1px solid #cbd5e1;
-  padding: 9px 8px;
+  padding: 7px 7px;
   text-align: center;
   font-weight: 900;
 }
@@ -484,7 +491,7 @@
 }
 
 .rams-risk-band strong {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
 }
 
 .rams-risk-band.risk-none,
@@ -639,7 +646,7 @@
 
 .rams-editor-two-col {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  gap: 10px;
 }
 
 .rams-logic-picker,

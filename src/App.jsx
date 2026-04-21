@@ -1508,10 +1508,11 @@ function normalizeRamsCard(card = {}, fallback = {}) {
     content: content.length ? content : ["Write the control measure or method step here."]
   };
   if (!isRisk) return normalized;
+  const responsibility = String(merged.responsibility || fallback.responsibility || "Installers from selected job");
   return {
     ...normalized,
     whoAtRisk: String(merged.whoAtRisk || fallback.whoAtRisk || "Employees\nThird parties"),
-    responsibility: String(merged.responsibility || fallback.responsibility || "Matt Carroll"),
+    responsibility: responsibility === "Matt Carroll" ? "Installers from selected job" : responsibility,
     controlMeasure: String(merged.controlMeasure || fallback.controlMeasure || normalized.content.join("\n")),
     initialLikelihood: toRamsScore(merged.initialLikelihood ?? fallback.initialLikelihood ?? getRamsLcr(merged, "initial").likelihood, 2),
     initialConsequence: toRamsScore(merged.initialConsequence ?? fallback.initialConsequence ?? getRamsLcr(merged, "initial").consequence, 3),
@@ -3104,7 +3105,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
           initialConsequence: 3,
           residualLikelihood: 1,
           residualConsequence: 1,
-          responsibility: "Matt Carroll",
+          responsibility: "Installers from selected job",
           controlMeasure: "Write the required control measure here.",
           content: [isMethod ? "Write the method step here." : "Write the required control measure here."]
         }
@@ -3296,7 +3297,10 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                         </label>
                         <label>
                           Responsibility
-                          <input value={activeCard.responsibility || ""} onChange={(event) => updateRamsCard(activeCardId, "responsibility", event.target.value)} />
+                          <input
+                            value={activeCard.responsibility || "Installers from selected job"}
+                            onChange={(event) => updateRamsCard(activeCardId, "responsibility", event.target.value)}
+                          />
                         </label>
                       </div>
                       <div className="rams-risk-score-editor">
@@ -3336,6 +3340,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       <label className="rams-field-wide">
                         Required control measure
                         <textarea
+                          className="rams-control-textarea"
                           value={activeCard.controlMeasure || (Array.isArray(activeCard.content) ? activeCard.content.join("\n") : "")}
                           onChange={(event) => updateRamsCard(activeCardId, "controlMeasure", event.target.value)}
                         />
@@ -3965,6 +3970,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                           const residual = getRamsLcr(card, "residual");
                           const riskBand = getRamsRiskBand(residual.rating);
                           const controlLines = String(card.controlMeasure || (Array.isArray(card.content) ? card.content.join("\n") : "")).split("\n").filter(Boolean);
+                          const responsibility = !card.responsibility || card.responsibility === "Matt Carroll" || card.responsibility === "Installers from selected job"
+                            ? displayedInstallers
+                            : card.responsibility;
                           return (
                             <tr key={`risk-row-${card.id}`}>
                               <td>
@@ -3982,7 +3990,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                                   ))}
                                 </ul>
                               </td>
-                              <td>{renderEditable(`risk-${card.id}-responsibility`, card.responsibility || "Matt Carroll")}</td>
+                              <td>{renderEditable(`risk-${card.id}-responsibility`, responsibility)}</td>
                               <td>{renderEditable(`risk-${card.id}-residual-l`, residual.likelihood)}</td>
                               <td>{renderEditable(`risk-${card.id}-residual-c`, residual.consequence)}</td>
                               <td><strong>{residual.rating}</strong></td>
