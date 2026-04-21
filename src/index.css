@@ -385,6 +385,10 @@
   grid-column: 1 / -1;
 }
 
+.rams-work-type-picker {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
 .rams-setup-actions {
   display: flex;
   justify-content: flex-end;
@@ -895,13 +899,25 @@
   display: flex;
   align-items: center;
   gap: 7px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 8px;
+  cursor: pointer;
   font-size: 0.82rem;
   font-weight: 700;
+}
+
+.rams-tag-matrix label.is-checked {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
 }
 
 .rams-tag-matrix input {
   width: auto;
   min-height: auto;
+  pointer-events: none;
 }
 
 .rams-tag-admin-drawer {
@@ -1472,6 +1488,12 @@
   align-items: stretch;
 }
 
+.rams-emergency-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr);
+  gap: 6px;
+}
+
 .rams-method-info-card {
   min-height: 68px;
   border: 1px solid #bbf7d0;
@@ -1499,6 +1521,16 @@
   padding: 9px 11px 11px;
   font-size: 0.82rem;
   line-height: 1.24;
+}
+
+.rams-emergency-contact-list {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 10px;
+}
+
+.rams-emergency-contact-list p {
+  padding: 0;
 }
 
 .rams-ppe-grid {
@@ -1842,6 +1874,13 @@
     background: #fff !important;
   }
 
+  html,
+  body,
+  :root,
+  #root {
+    background: #fff !important;
+  }
+
   .host-nav-shell,
   .rams-header,
   .rams-question-panel,
@@ -1881,6 +1920,7 @@
     font-size: 7.8pt !important;
     line-height: 1.16 !important;
     background: #fff !important;
+    min-height: 0 !important;
   }
 
   .rams-doc-title {
@@ -2018,6 +2058,17 @@
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
+  }
+
+  .rams-emergency-grid {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 0.9fr) !important;
+    gap: 1.4mm !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-emergency-contact-list {
+    gap: 0.8mm !important;
+    padding: 1.6mm 2.4mm 2mm !important;
   }
 
   .rams-doc-section {
@@ -6512,7 +6563,7 @@ button {
 
 .permissions-profile-card {
   display: grid;
-  grid-template-columns: 72px minmax(180px, 0.8fr) minmax(260px, 1.4fr);
+  grid-template-columns: 72px minmax(160px, 0.8fr) minmax(150px, 0.7fr) minmax(260px, 1.4fr);
   gap: 12px;
   align-items: start;
   padding: 12px;

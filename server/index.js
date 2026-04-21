@@ -1384,6 +1384,24 @@ function sanitizeRamsDocument(payload = {}) {
   };
 }
 
+function buildRamsPdfFileName(job, documentId, existingDocuments = []) {
+  const baseReference = String(job?.orderReference || job?.id || "RAMS").trim() || "RAMS";
+  const safeBase = `${baseReference} RAMS`.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
+  const used = new Set(
+    existingDocuments
+      .filter((document) => String(document?.id || "") !== String(documentId || ""))
+      .map((document) => String(document?.pdfFileName || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  let candidate = `${safeBase}.pdf`;
+  let suffix = 1;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${safeBase} (${suffix}).pdf`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
 function toPublicJob(job) {
   const normalized = sanitizeJob(job);
   return {
@@ -1578,6 +1596,8 @@ function buildRamsPdfDocument(job, document, payload = {}) {
   const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
   const siteHazards = sanitizePdfLine(payload.siteHazards || "N/A");
   const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
+  const emergencyContacts = Array.isArray(payload.emergencyContacts) ? payload.emergencyContacts : [];
+  const officeAddress = sanitizePdfLine(payload.officeAddress || "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP");
   const risks = Array.isArray(payload.risks) ? payload.risks : [];
   const methods = Array.isArray(payload.methods) ? payload.methods : [];
 
@@ -1621,6 +1641,12 @@ function buildRamsPdfDocument(job, document, payload = {}) {
     (Array.isArray(method.lines) ? method.lines : []).forEach((line) => lines.push({ text: `- ${sanitizePdfLine(line, "")}`, indent: 12 }));
     lines.push("__GAP__");
   });
+  lines.push({ text: "Emergency Contacts", bold: true, size: 12 });
+  emergencyContacts.forEach((contact) => {
+    lines.push(`${sanitizePdfLine(contact?.label || "Contact")}: ${[contact?.name, contact?.jobTitle, contact?.phone].map((item) => sanitizePdfLine(item, "")).filter(Boolean).join(" - ")}`);
+  });
+  lines.push(`Signs Express Office: ${officeAddress}`);
+  lines.push("__GAP__");
 
   return buildSimpleTextPdf(payload.title || "Risk Assessment and Method Statement", lines);
 }
@@ -4664,7 +4690,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const uploadDir = await ensureRamsUploadsDir();
       await fsp.writeFile(path.join(uploadDir, storageName), pdfBuffer);
       nextDocument.pdfStorageName = storageName;
-      nextDocument.pdfFileName = `${nextDocument.reference || "RAMS"}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
+      nextDocument.pdfFileName = buildRamsPdfFileName(existing, nextDocument.id, existing.ramsDocuments);
       nextDocument.pdfSize = pdfBuffer.length;
     } catch (error) {
       console.error("Could not generate RAMS PDF.", error);

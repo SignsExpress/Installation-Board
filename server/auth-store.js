@@ -118,6 +118,7 @@ function normalizePhotoDataUrl(value) {
 function normalizeUserProfile(user) {
   return {
     jobTitle: normalizeProfileText(user?.jobTitle || ""),
+    phoneNumber: normalizeProfileText(user?.phoneNumber || "", 40),
     qualifications: normalizeQualifications(user?.qualifications),
     photoDataUrl: normalizePhotoDataUrl(user?.photoDataUrl)
   };
@@ -317,6 +318,7 @@ async function createUser({ displayName, role = "client", password = "" }) {
     permissions: getDefaultPermissions(normalizedRole),
     attendanceProfile: getDefaultAttendanceProfile(),
     jobTitle: "",
+    phoneNumber: "",
     qualifications: [],
     photoDataUrl: "",
     passwordSalt: "",

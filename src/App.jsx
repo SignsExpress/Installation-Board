@@ -129,7 +129,7 @@ const RAMS_TOOL_OPTIONS = [
 
 const RAMS_DEFAULT_QUESTIONS = {
   jobId: "",
-  activity: "external",
+  activity: ["external"],
   access: [],
   workArea: "quiet",
   tools: [],
@@ -696,8 +696,8 @@ const RAMS_DEFAULT_LOGIC = {
     {
       key: "activity",
       label: "Work type",
-      input: "buttons",
-      multi: false,
+      input: "checkboxes",
+      multi: true,
       options: RAMS_ACTIVITY_OPTIONS.map((option) => ({
         ...option,
         cardIds:
@@ -1571,6 +1571,11 @@ function getUserProfileForInstaller(installer, users) {
   return (Array.isArray(users) ? users : []).find((user) => normalizeLookupName(user.displayName) === installerName) || null;
 }
 
+function getUserProfileByName(name, users) {
+  const lookupName = normalizeLookupName(name);
+  return (Array.isArray(users) ? users : []).find((user) => normalizeLookupName(user.displayName) === lookupName) || null;
+}
+
 function getInitials(name) {
   return String(name || "")
     .split(/\s+/)
@@ -1592,6 +1597,11 @@ function formatRamsCreatedDate(value) {
 }
 
 function normalizeRamsQuestions(questions) {
+  const activity = Array.isArray(questions?.activity)
+    ? questions.activity
+    : questions?.activity
+      ? [questions.activity]
+      : RAMS_DEFAULT_QUESTIONS.activity;
   const access = Array.isArray(questions?.access)
     ? questions.access
     : questions?.access
@@ -1600,6 +1610,7 @@ function normalizeRamsQuestions(questions) {
   return {
     ...RAMS_DEFAULT_QUESTIONS,
     ...questions,
+    activity,
     access,
     tools: Array.isArray(questions?.tools) ? questions.tools : RAMS_DEFAULT_QUESTIONS.tools,
     ppe: Array.isArray(questions?.ppe) ? questions.ppe : RAMS_DEFAULT_QUESTIONS.ppe
@@ -1689,8 +1700,8 @@ function normalizeRamsLogic(logic = {}) {
       return {
         key,
         label: String(group.label || fallback.label || "Question"),
-        input: key === "access" ? "checkboxes" : ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
-        multi: key === "access" ? true : Boolean(group.multi ?? fallback.multi),
+        input: key === "access" || key === "activity" ? "checkboxes" : ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
+        multi: key === "access" || key === "activity" ? true : Boolean(group.multi ?? fallback.multi),
         options: mergedOptions.map((option, optionIndex) => ({
           value: String(option.value || `option-${optionIndex}`),
           label: String(option.label || option.value || "Option"),
@@ -1743,9 +1754,42 @@ function getRamsCardIdsForQuestions(questions, logic = RAMS_DEFAULT_LOGIC) {
 
 function buildRamsReference(job, questions) {
   const reference = String(job?.orderReference || job?.id || "RAMS").trim();
-  const date = String(job?.date || getLocalTodayIso()).replaceAll("-", "");
-  const activity = String(questions?.activity || "works").toUpperCase();
-  return `${reference}-${date}-${activity}`;
+  return `${reference} RAMS`;
+}
+
+const RAMS_METHOD_FLOW_KEYWORDS = [
+  ["arrive", "sign in", "induction", "confirm site"],
+  ["park", "unload", "working area", "access routes"],
+  ["check artwork", "position", "substrate", "survey"],
+  ["access equipment", "ladder", "podium", "scaffold", "lift"],
+  ["prepare", "clean", "mask", "surface"],
+  ["install", "apply", "fix", "signage", "graphics"],
+  ["quality", "make good", "clean down", "check"],
+  ["photo", "photograph", "completion"],
+  ["signature", "sign off", "handover"],
+  ["leave", "depart", "remove waste", "clear site"]
+];
+
+function getRamsMethodFlowRank(card = {}) {
+  const text = `${card.title || ""} ${Array.isArray(card.content) ? card.content.join(" ") : ""}`.toLowerCase();
+  const index = RAMS_METHOD_FLOW_KEYWORDS.findIndex((keywords) => keywords.some((keyword) => text.includes(keyword)));
+  return index === -1 ? RAMS_METHOD_FLOW_KEYWORDS.length : index;
+}
+
+function sortRamsMethodCardsForFlow(cards = []) {
+  return [...cards].sort((left, right) => {
+    const rankDifference = getRamsMethodFlowRank(left) - getRamsMethodFlowRank(right);
+    if (rankDifference !== 0) return rankDifference;
+    return String(left.title || "").localeCompare(String(right.title || ""));
+  });
+}
+
+function sortRamsCardOrderForFlow(cardOrder = [], cards = {}) {
+  const riskIds = cardOrder.filter((cardId) => cards[cardId]?.type !== "Method");
+  const methodCards = cardOrder
+    .filter((cardId) => cards[cardId]?.type === "Method")
+    .map((cardId) => ({ id: cardId, ...cards[cardId] }));
+  return [...riskIds, ...sortRamsMethodCardsForFlow(methodCards).map((card) => card.id)];
 }
 
 function getRamsLcr(card, phase = "initial") {
@@ -2474,6 +2518,7 @@ function PermissionsPanel({
     if (!user || savingKey === `${user.id}:profile`) return;
     onUpdateUserProfile(user.id, {
       jobTitle: user.jobTitle || "",
+      phoneNumber: user.phoneNumber || "",
       qualifications: Array.isArray(user.qualifications) ? user.qualifications : [],
       photoDataUrl: user.photoDataUrl || "",
       ...patch
@@ -2594,6 +2639,16 @@ function PermissionsPanel({
                       defaultValue={user.jobTitle || ""}
                       placeholder="Installer"
                       onBlur={(event) => updateUserProfileValue(user, { jobTitle: event.target.value })}
+                      disabled={savingKey === `${user.id}:profile`}
+                    />
+                  </label>
+                  <label className="permissions-profile-field">
+                    Phone
+                    <input
+                      type="tel"
+                      defaultValue={user.phoneNumber || ""}
+                      placeholder="Phone number"
+                      onBlur={(event) => updateUserProfileValue(user, { phoneNumber: event.target.value })}
                       disabled={savingKey === `${user.id}:profile`}
                     />
                   </label>
@@ -3677,11 +3732,18 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                             </span>
                           </legend>
                           {group.options.map((option, optionIndex) => (
-                            <label key={`${group.key}-${option.value}-${optionIndex}`}>
+                            <label
+                              key={`${group.key}-${option.value}-${optionIndex}`}
+                              className={option.cardIds.includes(activeCardId) ? "is-checked" : ""}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                toggleOptionCard(groupIndex, optionIndex, activeCardId);
+                              }}
+                            >
                               <input
                                 type="checkbox"
                                 checked={option.cardIds.includes(activeCardId)}
-                                onChange={() => toggleOptionCard(groupIndex, optionIndex, activeCardId)}
+                                readOnly
                               />
                               {option.label}
                             </label>
@@ -3921,9 +3983,9 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     setCardOrder((current) => {
       const existing = current.filter((cardId) => suggestedCardIds.includes(cardId));
       const missing = suggestedCardIds.filter((cardId) => !existing.includes(cardId));
-      return [...existing, ...missing];
+      return sortRamsCardOrderForFlow([...existing, ...missing], ramsLogic.cards);
     });
-  }, [suggestedCardIds]);
+  }, [suggestedCardIds, ramsLogic.cards]);
 
   function updateQuestion(key, value) {
     setQuestions((current) => ({ ...current, [key]: value }));
@@ -4131,6 +4193,10 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     });
   }
 
+  function smartSortMethodCards() {
+    setCardOrder((current) => sortRamsCardOrderForFlow(current, ramsLogic.cards));
+  }
+
   function handleCardDrop(targetCardId) {
     if (!draggingCardId || draggingCardId === targetCardId) return;
     setCardOrder((current) => {
@@ -4186,7 +4252,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     .filter((card) => card.title);
   const methodCards = selectedCards.filter((card) => card.type === "Method");
   const riskCards = selectedCards.filter((card) => card.type !== "Method");
-  const selectedActivity = ramsLogic.optionGroups.find((group) => group.key === "activity")?.options.find((option) => option.value === questions.activity)?.label || questions.activity;
+  const selectedActivityValues = Array.isArray(questions.activity) ? questions.activity : questions.activity ? [questions.activity] : [];
+  const selectedActivity = (ramsLogic.optionGroups.find((group) => group.key === "activity")?.options || [])
+    .filter((option) => selectedActivityValues.includes(option.value))
+    .map((option) => option.label)
+    .join(", ") || "Works";
   const selectedAccessValues = Array.isArray(questions.access) ? questions.access : questions.access ? [questions.access] : [];
   const selectedAccess = (ramsLogic.optionGroups.find((group) => group.key === "access")?.options || [])
     .filter((option) => selectedAccessValues.includes(option.value))
@@ -4227,6 +4297,28 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       isCustom: installer.isCustom || !profile
     };
   });
+  const mattProfile = getUserProfileByName("Matt Rutlidge", users) || {};
+  const preparedByProfile = getUserProfileByName(currentUser?.displayName, users) || currentUser || {};
+  const emergencyContacts = [
+    {
+      label: "Emergency contact",
+      name: getRamsEdit("emergencyContact-matt-name", "Matt Rutlidge"),
+      jobTitle: getRamsEdit("emergencyContact-matt-title", mattProfile.jobTitle || "Director"),
+      phone: getRamsEdit("emergencyContact-matt-phone", mattProfile.phoneNumber || "Phone number to be confirmed")
+    },
+    {
+      label: "Prepared by",
+      name: getRamsEdit("emergencyContact-prepared-name", currentUser?.displayName || "Signs Express"),
+      jobTitle: getRamsEdit("emergencyContact-prepared-title", preparedByProfile.jobTitle || "RAMS prepared by"),
+      phone: getRamsEdit("emergencyContact-prepared-phone", preparedByProfile.phoneNumber || "Phone number to be confirmed")
+    },
+    {
+      label: "Office",
+      name: "Signs Express Central Lancashire",
+      jobTitle: "Office",
+      phone: "01772 797800"
+    }
+  ];
 
   function buildCurrentRamsPdfPayload() {
     return {
@@ -4263,6 +4355,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
         facility: displayedFirstAidFacility,
         boxLocation: displayedFirstAidBoxLocation
       },
+      emergencyContacts,
+      officeAddress: getRamsEdit("officeAddress", "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP"),
       risks: riskCards.map((card) => {
         const initial = getRamsLcr(card, "initial");
         const residual = getRamsLcr(card, "residual");
@@ -4396,6 +4490,9 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
 
               <button className="ghost-button rams-logic-launch" type="button" onClick={() => window.location.assign("/rams/logic")}>
                 Open RAMS logic editor
+              </button>
+              <button className="ghost-button rams-logic-launch" type="button" onClick={smartSortMethodCards}>
+                Smart sort methods
               </button>
             </aside>
 
@@ -4610,6 +4707,33 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                       </div>
                     );
                   })}
+                  <div className="rams-emergency-grid">
+                    <div className="rams-method-info-card">
+                      <h5>Emergency Contacts</h5>
+                      <div className="rams-emergency-contact-list">
+                        {emergencyContacts.map((contact, index) => (
+                          <p key={`${contact.label}-${index}`}>
+                            <strong>{contact.label}:</strong>{" "}
+                            {index < 2 ? (
+                              <>
+                                {renderEditable(`emergencyContact-${index === 0 ? "matt" : "prepared"}-name`, contact.name)}
+                                {" - "}
+                                {renderEditable(`emergencyContact-${index === 0 ? "matt" : "prepared"}-title`, contact.jobTitle)}
+                                {" - "}
+                                {renderEditable(`emergencyContact-${index === 0 ? "matt" : "prepared"}-phone`, contact.phone)}
+                              </>
+                            ) : (
+                              `${contact.name} - ${contact.phone}`
+                            )}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rams-method-info-card">
+                      <h5>Signs Express Office</h5>
+                      <p>{renderEditable("officeAddress", "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP")}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="rams-signoff">
                   <span>Prepared by: {currentUser?.displayName || "Signs Express"}</span>
@@ -4639,14 +4763,21 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                     <h3>Job Basics</h3>
                     <div className="rams-setup-grid">
                       {activityGroup ? (
-                        <label>
-                          {activityGroup.label}
-                          <select value={questions.activity || ""} onChange={(event) => updateQuestion("activity", event.target.value)}>
+                        <div className="rams-question-group">
+                          <span>{activityGroup.label}</span>
+                          <div className="rams-check-grid rams-work-type-picker">
                             {activityGroup.options.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
+                              <label key={option.value} className="rams-check">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedActivityValues.includes(option.value)}
+                                  onChange={() => updateMultiQuestion("activity", option.value)}
+                                />
+                                {option.label}
+                              </label>
                             ))}
-                          </select>
-                        </label>
+                          </div>
+                        </div>
                       ) : null}
                       {workAreaGroup ? (
                         <label>
