@@ -1462,9 +1462,24 @@ function getRamsContact(job) {
 }
 
 function getInstallerNamesForRams(job) {
-  const names = Array.isArray(job?.installers) ? job.installers.filter((entry) => entry && entry !== "Custom") : [];
+  const names = Array.isArray(job?.installers)
+    ? job.installers
+      .filter((entry) => entry && entry !== "Custom")
+      .map((entry) => getHolidayStaffEntry(entry)?.fullName || entry)
+    : [];
   if (job?.installers?.includes?.("Custom") && job?.customInstaller) names.push(job.customInstaller);
   return names.length ? names.join(", ") : "To be allocated";
+}
+
+function formatRamsCreatedDate(value) {
+  const parsed = value ? new Date(value) : new Date();
+  if (Number.isNaN(parsed.getTime())) return formatJobDate(getLocalTodayIso());
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: "Europe/London"
+  }).format(parsed);
 }
 
 function normalizeRamsQuestions(questions) {
@@ -1799,6 +1814,8 @@ function renderJobCardContent({
 }) {
   const meta = getJobTypeMeta(job.jobType);
   const installerLabels = getInstallerDisplayList(job);
+  const savedRamsDocuments = Array.isArray(job.ramsDocuments) ? job.ramsDocuments : [];
+  const latestRams = savedRamsDocuments[0] || null;
 
   return (
       <div
@@ -1844,6 +1861,18 @@ function renderJobCardContent({
           {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
           {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
           {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
+          {latestRams ? (
+            <button
+              className="job-rams-pill"
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+              }}
+            >
+              RAMS saved
+            </button>
+          ) : null}
           {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
           {installerLabels.length ? (
             <div className="job-title-installers">
@@ -1874,6 +1903,18 @@ function renderJobCardContent({
                   <button className="text-button" type="button" onClick={(event) => { event.stopPropagation(); editJob(job); }}>
                     Edit
                   </button>
+                  {latestRams ? (
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                      }}
+                    >
+                      Open RAMS
+                    </button>
+                  ) : null}
                   <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
                     Delete
                   </button>
@@ -3237,9 +3278,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       onClick={() => setSelectedCardId(cardId)}
                     >
                       <strong>{card.title}</strong>
-                      <span>
-                        {ramsLogicDraft.baseCardIds.includes(cardId) ? "Always included" : `${tagCount} trigger${tagCount === 1 ? "" : "s"}`}
-                      </span>
+                      <span>{tagCount} trigger{tagCount === 1 ? "" : "s"}</span>
                       {card.type !== "Method" ? <small className={`rams-mini-risk ${band.className}`}>{band.code}</small> : null}
                     </button>
                   );
@@ -3485,6 +3524,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const [jobs, setJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobError, setJobError] = useState("");
+  const [saveStatus, setSaveStatus] = useState("");
+  const [savingRams, setSavingRams] = useState(false);
+  const [savedRamsId, setSavedRamsId] = useState("");
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
   const [ramsLogic, setRamsLogic] = useState(() => getStoredRamsLogic());
   const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
@@ -3493,6 +3535,14 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const [draggingCardId, setDraggingCardId] = useState("");
   const [ramsEdits, setRamsEdits] = useState({});
   const todayIso = getLocalTodayIso();
+  const initialRamsParams = useMemo(() => {
+    if (typeof window === "undefined") return { jobId: "", ramsId: "" };
+    const params = new URLSearchParams(window.location.search);
+    return {
+      jobId: params.get("jobId") || "",
+      ramsId: params.get("ramsId") || ""
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -3504,12 +3554,15 @@ function RamsPage({ currentUser, onLogout, notifications }) {
         if (!response.ok) throw new Error("Could not load installation jobs.");
         const payload = await response.json();
         if (!active) return;
-        const futureJobs = (Array.isArray(payload) ? payload : [])
-          .filter((job) => String(job.date || "") >= todayIso)
+        const jobsPayload = Array.isArray(payload) ? payload : [];
+        const futureJobs = jobsPayload
+          .filter((job) => String(job.date || "") >= todayIso || String(job.id || "") === String(initialRamsParams.jobId || ""))
           .sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")));
         setJobs(futureJobs);
         setQuestions((current) => {
           if (current.jobId || !futureJobs.length) return current;
+          const requestedJob = futureJobs.find((job) => String(job.id || "") === String(initialRamsParams.jobId || ""));
+          if (requestedJob) return { ...current, jobId: String(requestedJob.id || "") };
           return { ...current, jobId: String(futureJobs[0].id || "") };
         });
       } catch (error) {
@@ -3524,7 +3577,7 @@ function RamsPage({ currentUser, onLogout, notifications }) {
     return () => {
       active = false;
     };
-  }, [todayIso]);
+  }, [initialRamsParams.jobId, todayIso]);
 
   const selectedJob = useMemo(
     () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
@@ -3535,8 +3588,28 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
 
   useEffect(() => {
-    setRamsEdits({});
-  }, [selectedJob?.id]);
+    if (!selectedJob) return;
+    const savedDocuments = Array.isArray(selectedJob.ramsDocuments) ? selectedJob.ramsDocuments : [];
+    const requested = savedDocuments.find((entry) => String(entry.id || "") === String(initialRamsParams.ramsId || ""));
+    const savedDocument = requested || savedDocuments[0] || null;
+    if (!savedDocument) {
+      setSavedRamsId("");
+      setRamsEdits({});
+      setSaveStatus("");
+      return;
+    }
+    setSavedRamsId(savedDocument.id || "");
+    setQuestions((current) => ({
+      ...current,
+      ...(savedDocument.questions || {}),
+      jobId: String(selectedJob.id || "")
+    }));
+    if (Array.isArray(savedDocument.cardOrder) && savedDocument.cardOrder.length) {
+      setCardOrder(savedDocument.cardOrder);
+    }
+    setRamsEdits(savedDocument.edits && typeof savedDocument.edits === "object" ? savedDocument.edits : {});
+    setSaveStatus(`Loaded saved RAMS ${savedDocument.reference || ""}`.trim());
+  }, [initialRamsParams.ramsId, selectedJob?.id]);
 
   useEffect(() => {
     setCardOrder((current) => {
@@ -3756,6 +3829,44 @@ function RamsPage({ currentUser, onLogout, notifications }) {
     setDraggingCardId("");
   }
 
+  async function saveCurrentRams() {
+    if (!selectedJob) {
+      setSaveStatus("Select an installation job before saving.");
+      return;
+    }
+    try {
+      setSavingRams(true);
+      setSaveStatus("");
+      const documentId = savedRamsId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `rams-${Date.now()}`);
+      const existingDocument = Array.isArray(selectedJob.ramsDocuments)
+        ? selectedJob.ramsDocuments.find((entry) => String(entry.id || "") === String(documentId))
+        : null;
+      const body = {
+        id: documentId,
+        reference: getRamsEdit("reference", ramsReference),
+        createdAt: existingDocument?.createdAt || new Date().toISOString(),
+        questions,
+        cardOrder,
+        edits: ramsEdits
+      };
+      const response = await fetch(`/api/jobs/${encodeURIComponent(selectedJob.id)}/rams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not save RAMS.");
+      if (Array.isArray(payload.jobs)) setJobs(payload.jobs.filter((job) => String(job.date || "") >= todayIso || String(job.id || "") === String(selectedJob.id || "")));
+      setSavedRamsId(payload.ramsDocument?.id || documentId);
+      setSaveStatus("RAMS saved to this installation job.");
+    } catch (error) {
+      console.error(error);
+      setSaveStatus(error.message || "Could not save RAMS.");
+    } finally {
+      setSavingRams(false);
+    }
+  }
+
   const selectedCards = cardOrder
     .map((cardId) => ({ id: cardId, ...ramsLogic.cards[cardId] }))
     .filter((card) => card.title);
@@ -3765,7 +3876,11 @@ function RamsPage({ currentUser, onLogout, notifications }) {
   const selectedAccess = ramsLogic.optionGroups.find((group) => group.key === "access")?.options.find((option) => option.value === questions.access)?.label || questions.access;
   const selectedWorkArea = ramsLogic.optionGroups.find((group) => group.key === "workArea")?.options.find((option) => option.value === questions.workArea)?.label || questions.workArea;
   const selectedTools = (ramsLogic.optionGroups.find((group) => group.key === "tools")?.options || []).filter((option) => questions.tools.includes(option.value)).map((option) => option.label);
-  const displayedDate = getRamsEdit("date", formatJobDate(selectedJob?.date));
+  const activeSavedRams = Array.isArray(selectedJob?.ramsDocuments)
+    ? selectedJob.ramsDocuments.find((entry) => String(entry.id || "") === String(savedRamsId || ""))
+    : null;
+  const displayedInstallDate = getRamsEdit("installDate", formatJobDate(selectedJob?.date));
+  const displayedCreatedDate = getRamsEdit("createdDate", formatRamsCreatedDate(activeSavedRams?.createdAt));
   const displayedOperatives = getRamsEdit("operatives", questions.operatives);
   const displayedDuration = getRamsEdit("duration", questions.duration);
   const displayedInstallers = getRamsEdit("installers", selectedJob ? getInstallerNamesForRams(selectedJob) : "To be allocated");
@@ -3794,9 +3909,13 @@ function RamsPage({ currentUser, onLogout, notifications }) {
             <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
               Print / Save PDF
             </button>
+            <button className="ghost-button" type="button" onClick={saveCurrentRams} disabled={!selectedJob || savingRams}>
+              {savingRams ? "Saving..." : savedRamsId ? "Save RAMS changes" : "Save RAMS to job"}
+            </button>
           </div>
 
           {jobError ? <div className="flash error">{jobError}</div> : null}
+          {saveStatus ? <div className={`flash ${saveStatus.toLowerCase().includes("could not") ? "error" : "success"}`}>{saveStatus}</div> : null}
 
           <div className="rams-builder-grid">
             <aside className="rams-question-panel">
@@ -3896,7 +4015,8 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                   </div>
                 </div>
                 <div className="rams-doc-meta">
-                  <span><strong>Date:</strong> {renderEditable("date", displayedDate)}</span>
+                  <span><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</span>
+                  <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
                   <span><strong>Operatives:</strong> {renderEditable("operatives", displayedOperatives)}</span>
                   <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
                   <span><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
@@ -4020,7 +4140,6 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                       >
                         <div>
                           <strong>{renderEditable(`method-${card.id}-title`, card.title)}</strong>
-                          <span>{card.trigger}</span>
                           <span className="rams-card-actions no-print">
                             <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">^</button>
                             <button type="button" className="icon-button" onClick={() => moveCard(card.id, 1)} disabled={cardIndex === selectedCards.length - 1} aria-label="Move method down">v</button>

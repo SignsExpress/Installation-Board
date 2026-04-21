@@ -1267,6 +1267,19 @@ function sanitizeJobPhoto(payload) {
   };
 }
 
+function sanitizeRamsDocument(payload = {}) {
+  return {
+    id: String(payload.id || makeId()),
+    reference: String(payload.reference || "").trim(),
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: String(payload.updatedAt || new Date().toISOString()),
+    createdByName: String(payload.createdByName || "").trim(),
+    questions: payload.questions && typeof payload.questions === "object" ? payload.questions : {},
+    cardOrder: Array.isArray(payload.cardOrder) ? payload.cardOrder.map(String).filter(Boolean) : [],
+    edits: payload.edits && typeof payload.edits === "object" ? payload.edits : {}
+  };
+}
+
 function toPublicJob(job) {
   const normalized = sanitizeJob(job);
   return {
@@ -1558,6 +1571,9 @@ function sanitizeJob(payload) {
       ? payload.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
       : [];
   const rawPhotos = Array.isArray(payload.photos) ? payload.photos.map(sanitizeJobPhoto) : [];
+  const rawRamsDocuments = Array.isArray(payload.ramsDocuments)
+    ? payload.ramsDocuments.map(sanitizeRamsDocument)
+    : [];
 
   return {
     id: String(payload.id || makeId()),
@@ -1591,6 +1607,7 @@ function sanitizeJob(payload) {
     snaggingByUserId: String(payload.snaggingByUserId || "").trim(),
     snaggingByName: String(payload.snaggingByName || "").trim(),
     photos: rawPhotos,
+    ramsDocuments: rawRamsDocuments,
     notes: String(payload.notes || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
@@ -4276,6 +4293,48 @@ app.get("/api/corebridge/orders", async (request, response) => {
       holidays: savedStore.holidays,
       board: buildBoardRowsFromStore(savedStore),
       job: toPublicJob(nextJob)
+    };
+    broadcast("board-updated", payload.board);
+    response.json(payload);
+  });
+
+  app.post("/api/jobs/:id/rams", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Job not found." });
+      return;
+    }
+
+    const existing = sanitizeJob(store.jobs[index]);
+    const incoming = sanitizeRamsDocument({
+      ...(request.body || {}),
+      createdByName: request.body?.createdByName || request.user?.displayName || ""
+    });
+    const existingRams = existing.ramsDocuments.find((entry) => String(entry.id || "") === String(incoming.id || ""));
+    const nextDocument = sanitizeRamsDocument({
+      ...incoming,
+      createdAt: existingRams?.createdAt || incoming.createdAt || new Date().toISOString(),
+      createdByName: existingRams?.createdByName || incoming.createdByName || request.user?.displayName || "",
+      updatedAt: new Date().toISOString()
+    });
+    const ramsDocuments = existing.ramsDocuments.some((entry) => String(entry.id || "") === String(nextDocument.id || ""))
+      ? existing.ramsDocuments.map((entry) => String(entry.id || "") === String(nextDocument.id || "") ? nextDocument : entry)
+      : [nextDocument, ...existing.ramsDocuments];
+    const nextJob = sanitizeJob({
+      ...existing,
+      ramsDocuments
+    });
+
+    store.jobs[index] = nextJob;
+    const savedStore = await writeStore(store);
+    const payload = {
+      jobs: toPublicJobs(savedStore.jobs),
+      holidays: savedStore.holidays,
+      board: buildBoardRowsFromStore(savedStore),
+      job: toPublicJob(nextJob),
+      ramsDocument: nextDocument
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
