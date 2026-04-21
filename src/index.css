@@ -1171,6 +1171,11 @@
     margin: 8mm 8mm 9mm;
   }
 
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
   body {
     background: #fff !important;
   }
@@ -1206,9 +1211,10 @@
     border-radius: 0 !important;
     padding: 0 !important;
     gap: 3mm !important;
-    box-shadow: none !important;
+    box-shadow: 0 0 0 0.35mm rgba(15, 23, 42, 0.08) !important;
     font-size: 7.8pt !important;
     line-height: 1.16 !important;
+    background: #fff !important;
   }
 
   .rams-doc-title {
@@ -1238,6 +1244,7 @@
     padding: 1.2mm 1.5mm !important;
     font-size: 7.2pt !important;
     line-height: 1.1 !important;
+    background: #f8fafc !important;
   }
 
   .rams-doc-section {
@@ -1251,6 +1258,19 @@
   .rams-doc-section h4 {
     padding: 1mm 1.8mm !important;
     font-size: 7.5pt !important;
+    border-radius: 1.6mm !important;
+    background: #f1ecf4 !important;
+    color: #4f365f !important;
+  }
+
+  .rams-doc-method-section h4 {
+    background: #dcfce7 !important;
+    color: #166534 !important;
+  }
+
+  .rams-doc-risk-section h4 {
+    background: #ffedd5 !important;
+    color: #9a3412 !important;
   }
 
   .rams-doc-section p {
@@ -1260,6 +1280,44 @@
 
   .rams-risk-table-wrap {
     overflow: visible !important;
+    border-color: #fed7aa !important;
+    border-radius: 2.2mm !important;
+  }
+
+  .rams-risk-key {
+    gap: 0.4mm !important;
+    border-radius: 1.8mm !important;
+    font-size: 5.8pt !important;
+  }
+
+  .rams-risk-key span {
+    background: #008c94 !important;
+    color: #fff !important;
+    padding: 1mm 1.2mm !important;
+  }
+
+  .rams-risk-key .risk-none,
+  .rams-risk-final.risk-none {
+    background: #008c2e !important;
+    color: #fff !important;
+  }
+
+  .rams-risk-key .risk-low,
+  .rams-risk-final.risk-low {
+    background: #ffd400 !important;
+    color: #422006 !important;
+  }
+
+  .rams-risk-key .risk-medium,
+  .rams-risk-final.risk-medium {
+    background: #f28c18 !important;
+    color: #fff !important;
+  }
+
+  .rams-risk-key .risk-high,
+  .rams-risk-final.risk-high {
+    background: #bd1230 !important;
+    color: #fff !important;
   }
 
   .rams-risk-table {
@@ -1280,16 +1338,47 @@
   }
 
   .rams-col-controls {
-    width: 43% !important;
+    width: 34% !important;
+  }
+
+  .rams-col-responsibility {
+    width: 12% !important;
+  }
+
+  .rams-col-final-risk {
+    width: 6% !important;
   }
 
   .rams-risk-table th,
   .rams-risk-table td {
     padding: 1.2mm !important;
+    border-color: #ffedd5 !important;
   }
 
   .rams-risk-table th {
     font-size: 5.8pt !important;
+    background: #008c94 !important;
+    color: #fff !important;
+  }
+
+  .rams-risk-table th[colspan] {
+    background: #00787f !important;
+    color: #fff !important;
+  }
+
+  .rams-risk-table td:first-child {
+    background: #008c94 !important;
+    color: #fff !important;
+  }
+
+  .rams-risk-table td:first-child span {
+    color: #dffcff !important;
+  }
+
+  .rams-risk-final {
+    font-size: 8pt !important;
+    font-weight: 900 !important;
+    vertical-align: middle !important;
   }
 
   .rams-risk-table ul,
@@ -1301,6 +1390,21 @@
   .rams-doc-card {
     padding: 1.4mm 2mm !important;
     gap: 1mm !important;
+    border-radius: 2mm !important;
+    box-shadow: inset 1.3mm 0 0 #d7cbdd !important;
+    background: #fbfafc !important;
+  }
+
+  .rams-doc-method-section .rams-doc-card {
+    background: #f0fdf4 !important;
+    border-color: #bbf7d0 !important;
+    box-shadow: inset 1.3mm 0 0 #16a34a !important;
+  }
+
+  .rams-doc-risk-section .rams-doc-card {
+    background: #fff7ed !important;
+    border-color: #fed7aa !important;
+    box-shadow: inset 1.3mm 0 0 #ea580c !important;
   }
 
   .rams-editable:hover,
