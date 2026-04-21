@@ -4462,44 +4462,40 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                     </div>
                   </section>
 
-                  <section className="rams-setup-card rams-access-tools-card">
-                    <h3>Tools and Access</h3>
-                    <div className="rams-access-tools-grid">
-                      {toolsGroup ? (
-                        <div className="rams-question-group">
-                          <span>Tools installers will use</span>
-                          <div className="rams-check-grid">
-                            {toolsGroup.options.map((option) => (
-                              <label key={option.value} className="rams-check">
-                                <input
-                                  type="checkbox"
-                                  checked={Array.isArray(questions.tools) && questions.tools.includes(option.value)}
-                                  onChange={() => updateMultiQuestion("tools", option.value)}
-                                />
-                                {option.label}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                      {accessGroup ? (
-                        <div className="rams-question-group">
-                          <span>Access methods</span>
-                          <div className="rams-check-grid">
-                            {accessGroup.options.map((option) => (
-                              <label key={option.value} className="rams-check">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedAccessValues.includes(option.value)}
-                                  onChange={() => updateMultiQuestion("access", option.value)}
-                                />
-                                {option.label}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
+                  <section className="rams-setup-card rams-picker-card rams-tools-card">
+                    <h3>Tools installers will use</h3>
+                    {toolsGroup ? (
+                      <div className="rams-check-grid">
+                        {toolsGroup.options.map((option) => (
+                          <label key={option.value} className="rams-check">
+                            <input
+                              type="checkbox"
+                              checked={Array.isArray(questions.tools) && questions.tools.includes(option.value)}
+                              onChange={() => updateMultiQuestion("tools", option.value)}
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+                  </section>
+
+                  <section className="rams-setup-card rams-picker-card rams-access-card">
+                    <h3>Access methods</h3>
+                    {accessGroup ? (
+                      <div className="rams-check-grid">
+                        {accessGroup.options.map((option) => (
+                          <label key={option.value} className="rams-check">
+                            <input
+                              type="checkbox"
+                              checked={selectedAccessValues.includes(option.value)}
+                              onChange={() => updateMultiQuestion("access", option.value)}
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
                   </section>
 
                   <section className="rams-setup-card">
@@ -4553,9 +4549,9 @@ function RamsPage({ currentUser, onLogout, notifications }) {
                     </div>
                   </section>
 
-                  <section className="rams-setup-card">
+                  <section className="rams-setup-card rams-arrangements-card">
                     <h3>Arrangements</h3>
-                    <div className="rams-setup-grid">
+                    <div className="rams-arrangements-grid">
                       <label>
                         Welfare
                         <textarea value={questions.welfare} onChange={(event) => updateQuestion("welfare", event.target.value)} />

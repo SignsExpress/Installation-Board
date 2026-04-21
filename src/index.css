@@ -238,19 +238,47 @@
   grid-column: 1 / -1;
 }
 
-.rams-access-tools-card {
-  grid-column: 1 / -1;
+.rams-picker-card {
+  align-content: start;
 }
 
-.rams-access-tools-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  align-items: start;
+.rams-tools-card {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.rams-access-card {
+  border-color: #c7d2fe;
+  background: #f8f9ff;
+}
+
+.rams-picker-card .rams-check-grid {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.rams-tools-card .rams-check-grid {
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+}
+
+.rams-access-card .rams-check-grid {
+  grid-template-columns: 1fr;
 }
 
 .rams-site-hazards-card textarea {
   min-height: 118px;
+}
+
+.rams-arrangements-card {
+  grid-column: 1 / -1;
+}
+
+.rams-arrangements-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
 }
 
 .rams-setup-card {
@@ -341,7 +369,9 @@
 }
 
 .rams-setup-card textarea {
-  min-height: 72px;
+  min-height: 118px;
+  line-height: 1.35;
+  white-space: pre-wrap;
   resize: vertical;
 }
 
@@ -367,13 +397,13 @@
   }
 
   .rams-setup-modal-body .rams-setup-card:first-child,
-  .rams-access-tools-card {
+  .rams-arrangements-card {
     grid-column: auto;
     grid-row: auto;
   }
 
   .rams-setup-grid,
-  .rams-access-tools-grid {
+  .rams-arrangements-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
