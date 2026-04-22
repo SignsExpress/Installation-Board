@@ -1582,6 +1582,147 @@
   gap: 8px;
 }
 
+.client-rams-readonly-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.client-rams-view {
+  display: grid;
+  gap: 12px;
+  color: #0f172a;
+}
+
+.client-rams-view-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  background: #f0fdf4;
+  border-bottom: 1px solid #bbf7d0;
+}
+
+.client-rams-view-head h3 {
+  margin: 2px 0 0;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.client-rams-view-head > span {
+  color: #166534;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.client-rams-mini-grid,
+.client-rams-section,
+.client-rams-signature-box,
+.client-rams-amendment-box {
+  margin-inline: 14px;
+}
+
+.client-rams-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.client-rams-mini-card,
+.client-rams-section,
+.client-rams-signature-box,
+.client-rams-amendment-box {
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.client-rams-mini-card {
+  display: grid;
+  gap: 3px;
+}
+
+.client-rams-mini-card strong,
+.client-rams-section h4,
+.client-rams-signature-box h4 {
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+}
+
+.client-rams-section {
+  display: grid;
+  gap: 8px;
+}
+
+.client-rams-section h4,
+.client-rams-section h5,
+.client-rams-section p,
+.client-rams-signature-box h4,
+.client-rams-signature-box p {
+  margin: 0;
+}
+
+.client-rams-method-card,
+.client-rams-risk-card {
+  border-left: 4px solid #16a34a;
+  background: #f8fff9;
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.client-rams-risk-card {
+  border-left-color: #ea580c;
+  background: #fffaf5;
+}
+
+.client-rams-risk-card > div {
+  display: grid;
+  gap: 3px;
+}
+
+.client-rams-risk-card span {
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.client-rams-view ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.client-rams-signature-box {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.client-rams-amendment-box {
+  margin-bottom: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.client-rams-amendment-box label {
+  display: grid;
+  gap: 6px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.client-rams-amendment-box textarea {
+  width: 100%;
+  min-height: 86px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font: inherit;
+  resize: vertical;
+}
+
 .rams-doc-section {
   display: grid;
   gap: 4px;

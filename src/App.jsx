@@ -2046,14 +2046,11 @@ function renderJobCardContent({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                if (isClientMode && latestRams.pdfUrl) {
-                  window.open(latestRams.pdfUrl, "_blank", "noopener,noreferrer");
-                } else {
-                  window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
-                }
+                if (isClientMode) setActiveClientJob(job);
+                else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
               }}
             >
-              {isClientMode && latestRams.pdfUrl ? "RAMS PDF" : "RAMS saved"}
+              RAMS saved
             </button>
           ) : null}
           {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
@@ -2098,11 +2095,6 @@ function renderJobCardContent({
                       >
                         Open RAMS
                       </button>
-                      {latestRams.pdfUrl ? (
-                        <a className="text-button" href={latestRams.pdfUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
-                          PDF
-                        </a>
-                      ) : null}
                     </>
                   ) : null}
                   <button className="text-button danger" type="button" onClick={(event) => { event.stopPropagation(); handleDelete(job.id); }}>
@@ -4197,6 +4189,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     setCardOrder((current) => sortRamsCardOrderForFlow(current, ramsLogic.cards));
   }
 
+  function applyRamsSetup() {
+    setCardOrder((current) => sortRamsCardOrderForFlow(current, ramsLogic.cards));
+    setRamsSetupOpen(false);
+  }
+
   function handleCardDrop(targetCardId) {
     if (!draggingCardId || draggingCardId === targetCardId) return;
     setCardOrder((current) => {
@@ -4227,7 +4224,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
         questions,
         cardOrder,
         edits: ramsEdits,
-        pdf: buildCurrentRamsPdfPayload()
+        viewPayload: buildCurrentRamsPdfPayload()
       };
       const response = await fetch(`/api/jobs/${encodeURIComponent(selectedJob.id)}/rams`, {
         method: "POST",
@@ -4299,18 +4296,31 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   });
   const mattProfile = getUserProfileByName("Matt Rutlidge", users) || {};
   const preparedByProfile = getUserProfileByName(currentUser?.displayName, users) || currentUser || {};
+  const getLiveProfileEdit = (key, fallback, liveValue) => {
+    const stored = getRamsEdit(key, fallback);
+    if (
+      liveValue &&
+      (!stored ||
+        stored === "Phone number to be confirmed" ||
+        stored === "RAMS prepared by" ||
+        stored === "Director")
+    ) {
+      return liveValue;
+    }
+    return stored;
+  };
   const emergencyContacts = [
     {
       label: "Emergency contact",
       name: getRamsEdit("emergencyContact-matt-name", "Matt Rutlidge"),
-      jobTitle: getRamsEdit("emergencyContact-matt-title", mattProfile.jobTitle || "Director"),
-      phone: getRamsEdit("emergencyContact-matt-phone", mattProfile.phoneNumber || "Phone number to be confirmed")
+      jobTitle: getLiveProfileEdit("emergencyContact-matt-title", "Director", mattProfile.jobTitle || ""),
+      phone: getLiveProfileEdit("emergencyContact-matt-phone", "Phone number to be confirmed", mattProfile.phoneNumber || "")
     },
     {
       label: "Prepared by",
       name: getRamsEdit("emergencyContact-prepared-name", currentUser?.displayName || "Signs Express"),
-      jobTitle: getRamsEdit("emergencyContact-prepared-title", preparedByProfile.jobTitle || "RAMS prepared by"),
-      phone: getRamsEdit("emergencyContact-prepared-phone", preparedByProfile.phoneNumber || "Phone number to be confirmed")
+      jobTitle: getLiveProfileEdit("emergencyContact-prepared-title", "RAMS prepared by", preparedByProfile.jobTitle || ""),
+      phone: getLiveProfileEdit("emergencyContact-prepared-phone", "Phone number to be confirmed", preparedByProfile.phoneNumber || "")
     },
     {
       label: "Office",
@@ -4430,11 +4440,6 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
               <button className="primary-button" type="button" onClick={() => window.print()} disabled={!selectedJob}>
                 Print / Save PDF
               </button>
-              {activeSavedRams?.pdfUrl ? (
-                <a className="ghost-button" href={activeSavedRams.pdfUrl} target="_blank" rel="noreferrer">
-                  Open fitter PDF
-                </a>
-              ) : null}
               <button className="ghost-button" type="button" onClick={saveCurrentRams} disabled={!selectedJob || savingRams}>
                 {savingRams ? "Saving..." : savedRamsId ? "Save RAMS changes" : "Save RAMS to job"}
               </button>
@@ -4490,9 +4495,6 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
 
               <button className="ghost-button rams-logic-launch" type="button" onClick={() => window.location.assign("/rams/logic")}>
                 Open RAMS logic editor
-              </button>
-              <button className="ghost-button rams-logic-launch" type="button" onClick={smartSortMethodCards}>
-                Smart sort methods
               </button>
             </aside>
 
@@ -4900,7 +4902,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
 
                 <div className="modal-actions rams-setup-actions">
                   <button className="ghost-button" type="button" onClick={() => setRamsSetupOpen(false)}>Close</button>
-                  <button className="primary-button" type="button" onClick={() => setRamsSetupOpen(false)}>Apply to RAMS</button>
+                  <button className="primary-button" type="button" onClick={applyRamsSetup}>Apply to RAMS</button>
                 </div>
               </div>
             </div>
@@ -4908,6 +4910,129 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
         </section>
       </div>
     </div>
+  );
+}
+
+function ReadOnlyRamsDocument({
+  job,
+  document,
+  amendmentDraft,
+  setAmendmentDraft,
+  amendmentSaving,
+  onRequestAmendment
+}) {
+  const payload = document?.viewPayload && typeof document.viewPayload === "object" ? document.viewPayload : {};
+  const meta = Array.isArray(payload.meta) ? payload.meta : [];
+  const site = Array.isArray(payload.site) ? payload.site : [];
+  const arrangements = Array.isArray(payload.arrangements) ? payload.arrangements : [];
+  const risks = Array.isArray(payload.risks) ? payload.risks : [];
+  const methods = Array.isArray(payload.methods) ? payload.methods : [];
+  const installers = getInstallerNamesForRams(job);
+
+  if (!Object.keys(payload).length) {
+    return (
+      <section className="client-rams-view">
+        <h3>{document?.reference || "RAMS"}</h3>
+        <p>This RAMS was saved before the mobile read-only view existed. Re-save it from the RAMS builder to publish the full mobile version.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="client-rams-view">
+      <div className="client-rams-view-head">
+        <div>
+          <span className="panel-kicker">Read-only RAMS</span>
+          <h3>{document?.reference || payload.reference || "Risk Assessment and Method Statement"}</h3>
+        </div>
+        <span>{formatRamsCreatedDate(document?.updatedAt || document?.createdAt)}</span>
+      </div>
+
+      <div className="client-rams-mini-grid">
+        {meta.map((item) => (
+          <div key={`${item.label}-${item.value}`} className="client-rams-mini-card">
+            <strong>{item.label}</strong>
+            <span>{item.value || "-"}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="client-rams-section">
+        <h4>Site Details</h4>
+        {site.map((item) => (
+          <p key={`${item.label}-${item.value}`}><strong>{item.label}:</strong> {item.value || "-"}</p>
+        ))}
+      </div>
+
+      <div className="client-rams-section">
+        <h4>Method Statement</h4>
+        <p><strong>Installers:</strong> {installers}</p>
+        <p><strong>Tools:</strong> {(payload.tools || []).join(", ") || "-"}</p>
+        <p><strong>Access:</strong> {(payload.accessMethods || []).join(", ") || "-"}</p>
+        <p><strong>PPE:</strong> {(payload.ppe || []).join(", ") || "-"}</p>
+        <p><strong>First aid:</strong> {payload.firstAid?.facility || "-"} | <strong>Box:</strong> {payload.firstAid?.boxLocation || "Signs Express Van"}</p>
+        {methods.map((method) => (
+          <article key={method.title} className="client-rams-method-card">
+            <h5>{method.title}</h5>
+            <ul>
+              {(Array.isArray(method.lines) ? method.lines : []).map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <div className="client-rams-section">
+        <h4>Risk Assessment</h4>
+        {risks.map((risk) => (
+          <article key={risk.title} className="client-rams-risk-card">
+            <div>
+              <strong>{risk.title}</strong>
+              <span>Initial {risk.initialL}/{risk.initialC}/{risk.initialR} | Residual {risk.residualL}/{risk.residualC}/{risk.residualR} | {risk.risk}</span>
+            </div>
+            <p><strong>Who may be harmed:</strong> {risk.whoAtRisk}</p>
+            <p><strong>Responsibility:</strong> {risk.responsibility}</p>
+            <ul>
+              {(Array.isArray(risk.controls) ? risk.controls : []).map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <div className="client-rams-section">
+        <h4>Emergency Contacts</h4>
+        {(payload.emergencyContacts || []).map((contact) => (
+          <p key={contact.label}><strong>{contact.label}:</strong> {[contact.name, contact.jobTitle, contact.phone].filter(Boolean).join(" - ")}</p>
+        ))}
+        <p><strong>Signs Express Office:</strong> {payload.officeAddress || "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP"}</p>
+      </div>
+
+      <div className="client-rams-signature-box">
+        <h4>Signed By</h4>
+        <p><strong>{installers}</strong></p>
+        <p>
+          By commencing the works, the operatives confirm that they have read and understood this RAMS, consider it suitable for the works being undertaken, and agree to carry out the works in accordance with the stated method statement, control measures and identified risks.
+        </p>
+      </div>
+
+      <div className="client-rams-amendment-box">
+        <label>
+          Request amendments
+          <textarea
+            value={amendmentDraft}
+            onChange={(event) => setAmendmentDraft(event.target.value)}
+            placeholder="Tell the RAMS creator what needs changing."
+          />
+        </label>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => onRequestAmendment(job, document, amendmentDraft)}
+          disabled={amendmentSaving || !String(amendmentDraft || "").trim()}
+        >
+          {amendmentSaving ? "Sending..." : "Request amendments"}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -8659,6 +8784,9 @@ export default function App() {
   const [activeHolidayId, setActiveHolidayId] = useState("");
   const [jobModalDate, setJobModalDate] = useState("");
   const [activeClientJob, setActiveClientJob] = useState(null);
+  const [activeClientRamsId, setActiveClientRamsId] = useState("");
+  const [ramsAmendmentDraft, setRamsAmendmentDraft] = useState("");
+  const [ramsAmendmentSaving, setRamsAmendmentSaving] = useState(false);
   const [clientCompletePrompt, setClientCompletePrompt] = useState(false);
   const [clientPhotoUploading, setClientPhotoUploading] = useState(false);
   const [clientExporting, setClientExporting] = useState(false);
@@ -8879,6 +9007,8 @@ export default function App() {
 
   useEffect(() => {
     setClientCompletePrompt(false);
+    setActiveClientRamsId("");
+    setRamsAmendmentDraft("");
     setClientPhotoUploading(false);
     setClientExporting(false);
     if (clientPhotoInputRef.current) {
@@ -10012,6 +10142,33 @@ export default function App() {
     }
   }
 
+  async function requestRamsAmendment(job, document, note) {
+    if (!job || !document) return;
+    const cleanNote = String(note || "").trim();
+    if (!cleanNote) {
+      setMessage(createMessage("Add a note explaining what needs changing.", "error"));
+      return;
+    }
+    try {
+      setRamsAmendmentSaving(true);
+      const response = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/rams/${encodeURIComponent(document.id)}/amendments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: cleanNote })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not send amendment request.");
+      setRamsAmendmentDraft("");
+      await refreshNotifications();
+      setMessage(createMessage("RAMS amendment request sent.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not send amendment request.", "error"));
+    } finally {
+      setRamsAmendmentSaving(false);
+    }
+  }
+
   async function undoAdminJobComplete(job) {
     if (!job?.id) return;
     try {
@@ -10847,6 +11004,10 @@ export default function App() {
     return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;
   }
 
+  const activeClientRamsDocument = activeClientJob && Array.isArray(activeClientJob.ramsDocuments)
+    ? activeClientJob.ramsDocuments.find((document) => String(document.id || "") === String(activeClientRamsId || "")) || null
+    : null;
+
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
       <div className="page">
@@ -11629,19 +11790,35 @@ export default function App() {
                   {Array.isArray(activeClientJob.ramsDocuments) && activeClientJob.ramsDocuments.length ? (
                     <div className="client-rams-links">
                       {activeClientJob.ramsDocuments.map((document) => (
-                        document.pdfUrl ? (
-                          <a key={document.id} className="ghost-button" href={document.pdfUrl} target="_blank" rel="noreferrer">
-                            {document.reference || "Open RAMS PDF"}
-                          </a>
-                        ) : (
-                          <span key={document.id}>{document.reference || "RAMS saved"}</span>
-                        )
+                        <button
+                          key={document.id}
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => {
+                            setActiveClientRamsId(document.id);
+                            setRamsAmendmentDraft("");
+                          }}
+                        >
+                          {document.reference || "Open RAMS"}
+                        </button>
                       ))}
                     </div>
                   ) : (
-                    <p>No RAMS uploaded yet.</p>
+                    <p>No RAMS saved yet.</p>
                   )}
                 </div>
+                {activeClientRamsDocument ? (
+                  <div className="detail-card detail-card-wide client-rams-readonly-card">
+                    <ReadOnlyRamsDocument
+                      job={activeClientJob}
+                      document={activeClientRamsDocument}
+                      amendmentDraft={ramsAmendmentDraft}
+                      setAmendmentDraft={setRamsAmendmentDraft}
+                      amendmentSaving={ramsAmendmentSaving}
+                      onRequestAmendment={requestRamsAmendment}
+                    />
+                  </div>
+                ) : null}
                 <div className="detail-card detail-card-wide">
                   <strong>Photos</strong>
                   {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (

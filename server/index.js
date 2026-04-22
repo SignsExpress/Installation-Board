@@ -1380,7 +1380,8 @@ function sanitizeRamsDocument(payload = {}) {
     pdfSize: Math.max(0, Number(payload.pdfSize) || 0),
     questions: payload.questions && typeof payload.questions === "object" ? payload.questions : {},
     cardOrder: Array.isArray(payload.cardOrder) ? payload.cardOrder.map(String).filter(Boolean) : [],
-    edits: payload.edits && typeof payload.edits === "object" ? payload.edits : {}
+    edits: payload.edits && typeof payload.edits === "object" ? payload.edits : {},
+    viewPayload: payload.viewPayload && typeof payload.viewPayload === "object" ? payload.viewPayload : {}
   };
 }
 
@@ -1410,12 +1411,7 @@ function toPublicJob(job) {
       ...photo,
       url: `/api/jobs/${encodeURIComponent(normalized.id)}/photos/${encodeURIComponent(photo.id)}`
     })),
-    ramsDocuments: normalized.ramsDocuments.map((document) => ({
-      ...document,
-      pdfUrl: document.pdfStorageName
-        ? `/api/jobs/${encodeURIComponent(normalized.id)}/rams/${encodeURIComponent(document.id)}/pdf`
-        : ""
-    }))
+    ramsDocuments: normalized.ramsDocuments
   };
 }
 
@@ -4680,21 +4676,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const existingRams = existing.ramsDocuments.find((entry) => String(entry.id || "") === String(incoming.id || ""));
     const nextDocument = sanitizeRamsDocument({
       ...incoming,
+      viewPayload: request.body?.viewPayload || request.body?.pdf || incoming.viewPayload || {},
       createdAt: existingRams?.createdAt || incoming.createdAt || new Date().toISOString(),
       createdByName: existingRams?.createdByName || incoming.createdByName || request.user?.displayName || "",
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      pdfStorageName: "",
+      pdfFileName: "",
+      pdfSize: 0
     });
-    try {
-      const pdfBuffer = buildRamsPdfDocument(existing, nextDocument, request.body?.pdf || {});
-      const storageName = `${String(request.params.id || "").trim()}-${nextDocument.id}.pdf`;
-      const uploadDir = await ensureRamsUploadsDir();
-      await fsp.writeFile(path.join(uploadDir, storageName), pdfBuffer);
-      nextDocument.pdfStorageName = storageName;
-      nextDocument.pdfFileName = buildRamsPdfFileName(existing, nextDocument.id, existing.ramsDocuments);
-      nextDocument.pdfSize = pdfBuffer.length;
-    } catch (error) {
-      console.error("Could not generate RAMS PDF.", error);
-    }
     const ramsDocuments = existing.ramsDocuments.some((entry) => String(entry.id || "") === String(nextDocument.id || ""))
       ? existing.ramsDocuments.map((entry) => String(entry.id || "") === String(nextDocument.id || "") ? nextDocument : entry)
       : [nextDocument, ...existing.ramsDocuments];
@@ -4714,6 +4703,51 @@ app.get("/api/corebridge/orders", async (request, response) => {
     };
     broadcast("board-updated", payload.board);
     response.json(payload);
+  });
+
+  app.post("/api/jobs/:jobId/rams/:ramsId/amendments", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const note = String(request.body?.note || "").trim();
+    if (!note) {
+      response.status(400).json({ error: "Add a note explaining the amendment required." });
+      return;
+    }
+
+    const store = await readStore();
+    const job = store.jobs.find((entry) => String(entry.id || "") === String(request.params.jobId || ""));
+    const document = Array.isArray(job?.ramsDocuments)
+      ? job.ramsDocuments.map(sanitizeRamsDocument).find((entry) => String(entry.id || "") === String(request.params.ramsId || ""))
+      : null;
+    if (!job || !document) {
+      response.status(404).json({ error: "RAMS document not found." });
+      return;
+    }
+
+    const usersStore = await readUsersStore();
+    const creatorName = String(document.createdByName || "").trim().toLowerCase();
+    const creator = (usersStore.users || []).find((user) => String(user.displayName || "").trim().toLowerCase() === creatorName);
+    const recipients = creator
+      ? [creator]
+      : getBoardEditorNotificationRecipients(usersStore.users || []);
+    const jobSummary = getJobNotificationSummary(job);
+    store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+    recipients.forEach((user) => {
+      store.notifications.unshift(
+        createNotification({
+          userId: user.id,
+          type: "rams-amendment",
+          title: "RAMS amendment requested",
+          message: `${request.user?.displayName || "A user"} requested a RAMS amendment for ${jobSummary}: ${note}`,
+          link: `/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(document.id)}`
+        })
+      );
+    });
+
+    const savedStore = await writeStore(store);
+    response.json({
+      ok: true,
+      notifications: savedStore.notifications.filter((entry) => String(entry.userId || "") === String(request.user?.id || ""))
+    });
   });
 
   app.get("/api/jobs/:jobId/rams/:ramsId/pdf", async (request, response) => {
