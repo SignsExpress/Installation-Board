@@ -3456,6 +3456,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             name: voice.name,
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
+            exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
             createdAt: voice.createdAt
           }))
         } : current);
@@ -3593,6 +3594,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                 <div className={`social-post-status ${socialStatus.ai?.configured ? "is-ok" : "is-warning"}`}>
                   <span>{socialStatus.ai?.configured ? "AI connected" : "AI key not visible to Render"}</span>
                   <span>{Array.isArray(socialStatus.voices) && socialStatus.voices.length ? `${socialStatus.voices.length} tone file${socialStatus.voices.length === 1 ? "" : "s"} saved` : "No uploaded tone file saved"}</span>
+                  {selectedVoice ? <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired examples</span> : null}
                 </div>
               ) : null}
 
@@ -3657,7 +3659,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               <div className="social-post-tone-head">
                 <div>
                   <h3>{selectedVoice.name}</h3>
-                  <p>{selectedVoice.fileName || "Saved tone examples"}</p>
+                  <p>{selectedVoice.fileName || "Saved tone examples"} · {Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired A/B examples</p>
                 </div>
                 <button className="icon-button" type="button" onClick={() => setToneViewerOpen(false)}>x</button>
               </div>

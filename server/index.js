@@ -4234,11 +4234,21 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
 }
 
 function sanitizeSocialToneVoice(voice = {}) {
+  const examples = Array.isArray(voice.examples)
+    ? voice.examples
+        .map((example) => ({
+          reference: String(example?.reference || "").replace(/\s+/g, " ").trim().slice(0, 80),
+          post: String(example?.post || "").replace(/\u0000/g, "").trim().slice(0, 8000)
+        }))
+        .filter((example) => example.reference && example.post)
+        .slice(0, 250)
+    : [];
   return {
     id: String(voice.id || makeId()),
     name: String(voice.name || "LinkedIn").replace(/\s+/g, " ").trim().slice(0, 80) || "LinkedIn",
     fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
     content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 100000),
+    examples,
     createdAt: String(voice.createdAt || new Date().toISOString())
   };
 }
@@ -4293,9 +4303,9 @@ function readZipEntries(buffer) {
   return entries;
 }
 
-function parseXlsxText(buffer) {
+function parseXlsxToneData(buffer) {
   const entries = readZipEntries(buffer);
-  if (!entries.size) return "";
+  if (!entries.size) return { content: "", examples: [] };
   const sharedXml = entries.get("xl/sharedStrings.xml")?.toString("utf8") || "";
   const sharedStrings = [...sharedXml.matchAll(/<si\b[\s\S]*?<\/si>/g)].map((match) =>
     decodeXmlEntities(
@@ -4306,22 +4316,43 @@ function parseXlsxText(buffer) {
   );
 
   const sheetTexts = [];
+  const examples = [];
   for (const [fileName, content] of entries.entries()) {
     if (!/^xl\/worksheets\/sheet\d+\.xml$/i.test(fileName)) continue;
     const xml = content.toString("utf8");
     const rows = [...xml.matchAll(/<row\b[\s\S]*?<\/row>/g)].map((rowMatch) => {
-      const cells = [...rowMatch[0].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map((cellMatch) => {
+      const cellsByColumn = {};
+      [...rowMatch[0].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].forEach((cellMatch) => {
         const attrs = cellMatch[1] || "";
         const body = cellMatch[2] || "";
+        const ref = attrs.match(/\br="([A-Z]+)\d+"/i)?.[1]?.toUpperCase() || "";
         const value = body.match(/<v>([\s\S]*?)<\/v>/)?.[1] || body.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] || "";
-        if (/\bt="s"/.test(attrs)) return sharedStrings[Number(value)] || "";
-        return decodeXmlEntities(value.replace(/<[^>]+>/g, ""));
+        const decoded = /\bt="s"/.test(attrs)
+          ? sharedStrings[Number(value)] || ""
+          : decodeXmlEntities(value.replace(/<[^>]+>/g, ""));
+        if (ref && decoded) cellsByColumn[ref] = decoded.trim();
       });
+      const reference = String(cellsByColumn.A || "").trim();
+      const post = String(cellsByColumn.B || "").trim();
+      if (/^(ord|inv)-?\d+/i.test(reference) && post.length > 30) {
+        examples.push({ reference, post });
+      }
+      const cells = Object.keys(cellsByColumn)
+        .sort()
+        .map((key) => cellsByColumn[key])
+        .filter(Boolean);
       return cells.filter(Boolean).join(" | ");
     });
     sheetTexts.push(rows.filter(Boolean).join("\n"));
   }
-  return sheetTexts.join("\n\n").replace(/\s+\|/g, " |").trim();
+  return {
+    content: sheetTexts.join("\n\n").replace(/\s+\|/g, " |").trim(),
+    examples
+  };
+}
+
+function parseXlsxText(buffer) {
+  return parseXlsxToneData(buffer).content;
 }
 
 function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
@@ -4334,7 +4365,14 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
     const buffer = Buffer.from(base64, "base64");
     const lowerName = rawFileName.toLowerCase();
     if (lowerName.endsWith(".xlsx") || meta.includes("spreadsheetml")) {
-      content = parseXlsxText(buffer);
+      const parsed = parseXlsxToneData(buffer);
+      content = parsed.content;
+      return sanitizeSocialToneVoice({
+        name: rawName || rawFileName.replace(/\.[^.]+$/, "") || "LinkedIn tone",
+        fileName: rawFileName,
+        content,
+        examples: parsed.examples
+      });
     } else {
       content = buffer.toString("utf8");
     }
@@ -4343,13 +4381,23 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
   return sanitizeSocialToneVoice({
     name: rawName || rawFileName.replace(/\.[^.]+$/, "") || "LinkedIn tone",
     fileName: rawFileName,
-    content
+    content,
+    examples: []
   });
 }
 
 function getSocialPostToneSummary(voice) {
   const text = String(voice?.content || "").replace(/\s+/g, " ").trim();
   return text.slice(0, 20000);
+}
+
+function getSocialPostTransformationExamples(voice) {
+  return (Array.isArray(voice?.examples) ? voice.examples : [])
+    .map((example) => ({
+      reference: example.reference,
+      finishedPost: String(example.post || "").slice(0, 4000)
+    }))
+    .slice(0, 40);
 }
 
 function getSocialPostAiStatus() {
@@ -4510,6 +4558,7 @@ function buildSocialPostBrief(order, voice) {
     items,
     toneName: voice?.name || "LinkedIn",
     toneSummary: getSocialPostToneSummary(voice),
+    transformationExamples: getSocialPostTransformationExamples(voice),
     debug: {
       chosenDescription: mainDescription,
       descriptionCandidates,
@@ -4519,6 +4568,7 @@ function buildSocialPostBrief(order, voice) {
       sourceFields,
       toneName: voice?.name || "Matt Rutlidge",
       toneExcerpt: getSocialPostToneSummary(voice).slice(0, 3000),
+      transformationExamples: getSocialPostTransformationExamples(voice).slice(0, 8),
       sourceFieldCount: Array.isArray(order.debugFields) ? order.debugFields.length : 0
     }
   };
@@ -4647,7 +4697,10 @@ async function generateSocialPostWithAi(brief) {
     "IMPORTANT TRANSFORMATION:",
     "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
     "- Read primaryDescription, descriptionCandidates and items to understand what was supplied, produced or installed.",
-    "- Read toneSummary as historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
+    "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
+    "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did Matt take from the Corebridge job, what did he ignore, what did he simplify, what did he fluff up, and what hook style did he use?",
+    "- Find repeatable patterns across all transformationExamples, then apply those patterns to the new Corebridge job.",
+    "- Read toneSummary as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
     "- Pay special attention to mannerisms: punchy first line, rhetorical questions, conversational phrases, confidence, personality, emoji placement and how the examples move from broad idea to specific job.",
     "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
@@ -5180,6 +5233,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: voice.name,
         fileName: voice.fileName,
         contentLength: voice.content.length,
+        exampleCount: voice.examples.length,
         createdAt: voice.createdAt
       }))
     });
@@ -5226,6 +5280,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       ...existing,
       name: request.body?.name ?? existing.name,
       content: request.body?.content ?? existing.content,
+      examples: request.body?.examples ?? existing.examples,
       fileName: request.body?.fileName ?? existing.fileName,
       createdAt: existing.createdAt
     });
@@ -5294,6 +5349,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: selectedVoice.name,
         fileName: selectedVoice.fileName,
         contentLength: selectedVoice.content.length,
+        exampleCount: selectedVoice.examples.length,
         isFallback: !voices.length
       };
       const generated = await generateSocialPostWithAi(brief);
