@@ -4533,12 +4533,15 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                     <p>{renderEditable("jobTitle", selectedJob ? getRamsJobTitle(selectedJob) : "Select a job to generate the document")}</p>
                   </div>
                 </div>
-                <div className="rams-doc-meta">
-                  <span><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</span>
-                  <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
-                  <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
-                  <span className="meta-wide"><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
-                  <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
+                <div className="rams-doc-section rams-doc-job-section">
+                  <h4>Job Details</h4>
+                  <div className="rams-doc-meta">
+                    <span><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</span>
+                    <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
+                    <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
+                    <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
+                    <span className="meta-full"><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
+                  </div>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>
@@ -4641,7 +4644,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
                   <h5 className="rams-method-subhead rams-installers-subhead">Installers</h5>
-                  <div className="rams-installer-contact-grid">
+                  <div className={`rams-installer-contact-grid count-${Math.min(Math.max(installerContacts.length, 1), 4)}`}>
                     {installerContacts.map((contact, index) => (
                       <article key={contact.key} className="rams-installer-contact-card">
                         <label className="rams-installer-photo no-print">
@@ -5010,12 +5013,15 @@ function ReadOnlyRamsDocument({
           </div>
         </div>
 
-        <div className="rams-doc-meta">
-          {meta.map((item, index) => (
-            <span key={`${item.label}-${index}`} className={item.label === "Installers" ? "meta-wide" : ""}>
-              <strong>{item.label}:</strong> {item.value || "-"}
-            </span>
-          ))}
+        <div className="rams-doc-section rams-doc-job-section">
+          <h4>Job Details</h4>
+          <div className="rams-doc-meta">
+            {meta.map((item, index) => (
+              <span key={`${item.label}-${index}`} className={item.label === "Installers" ? "meta-full" : ""}>
+                <strong>{item.label}:</strong> {item.value || "-"}
+              </span>
+            ))}
+          </div>
         </div>
 
         <div className="rams-doc-section">
@@ -5112,7 +5118,7 @@ function ReadOnlyRamsDocument({
           {installerContacts.length ? (
             <>
               <h5 className="rams-method-subhead rams-installers-subhead">Installers</h5>
-              <div className="rams-installer-contact-grid">
+              <div className={`rams-installer-contact-grid count-${Math.min(Math.max(installerContacts.length, 1), 4)}`}>
                 {installerContacts.map((contact, index) => (
                   <article key={`${contact.name}-${index}`} className="rams-installer-contact-card">
                     <div className="rams-installer-photo">

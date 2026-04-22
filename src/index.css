@@ -1404,6 +1404,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
+  grid-column: 1 / -1;
 }
 
 .rams-doc-meta span {
@@ -1424,6 +1425,10 @@
 
 .rams-doc-meta .meta-full {
   grid-column: 1 / -1;
+}
+
+.rams-doc-job-section {
+  align-items: stretch;
 }
 
 .rams-doc-meta .rams-editable {
@@ -1447,8 +1452,24 @@
 
 .rams-installer-contact-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+}
+
+.rams-installer-contact-grid.count-1 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rams-installer-contact-grid.count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.rams-installer-contact-grid.count-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rams-installer-contact-grid.count-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .rams-method-subhead {
@@ -1464,6 +1485,8 @@
 .rams-installers-subhead {
   background: #fee2e2;
   color: #991b1b;
+  border: 1px solid #ef4444;
+  border-bottom: 0;
 }
 
 .rams-installer-contact-card {
@@ -2286,6 +2309,11 @@
     grid-column: 1 / -1 !important;
   }
 
+  .rams-doc-job-section {
+    border-color: #e2e8f0 !important;
+    background: #fff !important;
+  }
+
   .rams-method-safety-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
@@ -2366,15 +2394,32 @@
   }
 
   .rams-installer-contact-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
+  }
+
+  .rams-installer-contact-grid.count-1,
+  .rams-installer-contact-grid.count-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .rams-installer-contact-grid.count-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .rams-installer-contact-grid.count-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
   }
 
   .rams-method-subhead {
     padding: 1.2mm 2mm !important;
     font-size: 7.5pt !important;
     border-radius: 1.6mm 1.6mm 0 0 !important;
+  }
+
+  .rams-installers-subhead {
+    border: 0.35mm solid #ef4444 !important;
+    border-bottom: 0 !important;
   }
 
   .rams-installer-contact-card {
