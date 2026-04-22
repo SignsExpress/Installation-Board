@@ -3457,7 +3457,8 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
             exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
-            createdAt: voice.createdAt
+            createdAt: voice.createdAt,
+            seeded: voice.seeded === true
           }))
         } : current);
         setVoiceId(payload.voice?.id || nextVoices[0]?.id || "");
@@ -3528,11 +3529,13 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         voices: nextVoices.map((voice) => ({
           id: voice.id,
           name: voice.name,
-          fileName: voice.fileName,
-          contentLength: String(voice.content || "").length,
-          createdAt: voice.createdAt
-        }))
-      } : current);
+            fileName: voice.fileName,
+            contentLength: String(voice.content || "").length,
+            exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
+            createdAt: voice.createdAt,
+            seeded: voice.seeded === true
+          }))
+        } : current);
       setToneMessage("Saved.");
     } catch (saveError) {
       setToneMessage(saveError.message || "Could not save tone examples.");
@@ -3655,13 +3658,15 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           </div>
 
           {toneViewerOpen && selectedVoice ? (
-            <div className="social-post-tone-panel">
+            <div className="modal-backdrop social-post-tone-backdrop" onMouseDown={() => setToneViewerOpen(false)}>
+              <div className="social-post-tone-modal" role="dialog" aria-modal="true" aria-labelledby="social-post-tone-title" onMouseDown={(event) => event.stopPropagation()}>
               <div className="social-post-tone-head">
                 <div>
-                  <h3>{selectedVoice.name}</h3>
+                  <p className="eyebrow">Tone examples</p>
+                  <h3 id="social-post-tone-title">{selectedVoice.name}</h3>
                   <p>{selectedVoice.fileName || "Saved tone examples"} · {Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired A/B examples</p>
                 </div>
-                <button className="icon-button" type="button" onClick={() => setToneViewerOpen(false)}>x</button>
+                <button className="icon-button" type="button" onClick={() => setToneViewerOpen(false)} aria-label="Close tone examples">x</button>
               </div>
               <textarea
                 value={toneDraft}
@@ -3676,6 +3681,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                     {toneSaving ? <span className="button-spinner-label"><span className="button-spinner" />Saving...</span> : "Save tone examples"}
                   </button>
                 ) : null}
+              </div>
               </div>
             </div>
           ) : null}

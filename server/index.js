@@ -27,6 +27,7 @@ const DEFAULT_DATA_FILE = path.join(__dirname, "..", "data", "jobs.json");
 const DEFAULT_INSTALLERS_FILE = path.join(__dirname, "..", "data", "installers-live.json");
 const DEFAULT_REQUESTS_FILE = path.join(__dirname, "..", "data", "requests.json");
 const DEFAULT_HOLIDAY_SEED_FILE = path.join(__dirname, "..", "data", "holiday-seed.json");
+const DEFAULT_SOCIAL_TONE_FILE = path.join(__dirname, "..", "data", "social-tone-matt-rutlidge.xlsx");
 const LEGACY_INSTALLER_DIRECTORY = "/var/data/sx-installer-directory";
 const LEGACY_INSTALLERS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "installers.json");
 const LEGACY_REQUESTS_FILE = path.join(LEGACY_INSTALLER_DIRECTORY, "requests.json");
@@ -275,6 +276,11 @@ function canAccessRams(user) {
 function canAccessSocialPost(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "socialPost", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditSocialPost(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "socialPost", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
 function toPublicRamsProfile(user = {}) {
@@ -4249,7 +4255,8 @@ function sanitizeSocialToneVoice(voice = {}) {
     fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
     content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 100000),
     examples,
-    createdAt: String(voice.createdAt || new Date().toISOString())
+    createdAt: String(voice.createdAt || new Date().toISOString()),
+    seeded: voice.seeded === true
   };
 }
 
@@ -4384,6 +4391,49 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
     content,
     examples: []
   });
+}
+
+let defaultSocialToneVoiceCache = null;
+
+function getDefaultSocialToneVoice() {
+  if (defaultSocialToneVoiceCache) return defaultSocialToneVoiceCache;
+
+  try {
+    if (fs.existsSync(DEFAULT_SOCIAL_TONE_FILE)) {
+      const parsed = parseXlsxToneData(fs.readFileSync(DEFAULT_SOCIAL_TONE_FILE));
+      defaultSocialToneVoiceCache = sanitizeSocialToneVoice({
+        id: "matt-rutlidge-default",
+        name: "Matt Rutlidge",
+        fileName: "Tone of Voice - Linkedin - Corebridge.xlsx",
+        content: parsed.content,
+        examples: parsed.examples,
+        createdAt: "2026-04-22T00:00:00.000Z",
+        seeded: true
+      });
+      return defaultSocialToneVoiceCache;
+    }
+  } catch (error) {
+    console.error("Could not load the default Social Post tone workbook.", error.message);
+  }
+
+  defaultSocialToneVoiceCache = sanitizeSocialToneVoice({
+    id: "matt-rutlidge-default",
+    name: "Matt Rutlidge",
+    fileName: "",
+    content: "Friendly, practical LinkedIn posts for completed signage work. Use natural hooks, short paragraphs, occasional emojis and plain language.",
+    examples: [],
+    createdAt: "2026-04-22T00:00:00.000Z",
+    seeded: true
+  });
+  return defaultSocialToneVoiceCache;
+}
+
+function getSocialPostVoices(store = {}) {
+  const savedVoices = (Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : []).map(sanitizeSocialToneVoice);
+  const hasMattVoice = savedVoices.some(
+    (voice) => String(voice.id) === "matt-rutlidge-default" || voice.name.toLowerCase() === "matt rutlidge"
+  );
+  return hasMattVoice ? savedVoices : [getDefaultSocialToneVoice(), ...savedVoices];
 }
 
 function getSocialPostToneSummary(voice) {
@@ -5255,14 +5305,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
     if (!requireSocialPostAccess(request, response)) return;
     const store = await readStore();
     response.json({
-      voices: (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice)
+      voices: getSocialPostVoices(store)
     });
   });
 
   app.get("/api/social-post/status", async (request, response) => {
     if (!requireSocialPostAccess(request, response)) return;
     const store = await readStore();
-    const voices = (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice);
+    const voices = getSocialPostVoices(store);
     response.json({
       ai: getSocialPostAiStatus(),
       voices: voices.map((voice) => ({
@@ -5271,13 +5321,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
         fileName: voice.fileName,
         contentLength: voice.content.length,
         exampleCount: voice.examples.length,
-        createdAt: voice.createdAt
+        createdAt: voice.createdAt,
+        seeded: voice.seeded
       }))
     });
   });
 
   app.post("/api/social-post/voices", async (request, response) => {
-    if (!request.user?.canManagePermissions) {
+    if (!canEditSocialPost(request.user)) {
       response.status(403).json({ error: "Only admins can upload tone of voice files." });
       return;
     }
@@ -5292,14 +5343,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const voices = Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [];
       store.socialPostToneVoices = [voice, ...voices.filter((entry) => String(entry.id) !== String(voice.id))].slice(0, 20);
       const savedStore = await writeStore(store);
-      response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice), voice });
+      response.json({ voices: getSocialPostVoices(savedStore), voice });
     } catch (error) {
       response.status(400).json({ error: error.message || "Could not upload tone of voice." });
     }
   });
 
   app.patch("/api/social-post/voices/:id", async (request, response) => {
-    if (!request.user?.canManagePermissions) {
+    if (!canEditSocialPost(request.user)) {
       response.status(403).json({ error: "Only admins can edit tone of voice files." });
       return;
     }
@@ -5307,39 +5358,43 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const store = await readStore();
     const voices = Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [];
     const index = voices.findIndex((voice) => String(voice.id) === String(request.params.id));
-    if (index === -1) {
+    const editingDefaultVoice = String(request.params.id) === String(getDefaultSocialToneVoice().id);
+    if (index === -1 && !editingDefaultVoice) {
       response.status(404).json({ error: "Tone of voice not found." });
       return;
     }
 
-    const existing = sanitizeSocialToneVoice(voices[index]);
+    const existing = sanitizeSocialToneVoice(index === -1 ? getDefaultSocialToneVoice() : voices[index]);
     const nextVoice = sanitizeSocialToneVoice({
       ...existing,
       name: request.body?.name ?? existing.name,
       content: request.body?.content ?? existing.content,
       examples: request.body?.examples ?? existing.examples,
       fileName: request.body?.fileName ?? existing.fileName,
-      createdAt: existing.createdAt
+      createdAt: existing.createdAt,
+      seeded: false
     });
     if (!nextVoice.content) {
       response.status(400).json({ error: "Tone content cannot be empty." });
       return;
     }
 
-    store.socialPostToneVoices = voices.map((voice, voiceIndex) => (voiceIndex === index ? nextVoice : voice));
+    store.socialPostToneVoices = index === -1
+      ? [nextVoice, ...voices].slice(0, 20)
+      : voices.map((voice, voiceIndex) => (voiceIndex === index ? nextVoice : voice));
     const savedStore = await writeStore(store);
-    response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice), voice: nextVoice });
+    response.json({ voices: getSocialPostVoices(savedStore), voice: nextVoice });
   });
 
   app.delete("/api/social-post/voices/:id", async (request, response) => {
-    if (!request.user?.canManagePermissions) {
+    if (!canEditSocialPost(request.user)) {
       response.status(403).json({ error: "Only admins can delete tone of voice files." });
       return;
     }
     const store = await readStore();
     store.socialPostToneVoices = (store.socialPostToneVoices || []).filter((voice) => String(voice.id) !== String(request.params.id));
     const savedStore = await writeStore(store);
-    response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice) });
+    response.json({ voices: getSocialPostVoices(savedStore) });
   });
 
   app.post("/api/social-post/generate", async (request, response) => {
@@ -5351,7 +5406,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         return;
       }
       const store = await readStore();
-      const voices = (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice);
+      const voices = getSocialPostVoices(store);
       const selectedVoice = voices.find((voice) => String(voice.id) === String(request.body?.voiceId)) || voices[0] || sanitizeSocialToneVoice({
         name: "Matt Rutlidge",
         content: "Friendly, practical LinkedIn posts for completed signage work. Mention the customer, what was produced, and the installation or finish where relevant."

@@ -7055,13 +7055,23 @@ button {
   }
 }
 
-.social-post-tone-panel {
+.social-post-tone-backdrop {
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+}
+
+.social-post-tone-modal {
   display: grid;
   gap: 12px;
-  padding: 16px;
+  width: min(900px, 100%);
+  max-height: min(760px, 88vh);
+  overflow: hidden;
+  padding: 18px;
   border: 1px solid #d8c8e6;
   border-radius: 18px;
   background: #fbf7ff;
+  box-shadow: 0 26px 70px rgba(15, 23, 42, 0.24);
 }
 
 .social-post-tone-head,
@@ -7084,17 +7094,36 @@ button {
   font-weight: 800;
 }
 
-.social-post-tone-panel textarea {
+.social-post-tone-modal textarea {
   width: 100%;
-  min-height: 300px;
+  min-height: 360px;
+  max-height: 56vh;
   border: 1px solid var(--sx-border);
   border-radius: 12px;
   padding: 12px;
   resize: vertical;
   color: #0f172a;
   background: #fff;
-  font: inherit;
-  line-height: 1.45;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.48;
+}
+
+@media (max-width: 700px) {
+  .social-post-tone-backdrop {
+    padding: 10px;
+  }
+
+  .social-post-tone-modal {
+    max-height: 92vh;
+    padding: 14px;
+  }
+
+  .social-post-tone-modal textarea {
+    min-height: 50vh;
+    font-size: 0.82rem;
+  }
 }
 
 .notifications-page {
