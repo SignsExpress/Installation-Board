@@ -4073,12 +4073,15 @@ function extractCoreBridgeDestinationRecords(payload) {
   return [];
 }
 
-function filterCoreBridgeOrders(orders, searchTerm = "") {
+function filterCoreBridgeOrders(orders, searchTerm = "", options = {}) {
   const normalizedSearch = String(searchTerm || "").trim().toLowerCase();
-  const filteredByStatus = orders.filter((order) => {
-    const status = String(order.status || "").toLowerCase();
-    return !status || !["closed", "cancelled", "canceled", "complete", "completed", "invoiced"].includes(status);
-  });
+  const includeClosed = options.includeClosed === true;
+  const filteredByStatus = includeClosed
+    ? orders
+    : orders.filter((order) => {
+        const status = String(order.status || "").toLowerCase();
+        return !status || !["closed", "cancelled", "canceled", "complete", "completed", "invoiced"].includes(status);
+      });
 
   if (!normalizedSearch) {
     return filteredByStatus.slice(0, 100);
@@ -4101,7 +4104,7 @@ function filterCoreBridgeOrders(orders, searchTerm = "") {
   );
 }
 
-async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
+async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, options = {}) {
   const config = getCoreBridgeConfig();
   if (!config.token || !config.subscriptionKey) {
     const error = new Error("CoreBridge is not configured yet.");
@@ -4176,7 +4179,8 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
           }
           return normalized;
         }),
-        normalizedSearch
+        normalizedSearch,
+        options
       ).filter((order) => order.orderReference || order.customerName);
 
       if (looksLikeFormattedNumber && orders.length) {
@@ -4241,11 +4245,14 @@ function sanitizeSocialToneVoice(voice = {}) {
 
 function decodeXmlEntities(value = "") {
   return String(value)
+    .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
+    .replace(/&apos;/g, "'")
+    .replace(/&#160;/g, " ")
+    .replace(/&#xA0;/gi, " ");
 }
 
 function readZipEntries(buffer) {
@@ -4385,10 +4392,11 @@ function isSocialDescriptionKey(key = "") {
 }
 
 function normalizeSocialText(value = "") {
-  return String(value || "")
+  return decodeXmlEntities(value)
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/p>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
+    .replace(/\u00a0/g, " ")
     .replace(/\r/g, "")
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s+/g, "\n")
@@ -4504,44 +4512,98 @@ function buildSocialPostBrief(order, voice) {
   };
 }
 
-function generateFallbackSocialPost(brief) {
-  const customer = brief.customerName || "a client";
-  const itemLines = brief.items.length
-    ? brief.items.map((item) => [item.category, item.description].filter(Boolean).join(": ")).filter(Boolean)
-    : [brief.description].filter(Boolean);
-  const hero = itemLines[0] || "a new signage project";
-  const extras = itemLines.slice(1, 4);
-  const location = brief.address ? ` in ${brief.address.split(",").slice(-2).join(",").trim()}` : "";
-  const simplified = hero
-    .replace(/\b\d{2,5}mm\b/gi, "")
-    .replace(/\b\d+mm\s*\([^)]+\)/gi, "")
+function getSocialLookupReferences(reference = "") {
+  const trimmed = String(reference || "").trim();
+  const references = [trimmed];
+  if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "ORD-"));
+  if (/^ord-/i.test(trimmed)) references.push(trimmed.replace(/^ord-/i, "INV-"));
+  return [...new Set(references.filter(Boolean))];
+}
+
+function cleanSocialPostSpec(value = "") {
+  return normalizeSocialText(value)
+    .replace(/\b\d{2,5}\s*mm\b/gi, "")
+    .replace(/\b\d+(?:\.\d+)?\s*(?:mm|m)\b/gi, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b\d+mm\b/gi, "")
+    .replace(/\b3mm\b/gi, "")
+    .replace(/\b5mm\b/gi, "")
+    .replace(/\s*[xX]\s*/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\s+([,.])/g, "$1")
     .trim();
+}
+
+function getSocialPostFeaturePhrases(brief) {
+  const text = [brief.primaryDescription, brief.description, ...(brief.items || []).map((item) => item.description)]
+    .filter(Boolean)
+    .map(cleanSocialPostSpec)
+    .join(" ")
+    .toLowerCase();
+  const features = [];
+  if (/fascia|sign tray|tray|fret cut|push through|opal|illuminat|led/.test(text)) {
+    features.push("a digitally printed, stencil-cut illuminated fascia sign");
+  }
+  if (/window|birch|plywood|3d|dimensional|layer/.test(text)) {
+    features.push("layered window-box graphics with dimensional details");
+  }
+  if (/wall|floor|wrap|ceiling/.test(text)) {
+    features.push("wall, ceiling or interior graphic wraps");
+  }
+  if (/install|site|stonework|external/.test(text)) {
+    features.push("careful external installation on site");
+  }
+  return [...new Set(features)].slice(0, 4);
+}
+
+function generateFallbackSocialPost(brief) {
+  const customer = brief.customerName || "a client";
+  const features = getSocialPostFeaturePhrases(brief);
+  const featureSentence = features.length
+    ? `For ${customer}, we brought the brand to life with ${features.join(", ")}.`
+    : `For ${customer}, we helped turn a detailed signage brief into something bold, polished and built to be noticed.`;
   return [
-    `A smart new signage project completed for ${customer}${location}.`,
+    "Want to get noticed? Start with signage people actually stop and look at.",
     "",
-    `The work included ${simplified || hero}${extras.length ? `, plus ${extras.join(", ")}` : ""}.`,
+    "In a world full of safe choices, the brands that stand out are usually the ones brave enough to show a bit of personality.",
     "",
-    "A good example of turning the technical detail behind the scenes into clean, professional branding on site.",
+    featureSentence,
     "",
-    "#SignsExpress #Signage #Branding #Installation #LinkedIn"
+    "The Corebridge spec might be full of materials, fixings and production detail, but the end result is much simpler: impact, visibility and a finish that feels properly considered.",
+    "",
+    "At Signs Express (Central Lancashire) & Signs Express (Southport), we bring bold ideas to life.",
+    "",
+    "Ready to be the business people talk about? Let's make it happen.",
+    "",
+    "#SignsExpress #Signage #Branding #VehicleGraphics #BusinessBranding"
   ].join("\n");
 }
 
 async function generateSocialPostWithAi(brief) {
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
-  if (!apiKey) return { post: generateFallbackSocialPost(brief), source: "template" };
+  if (!apiKey) {
+    return {
+      post: generateFallbackSocialPost(brief),
+      source: "template",
+      warning: "OPENAI_API_KEY is not configured, so this used the local fallback rather than reading the tone file with AI."
+    };
+  }
 
   const model = String(process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim();
   const prompt = [
-    "Write one LinkedIn post for Signs Express Central Lancashire.",
-    "Use the uploaded tone examples as historical examples of how Matt simplifies Corebridge order wording, but do not copy them.",
-    "Prioritise primaryDescription and descriptionCandidates. Really identify the customer description and ignore VAT/tax/price/internal admin lines.",
-    "Translate technical production wording into plain-English benefits, visible outcomes and recognisable signage language.",
-    "If the order has several item descriptions, group them naturally instead of listing raw line items.",
-    "Keep it specific to the Corebridge order, warm, professional and concise.",
-    "Avoid overclaiming. Do not mention pricing. Include 3 to 6 relevant hashtags.",
+    "Write one LinkedIn post for Signs Express Central Lancashire in Matt Rutlidge's style.",
+    "",
+    "IMPORTANT TRANSFORMATION:",
+    "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
+    "- Read primaryDescription, descriptionCandidates and items to understand what was made and installed.",
+    "- Read toneSummary as historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
+    "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
+    "- Use a hook, short paragraphs, light emoji use where it fits, and a conversational call to action.",
+    "- Mention the customer/project if available. Mention designer credit if the source data or tone examples clearly support it, otherwise do not invent names.",
+    "- It is fine to mention simplified product phrases such as illuminated fascia sign, window graphics, wall wraps or layered displays.",
+    "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
+    "- Keep it LinkedIn-ready and flowing naturally, not like a quote summary.",
+    "- Include 3 to 6 relevant hashtags at the end.",
     "",
     JSON.stringify(brief, null, 2)
   ].join("\n");
@@ -4556,10 +4618,10 @@ async function generateSocialPostWithAi(brief) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You write practical, natural LinkedIn posts for a UK signage company." },
+          { role: "system", content: "You are a senior LinkedIn copywriter for a UK signage company. You convert technical signage job descriptions into warm, bold, human social posts in the user's proven tone of voice." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.75
+        temperature: 0.82
       })
     });
     const payload = await response.json();
@@ -5099,16 +5161,35 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: "Matt Rutlidge",
         content: "Friendly, practical LinkedIn posts for completed signage work. Mention the customer, what was produced, and the installation or finish where relevant."
       });
-      const lookup = await fetchCoreBridgeOrders(orderReference, true);
-      const order = (lookup.orders || [])[0];
+      const lookupReferences = getSocialLookupReferences(orderReference);
+      let lookup = null;
+      let order = null;
+      const lookupAttempts = [];
+      for (const reference of lookupReferences) {
+        try {
+          const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+          const candidateOrder = (candidateLookup.orders || [])[0];
+          lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
+          if (candidateOrder) {
+            lookup = candidateLookup;
+            order = candidateOrder;
+            break;
+          }
+        } catch (lookupError) {
+          lookupAttempts.push({ reference, found: false, error: lookupError.message || "Lookup failed" });
+        }
+      }
       if (!order) {
         response.status(404).json({ error: "No Corebridge order found for that reference." });
         return;
       }
       const brief = buildSocialPostBrief(order, selectedVoice);
+      brief.lookupAttempts = lookupAttempts;
+      brief.debug.lookupAttempts = lookupAttempts;
       const generated = await generateSocialPostWithAi(brief);
       response.json({
         order,
+        lookup,
         brief,
         voice: selectedVoice,
         post: generated.post,
