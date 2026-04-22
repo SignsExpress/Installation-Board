@@ -4378,7 +4378,8 @@ function createServer() {
           holidays: request.body?.holidays,
           attendance: request.body?.attendance,
           mileage: request.body?.mileage,
-          vanEstimator: request.body?.vanEstimator
+          vanEstimator: request.body?.vanEstimator,
+          rams: request.body?.rams
         });
       response.json({ user: updatedUser });
     } catch (error) {

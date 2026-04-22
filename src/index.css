@@ -6802,6 +6802,7 @@ button {
   border-radius: 14px;
   padding: 12px;
   background: linear-gradient(180deg, #ffffff 0%, #f7f3fa 100%);
+  color: #0f172a;
   text-align: left;
   display: flex;
   align-items: center;
@@ -6812,6 +6813,7 @@ button {
 }
 
 .host-launch-card strong {
+  color: #0f172a;
   font-size: 0.98rem;
   line-height: 1.1;
 }
