@@ -2373,6 +2373,8 @@ function MainNavBar({
   onLogout,
   notifications = []
 }) {
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+
   function goTo(path) {
     window.location.assign(path);
   }
@@ -2457,13 +2459,27 @@ function MainNavBar({
               </svg>
               {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
             </button>
-            <span className="host-nav-user">
-              <span>Logged in as:</span>
-              <strong>{currentUser.displayName}</strong>
-            </span>
-            <button className="host-nav-logout" type="button" onClick={onLogout}>
-              <span className="host-nav-link-label">Log out</span>
-            </button>
+            <div className="host-nav-account">
+              <button
+                className="host-nav-account-button"
+                type="button"
+                onClick={() => setAccountMenuOpen((current) => !current)}
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+              >
+                <span className="host-nav-user">
+                  <span>Logged in as:</span>
+                  <strong>{currentUser.displayName}</strong>
+                </span>
+              </button>
+              {accountMenuOpen ? (
+                <div className="host-nav-account-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={onLogout}>
+                    Log out
+                  </button>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       </nav>

@@ -2838,6 +2838,12 @@ button {
   min-width: 0;
 }
 
+.host-nav-meta {
+  position: relative;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
 .host-nav-link,
 .host-nav-logout {
   min-height: 32px;
@@ -2870,6 +2876,21 @@ button {
   cursor: not-allowed;
 }
 
+.host-nav-account {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.host-nav-account-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: right;
+  box-shadow: none;
+}
+
 .host-nav-user {
   display: grid;
   gap: 2px;
@@ -2883,6 +2904,46 @@ button {
   font-size: 0.68rem;
   font-weight: 800;
   color: #64748b;
+}
+
+.host-nav-account-button:hover .host-nav-user strong,
+.host-nav-account-button:focus-visible .host-nav-user strong {
+  color: var(--sx-main);
+}
+
+.host-nav-account-button:focus-visible {
+  outline: 2px solid rgba(113, 76, 152, 0.24);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.host-nav-account-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 120;
+  min-width: 126px;
+  padding: 6px;
+  border: 1px solid #d7cbdd;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 36px rgba(15, 23, 42, 0.14);
+}
+
+.host-nav-account-menu button {
+  width: 100%;
+  min-height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #991b1b;
+  font-weight: 800;
+  text-align: left;
+}
+
+.host-nav-account-menu button:hover,
+.host-nav-account-menu button:focus-visible {
+  background: #fee2e2;
 }
 
 .host-nav-notification-bell {
@@ -8298,11 +8359,18 @@ button {
   .host-nav-user {
     font-size: 0.82rem;
     line-height: 1.25;
-    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .host-nav-account {
+    min-width: 0;
+  }
+
+  .host-nav-account-button {
+    max-width: 42vw;
   }
 
   .host-nav-notification-bell {
