@@ -5966,6 +5966,7 @@ button {
 }
 
 .host-landing-page {
+  width: min(100%, 1120px);
   max-width: 1240px;
 }
 
@@ -6721,7 +6722,7 @@ button {
 
 .host-landing-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -6770,6 +6771,11 @@ button {
 .host-launch-icon svg {
   width: 24px;
   height: 24px;
+}
+
+.host-launch-card.icon-permissions .host-launch-icon {
+  background: #b91c1c;
+  color: #fff;
 }
 
 .host-launch-copy {
@@ -8132,9 +8138,12 @@ button {
     text-align: left;
   }
 
-  .installer-layout,
-  .host-landing-actions {
+  .installer-layout {
     grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+
+  .host-landing-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .auth-panel {
@@ -8189,6 +8198,14 @@ button {
   }
 
   .permissions-user-body {
+    grid-template-columns: 1fr;
+  }
+
+  .host-landing-page {
+    width: 100%;
+  }
+
+  .host-landing-actions {
     grid-template-columns: 1fr;
   }
 

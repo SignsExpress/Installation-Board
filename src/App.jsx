@@ -3163,7 +3163,7 @@ function HostLaunchIcon({ type }) {
 function HostLaunchCard({ icon, label, description, onClick, disabled = false, status = "", title = "" }) {
   return (
     <button
-      className={`host-launch-card ${disabled ? "disabled" : ""}`}
+      className={`host-launch-card icon-${icon} ${disabled ? "disabled" : ""}`}
       type="button"
       disabled={disabled}
       onClick={onClick}
