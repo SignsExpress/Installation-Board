@@ -3909,6 +3909,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
 
 function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const [jobs, setJobs] = useState([]);
+  const [profileUsers, setProfileUsers] = useState(users);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [jobError, setJobError] = useState("");
   const [saveStatus, setSaveStatus] = useState("");
@@ -3942,11 +3943,20 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     async function loadJobs() {
       try {
         setLoadingJobs(true);
-        const response = await fetch("/api/jobs");
-        if (!response.ok) throw new Error("Could not load installation jobs.");
-        const payload = await response.json();
+        const [jobsResponse, profilesResponse] = await Promise.all([
+          fetch("/api/jobs"),
+          fetch("/api/rams/profiles")
+        ]);
+        const [payload, profilesPayload] = await Promise.all([
+          jobsResponse.json(),
+          profilesResponse.ok ? profilesResponse.json() : Promise.resolve([])
+        ]);
+        if (!jobsResponse.ok) throw new Error(payload.error || "Could not load installation jobs.");
         if (!active) return;
         const jobsPayload = Array.isArray(payload) ? payload : [];
+        if (Array.isArray(profilesPayload) && profilesPayload.length) {
+          setProfileUsers(profilesPayload);
+        }
         const futureJobs = jobsPayload
           .filter((job) => String(job.date || "") >= todayIso || String(job.id || "") === String(initialRamsParams.jobId || ""))
           .sort((left, right) => String(left.date || "").localeCompare(String(right.date || "")));
@@ -3970,6 +3980,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       active = false;
     };
   }, [initialRamsParams.jobId, todayIso]);
+
+  useEffect(() => {
+    if (!profileUsers.length && Array.isArray(users) && users.length) {
+      setProfileUsers(users);
+    }
+  }, [profileUsers.length, users]);
 
   const selectedJob = useMemo(
     () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
@@ -4368,7 +4384,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const toolsGroup = ramsLogic.optionGroups.find((group) => group.key === "tools");
   const accessGroup = ramsLogic.optionGroups.find((group) => group.key === "access");
   const installerContacts = getRamsInstallerRoster(selectedJob).map((installer, index) => {
-    const profile = getUserProfileForInstaller(installer, users);
+    const profile = getUserProfileForInstaller(installer, profileUsers);
     const qualifications = Array.isArray(profile?.qualifications) ? profile.qualifications : [];
     const qualificationFallback = qualifications.join(", ");
     const fallbackTitle = profile?.jobTitle || (installer.isCustom ? "Installer" : "Installation operative");
@@ -4381,8 +4397,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       isCustom: installer.isCustom || !profile
     };
   });
-  const mattProfile = getUserProfileByName("Matt Rutlidge", users) || {};
-  const preparedByProfile = getUserProfileByName(currentUser?.displayName, users) || currentUser || {};
+  const mattProfile = getUserProfileByName("Matt Rutlidge", profileUsers) || {};
+  const preparedByProfile = getUserProfileByName(currentUser?.displayName, profileUsers) || currentUser || {};
   const getLiveProfileEdit = (key, fallback, liveValue) => {
     const stored = getRamsEdit(key, fallback);
     if (

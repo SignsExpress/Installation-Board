@@ -4553,7 +4553,7 @@ function createServer() {
   });
 
   app.get("/api/rams/profiles", async (request, response) => {
-    if (!requireRamsAccess(request, response)) return;
+    if (!requireBoardOrRamsAccess(request, response)) return;
     const usersStore = await readUsersStore();
     response.json((usersStore.users || []).map(toPublicRamsProfile));
   });

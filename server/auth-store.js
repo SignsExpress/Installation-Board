@@ -216,6 +216,7 @@ function normalizeStore(parsed, options = {}) {
     user.attendanceProfile = normalizeAttendanceProfile(user.attendanceProfile);
     const profile = normalizeUserProfile(user);
     user.jobTitle = profile.jobTitle;
+    user.phoneNumber = profile.phoneNumber;
     user.qualifications = profile.qualifications;
     user.photoDataUrl = profile.photoDataUrl;
     if (isOwnerUser(user)) {
@@ -437,6 +438,7 @@ async function updateUserProfile(userId, profile) {
 
   const nextProfile = normalizeUserProfile(profile);
   user.jobTitle = nextProfile.jobTitle;
+  user.phoneNumber = nextProfile.phoneNumber;
   user.qualifications = nextProfile.qualifications;
   user.photoDataUrl = nextProfile.photoDataUrl;
   await writeUsersStore(store);
