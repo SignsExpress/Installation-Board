@@ -4606,9 +4606,28 @@ function extractSocialOrderItems(order = {}) {
   return candidates.slice(0, 3).map((candidate) => ({ category: "", description: candidate.text, quantity: "" }));
 }
 
+function getSocialLineItemBriefs(items = []) {
+  return items.map((item, index) => {
+    const description = cleanSocialPostSpec(item.description || "");
+    const category = cleanSocialPostSpec(item.category || "");
+    const combined = `${category} ${description}`.toLowerCase();
+    let focusScore = Math.min(description.length / 80, 6);
+    if (/(fascia|sign tray|illuminat|led|wall|floor|window|wrap|plinth|prize wheel|display|graphics|acrylic|aluminium)/i.test(combined)) focusScore += 3;
+    if (/(delivery|install|installation|attend site|survey|artwork|setup labour|bought in)/i.test(combined)) focusScore -= 2;
+    return {
+      itemNumber: index + 1,
+      category: item.category || "",
+      quantity: item.quantity || "",
+      description,
+      suggestedTreatment: focusScore >= 4 ? "feature or mention separately" : "skim, group lightly or omit if it makes the post too long"
+    };
+  });
+}
+
 function buildSocialPostBrief(order, voice) {
   const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
+  const lineItems = getSocialLineItemBriefs(items);
   const mainDescription = descriptionCandidates[0]?.text || order.description || items[0]?.description || "";
   const jobEvidence = getSocialJobEvidence(order, items, descriptionCandidates);
   const customerClassification = classifySocialCustomer(order.customerName);
@@ -4631,6 +4650,8 @@ function buildSocialPostBrief(order, voice) {
     address: order.address || "",
     contact: order.contact || "",
     items,
+    lineItemCount: items.length,
+    lineItems,
     toneName: voice?.name || "LinkedIn",
     toneSummary: getSocialPostToneSummary(voice),
     transformationExamples: getSocialPostTransformationExamples(voice),
@@ -4639,6 +4660,7 @@ function buildSocialPostBrief(order, voice) {
       customerClassification,
       descriptionCandidates,
       itemCandidates: items,
+      lineItems,
       exactDescriptionMatches,
       jobEvidence,
       sourceFields,
@@ -4719,6 +4741,9 @@ function getSocialJobEvidence(order = {}, items = [], descriptionCandidates = []
 function sanitizeGeneratedSocialPost(post = "") {
   let text = normalizeSocialText(post)
     .replace(/\bexciting news\b[!,.:\s]*/i, "")
+    .replace(/\bpizzazz\b/gi, "impact")
+    .replace(/\bjazz(?:ed)?\s+up\b/gi, "made stand out")
+    .replace(/\btalk about a glow up!?/gi, "it made a proper difference")
     .replace(/[‐‑‒–—―-]/g, " ")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n[ \t]+/g, "\n")
@@ -4777,7 +4802,10 @@ async function generateSocialPostWithAi(brief) {
     "",
     "IMPORTANT TRANSFORMATION:",
     "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
-    "- Read primaryDescription, descriptionCandidates and items to understand what was supplied, produced or installed.",
+    "- Read primaryDescription, descriptionCandidates, items and lineItems to understand what was supplied, produced or installed.",
+    "- Treat each entry in lineItems as a separate quotation line unless the wording explicitly says one item is physically part of another.",
+    "- Do not blend two separate line items into one invented product. For example, if one line is a prize wheel and another line is a plinth, describe them as separate pieces of the same project, not as a prize wheel wrapped around a plinth.",
+    "- Decide what deserves space in the post. Feature visually interesting or higher-value lines, lightly mention supporting pieces, and quietly ignore boring low-value/admin/delivery lines if the post would become too long.",
     "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
     "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did Matt take from the Corebridge job, what did he ignore, what did he simplify, what did he fluff up, and what hook style did he use?",
     "- Find repeatable patterns across all transformationExamples, then apply those patterns to the new Corebridge job.",
@@ -4787,6 +4815,7 @@ async function generateSocialPostWithAi(brief) {
     "- Example hook flavours to emulate when appropriate: Did I spend hours with a pencil case full of Sharpies and half-chewed crayons, or is this actually one-piece wallpaper? / Simple, effective, and looks tidy. Enough about me though, what do you think of this completed job?",
     "- Use the examples to infer which emojis Matt likes and where they normally sit. Match the usual emoji density from the tone file rather than adding random emojis.",
     "- Do not over-polish the humour. It should feel like Matt's version of funny: dry, playful, slightly cheeky, human and not corporate.",
+    "- Avoid words and phrases Matt would not use, including pizzazz, jazzed up, glow up, game changer, elevate your brand, stunning solution and proud to announce.",
     "- Check customerClassification before describing the customer. Do not call a council, leisure trust, school, charity, NHS or public sector organisation a business or company. Use organisation, council, venue, team, site or facility instead.",
     "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
