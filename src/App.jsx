@@ -2219,6 +2219,11 @@ function canAccessVanEstimator(user) {
   return getPermissionForApp(user, "vanEstimator") !== "none";
 }
 
+function canEditVanEstimator(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "vanEstimator") === "admin";
+}
+
 function canAccessRams(user) {
   return canEditBoard(user);
 }
@@ -2791,23 +2796,18 @@ function PermissionsPanel({
 
                     <div className="permissions-app-row">
                       <span className="permissions-app-label">Vehicle Pricing Calculator</span>
-                      <div className="permission-segment permission-toggle-segment">
-                        <button
-                          type="button"
-                          className={`permission-chip permission-toggle-chip ${vanEstimatorPermission !== "none" ? "active active-state" : ""}`}
-                          disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
-                          onClick={() => onChangePermission(user.id, "vanEstimator", "admin")}
-                        >
-                          Active
-                        </button>
-                        <button
-                          type="button"
-                          className={`permission-chip permission-toggle-chip ${vanEstimatorPermission === "none" ? "active inactive-state" : ""}`}
-                          disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
-                          onClick={() => onChangePermission(user.id, "vanEstimator", "none")}
-                        >
-                          Inactive
-                        </button>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-van-estimator-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${vanEstimatorPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
+                            onClick={() => onChangePermission(user.id, "vanEstimator", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -4372,7 +4372,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       installers: installerContacts.map((contact) => ({
         name: contact.name,
         jobTitle: contact.jobTitle,
-        qualifications: contact.qualifications
+        qualifications: contact.qualifications,
+        photoDataUrl: contact.photoDataUrl || ""
       })),
       siteHazards: displayedSiteHazards,
       ppe: selectedPpe.map((item) => item.label),
@@ -4935,6 +4936,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
 function ReadOnlyRamsDocument({
   job,
   document,
+  users = [],
   amendmentDraft,
   setAmendmentDraft,
   amendmentSaving,
@@ -4947,12 +4949,28 @@ function ReadOnlyRamsDocument({
   const risks = Array.isArray(payload.risks) ? payload.risks : [];
   const methods = Array.isArray(payload.methods) ? payload.methods : [];
   const installers = payload.meta?.find?.((item) => item.label === "Installers")?.value || getInstallerNamesForRams(job);
-  const installerContacts = Array.isArray(payload.installers) ? payload.installers : [];
+  const installerContacts = (Array.isArray(payload.installers) ? payload.installers : []).map((contact) => {
+    const profile = getUserProfileByName(contact?.name, users);
+    const liveQualifications = Array.isArray(profile?.qualifications) ? profile.qualifications.join(", ") : "";
+    return {
+      ...contact,
+      jobTitle: profile?.jobTitle || contact?.jobTitle || "Installer",
+      qualifications: liveQualifications || contact?.qualifications || "Qualifications to be confirmed",
+      photoDataUrl: profile?.photoDataUrl || contact?.photoDataUrl || ""
+    };
+  });
   const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
   const tools = Array.isArray(payload.tools) ? payload.tools : [];
   const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
   const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
-  const emergencyContacts = Array.isArray(payload.emergencyContacts) ? payload.emergencyContacts : [];
+  const emergencyContacts = (Array.isArray(payload.emergencyContacts) ? payload.emergencyContacts : []).map((contact) => {
+    const profile = getUserProfileByName(contact?.name, users);
+    return {
+      ...contact,
+      jobTitle: profile?.jobTitle || contact?.jobTitle || "",
+      phone: profile?.phoneNumber || contact?.phone || ""
+    };
+  });
   const officeAddress = payload.officeAddress || "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP";
 
   if (!Object.keys(payload).length) {
@@ -5214,6 +5232,7 @@ function ClientRamsPage() {
   const jobId = params.get("jobId") || "";
   const ramsId = params.get("ramsId") || "";
   const [jobs, setJobs] = useState([]);
+  const [profileUsers, setProfileUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [amendmentDraft, setAmendmentDraft] = useState("");
@@ -5225,10 +5244,19 @@ function ClientRamsPage() {
     async function loadJobs() {
       try {
         setLoading(true);
-        const response = await fetch("/api/jobs");
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Could not load RAMS.");
-        if (mounted) setJobs(Array.isArray(payload) ? payload : []);
+        const [jobsResponse, profilesResponse] = await Promise.all([
+          fetch("/api/jobs"),
+          fetch("/api/rams/profiles")
+        ]);
+        const [jobsPayload, profilesPayload] = await Promise.all([
+          jobsResponse.json(),
+          profilesResponse.ok ? profilesResponse.json() : Promise.resolve([])
+        ]);
+        if (!jobsResponse.ok) throw new Error(jobsPayload.error || "Could not load RAMS.");
+        if (mounted) {
+          setJobs(Array.isArray(jobsPayload) ? jobsPayload : []);
+          setProfileUsers(Array.isArray(profilesPayload) ? profilesPayload : []);
+        }
       } catch (error) {
         console.error(error);
         if (mounted) setLoadError(error.message || "Could not load RAMS.");
@@ -5287,6 +5315,7 @@ function ClientRamsPage() {
             <ReadOnlyRamsDocument
               job={job}
               document={document}
+              users={profileUsers}
               amendmentDraft={amendmentDraft}
               setAmendmentDraft={setAmendmentDraft}
               amendmentSaving={amendmentSaving}
@@ -6724,6 +6753,7 @@ function AttendancePage({
 }
 
 function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
+  const pricingEditable = canEditVanEstimator(currentUser);
   const [svgMarkup, setSvgMarkup] = useState("");
   const [artBoardMarkup, setArtBoardMarkup] = useState("");
   const [svgError, setSvgError] = useState("");
@@ -8773,7 +8803,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                 </div>
               </div>
 
-              {currentUser?.canManagePermissions ? (
+              {pricingEditable ? (
                 <details className="vinyl-pricing-settings" onToggle={handlePricingSettingsToggle}>
                   <summary>Pricing settings</summary>
                   <p className="vinyl-pricing-context">

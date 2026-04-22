@@ -266,6 +266,18 @@ function canAccessVanEstimator(user) {
   return getUserPermission(user, "vanEstimator", "none") !== "none";
 }
 
+function toPublicRamsProfile(user = {}) {
+  const safeUser = sanitizeUser(user);
+  return {
+    id: safeUser.id,
+    displayName: safeUser.displayName,
+    jobTitle: safeUser.jobTitle || "",
+    phoneNumber: safeUser.phoneNumber || "",
+    qualifications: Array.isArray(safeUser.qualifications) ? safeUser.qualifications : [],
+    photoDataUrl: safeUser.photoDataUrl || ""
+  };
+}
+
 function canManagePermissions(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -4520,6 +4532,12 @@ function createServer() {
       console.error("RAMS hospital lookup failed.", error);
       response.status(500).json({ error: "Could not load nearby hospitals." });
     }
+  });
+
+  app.get("/api/rams/profiles", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const usersStore = await readUsersStore();
+    response.json((usersStore.users || []).map(toPublicRamsProfile));
   });
 
   app.get("/api/installers", async (request, response) => {
