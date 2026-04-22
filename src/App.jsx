@@ -2394,7 +2394,7 @@ function MainNavBar({
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
-  const navItems = [
+  const primaryNavItems = [
     { key: "home", label: "Home", path: homePath, allowed: true },
     { key: "board", label: "Installation Board", path: boardPath, allowed: boardAllowed },
     { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
@@ -2402,10 +2402,11 @@ function MainNavBar({
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
-    { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed },
-    { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length }
+    { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
-  const activeNavKey = navItems.some((item) => item.key === active) ? active : "home";
+  const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
+  const navItems = [...primaryNavItems, notificationItem];
+  const activeNavKey = primaryNavItems.some((item) => item.key === active) ? active : "home";
 
   return (
     <header className="host-nav-shell">
@@ -2417,12 +2418,12 @@ function MainNavBar({
           <label className="host-nav-mobile-menu">
             <span>Menu</span>
             <select value={activeNavKey} onChange={(event) => {
-              const nextItem = navItems.find((item) => item.key === event.target.value);
+              const nextItem = primaryNavItems.find((item) => item.key === event.target.value);
               if (nextItem) goTo(nextItem.path);
             }}>
-              {navItems.map((item) => (
+              {primaryNavItems.map((item) => (
                 <option key={item.key} value={item.key}>
-                  {item.badge ? `${item.label} (${item.badge})` : item.label}
+                  {item.label}
                 </option>
               ))}
             </select>
@@ -2443,6 +2444,19 @@ function MainNavBar({
             ))}
           </div>
           <div className="host-nav-meta">
+            <button
+              className={`host-nav-notification-bell ${active === "notifications" ? "active" : ""}`}
+              type="button"
+              onClick={() => goTo(notificationsPath)}
+              aria-label={unreadNotifications.length ? `${unreadNotifications.length} unread notifications` : "Notifications"}
+              title="Notifications"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18 9.4c0-3.2-2.1-5.4-5-5.9V2h-2v1.5c-2.9.5-5 2.7-5 5.9v3.1l-1.8 3v.9h15.6v-.9l-1.8-3V9.4Z" />
+                <path d="M9.4 18.3a2.6 2.6 0 0 0 5.2 0" />
+              </svg>
+              {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
+            </button>
             <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
             <button className="host-nav-logout" type="button" onClick={onLogout}>
               <span className="host-nav-link-label">Log out</span>
@@ -2568,6 +2582,7 @@ function PermissionsPanel({
       <div className="permissions-grid">
           {visibleUsers.map((user) => {
             const isSelf = user.id === currentUser.id;
+            const permissionsLocked = Boolean(user.canManagePermissions);
             const boardPermission = getPermissionForApp(user, "board");
             const holidaysPermission = getPermissionForApp(user, "holidays");
             const installerPermission = getPermissionForApp(user, "installer");
@@ -2686,8 +2701,9 @@ function PermissionsPanel({
                             key={`${user.id}-board-${option.value}`}
                             type="button"
                             className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:board`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:board`}
                             onClick={() => onChangePermission(user.id, "board", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2703,8 +2719,9 @@ function PermissionsPanel({
                             key={`${user.id}-installer-${option.value}`}
                             type="button"
                             className={`permission-chip ${installerPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:installer`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:installer`}
                             onClick={() => onChangePermission(user.id, "installer", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2720,8 +2737,9 @@ function PermissionsPanel({
                             key={`${user.id}-holidays-${option.value}`}
                             type="button"
                             className={`permission-chip ${holidaysPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:holidays`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:holidays`}
                             onClick={() => onChangePermission(user.id, "holidays", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2737,8 +2755,9 @@ function PermissionsPanel({
                             key={`${user.id}-attendance-${option.value}`}
                             type="button"
                             className={`permission-chip ${attendancePermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:attendance`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:attendance`}
                             onClick={() => onChangePermission(user.id, "attendance", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2754,8 +2773,9 @@ function PermissionsPanel({
                             key={`${user.id}-mileage-${option.value}`}
                             type="button"
                             className={`permission-chip ${mileagePermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:mileage`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:mileage`}
                             onClick={() => onChangePermission(user.id, "mileage", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2771,8 +2791,9 @@ function PermissionsPanel({
                             key={`${user.id}-van-estimator-${option.value}`}
                             type="button"
                             className={`permission-chip ${vanEstimatorPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:vanEstimator`}
                             onClick={() => onChangePermission(user.id, "vanEstimator", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -2788,8 +2809,9 @@ function PermissionsPanel({
                             key={`${user.id}-rams-${option.value}`}
                             type="button"
                             className={`permission-chip ${ramsPermission === option.value ? "active" : ""}`}
-                            disabled={isSelf || savingKey === `${user.id}:rams`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:rams`}
                             onClick={() => onChangePermission(user.id, "rams", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
                           </button>
@@ -9722,8 +9744,13 @@ export default function App() {
       rams: getPermissionForApp(targetUser, "rams"),
       [appKey]: value
     };
-
     setPermissionSavingKey(`${userId}:${appKey}`);
+    setLoginUsers((current) =>
+      current.map((entry) => (entry.id === userId ? { ...entry, permissions: nextPermissions } : entry))
+    );
+    if (currentUser?.id === userId) {
+      setCurrentUser((existing) => (existing ? { ...existing, permissions: nextPermissions } : existing));
+    }
 
     try {
       const response = await fetch(`/api/auth/users/${encodeURIComponent(userId)}/permissions`, {
@@ -9740,9 +9767,18 @@ export default function App() {
       setLoginUsers((current) =>
         current.map((entry) => (entry.id === userId ? { ...entry, ...payload.user } : entry))
       );
+      if (currentUser?.id === userId) {
+        setCurrentUser((existing) => (existing ? { ...existing, ...payload.user } : existing));
+      }
       setMessage(createMessage(`Updated ${targetUser.displayName}'s permissions.`, "success"));
     } catch (error) {
       console.error(error);
+      setLoginUsers((current) =>
+        current.map((entry) => (entry.id === userId ? targetUser : entry))
+      );
+      if (currentUser?.id === userId) {
+        setCurrentUser((existing) => (existing ? { ...existing, ...targetUser } : existing));
+      }
       setMessage(createMessage(error.message || "Could not update permissions.", "error"));
     } finally {
       setPermissionSavingKey("");

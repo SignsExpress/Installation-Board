@@ -2876,6 +2876,40 @@ button {
   white-space: nowrap;
 }
 
+.host-nav-notification-bell {
+  display: none;
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #dbe3ef;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--sx-main);
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.host-nav-notification-bell svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.host-nav-notification-bell.active {
+  border-color: #c7b7d2;
+  background: var(--sx-main-soft);
+}
+
+.host-nav-notification-bell .host-nav-badge {
+  top: -5px;
+  right: -5px;
+}
+
 .host-nav-mobile-menu {
   display: none;
 }
@@ -7283,6 +7317,16 @@ button {
   color: var(--sx-main);
 }
 
+.permission-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.permission-chip.active:disabled {
+  background: #f4eff7;
+  color: #7b5c8c;
+}
+
 .permission-toggle-segment {
   padding: 3px;
   border: 1px solid #d7cbdd;
@@ -8233,6 +8277,13 @@ button {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  .host-nav-notification-bell {
+    display: inline-flex;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
   }
 
   .host-nav-links {

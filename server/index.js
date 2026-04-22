@@ -4300,13 +4300,13 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
     const { sessionId, expiresAt } = createSession(sessionUser);
     response.setHeader("Set-Cookie", serializeSessionCookie(sessionId, { expiresAt }));
-    response.json({ user: sessionUser });
+    response.json({ user: { ...sessionUser, canManagePermissions: canManagePermissions(sessionUser) } });
   });
 
   app.post("/api/auth/users", async (request, response) => {
