@@ -3393,6 +3393,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [socialStatus, setSocialStatus] = useState(null);
 
   const canAdmin = canEditSocialPost(currentUser);
 
@@ -3400,12 +3401,18 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     let active = true;
     async function loadVoices() {
       try {
-        const response = await fetch("/api/social-post/voices");
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Could not load tone voices.");
+        const [voicesResponse, statusResponse] = await Promise.all([
+          fetch("/api/social-post/voices"),
+          fetch("/api/social-post/status")
+        ]);
+        const payload = await voicesResponse.json();
+        const statusPayload = await statusResponse.json();
+        if (!voicesResponse.ok) throw new Error(payload.error || "Could not load tone voices.");
+        if (!statusResponse.ok) throw new Error(statusPayload.error || "Could not load Social Post status.");
         if (!active) return;
         const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
         setVoices(nextVoices);
+        setSocialStatus(statusPayload);
         setVoiceId((current) => current || nextVoices[0]?.id || "");
       } catch (loadError) {
         if (active) setError(loadError.message || "Could not load tone voices.");
@@ -3437,6 +3444,16 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         if (!response.ok) throw new Error(payload.error || "Could not upload tone voice.");
         const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
         setVoices(nextVoices);
+        setSocialStatus((current) => current ? {
+          ...current,
+          voices: nextVoices.map((voice) => ({
+            id: voice.id,
+            name: voice.name,
+            fileName: voice.fileName,
+            contentLength: String(voice.content || "").length,
+            createdAt: voice.createdAt
+          }))
+        } : current);
         setVoiceId(payload.voice?.id || nextVoices[0]?.id || "");
         setVoiceName("");
       } catch (uploadError) {
@@ -3524,6 +3541,12 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   )) : <option value="">Matt Rutlidge</option>}
                 </select>
               </label>
+              {socialStatus ? (
+                <div className={`social-post-status ${socialStatus.ai?.configured ? "is-ok" : "is-warning"}`}>
+                  <span>{socialStatus.ai?.configured ? "AI connected" : "AI key not visible to Render"}</span>
+                  <span>{Array.isArray(socialStatus.voices) && socialStatus.voices.length ? `${socialStatus.voices.length} tone file${socialStatus.voices.length === 1 ? "" : "s"} saved` : "No uploaded tone file saved"}</span>
+                </div>
+              ) : null}
 
               {canAdmin ? (
                 <div className="social-post-upload">
@@ -3569,6 +3592,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   <strong>{result.order.orderReference}</strong>
                   <span>{result.order.customerName || "Customer not shown"}</span>
                   <span>{result.source === "ai" ? "Generated with AI" : "Generated with local template"}</span>
+                  {result.ai ? <span>{result.ai.configured ? `AI key visible (${result.ai.model})` : "AI key not visible"}</span> : null}
                   {result.warning ? <span>{result.warning}</span> : null}
                 </div>
               ) : null}

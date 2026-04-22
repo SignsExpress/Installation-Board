@@ -6953,6 +6953,27 @@ button {
   font: inherit;
 }
 
+.social-post-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: -2px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.social-post-status span {
+  padding: 7px 9px;
+  border-radius: 999px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.social-post-status.is-ok span:first-child {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .social-post-order-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

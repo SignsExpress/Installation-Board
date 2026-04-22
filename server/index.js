@@ -4352,6 +4352,15 @@ function getSocialPostToneSummary(voice) {
   return text.slice(0, 5000);
 }
 
+function getSocialPostAiStatus() {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  return {
+    configured: Boolean(apiKey),
+    model: String(process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim(),
+    keyLength: apiKey ? apiKey.length : 0
+  };
+}
+
 const SOCIAL_POST_DESCRIPTION_FINGERPRINTS = [
   "5500mm (w) x 650mm (h) x 85mm (d) 3mm Folded Aluminium Composite Sign Tray"
 ];
@@ -4580,16 +4589,18 @@ function generateFallbackSocialPost(brief) {
 }
 
 async function generateSocialPostWithAi(brief) {
+  const aiStatus = getSocialPostAiStatus();
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey) {
     return {
       post: generateFallbackSocialPost(brief),
       source: "template",
-      warning: "OPENAI_API_KEY is not configured, so this used the local fallback rather than reading the tone file with AI."
+      warning: "OPENAI_API_KEY is not configured, so this used the local fallback rather than reading the tone file with AI.",
+      aiStatus
     };
   }
 
-  const model = String(process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim();
+  const model = aiStatus.model;
   const prompt = [
     "Write one LinkedIn post for Signs Express Central Lancashire in Matt Rutlidge's style.",
     "",
@@ -4627,9 +4638,9 @@ async function generateSocialPostWithAi(brief) {
     const payload = await response.json();
     const post = payload?.choices?.[0]?.message?.content?.trim();
     if (!response.ok || !post) throw new Error(payload?.error?.message || "AI generation failed.");
-    return { post, source: "ai" };
+    return { post, source: "ai", aiStatus };
   } catch (error) {
-    return { post: generateFallbackSocialPost(brief), source: "template", warning: error.message };
+    return { post: generateFallbackSocialPost(brief), source: "template", warning: error.message, aiStatus };
   }
 }
 
@@ -5114,6 +5125,22 @@ app.get("/api/corebridge/orders", async (request, response) => {
     });
   });
 
+  app.get("/api/social-post/status", async (request, response) => {
+    if (!requireSocialPostAccess(request, response)) return;
+    const store = await readStore();
+    const voices = (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice);
+    response.json({
+      ai: getSocialPostAiStatus(),
+      voices: voices.map((voice) => ({
+        id: voice.id,
+        name: voice.name,
+        fileName: voice.fileName,
+        contentLength: voice.content.length,
+        createdAt: voice.createdAt
+      }))
+    });
+  });
+
   app.post("/api/social-post/voices", async (request, response) => {
     if (!request.user?.canManagePermissions) {
       response.status(403).json({ error: "Only admins can upload tone of voice files." });
@@ -5186,6 +5213,13 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const brief = buildSocialPostBrief(order, selectedVoice);
       brief.lookupAttempts = lookupAttempts;
       brief.debug.lookupAttempts = lookupAttempts;
+      brief.debug.selectedVoice = {
+        id: selectedVoice.id,
+        name: selectedVoice.name,
+        fileName: selectedVoice.fileName,
+        contentLength: selectedVoice.content.length,
+        isFallback: !voices.length
+      };
       const generated = await generateSocialPostWithAi(brief);
       response.json({
         order,
@@ -5195,6 +5229,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         post: generated.post,
         source: generated.source,
         warning: generated.warning || "",
+        ai: generated.aiStatus || getSocialPostAiStatus(),
         debug: brief.debug
       });
     } catch (error) {
