@@ -43,7 +43,8 @@ function getDefaultPermissions(role) {
       attendance: "admin",
       mileage: "admin",
       vanEstimator: "none",
-      rams: "admin"
+      rams: "admin",
+      socialPost: "admin"
     };
   }
 
@@ -54,7 +55,8 @@ function getDefaultPermissions(role) {
     attendance: "user",
     mileage: "user",
     vanEstimator: "none",
-    rams: "none"
+    rams: "none",
+    socialPost: "none"
   };
 }
 
@@ -140,7 +142,8 @@ function normalizePermissions(permissions, role) {
     attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
     mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage),
     vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator),
-    rams: normalizePermissionValue(permissions?.rams, defaults.rams)
+    rams: normalizePermissionValue(permissions?.rams, defaults.rams),
+    socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost)
   };
 }
 
@@ -159,7 +162,8 @@ function applyOwnerPermissions(user) {
       attendance: "admin",
       mileage: "admin",
       vanEstimator: "admin",
-      rams: "admin"
+      rams: "admin",
+      socialPost: "admin"
     }
   };
 }
@@ -172,7 +176,8 @@ function deriveRoleFromPermissions(permissions) {
     permissions?.attendance === "user" &&
     permissions?.mileage === "user" &&
     permissions?.vanEstimator === "none" &&
-    permissions?.rams === "none"
+    permissions?.rams === "none" &&
+    permissions?.socialPost === "none"
   ) {
     return "client";
   }
@@ -227,7 +232,8 @@ function normalizeStore(parsed, options = {}) {
         attendance: "admin",
         mileage: "admin",
         vanEstimator: "admin",
-        rams: "admin"
+        rams: "admin",
+        socialPost: "admin"
       };
     }
   }
@@ -408,7 +414,8 @@ async function updateUserPermissions(userId, permissions) {
         attendance: "admin",
         mileage: "admin",
         vanEstimator: "admin",
-        rams: "admin"
+        rams: "admin",
+        socialPost: "admin"
       };
     }
   await writeUsersStore(store);

@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const zlib = require("node:zlib");
 const {
   bootstrapPasswordsFromEnv,
   createUser,
@@ -271,6 +272,11 @@ function canAccessRams(user) {
   return getUserPermission(user, "rams", user?.role === "host" ? "admin" : "none") !== "none";
 }
 
+function canAccessSocialPost(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "socialPost", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
 function toPublicRamsProfile(user = {}) {
   const safeUser = sanitizeUser(user);
   return {
@@ -491,6 +497,12 @@ function requireRamsAccess(request, response) {
   return false;
 }
 
+function requireSocialPostAccess(request, response) {
+  if (canAccessSocialPost(request.user)) return true;
+  response.status(403).json({ error: "Social Post access required." });
+  return false;
+}
+
 function requireBoardAdmin(request, response) {
   if (canEditBoard(request.user)) return true;
   response.status(403).json({ error: "Board admin access required." });
@@ -557,7 +569,7 @@ function ensureStoreFile() {
     if (!fs.existsSync(file)) {
       fs.writeFileSync(
         file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [] }, null, 2)}\n`,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], socialPostToneVoices: [] }, null, 2)}\n`,
         "utf8"
       );
     }
@@ -592,7 +604,8 @@ function mergeHolidaySeed(store) {
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
-        mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : []
+        mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
+        socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : []
       };
 
   seed.holidays.forEach((holiday) => {
@@ -685,7 +698,8 @@ async function readStore() {
             holidayEvents: [],
             notifications: [],
             attendanceEntries: [],
-            mileageClaims: []
+            mileageClaims: [],
+            socialPostToneVoices: []
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -701,6 +715,7 @@ async function readStore() {
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
+          socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -717,7 +732,8 @@ async function readStore() {
           holidayEvents: [],
           notifications: [],
           attendanceEntries: [],
-          mileageClaims: []
+          mileageClaims: [],
+          socialPostToneVoices: []
         });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -759,6 +775,7 @@ async function writeStore(store) {
           if (left.monthId !== right.monthId) return String(right.monthId || "").localeCompare(String(left.monthId || ""));
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
+      socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
@@ -4212,6 +4229,216 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false) {
   throw error;
 }
 
+function sanitizeSocialToneVoice(voice = {}) {
+  return {
+    id: String(voice.id || makeId()),
+    name: String(voice.name || "LinkedIn").replace(/\s+/g, " ").trim().slice(0, 80) || "LinkedIn",
+    fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
+    content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 60000),
+    createdAt: String(voice.createdAt || new Date().toISOString())
+  };
+}
+
+function decodeXmlEntities(value = "") {
+  return String(value)
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function readZipEntries(buffer) {
+  const entries = new Map();
+  const eocdSignature = 0x06054b50;
+  let eocdOffset = -1;
+  for (let index = buffer.length - 22; index >= Math.max(0, buffer.length - 70000); index -= 1) {
+    if (buffer.readUInt32LE(index) === eocdSignature) {
+      eocdOffset = index;
+      break;
+    }
+  }
+  if (eocdOffset < 0) return entries;
+
+  const entryCount = buffer.readUInt16LE(eocdOffset + 10);
+  const centralDirectoryOffset = buffer.readUInt32LE(eocdOffset + 16);
+  let offset = centralDirectoryOffset;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (buffer.readUInt32LE(offset) !== 0x02014b50) break;
+    const method = buffer.readUInt16LE(offset + 10);
+    const compressedSize = buffer.readUInt32LE(offset + 20);
+    const fileNameLength = buffer.readUInt16LE(offset + 28);
+    const extraLength = buffer.readUInt16LE(offset + 30);
+    const commentLength = buffer.readUInt16LE(offset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(offset + 42);
+    const fileName = buffer.slice(offset + 46, offset + 46 + fileNameLength).toString("utf8");
+    const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+    const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+    const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+    const compressed = buffer.slice(dataStart, dataStart + compressedSize);
+    try {
+      entries.set(fileName, method === 8 ? zlib.inflateRawSync(compressed) : compressed);
+    } catch (error) {
+      entries.set(fileName, Buffer.alloc(0));
+    }
+    offset += 46 + fileNameLength + extraLength + commentLength;
+  }
+  return entries;
+}
+
+function parseXlsxText(buffer) {
+  const entries = readZipEntries(buffer);
+  if (!entries.size) return "";
+  const sharedXml = entries.get("xl/sharedStrings.xml")?.toString("utf8") || "";
+  const sharedStrings = [...sharedXml.matchAll(/<si\b[\s\S]*?<\/si>/g)].map((match) =>
+    decodeXmlEntities(
+      [...match[0].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)]
+        .map((textMatch) => textMatch[1].replace(/<[^>]+>/g, ""))
+        .join("")
+    )
+  );
+
+  const sheetTexts = [];
+  for (const [fileName, content] of entries.entries()) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/i.test(fileName)) continue;
+    const xml = content.toString("utf8");
+    const rows = [...xml.matchAll(/<row\b[\s\S]*?<\/row>/g)].map((rowMatch) => {
+      const cells = [...rowMatch[0].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)].map((cellMatch) => {
+        const attrs = cellMatch[1] || "";
+        const body = cellMatch[2] || "";
+        const value = body.match(/<v>([\s\S]*?)<\/v>/)?.[1] || body.match(/<t[^>]*>([\s\S]*?)<\/t>/)?.[1] || "";
+        if (/\bt="s"/.test(attrs)) return sharedStrings[Number(value)] || "";
+        return decodeXmlEntities(value.replace(/<[^>]+>/g, ""));
+      });
+      return cells.filter(Boolean).join(" | ");
+    });
+    sheetTexts.push(rows.filter(Boolean).join("\n"));
+  }
+  return sheetTexts.join("\n\n").replace(/\s+\|/g, " |").trim();
+}
+
+function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
+  const rawName = String(name || "").trim();
+  const rawFileName = String(fileName || "").trim();
+  let content = String(text || "").trim();
+
+  if (!content && dataUrl) {
+    const [meta, base64 = ""] = String(dataUrl).split(",");
+    const buffer = Buffer.from(base64, "base64");
+    const lowerName = rawFileName.toLowerCase();
+    if (lowerName.endsWith(".xlsx") || meta.includes("spreadsheetml")) {
+      content = parseXlsxText(buffer);
+    } else {
+      content = buffer.toString("utf8");
+    }
+  }
+
+  return sanitizeSocialToneVoice({
+    name: rawName || rawFileName.replace(/\.[^.]+$/, "") || "LinkedIn tone",
+    fileName: rawFileName,
+    content
+  });
+}
+
+function getSocialPostToneSummary(voice) {
+  const text = String(voice?.content || "").replace(/\s+/g, " ").trim();
+  return text.slice(0, 5000);
+}
+
+function extractSocialOrderItems(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const groups = new Map();
+  fields.forEach((field) => {
+    const key = String(field.key || "").toLowerCase();
+    const value = String(field.value || "").replace(/\s+/g, " ").trim();
+    if (!value || value.length < 3) return;
+    const match = key.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+    if (!match) return;
+    const group = groups.get(match[1]) || {};
+    const leaf = match[2];
+    if (leaf.includes("category")) group.category = value;
+    if (leaf.includes("description") || leaf.includes("name")) group.description = value;
+    if (leaf.includes("quantity")) group.quantity = value;
+    groups.set(match[1], group);
+  });
+
+  const items = [...groups.values()].filter((item) => item.description || item.category).slice(0, 12);
+  if (items.length) return items;
+  return order.description ? [{ category: "", description: order.description, quantity: "" }] : [];
+}
+
+function buildSocialPostBrief(order, voice) {
+  const items = extractSocialOrderItems(order);
+  return {
+    orderReference: order.orderReference || "",
+    customerName: order.customerName || "",
+    description: order.description || "",
+    address: order.address || "",
+    contact: order.contact || "",
+    items,
+    toneName: voice?.name || "LinkedIn",
+    toneSummary: getSocialPostToneSummary(voice)
+  };
+}
+
+function generateFallbackSocialPost(brief) {
+  const customer = brief.customerName || "a client";
+  const itemLines = brief.items.length
+    ? brief.items.map((item) => [item.category, item.description].filter(Boolean).join(": ")).filter(Boolean)
+    : [brief.description].filter(Boolean);
+  const hero = itemLines[0] || "a new signage project";
+  const extras = itemLines.slice(1, 4);
+  const location = brief.address ? ` in ${brief.address.split(",").slice(-2).join(",").trim()}` : "";
+  return [
+    `Another one ready to make an impact for ${customer}${location}.`,
+    "",
+    `This project included ${hero}${extras.length ? `, alongside ${extras.join(", ")}` : ""}.`,
+    "",
+    "A nice mix of production detail, careful finishing and practical installation planning from the team.",
+    "",
+    "#SignsExpress #Signage #Branding #Installation #LinkedIn"
+  ].join("\n");
+}
+
+async function generateSocialPostWithAi(brief) {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) return { post: generateFallbackSocialPost(brief), source: "template" };
+
+  const model = String(process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim();
+  const prompt = [
+    "Write one LinkedIn post for Signs Express Central Lancashire.",
+    "Use the tone examples as guidance, but do not copy them.",
+    "Keep it specific to the Corebridge order, warm, professional and concise.",
+    "Avoid overclaiming. Do not mention pricing. Include 3 to 6 relevant hashtags.",
+    "",
+    JSON.stringify(brief, null, 2)
+  ].join("\n");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: "You write practical, natural LinkedIn posts for a UK signage company." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.75
+      })
+    });
+    const payload = await response.json();
+    const post = payload?.choices?.[0]?.message?.content?.trim();
+    if (!response.ok || !post) throw new Error(payload?.error?.message || "AI generation failed.");
+    return { post, source: "ai" };
+  } catch (error) {
+    return { post: generateFallbackSocialPost(brief), source: "template", warning: error.message };
+  }
+}
+
 function createServer() {
   ensureStoreFile();
   ensureInstallersFile();
@@ -4300,7 +4527,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -4379,7 +4606,8 @@ function createServer() {
           attendance: request.body?.attendance,
           mileage: request.body?.mileage,
           vanEstimator: request.body?.vanEstimator,
-          rams: request.body?.rams
+          rams: request.body?.rams,
+          socialPost: request.body?.socialPost
         });
       response.json({ user: updatedUser });
     } catch (error) {
@@ -4679,6 +4907,85 @@ app.get("/api/corebridge/orders", async (request, response) => {
       console.error("CoreBridge destination debug failed.", error.message);
       response.status(500).json({
         error: "Could not load the CoreBridge destination debug.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.get("/api/social-post/voices", async (request, response) => {
+    if (!requireSocialPostAccess(request, response)) return;
+    const store = await readStore();
+    response.json({
+      voices: (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice)
+    });
+  });
+
+  app.post("/api/social-post/voices", async (request, response) => {
+    if (!request.user?.canManagePermissions) {
+      response.status(403).json({ error: "Only admins can upload tone of voice files." });
+      return;
+    }
+
+    try {
+      const voice = parseToneVoiceUpload(request.body || {});
+      if (!voice.content) {
+        response.status(400).json({ error: "The tone file did not contain readable text." });
+        return;
+      }
+      const store = await readStore();
+      const voices = Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [];
+      store.socialPostToneVoices = [voice, ...voices.filter((entry) => String(entry.id) !== String(voice.id))].slice(0, 20);
+      const savedStore = await writeStore(store);
+      response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice), voice });
+    } catch (error) {
+      response.status(400).json({ error: error.message || "Could not upload tone of voice." });
+    }
+  });
+
+  app.delete("/api/social-post/voices/:id", async (request, response) => {
+    if (!request.user?.canManagePermissions) {
+      response.status(403).json({ error: "Only admins can delete tone of voice files." });
+      return;
+    }
+    const store = await readStore();
+    store.socialPostToneVoices = (store.socialPostToneVoices || []).filter((voice) => String(voice.id) !== String(request.params.id));
+    const savedStore = await writeStore(store);
+    response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice) });
+  });
+
+  app.post("/api/social-post/generate", async (request, response) => {
+    if (!requireSocialPostAccess(request, response)) return;
+    try {
+      const orderReference = String(request.body?.orderReference || "").trim();
+      if (!orderReference) {
+        response.status(400).json({ error: "Enter a Corebridge order reference." });
+        return;
+      }
+      const store = await readStore();
+      const voices = (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice);
+      const selectedVoice = voices.find((voice) => String(voice.id) === String(request.body?.voiceId)) || voices[0] || sanitizeSocialToneVoice({
+        name: "Default LinkedIn",
+        content: "Friendly, practical LinkedIn posts for completed signage work. Mention the customer, what was produced, and the installation or finish where relevant."
+      });
+      const lookup = await fetchCoreBridgeOrders(orderReference, true);
+      const order = (lookup.orders || [])[0];
+      if (!order) {
+        response.status(404).json({ error: "No Corebridge order found for that reference." });
+        return;
+      }
+      const brief = buildSocialPostBrief(order, selectedVoice);
+      const generated = await generateSocialPostWithAi(brief);
+      response.json({
+        order,
+        brief,
+        voice: selectedVoice,
+        post: generated.post,
+        source: generated.source,
+        warning: generated.warning || ""
+      });
+    } catch (error) {
+      response.status(error.statusCode || 500).json({
+        error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not generate the social post.",
         detail: error.message
       });
     }

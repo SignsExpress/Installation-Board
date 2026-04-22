@@ -2161,6 +2161,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "socialPost"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2238,10 +2242,20 @@ function canEditRams(user) {
   return getPermissionForApp(user, "rams") === "admin";
 }
 
+function canAccessSocialPost(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "socialPost") !== "none";
+}
+
+function canEditSocialPost(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "socialPost") === "admin";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || user.canManagePermissions)
   );
 }
 
@@ -2385,6 +2399,7 @@ function MainNavBar({
   const mileageAllowed = canAccessMileage(currentUser);
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const ramsAllowed = canAccessRams(currentUser);
+  const socialPostAllowed = canAccessSocialPost(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -2393,6 +2408,7 @@ function MainNavBar({
   const mileagePath = "/mileage";
   const vanEstimatorPath = "/van-estimator";
   const ramsPath = "/rams";
+  const socialPostPath = "/social-post";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -2404,6 +2420,7 @@ function MainNavBar({
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
+    { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
@@ -2609,6 +2626,7 @@ function PermissionsPanel({
             const mileagePermission = getPermissionForApp(user, "mileage");
             const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
             const ramsPermission = getPermissionForApp(user, "rams");
+            const socialPostPermission = getPermissionForApp(user, "socialPost");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -2830,6 +2848,24 @@ function PermissionsPanel({
                             className={`permission-chip ${ramsPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:rams`}
                             onClick={() => onChangePermission(user.id, "rams", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Social Post</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-social-post-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${socialPostPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:socialPost`}
+                            onClick={() => onChangePermission(user.id, "socialPost", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3163,6 +3199,9 @@ function HostLaunchIcon({ type }) {
     rams: (
       <svg {...iconProps}><path {...commonProps} d="M7 3.5h7l3 3V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path {...commonProps} d="M14 3.5V7h3" /><path {...commonProps} d="M9 11h6M9 14h6M9 17h3" /></svg>
     ),
+    social: (
+      <svg {...iconProps}><path {...commonProps} d="M5 5h14v10H8l-3 3V5Z" /><path {...commonProps} d="M9 9h6M9 12h4" /><path {...commonProps} d="M17 18l2 2 3-4" /></svg>
+    ),
     vehicle: (
       <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
     ),
@@ -3240,6 +3279,9 @@ function HostLandingPage({
             ) : null}
             {canAccessRams(currentUser) ? (
               <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
+            ) : null}
+            {canAccessSocialPost(currentUser) ? (
+              <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
             ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
@@ -3321,6 +3363,9 @@ function ClientLandingPage({
             {canAccessRams(currentUser) ? (
               <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
             ) : null}
+            {canAccessSocialPost(currentUser) ? (
+              <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
+            ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -3333,6 +3378,196 @@ function ClientLandingPage({
           </div>
         </section>
 
+      </div>
+    </div>
+  );
+}
+
+function SocialPostPage({ currentUser, onLogout, notifications }) {
+  const [voices, setVoices] = useState([]);
+  const [voiceId, setVoiceId] = useState("");
+  const [orderReference, setOrderReference] = useState("");
+  const [voiceName, setVoiceName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+
+  const canAdmin = canEditSocialPost(currentUser);
+
+  useEffect(() => {
+    let active = true;
+    async function loadVoices() {
+      try {
+        const response = await fetch("/api/social-post/voices");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load tone voices.");
+        if (!active) return;
+        const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
+        setVoices(nextVoices);
+        setVoiceId((current) => current || nextVoices[0]?.id || "");
+      } catch (loadError) {
+        if (active) setError(loadError.message || "Could not load tone voices.");
+      }
+    }
+    loadVoices();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function uploadVoice(file) {
+    if (!file || !canAdmin) return;
+    setUploading(true);
+    setError("");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const response = await fetch("/api/social-post/voices", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: voiceName || file.name.replace(/\.[^.]+$/, ""),
+            fileName: file.name,
+            dataUrl: reader.result
+          })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not upload tone voice.");
+        const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
+        setVoices(nextVoices);
+        setVoiceId(payload.voice?.id || nextVoices[0]?.id || "");
+        setVoiceName("");
+      } catch (uploadError) {
+        setError(uploadError.message || "Could not upload tone voice.");
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.onerror = () => {
+      setError("Could not read that file.");
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function generatePost() {
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const response = await fetch("/api/social-post/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderReference, voiceId })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || payload.error || "Could not generate post.");
+      setResult(payload);
+    } catch (generateError) {
+      setError(generateError.message || "Could not generate post.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyPost() {
+    if (!result?.post) return;
+    await navigator.clipboard?.writeText(result.post);
+  }
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page">
+        <MainNavBar currentUser={currentUser} active="social-post" onLogout={onLogout} notifications={notifications} />
+
+        <section className="panel social-post-panel">
+          <div className="social-post-head">
+            <div>
+              <p className="eyebrow">Social Post</p>
+              <h2>LinkedIn post generator</h2>
+              <p>Fetch a Corebridge order, choose a tone of voice, then generate a draft post to copy.</p>
+            </div>
+          </div>
+
+          <div className="social-post-grid">
+            <div className="social-post-card">
+              <h3>Order</h3>
+              <label>
+                Corebridge order reference
+                <div className="social-post-order-row">
+                  <input
+                    type="text"
+                    value={orderReference}
+                    placeholder="ORD-1388"
+                    onChange={(event) => setOrderReference(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        generatePost();
+                      }
+                    }}
+                  />
+                  <button className="primary-button" type="button" onClick={generatePost} disabled={loading || !orderReference.trim()}>
+                    {loading ? "Generating..." : "Fetch order"}
+                  </button>
+                </div>
+              </label>
+
+              <label>
+                Tone of voice
+                <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+                  {voices.length ? voices.map((voice) => (
+                    <option key={voice.id} value={voice.id}>{voice.name}</option>
+                  )) : <option value="">Default LinkedIn tone</option>}
+                </select>
+              </label>
+
+              {canAdmin ? (
+                <div className="social-post-upload">
+                  <label>
+                    Add tone name
+                    <input type="text" value={voiceName} placeholder="LinkedIn - Signs Express" onChange={(event) => setVoiceName(event.target.value)} />
+                  </label>
+                  <label className="social-post-file">
+                    Upload Excel / CSV / text tone file
+                    <input
+                      type="file"
+                      accept=".xlsx,.csv,.txt,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                      disabled={uploading}
+                      onChange={(event) => {
+                        uploadVoice(event.target.files?.[0]);
+                        event.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : null}
+
+              {error ? <div className="flash error">{error}</div> : null}
+            </div>
+
+            <div className="social-post-card social-post-output">
+              <div className="social-post-output-head">
+                <h3>Suggested post</h3>
+                <button className="ghost-button" type="button" onClick={copyPost} disabled={!result?.post}>Copy</button>
+              </div>
+              <textarea
+                value={result?.post || ""}
+                placeholder="Your generated post will appear here."
+                onChange={(event) => setResult((current) => ({ ...(current || {}), post: event.target.value }))}
+              />
+              {result?.order ? (
+                <div className="social-post-summary">
+                  <strong>{result.order.orderReference}</strong>
+                  <span>{result.order.customerName || "Customer not shown"}</span>
+                  <span>{result.source === "ai" ? "Generated with AI" : "Generated with local template"}</span>
+                  {result.warning ? <span>{result.warning}</span> : null}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -9135,6 +9370,7 @@ export default function App() {
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
+  const isSocialPostRoute = pathname.startsWith("/social-post");
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
@@ -9222,6 +9458,7 @@ export default function App() {
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
+  const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
@@ -9231,8 +9468,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -9533,6 +9770,11 @@ export default function App() {
       return;
     }
 
+    if (isSocialPostRoute && !canAccessSocialPost(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isRamsRoute && !canAccessRams(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -9558,7 +9800,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -9566,7 +9808,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -9777,6 +10019,7 @@ export default function App() {
       mileage: getPermissionForApp(targetUser, "mileage"),
       vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
       rams: getPermissionForApp(targetUser, "rams"),
+      socialPost: getPermissionForApp(targetUser, "socialPost"),
       [appKey]: value
     };
     setPermissionSavingKey(`${userId}:${appKey}`);
@@ -11291,6 +11534,16 @@ export default function App() {
   if (showVanEstimator) {
     return (
       <VinylEstimatorPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showSocialPost) {
+    return (
+      <SocialPostPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
