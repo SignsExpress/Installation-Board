@@ -4345,6 +4345,10 @@ function getSocialPostToneSummary(voice) {
   return text.slice(0, 5000);
 }
 
+const SOCIAL_POST_DESCRIPTION_FINGERPRINTS = [
+  "5500mm (w) x 650mm (h) x 85mm (d) 3mm Folded Aluminium Composite Sign Tray"
+];
+
 function isUsefulSocialText(value = "") {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   if (text.length < 12) return false;
@@ -4352,6 +4356,13 @@ function isUsefulSocialText(value = "") {
   if (/^[\d\s.,£€$-]+$/.test(text)) return false;
   if (/^\d+\s*:\s*(vat|tax)$/i.test(text)) return false;
   return /[a-z]{4,}/i.test(text);
+}
+
+function matchesKnownSocialDescription(value = "") {
+  const normalized = String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+  return SOCIAL_POST_DESCRIPTION_FINGERPRINTS.some((fingerprint) =>
+    normalized.includes(String(fingerprint || "").replace(/\s+/g, " ").trim().toLowerCase())
+  );
 }
 
 function isSocialDescriptionKey(key = "") {
@@ -4398,7 +4409,7 @@ function getSocialDescriptionCandidates(order = {}) {
   fields.forEach((field) => {
     const key = String(field.key || "");
     const value = field.value;
-    if (isSocialDescriptionKey(key)) {
+    if (isSocialDescriptionKey(key) || matchesKnownSocialDescription(value)) {
       pushCandidate("Corebridge field", value, key);
     }
   });
@@ -4419,6 +4430,7 @@ function scoreSocialDescription(key = "", text = "") {
   if (lowerKey.includes("productdescription") || lowerKey.includes("estimatedescription")) score += 12;
   if (/(mm|aluminium|acrylic|vinyl|graphics|installed|illumina|led|tray|wall|floor|fascia|sign)/i.test(text)) score += 20;
   if (/(stonework|external|internal|folded|printed|raised|opal|returns|fret cut)/i.test(text)) score += 12;
+  if (matchesKnownSocialDescription(text)) score += 200;
   if (lowerText.includes("vat") || lowerText.includes("tax")) score -= 55;
   if (lowerText.length < 30) score -= 15;
   return score;
@@ -4465,6 +4477,9 @@ function buildSocialPostBrief(order, voice) {
     .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1000) }))
     .filter((field) => field.value)
     .slice(0, 80);
+  const exactDescriptionMatches = (Array.isArray(order.debugFields) ? order.debugFields : [])
+    .filter((field) => matchesKnownSocialDescription(field.value))
+    .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1500) }));
   return {
     orderReference: order.orderReference || "",
     customerName: order.customerName || "",
@@ -4480,6 +4495,7 @@ function buildSocialPostBrief(order, voice) {
       chosenDescription: mainDescription,
       descriptionCandidates,
       itemCandidates: items,
+      exactDescriptionMatches,
       sourceFields,
       toneName: voice?.name || "Matt Rutlidge",
       toneExcerpt: getSocialPostToneSummary(voice).slice(0, 1500),
