@@ -3742,15 +3742,11 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                             <label
                               key={`${group.key}-${option.value}-${optionIndex}`}
                               className={option.cardIds.includes(activeCardId) ? "is-checked" : ""}
-                              onClick={(event) => {
-                                event.preventDefault();
-                                toggleOptionCard(groupIndex, optionIndex, activeCardId);
-                              }}
                             >
                               <input
                                 type="checkbox"
                                 checked={option.cardIds.includes(activeCardId)}
-                                readOnly
+                                onChange={() => toggleOptionCard(groupIndex, optionIndex, activeCardId)}
                               />
                               {option.label}
                             </label>
@@ -3856,6 +3852,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const [savingRams, setSavingRams] = useState(false);
   const [savedRamsId, setSavedRamsId] = useState("");
   const [ramsSetupOpen, setRamsSetupOpen] = useState(false);
+  const ramsSetupModalRef = useRef(null);
   const [hospitalOptions, setHospitalOptions] = useState([]);
   const [hospitalLookupStatus, setHospitalLookupStatus] = useState("");
   const [loadingHospitals, setLoadingHospitals] = useState(false);
@@ -3958,6 +3955,18 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       active = false;
     };
   }, [selectedJob?.id, selectedJob?.address]);
+
+  useEffect(() => {
+    if (!ramsSetupOpen) return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.requestAnimationFrame(() => {
+      ramsSetupModalRef.current?.focus();
+    });
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [ramsSetupOpen]);
 
   const suggestedCardIds = useMemo(() => getRamsCardIdsForQuestions(questions, ramsLogic), [questions, ramsLogic]);
   const ramsReference = useMemo(() => buildRamsReference(selectedJob, questions), [selectedJob, questions]);
@@ -4769,7 +4778,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
           </div>
           {ramsSetupOpen ? (
             <div className="modal-backdrop rams-setup-backdrop" role="dialog" aria-modal="true">
-              <div className="modal rams-setup-modal">
+              <div className="modal rams-setup-modal" ref={ramsSetupModalRef} tabIndex={-1}>
                 <div className="modal-head">
                   <div>
                     <span className="panel-kicker">RAMS setup</span>

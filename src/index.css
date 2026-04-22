@@ -917,7 +917,7 @@
 .rams-tag-matrix input {
   width: auto;
   min-height: auto;
-  pointer-events: none;
+  flex: 0 0 auto;
 }
 
 .rams-tag-admin-drawer {
@@ -5806,6 +5806,30 @@ button {
   backdrop-filter: blur(10px);
   border: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+}
+
+.modal-backdrop.rams-setup-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  overflow: hidden;
+  z-index: 5000;
+}
+
+.modal.rams-setup-modal {
+  width: min(1120px, calc(100vw - 36px));
+  max-height: min(860px, calc(100dvh - 36px));
+  border-radius: 18px;
+  padding: 14px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  outline: none;
 }
 
 .modal-head {
