@@ -6966,6 +6966,12 @@ button {
   gap: 10px;
 }
 
+.social-post-output-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .social-post-output textarea {
   min-height: 360px;
   resize: vertical;
@@ -6986,6 +6992,20 @@ button {
   padding: 6px 8px;
   border-radius: 999px;
   background: #f8fafc;
+}
+
+.social-post-debug {
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .notifications-page {

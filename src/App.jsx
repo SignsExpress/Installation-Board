@@ -3392,6 +3392,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const canAdmin = canEditSocialPost(currentUser);
 
@@ -3455,6 +3456,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     setLoading(true);
     setError("");
     setResult(null);
+    setDebugOpen(false);
     try {
       const response = await fetch("/api/social-post/generate", {
         method: "POST",
@@ -3519,7 +3521,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                 <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
                   {voices.length ? voices.map((voice) => (
                     <option key={voice.id} value={voice.id}>{voice.name}</option>
-                  )) : <option value="">Default LinkedIn tone</option>}
+                  )) : <option value="">Matt Rutlidge</option>}
                 </select>
               </label>
 
@@ -3550,7 +3552,12 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             <div className="social-post-card social-post-output">
               <div className="social-post-output-head">
                 <h3>Suggested post</h3>
-                <button className="ghost-button" type="button" onClick={copyPost} disabled={!result?.post}>Copy</button>
+                <div className="social-post-output-actions">
+                  <button className="ghost-button" type="button" onClick={() => setDebugOpen((current) => !current)} disabled={!result}>
+                    {debugOpen ? "Hide debug" : "Debug"}
+                  </button>
+                  <button className="ghost-button" type="button" onClick={copyPost} disabled={!result?.post}>Copy</button>
+                </div>
               </div>
               <textarea
                 value={result?.post || ""}
@@ -3564,6 +3571,11 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   <span>{result.source === "ai" ? "Generated with AI" : "Generated with local template"}</span>
                   {result.warning ? <span>{result.warning}</span> : null}
                 </div>
+              ) : null}
+              {debugOpen && result ? (
+                <pre className="social-post-debug">
+                  {JSON.stringify(result.debug || result.brief?.debug || {}, null, 2)}
+                </pre>
               ) : null}
             </div>
           </div>

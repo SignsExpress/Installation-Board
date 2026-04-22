@@ -4345,39 +4345,146 @@ function getSocialPostToneSummary(voice) {
   return text.slice(0, 5000);
 }
 
+function isUsefulSocialText(value = "") {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length < 12) return false;
+  if (/^(vat|tax|sales tax|discount|subtotal|total|balance|paid|installation|delivery|courier|0|none|n\/a)$/i.test(text)) return false;
+  if (/^[\d\s.,£€$-]+$/.test(text)) return false;
+  if (/^\d+\s*:\s*(vat|tax)$/i.test(text)) return false;
+  return /[a-z]{4,}/i.test(text);
+}
+
+function isSocialDescriptionKey(key = "") {
+  const lowerKey = String(key || "").toLowerCase();
+  if (/(vat|tax|price|cost|amount|total|subtotal|balance|locator|phone|email|postcode|zip)/i.test(lowerKey)) return false;
+  return (
+    lowerKey.includes("customerdescription") ||
+    lowerKey.includes("descriptiontext") ||
+    lowerKey.includes("orderdescription") ||
+    lowerKey.includes("estimatedescription") ||
+    lowerKey.includes("productdescription") ||
+    lowerKey.includes("lineitemdescription") ||
+    lowerKey.includes("itemdescription") ||
+    lowerKey.includes("description") ||
+    lowerKey.includes("specification") ||
+    lowerKey.includes("notes") ||
+    lowerKey.includes("memo") ||
+    lowerKey.includes("product")
+  );
+}
+
+function normalizeSocialText(value = "") {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\r/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s+/g, "\n")
+    .trim();
+}
+
+function getSocialDescriptionCandidates(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const candidates = [];
+  const pushCandidate = (source, value, key = "") => {
+    const text = normalizeSocialText(value);
+    if (!isUsefulSocialText(text)) return;
+    if (candidates.some((candidate) => candidate.text.toLowerCase() === text.toLowerCase())) return;
+    candidates.push({ source, key, text, score: scoreSocialDescription(key, text) });
+  };
+
+  pushCandidate("normalized order.description", order.description, "order.description");
+  fields.forEach((field) => {
+    const key = String(field.key || "");
+    const value = field.value;
+    if (isSocialDescriptionKey(key)) {
+      pushCandidate("Corebridge field", value, key);
+    }
+  });
+
+  return candidates
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 20);
+}
+
+function scoreSocialDescription(key = "", text = "") {
+  const lowerKey = String(key || "").toLowerCase();
+  const lowerText = String(text || "").toLowerCase();
+  let score = Math.min(String(text || "").length, 900) / 30;
+  if (lowerKey.includes("customerdescription")) score += 35;
+  if (lowerKey.includes("itemdescription") || lowerKey.includes("lineitemdescription")) score += 25;
+  if (lowerKey.includes("description")) score += 20;
+  if (lowerKey.includes("orderdestinationitem")) score += 15;
+  if (lowerKey.includes("productdescription") || lowerKey.includes("estimatedescription")) score += 12;
+  if (/(mm|aluminium|acrylic|vinyl|graphics|installed|illumina|led|tray|wall|floor|fascia|sign)/i.test(text)) score += 20;
+  if (/(stonework|external|internal|folded|printed|raised|opal|returns|fret cut)/i.test(text)) score += 12;
+  if (lowerText.includes("vat") || lowerText.includes("tax")) score -= 55;
+  if (lowerText.length < 30) score -= 15;
+  return score;
+}
+
 function extractSocialOrderItems(order = {}) {
   const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
   const groups = new Map();
   fields.forEach((field) => {
     const key = String(field.key || "").toLowerCase();
-    const value = String(field.value || "").replace(/\s+/g, " ").trim();
-    if (!value || value.length < 3) return;
+    const value = normalizeSocialText(field.value);
+    if (!isUsefulSocialText(value)) return;
+    if (/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(key)) return;
     const match = key.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
     if (!match) return;
     const group = groups.get(match[1]) || {};
     const leaf = match[2];
-    if (leaf.includes("category")) group.category = value;
-    if (leaf.includes("description") || leaf.includes("name")) group.description = value;
+    if (leaf.includes("category") && !/vat|tax/i.test(value)) group.category = value;
+    if ((leaf.includes("description") || leaf.includes("customerdescription")) && isUsefulSocialText(value)) group.description = value;
+    if (!group.description && (leaf.includes("name") || leaf.includes("title") || leaf.includes("product")) && value.length > 22) group.description = value;
     if (leaf.includes("quantity")) group.quantity = value;
     groups.set(match[1], group);
   });
 
-  const items = [...groups.values()].filter((item) => item.description || item.category).slice(0, 12);
+  const items = [...groups.values()]
+    .filter((item) => isUsefulSocialText(item.description) || (isUsefulSocialText(item.category) && !/vat|tax/i.test(item.category)))
+    .map((item) => ({
+      ...item,
+      category: /vat|tax/i.test(item.category || "") ? "" : item.category,
+      description: item.description || item.category || ""
+    }))
+    .slice(0, 12);
   if (items.length) return items;
-  return order.description ? [{ category: "", description: order.description, quantity: "" }] : [];
+  const candidates = getSocialDescriptionCandidates(order);
+  return candidates.slice(0, 3).map((candidate) => ({ category: "", description: candidate.text, quantity: "" }));
 }
 
 function buildSocialPostBrief(order, voice) {
+  const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
+  const mainDescription = descriptionCandidates[0]?.text || order.description || items[0]?.description || "";
+  const sourceFields = (Array.isArray(order.debugFields) ? order.debugFields : [])
+    .filter((field) => isSocialDescriptionKey(field.key) || /(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.\d+/i.test(String(field.key || "")))
+    .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1000) }))
+    .filter((field) => field.value)
+    .slice(0, 80);
   return {
     orderReference: order.orderReference || "",
     customerName: order.customerName || "",
-    description: order.description || "",
+    primaryDescription: mainDescription,
+    description: mainDescription,
+    descriptionCandidates,
     address: order.address || "",
     contact: order.contact || "",
     items,
     toneName: voice?.name || "LinkedIn",
-    toneSummary: getSocialPostToneSummary(voice)
+    toneSummary: getSocialPostToneSummary(voice),
+    debug: {
+      chosenDescription: mainDescription,
+      descriptionCandidates,
+      itemCandidates: items,
+      sourceFields,
+      toneName: voice?.name || "Matt Rutlidge",
+      toneExcerpt: getSocialPostToneSummary(voice).slice(0, 1500),
+      sourceFieldCount: Array.isArray(order.debugFields) ? order.debugFields.length : 0
+    }
   };
 }
 
@@ -4389,12 +4496,18 @@ function generateFallbackSocialPost(brief) {
   const hero = itemLines[0] || "a new signage project";
   const extras = itemLines.slice(1, 4);
   const location = brief.address ? ` in ${brief.address.split(",").slice(-2).join(",").trim()}` : "";
+  const simplified = hero
+    .replace(/\b\d{2,5}mm\b/gi, "")
+    .replace(/\b\d+mm\s*\([^)]+\)/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.])/g, "$1")
+    .trim();
   return [
-    `Another one ready to make an impact for ${customer}${location}.`,
+    `A smart new signage project completed for ${customer}${location}.`,
     "",
-    `This project included ${hero}${extras.length ? `, alongside ${extras.join(", ")}` : ""}.`,
+    `The work included ${simplified || hero}${extras.length ? `, plus ${extras.join(", ")}` : ""}.`,
     "",
-    "A nice mix of production detail, careful finishing and practical installation planning from the team.",
+    "A good example of turning the technical detail behind the scenes into clean, professional branding on site.",
     "",
     "#SignsExpress #Signage #Branding #Installation #LinkedIn"
   ].join("\n");
@@ -4407,7 +4520,10 @@ async function generateSocialPostWithAi(brief) {
   const model = String(process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim();
   const prompt = [
     "Write one LinkedIn post for Signs Express Central Lancashire.",
-    "Use the tone examples as guidance, but do not copy them.",
+    "Use the uploaded tone examples as historical examples of how Matt simplifies Corebridge order wording, but do not copy them.",
+    "Prioritise primaryDescription and descriptionCandidates. Really identify the customer description and ignore VAT/tax/price/internal admin lines.",
+    "Translate technical production wording into plain-English benefits, visible outcomes and recognisable signage language.",
+    "If the order has several item descriptions, group them naturally instead of listing raw line items.",
     "Keep it specific to the Corebridge order, warm, professional and concise.",
     "Avoid overclaiming. Do not mention pricing. Include 3 to 6 relevant hashtags.",
     "",
@@ -4964,7 +5080,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const store = await readStore();
       const voices = (store.socialPostToneVoices || []).map(sanitizeSocialToneVoice);
       const selectedVoice = voices.find((voice) => String(voice.id) === String(request.body?.voiceId)) || voices[0] || sanitizeSocialToneVoice({
-        name: "Default LinkedIn",
+        name: "Matt Rutlidge",
         content: "Friendly, practical LinkedIn posts for completed signage work. Mention the customer, what was produced, and the installation or finish where relevant."
       });
       const lookup = await fetchCoreBridgeOrders(orderReference, true);
@@ -4981,7 +5097,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
         voice: selectedVoice,
         post: generated.post,
         source: generated.source,
-        warning: generated.warning || ""
+        warning: generated.warning || "",
+        debug: brief.debug
       });
     } catch (error) {
       response.status(error.statusCode || 500).json({
