@@ -1321,6 +1321,30 @@
   gap: 6px;
 }
 
+.rams-move-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #4f365f;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.rams-move-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.rams-move-button:disabled {
+  opacity: 0.35;
+}
+
 .rams-risk-rating {
   display: flex;
   gap: 10px;
@@ -1350,13 +1374,15 @@
 .rams-doc-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 7px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff, #f8fafc);
 }
 
 .rams-doc-title img {
-  width: 86px;
+  width: 94px;
   height: auto;
 }
 
@@ -1379,12 +1405,13 @@
 .rams-doc-meta span {
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  padding: 4px 5px;
+  padding: 6px 7px;
   font-size: 0.74rem;
   line-height: 1.15;
   overflow-wrap: anywhere;
   min-width: 0;
   white-space: normal;
+  background: #f8fafc;
 }
 
 .rams-doc-meta .meta-wide {
@@ -1426,11 +1453,12 @@
   gap: 9px;
   align-items: center;
   min-height: 74px;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #111827;
   border-radius: 8px;
-  background: #f0fdf4;
+  background: #111827;
   padding: 8px 10px;
   overflow: hidden;
+  color: #fff;
 }
 
 .rams-installer-photo {
@@ -1440,9 +1468,9 @@
   width: 48px;
   height: 58px;
   border-radius: 6px;
-  border: 1px solid #86efac;
+  border: 1px solid #374151;
   background: #fff;
-  color: #166534;
+  color: #111827;
   font-size: 0.78rem;
   font-weight: 900;
   overflow: hidden;
@@ -1470,13 +1498,13 @@
 }
 
 .rams-installer-contact-card span {
-  color: #334155;
+  color: #e5e7eb;
   font-size: 0.76rem;
   font-weight: 800;
 }
 
 .rams-installer-contact-card small {
-  color: #64748b;
+  color: #cbd5e1;
   font-size: 0.7rem;
   line-height: 1.2;
 }
@@ -1523,6 +1551,39 @@
   line-height: 1.24;
 }
 
+.rams-method-info-card.is-purple {
+  border-color: #c4b5fd;
+  background: #f5f3ff;
+}
+
+.rams-method-info-card.is-purple h4,
+.rams-method-info-card.is-purple h5 {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.rams-method-info-card.is-yellow {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.rams-method-info-card.is-yellow h4,
+.rams-method-info-card.is-yellow h5 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rams-method-info-card.is-blue {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.rams-method-info-card.is-blue h4,
+.rams-method-info-card.is-blue h5 {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .rams-emergency-contact-list {
   display: grid;
   gap: 2px;
@@ -1557,7 +1618,7 @@
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: #16a34a;
+  background: #2563eb;
   color: #fff;
   flex: 0 0 auto;
 }
@@ -1792,6 +1853,11 @@
 
 .rams-doc-section:not(.rams-doc-risk-section):not(.rams-doc-method-section) {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+  align-items: start;
 }
 
 .rams-doc-section:not(.rams-doc-risk-section):not(.rams-doc-method-section) h4 {
@@ -1801,6 +1867,8 @@
 .rams-doc-section p {
   font-size: 0.82rem;
   line-height: 1.22;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .rams-doc-section h4 {
@@ -1825,6 +1893,24 @@
   border-radius: 0;
   background: #dcfce7;
   color: #166534;
+}
+
+.rams-doc-method-section .rams-method-info-card.is-purple h4,
+.rams-doc-method-section .rams-method-info-card.is-purple h5 {
+  background: #ede9fe;
+  color: #4c1d95;
+}
+
+.rams-doc-method-section .rams-method-info-card.is-yellow h4,
+.rams-doc-method-section .rams-method-info-card.is-yellow h5 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rams-doc-method-section .rams-method-info-card.is-blue h4,
+.rams-doc-method-section .rams-method-info-card.is-blue h5 {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .rams-doc-risk-section h4 {
@@ -2178,6 +2264,21 @@
     min-height: 15mm !important;
   }
 
+  .rams-method-info-card.is-purple {
+    border-color: #c4b5fd !important;
+    background: #f5f3ff !important;
+  }
+
+  .rams-method-info-card.is-yellow {
+    border-color: #fde68a !important;
+    background: #fffbeb !important;
+  }
+
+  .rams-method-info-card.is-blue {
+    border-color: #bfdbfe !important;
+    background: #eff6ff !important;
+  }
+
   .rams-method-info-card h4,
   .rams-method-info-card h5 {
     background: #dcfce7 !important;
@@ -2199,6 +2300,24 @@
     border-radius: 0 !important;
   }
 
+  .rams-doc-method-section .rams-method-info-card.is-purple h4,
+  .rams-doc-method-section .rams-method-info-card.is-purple h5 {
+    background: #ede9fe !important;
+    color: #4c1d95 !important;
+  }
+
+  .rams-doc-method-section .rams-method-info-card.is-yellow h4,
+  .rams-doc-method-section .rams-method-info-card.is-yellow h5 {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+  }
+
+  .rams-doc-method-section .rams-method-info-card.is-blue h4,
+  .rams-doc-method-section .rams-method-info-card.is-blue h5 {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+  }
+
   .rams-installer-contact-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
@@ -2210,8 +2329,9 @@
     gap: 1.6mm !important;
     min-height: 15mm !important;
     padding: 1.5mm 2mm !important;
-    border-color: #bbf7d0 !important;
-    background: #f0fdf4 !important;
+    border-color: #111827 !important;
+    background: #111827 !important;
+    color: #fff !important;
   }
 
   .rams-installer-photo {
@@ -2227,6 +2347,7 @@
   .rams-installer-contact-card span,
   .rams-installer-contact-card small {
     font-size: 6.6pt !important;
+    color: #e5e7eb !important;
   }
 
   .rams-ppe-grid {
@@ -2242,7 +2363,7 @@
   .rams-ppe-icon {
     width: 6mm !important;
     height: 6mm !important;
-    background: #16a34a !important;
+    background: #2563eb !important;
     color: #fff !important;
   }
 

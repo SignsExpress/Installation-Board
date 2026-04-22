@@ -1036,6 +1036,37 @@ function formatHospitalAddress(tags = {}) {
   ].filter(Boolean).join(", ");
 }
 
+async function reverseGeocodeHospitalAddress(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return "";
+  try {
+    const url = new URL("https://nominatim.openstreetmap.org/reverse");
+    url.searchParams.set("format", "jsonv2");
+    url.searchParams.set("lat", String(lat));
+    url.searchParams.set("lon", String(lon));
+    url.searchParams.set("zoom", "18");
+    url.searchParams.set("addressdetails", "1");
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "sxpreston-rams/1.0 (https://www.sxpreston.com)"
+      }
+    });
+    if (!response.ok) return "";
+    const payload = await response.json();
+    const address = payload?.address || {};
+    const parts = [
+      address.road || address.pedestrian || address.footway,
+      address.suburb || address.neighbourhood,
+      address.city || address.town || address.village,
+      address.county,
+      address.postcode
+    ].filter(Boolean);
+    return parts.join(", ") || String(payload?.display_name || "").trim();
+  } catch (error) {
+    return "";
+  }
+}
+
 async function findNearestHospitals(address) {
   const origin = await geocodeMileageLocation(address);
   if (!origin) {
@@ -1067,7 +1098,7 @@ async function findNearestHospitals(address) {
 
   const payload = await response.json();
   const seen = new Set();
-  const hospitals = (Array.isArray(payload?.elements) ? payload.elements : [])
+  const hospitals = await Promise.all((Array.isArray(payload?.elements) ? payload.elements : [])
     .map((element) => {
       const tags = element.tags || {};
       const lat = Number(element.lat ?? element.center?.lat);
@@ -1083,15 +1114,30 @@ async function findNearestHospitals(address) {
         id: String(element.id || dedupeKey),
         name,
         address: addressLabel,
-        distanceKm: Math.round(distanceKm * 10) / 10,
-        label: `${name}${addressLabel ? ` - ${addressLabel}` : ""}${distanceKm ? ` (${Math.round(distanceKm * 10) / 10} km)` : ""}`
+        lat,
+        lon,
+        distanceKm: Math.round(distanceKm * 10) / 10
       };
     })
-    .filter(Boolean)
+    .filter(Boolean));
+
+  const nearestHospitalCandidates = hospitals
     .sort((left, right) => left.distanceKm - right.distanceKm)
     .slice(0, 5);
 
-  return { origin, hospitals };
+  const enrichedHospitals = await Promise.all(nearestHospitalCandidates.map(async (hospital) => {
+    const addressLabel = hospital.address || await reverseGeocodeHospitalAddress(hospital.lat, hospital.lon);
+    const distanceLabel = Number.isFinite(hospital.distanceKm) ? ` (${hospital.distanceKm} km)` : "";
+    return {
+      id: hospital.id,
+      name: hospital.name,
+      address: addressLabel,
+      distanceKm: hospital.distanceKm,
+      label: `${hospital.name}${addressLabel ? ` - ${addressLabel}` : ""}${distanceLabel}`
+    };
+  }));
+
+  return { origin, hospitals: enrichedHospitals };
 }
 
 function buildMonthNavigation(today = getTodayInLondon()) {

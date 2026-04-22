@@ -1758,22 +1758,36 @@ function buildRamsReference(job, questions) {
 }
 
 const RAMS_METHOD_FLOW_KEYWORDS = [
-  ["arrive", "sign in", "induction", "confirm site"],
-  ["park", "unload", "working area", "access routes"],
-  ["check artwork", "position", "substrate", "survey"],
-  ["access equipment", "ladder", "podium", "scaffold", "lift"],
-  ["prepare", "clean", "mask", "surface"],
-  ["install", "apply", "fix", "signage", "graphics"],
-  ["quality", "make good", "clean down", "check"],
-  ["photo", "photograph", "completion"],
-  ["signature", "sign off", "handover"],
-  ["leave", "depart", "remove waste", "clear site"]
+  { rank: 10, title: ["arrive", "sign in", "induction", "confirm site"], body: ["arrive", "sign in", "induction", "confirm site"] },
+  { rank: 20, title: ["set up", "working area", "park", "unload"], body: ["park", "unload", "working area", "access routes"] },
+  { rank: 30, title: ["access equipment", "ladder", "podium", "scaffold", "lift"], body: ["access equipment", "ladder", "podium", "scaffold", "lift"] },
+  { rank: 40, title: ["check artwork", "position", "substrate", "survey"], body: ["check artwork", "position", "substrate", "survey"] },
+  { rank: 50, title: ["prepare", "clean", "mask", "surface"], body: ["prepare", "clean", "mask", "surface"] },
+  { rank: 60, title: ["install", "apply", "fix", "signage", "graphics"], body: ["install", "apply", "fix", "signage", "graphics"] },
+  { rank: 70, title: ["quality", "make good", "snag"], body: ["quality", "make good", "snag"] },
+  { rank: 80, title: ["photo", "photograph"], body: ["photo", "photograph"] },
+  { rank: 90, title: ["completion", "handover", "sign off", "waste", "leave", "depart"], body: ["completion", "handover", "signature", "sign off", "remove waste", "clear site", "leave", "depart"] }
 ];
 
 function getRamsMethodFlowRank(card = {}) {
-  const text = `${card.title || ""} ${Array.isArray(card.content) ? card.content.join(" ") : ""}`.toLowerCase();
-  const index = RAMS_METHOD_FLOW_KEYWORDS.findIndex((keywords) => keywords.some((keyword) => text.includes(keyword)));
-  return index === -1 ? RAMS_METHOD_FLOW_KEYWORDS.length : index;
+  const title = String(card.title || "").toLowerCase();
+  const body = (Array.isArray(card.content) ? card.content.join(" ") : "").toLowerCase();
+  const exactIdRanks = {
+    siteArrival: 10,
+    accessSetup: 20,
+    ladders: 30,
+    mewp: 30,
+    surveyCheck: 40,
+    preparation: 50,
+    installSequence: 60,
+    qualityCheck: 70,
+    completion: 90
+  };
+  if (exactIdRanks[card.id]) return exactIdRanks[card.id];
+  const titleMatch = RAMS_METHOD_FLOW_KEYWORDS.find((group) => group.title.some((keyword) => title.includes(keyword)));
+  if (titleMatch) return titleMatch.rank;
+  const bodyMatch = RAMS_METHOD_FLOW_KEYWORDS.find((group) => group.body.some((keyword) => body.includes(keyword)));
+  return bodyMatch ? bodyMatch.rank : 65;
 }
 
 function sortRamsMethodCardsForFlow(cards = []) {
@@ -4453,7 +4467,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
           </div>
 
           {jobError ? <div className="flash error">{jobError}</div> : null}
-          {saveStatus ? <div className={`flash ${saveStatus.toLowerCase().includes("could not") ? "error" : "success"}`}>{saveStatus}</div> : null}
+          {saveStatus ? <div className={`flash no-print ${saveStatus.toLowerCase().includes("could not") ? "error" : "success"}`}>{saveStatus}</div> : null}
 
           <div className="rams-builder-grid">
             <aside className="rams-question-panel">
@@ -4645,22 +4659,22 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                     ))}
                   </div>
                   <div className="rams-method-prep-grid">
-                    <div className="rams-method-info-card">
+                    <div className="rams-method-info-card is-purple">
                       <h5>Tools</h5>
                       <p>{renderEditable("tools", displayedTools || "-")}</p>
                     </div>
-                    <div className="rams-method-info-card">
+                    <div className="rams-method-info-card is-purple">
                       <h5>Access Methods</h5>
                       <p>{renderEditable("access", displayedAccess || "-")}</p>
                     </div>
                   </div>
                   <div className="rams-method-safety-grid">
-                    <div className="rams-method-info-card rams-site-hazards-section is-green">
+                    <div className="rams-method-info-card rams-site-hazards-section is-yellow">
                       <h5>Site Specific Hazards or Information</h5>
                       <p>{renderEditable("notes", displayedSiteHazards)}</p>
                     </div>
                     {selectedPpe.length ? (
-                      <div className="rams-method-info-card rams-ppe-section is-green">
+                      <div className="rams-method-info-card rams-ppe-section is-blue">
                         <h5>PPE Required</h5>
                         <div className="rams-ppe-grid">
                           {selectedPpe.map((item) => (
@@ -4698,8 +4712,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                         <div>
                           <strong>{renderEditable(`method-${card.id}-title`, card.title)}</strong>
                           <span className="rams-card-actions no-print">
-                            <button type="button" className="icon-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">^</button>
-                            <button type="button" className="icon-button" onClick={() => moveCard(card.id, 1)} disabled={cardIndex === selectedCards.length - 1} aria-label="Move method down">v</button>
+                            <button type="button" className="icon-button rams-move-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">
+                              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 11.5 10 7l4.5 4.5" /></svg>
+                            </button>
+                            <button type="button" className="icon-button rams-move-button" onClick={() => moveCard(card.id, 1)} disabled={cardIndex === selectedCards.length - 1} aria-label="Move method down">
+                              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 8.5 10 13l4.5-4.5" /></svg>
+                            </button>
                           </span>
                         </div>
                         <ul>
@@ -5080,22 +5098,22 @@ function ReadOnlyRamsDocument({
           ) : null}
 
           <div className="rams-method-prep-grid">
-            <div className="rams-method-info-card is-green">
+            <div className="rams-method-info-card is-purple">
               <h5>Tools</h5>
               <p>{tools.join(", ") || "-"}</p>
             </div>
-            <div className="rams-method-info-card is-green">
+            <div className="rams-method-info-card is-purple">
               <h5>Access Methods</h5>
               <p>{accessMethods.join(", ") || "-"}</p>
             </div>
           </div>
 
           <div className="rams-method-safety-grid">
-            <div className="rams-method-info-card rams-site-hazards-section is-green">
+            <div className="rams-method-info-card rams-site-hazards-section is-yellow">
               <h5>Site Specific Hazards or Information</h5>
               <p>{payload.siteHazards || "N/A"}</p>
             </div>
-            <div className="rams-method-info-card rams-ppe-section is-green">
+            <div className="rams-method-info-card rams-ppe-section is-blue">
               <h5>PPE Required</h5>
               <div className="rams-ppe-grid">
                 {ppe.length ? ppe.map((item, index) => {
