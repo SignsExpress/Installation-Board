@@ -42,7 +42,8 @@ function getDefaultPermissions(role) {
       holidays: "admin",
       attendance: "admin",
       mileage: "admin",
-      vanEstimator: "none"
+      vanEstimator: "none",
+      rams: "admin"
     };
   }
 
@@ -52,7 +53,8 @@ function getDefaultPermissions(role) {
     holidays: "user",
     attendance: "user",
     mileage: "user",
-    vanEstimator: "none"
+    vanEstimator: "none",
+    rams: "none"
   };
 }
 
@@ -137,7 +139,8 @@ function normalizePermissions(permissions, role) {
     holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
     attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
     mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage),
-    vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator)
+    vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator),
+    rams: normalizePermissionValue(permissions?.rams, defaults.rams)
   };
 }
 
@@ -155,7 +158,8 @@ function applyOwnerPermissions(user) {
       holidays: "admin",
       attendance: "admin",
       mileage: "admin",
-      vanEstimator: "admin"
+      vanEstimator: "admin",
+      rams: "admin"
     }
   };
 }
@@ -167,7 +171,8 @@ function deriveRoleFromPermissions(permissions) {
     permissions?.holidays === "user" &&
     permissions?.attendance === "user" &&
     permissions?.mileage === "user" &&
-    permissions?.vanEstimator === "none"
+    permissions?.vanEstimator === "none" &&
+    permissions?.rams === "none"
   ) {
     return "client";
   }
@@ -220,7 +225,8 @@ function normalizeStore(parsed, options = {}) {
         holidays: "admin",
         attendance: "admin",
         mileage: "admin",
-        vanEstimator: "admin"
+        vanEstimator: "admin",
+        rams: "admin"
       };
     }
   }
@@ -400,7 +406,8 @@ async function updateUserPermissions(userId, permissions) {
         holidays: "admin",
         attendance: "admin",
         mileage: "admin",
-        vanEstimator: "admin"
+        vanEstimator: "admin",
+        rams: "admin"
       };
     }
   await writeUsersStore(store);

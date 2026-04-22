@@ -39,7 +39,7 @@ function createMessage(text, tone = "success") {
   return { text, tone, id: `${Date.now()}-${Math.random()}` };
 }
 
-export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOnly = false }) {
+export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOnly = false, navigation = null }) {
   const [installers, setInstallers] = useState([]);
   const [requests, setRequests] = useState([]);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -310,6 +310,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOn
   return (
     <div className="app-shell installer-host-view">
       <div className="page">
+        {navigation || (
         <header className="host-nav-shell">
           <nav className="host-nav">
             <div className="host-nav-inner">
@@ -350,6 +351,7 @@ export default function InstallerDirectoryHostV2({ currentUser, onLogout, readOn
             </div>
           </nav>
         </header>
+        )}
 
         <div className="workspace-grid">
           <section className="card card-large map-panel-card">

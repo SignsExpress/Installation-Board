@@ -2157,6 +2157,10 @@ function getPermissionForApp(user, key) {
         : "user"
       : key === "vanEstimator"
         ? "none"
+      : key === "rams"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2225,7 +2229,13 @@ function canEditVanEstimator(user) {
 }
 
 function canAccessRams(user) {
-  return canEditBoard(user);
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "rams") !== "none";
+}
+
+function canEditRams(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "rams") === "admin";
 }
 
 function usesHostShell(user) {
@@ -2384,6 +2394,18 @@ function MainNavBar({
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
+  const navItems = [
+    { key: "home", label: "Home", path: homePath, allowed: true },
+    { key: "board", label: "Installation Board", path: boardPath, allowed: boardAllowed },
+    { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
+    { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
+    { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
+    { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
+    { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
+    { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed },
+    { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length }
+  ].filter((item) => item.allowed);
+  const activeNavKey = navItems.some((item) => item.key === active) ? active : "home";
 
   return (
     <header className="host-nav-shell">
@@ -2392,87 +2414,33 @@ function MainNavBar({
           <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)} aria-label="Go to home">
             <BrandLogoIcon />
           </button>
+          <label className="host-nav-mobile-menu">
+            <span>Menu</span>
+            <select value={activeNavKey} onChange={(event) => {
+              const nextItem = navItems.find((item) => item.key === event.target.value);
+              if (nextItem) goTo(nextItem.path);
+            }}>
+              {navItems.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.badge ? `${item.label} (${item.badge})` : item.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="host-nav-links">
-            <button
-              type="button"
-              className={`host-nav-link ${active === "home" ? "active" : ""}`}
-              onClick={() => goTo(homePath)}
-            >
-              <span className="host-nav-link-label">Home</span>
-            </button>
-            {boardAllowed ? (
+            {navItems.map((item) => (
               <button
+                key={item.key}
                 type="button"
-                className={`host-nav-link ${active === "board" ? "active" : ""}`}
-                onClick={() => goTo(boardPath)}
+                className={`host-nav-link ${active === item.key ? "active" : ""}`}
+                onClick={() => goTo(item.path)}
               >
-                <span className="host-nav-link-label">Installation Board</span>
+                <span className="host-nav-link-label">
+                  {item.label}
+                  {item.badge ? <span className="host-nav-badge inline">{item.badge}</span> : null}
+                </span>
               </button>
-            ) : null}
-            {attendanceAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "attendance" ? "active" : ""}`}
-                onClick={() => goTo(attendancePath)}
-              >
-                <span className="host-nav-link-label">Attendance</span>
-              </button>
-            ) : null}
-            {holidaysAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "holidays" ? "active" : ""}`}
-                onClick={() => goTo(holidaysPath)}
-              >
-                <span className="host-nav-link-label">Holidays</span>
-              </button>
-            ) : null}
-            {mileageAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "mileage" ? "active" : ""}`}
-                onClick={() => goTo(mileagePath)}
-              >
-                <span className="host-nav-link-label">Mileage</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={`host-nav-link ${active === "van-estimator" ? "active" : ""} ${vanEstimatorAllowed ? "" : "disabled"}`}
-              disabled={!vanEstimatorAllowed}
-              onClick={() => goTo(vanEstimatorPath)}
-              title={vanEstimatorAllowed ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
-            >
-              <span className="host-nav-link-label">Vehicle Pricing Calculator</span>
-            </button>
-            {ramsAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "rams" ? "active" : ""}`}
-                onClick={() => goTo(ramsPath)}
-              >
-                <span className="host-nav-link-label">RAMS</span>
-              </button>
-            ) : null}
-            {installerAllowed ? (
-              <button
-                type="button"
-                className={`host-nav-link ${active === "installer" ? "active" : ""}`}
-                onClick={() => goTo(installerPath)}
-              >
-                <span className="host-nav-link-label">Subcontractor Directory</span>
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className={`host-nav-link ${active === "notifications" ? "active" : ""}`}
-              onClick={() => goTo(notificationsPath)}
-            >
-              <span className="host-nav-link-label">
-                Notifications
-                {unreadNotifications.length ? <span className="host-nav-badge inline">{unreadNotifications.length}</span> : null}
-              </span>
-            </button>
+            ))}
           </div>
           <div className="host-nav-meta">
             <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
@@ -2606,6 +2574,7 @@ function PermissionsPanel({
             const attendancePermission = getPermissionForApp(user, "attendance");
             const mileagePermission = getPermissionForApp(user, "mileage");
             const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
+            const ramsPermission = getPermissionForApp(user, "rams");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -2804,6 +2773,23 @@ function PermissionsPanel({
                             className={`permission-chip ${vanEstimatorPermission === option.value ? "active" : ""}`}
                             disabled={isSelf || savingKey === `${user.id}:vanEstimator`}
                             onClick={() => onChangePermission(user.id, "vanEstimator", option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">RAMS</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-rams-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${ramsPermission === option.value ? "active" : ""}`}
+                            disabled={isSelf || savingKey === `${user.id}:rams`}
+                            onClick={() => onChangePermission(user.id, "rams", option.value)}
                           >
                             {option.label}
                           </button>
@@ -3156,6 +3142,11 @@ function HostLandingPage({
                 <strong>Mileage</strong>
               </button>
             ) : null}
+            {canAccessRams(currentUser) ? (
+              <button className="host-launch-card" type="button" onClick={() => goTo("/rams")}>
+                <strong>RAMS</strong>
+              </button>
+            ) : null}
             <button
               className={`host-launch-card ${canAccessVanEstimator(currentUser) ? "" : "disabled"}`}
               type="button"
@@ -3292,6 +3283,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState("");
   const [logicSection, setLogicSection] = useState("risk");
+  const canDeleteRamsLogic = canEditRams(currentUser);
 
   const activeGroup = ramsLogicDraft.optionGroups[selectedGroupIndex] || ramsLogicDraft.optionGroups[0] || null;
   const activeGroupIndex = Math.max(0, ramsLogicDraft.optionGroups.indexOf(activeGroup));
@@ -3350,6 +3342,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   }
 
   function restoreDefaultRamsLogic() {
+    if (!canDeleteRamsLogic) return;
     const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
     setRamsLogicDraft(nextLogic);
     saveRamsLogic(nextLogic);
@@ -3389,6 +3382,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   }
 
   function removeRamsOption(groupIndex, optionIndex) {
+    if (!canDeleteRamsLogic) return;
     updateRamsLogicDraft((current) => ({
       ...current,
       optionGroups: current.optionGroups.map((group, currentGroupIndex) =>
@@ -3493,6 +3487,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
   }
 
   function removeRamsCard(cardId) {
+    if (!canDeleteRamsLogic) return;
     updateRamsLogicDraft((current) => {
       const nextCards = { ...current.cards };
       delete nextCards[cardId];
@@ -3541,9 +3536,11 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
               <button className="ghost-button" type="button" onClick={() => window.location.assign("/rams")}>
                 Back to RAMS
               </button>
-              <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>
-                Restore defaults
-              </button>
+              {canDeleteRamsLogic ? (
+                <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>
+                  Restore defaults
+                </button>
+              ) : null}
               <button className="primary-button" type="button" onClick={saveRamsLogicDraft}>
                 Save logic
               </button>
@@ -3755,9 +3752,11 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       ))}
                     </div>
                   </div>
-                  <button className="text-button danger" type="button" onClick={() => removeRamsCard(activeCardId)}>
-                    Delete {activeCard.type === "Method" ? "method" : "risk"}
-                  </button>
+                  {canDeleteRamsLogic ? (
+                    <button className="text-button danger" type="button" onClick={() => removeRamsCard(activeCardId)}>
+                      Delete {activeCard.type === "Method" ? "method" : "risk"}
+                    </button>
+                  ) : null}
                 </article>
               ) : (
                 <p className="rams-logic-empty">Select or add a card.</p>
@@ -3831,9 +3830,11 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       />
                     </label>
                   </div>
-                  <button className="text-button danger" type="button" onClick={() => removeRamsOption(activeGroupIndex, activeOptionIndex)}>
-                    Remove this button
-                  </button>
+                  {canDeleteRamsLogic ? (
+                    <button className="text-button danger" type="button" onClick={() => removeRamsOption(activeGroupIndex, activeOptionIndex)}>
+                      Remove this button
+                    </button>
+                  ) : null}
                 </article>
               ) : null}
             </div>
@@ -9147,7 +9148,7 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -9691,6 +9692,7 @@ export default function App() {
       attendance: getPermissionForApp(targetUser, "attendance"),
       mileage: getPermissionForApp(targetUser, "mileage"),
       vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
+      rams: getPermissionForApp(targetUser, "rams"),
       [appKey]: value
     };
 
@@ -11283,7 +11285,21 @@ export default function App() {
     }
 
   if (showInstallerDirectory) {
-    return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;
+    return (
+      <InstallerDirectoryHost
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        readOnly={!installerEditable}
+        navigation={(
+          <MainNavBar
+            currentUser={currentUser}
+            active="installer"
+            onLogout={handleLogout}
+            notifications={notifications}
+          />
+        )}
+      />
+    );
   }
 
   return (

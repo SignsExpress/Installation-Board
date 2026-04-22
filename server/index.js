@@ -266,6 +266,11 @@ function canAccessVanEstimator(user) {
   return getUserPermission(user, "vanEstimator", "none") !== "none";
 }
 
+function canAccessRams(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "rams", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
 function toPublicRamsProfile(user = {}) {
   const safeUser = sanitizeUser(user);
   return {
@@ -471,6 +476,18 @@ function getHolidayStaffIdentityKey(value) {
 function requireBoardAccess(request, response) {
   if (canAccessBoard(request.user)) return true;
   response.status(403).json({ error: "Board access required." });
+  return false;
+}
+
+function requireBoardOrRamsAccess(request, response) {
+  if (canAccessBoard(request.user) || canAccessRams(request.user)) return true;
+  response.status(403).json({ error: "Board or RAMS access required." });
+  return false;
+}
+
+function requireRamsAccess(request, response) {
+  if (canAccessRams(request.user)) return true;
+  response.status(403).json({ error: "RAMS access required." });
   return false;
 }
 
@@ -4514,13 +4531,13 @@ function createServer() {
   });
 
   app.get("/api/jobs", async (request, response) => {
-    if (!requireBoardAccess(request, response)) return;
+    if (!requireBoardOrRamsAccess(request, response)) return;
     const store = await readStore();
     response.json(toPublicJobs(store.jobs));
   });
 
   app.get("/api/rams/hospitals", async (request, response) => {
-    if (!requireBoardAccess(request, response)) return;
+    if (!requireRamsAccess(request, response)) return;
     const address = String(request.query.address || "").trim();
     if (!address) {
       response.status(400).json({ error: "Installation address is required." });
@@ -4535,7 +4552,7 @@ function createServer() {
   });
 
   app.get("/api/rams/profiles", async (request, response) => {
-    if (!requireBoardAccess(request, response)) return;
+    if (!requireRamsAccess(request, response)) return;
     const usersStore = await readUsersStore();
     response.json((usersStore.users || []).map(toPublicRamsProfile));
   });
@@ -4724,7 +4741,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.post("/api/jobs/:id/rams", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
+    if (!requireRamsAccess(request, response)) return;
     const store = await readStore();
     const index = store.jobs.findIndex((job) => String(job.id || "") === String(request.params.id || ""));
     if (index === -1) {
@@ -4836,7 +4853,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   app.delete("/api/jobs/:jobId/rams/:ramsId", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
+    if (!requireRamsAccess(request, response)) return;
     const store = await readStore();
     const index = store.jobs.findIndex((entry) => String(entry.id || "") === String(request.params.jobId || ""));
     if (index === -1) {
