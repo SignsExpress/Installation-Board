@@ -3394,8 +3394,13 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [result, setResult] = useState(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [socialStatus, setSocialStatus] = useState(null);
+  const [toneViewerOpen, setToneViewerOpen] = useState(false);
+  const [toneDraft, setToneDraft] = useState("");
+  const [toneSaving, setToneSaving] = useState(false);
+  const [toneMessage, setToneMessage] = useState("");
 
   const canAdmin = canEditSocialPost(currentUser);
+  const selectedVoice = voices.find((voice) => String(voice.id) === String(voiceId)) || voices[0] || null;
 
   useEffect(() => {
     let active = true;
@@ -3495,6 +3500,46 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     await navigator.clipboard?.writeText(result.post);
   }
 
+  function openToneViewer() {
+    if (!selectedVoice) return;
+    setToneDraft(selectedVoice.content || "");
+    setToneMessage("");
+    setToneViewerOpen(true);
+  }
+
+  async function saveToneDraft() {
+    if (!selectedVoice || !canAdmin) return;
+    setToneSaving(true);
+    setToneMessage("");
+    try {
+      const response = await fetch(`/api/social-post/voices/${encodeURIComponent(selectedVoice.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: toneDraft, name: selectedVoice.name, fileName: selectedVoice.fileName })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not save tone examples.");
+      const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
+      setVoices(nextVoices);
+      setVoiceId(payload.voice?.id || selectedVoice.id);
+      setSocialStatus((current) => current ? {
+        ...current,
+        voices: nextVoices.map((voice) => ({
+          id: voice.id,
+          name: voice.name,
+          fileName: voice.fileName,
+          contentLength: String(voice.content || "").length,
+          createdAt: voice.createdAt
+        }))
+      } : current);
+      setToneMessage("Saved.");
+    } catch (saveError) {
+      setToneMessage(saveError.message || "Could not save tone examples.");
+    } finally {
+      setToneSaving(false);
+    }
+  }
+
   return (
     <div className="app-shell social-post-shell">
       <div className="page social-post-page">
@@ -3528,7 +3573,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                     }}
                   />
                   <button className="primary-button" type="button" onClick={generatePost} disabled={loading || !orderReference.trim()}>
-                    {loading ? "Generating..." : "Fetch order"}
+                    {loading ? <span className="button-spinner-label"><span className="button-spinner" />Generating...</span> : "Fetch order"}
                   </button>
                 </div>
               </label>
@@ -3541,6 +3586,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   )) : <option value="">Matt Rutlidge</option>}
                 </select>
               </label>
+              <button className="ghost-button social-post-tone-button" type="button" onClick={openToneViewer} disabled={!selectedVoice}>
+                View tone examples
+              </button>
               {socialStatus ? (
                 <div className={`social-post-status ${socialStatus.ai?.configured ? "is-ok" : "is-warning"}`}>
                   <span>{socialStatus.ai?.configured ? "AI connected" : "AI key not visible to Render"}</span>
@@ -3603,6 +3651,32 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               ) : null}
             </div>
           </div>
+
+          {toneViewerOpen && selectedVoice ? (
+            <div className="social-post-tone-panel">
+              <div className="social-post-tone-head">
+                <div>
+                  <h3>{selectedVoice.name}</h3>
+                  <p>{selectedVoice.fileName || "Saved tone examples"}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setToneViewerOpen(false)}>x</button>
+              </div>
+              <textarea
+                value={toneDraft}
+                readOnly={!canAdmin}
+                onChange={(event) => setToneDraft(event.target.value)}
+                placeholder="Paste example posts, hook styles, phrases and mannerisms here."
+              />
+              <div className="social-post-tone-actions">
+                {toneMessage ? <span>{toneMessage}</span> : <span>{toneDraft.length.toLocaleString()} characters</span>}
+                {canAdmin ? (
+                  <button className="primary-button" type="button" onClick={saveToneDraft} disabled={toneSaving || !toneDraft.trim()}>
+                    {toneSaving ? <span className="button-spinner-label"><span className="button-spinner" />Saving...</span> : "Save tone examples"}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </div>

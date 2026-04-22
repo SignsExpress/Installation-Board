@@ -4238,7 +4238,7 @@ function sanitizeSocialToneVoice(voice = {}) {
     id: String(voice.id || makeId()),
     name: String(voice.name || "LinkedIn").replace(/\s+/g, " ").trim().slice(0, 80) || "LinkedIn",
     fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
-    content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 60000),
+    content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 100000),
     createdAt: String(voice.createdAt || new Date().toISOString())
   };
 }
@@ -4349,7 +4349,7 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
 
 function getSocialPostToneSummary(voice) {
   const text = String(voice?.content || "").replace(/\s+/g, " ").trim();
-  return text.slice(0, 5000);
+  return text.slice(0, 20000);
 }
 
 function getSocialPostAiStatus() {
@@ -4489,6 +4489,7 @@ function buildSocialPostBrief(order, voice) {
   const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
   const mainDescription = descriptionCandidates[0]?.text || order.description || items[0]?.description || "";
+  const jobEvidence = getSocialJobEvidence(order, items, descriptionCandidates);
   const sourceFields = (Array.isArray(order.debugFields) ? order.debugFields : [])
     .filter((field) => isSocialDescriptionKey(field.key) || /(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.\d+/i.test(String(field.key || "")))
     .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1000) }))
@@ -4503,6 +4504,7 @@ function buildSocialPostBrief(order, voice) {
     primaryDescription: mainDescription,
     description: mainDescription,
     descriptionCandidates,
+    ...jobEvidence,
     address: order.address || "",
     contact: order.contact || "",
     items,
@@ -4513,9 +4515,10 @@ function buildSocialPostBrief(order, voice) {
       descriptionCandidates,
       itemCandidates: items,
       exactDescriptionMatches,
+      jobEvidence,
       sourceFields,
       toneName: voice?.name || "Matt Rutlidge",
-      toneExcerpt: getSocialPostToneSummary(voice).slice(0, 1500),
+      toneExcerpt: getSocialPostToneSummary(voice).slice(0, 3000),
       sourceFieldCount: Array.isArray(order.debugFields) ? order.debugFields.length : 0
     }
   };
@@ -4550,6 +4553,9 @@ function getSocialPostFeaturePhrases(brief) {
     .join(" ")
     .toLowerCase();
   const features = [];
+  if (/poster kit|poster holder|cable poster/.test(text)) {
+    features.push("clean cable poster display kits");
+  }
   if (/fascia|sign tray|tray|fret cut|push through|opal|illuminat|led/.test(text)) {
     features.push("a digitally printed, stencil-cut illuminated fascia sign");
   }
@@ -4559,17 +4565,51 @@ function getSocialPostFeaturePhrases(brief) {
   if (/wall|floor|wrap|ceiling/.test(text)) {
     features.push("wall, ceiling or interior graphic wraps");
   }
-  if (/install|site|stonework|external/.test(text)) {
+  if (brief.hasInstallEvidence && /install|site|stonework|external/.test(text)) {
     features.push("careful external installation on site");
   }
   return [...new Set(features)].slice(0, 4);
+}
+
+function getSocialJobEvidence(order = {}, items = [], descriptionCandidates = []) {
+  const combined = [
+    order.description,
+    ...(items || []).map((item) => item.description),
+    ...(descriptionCandidates || []).map((candidate) => candidate.text)
+  ].filter(Boolean).join(" ").toLowerCase();
+  const hasInstallEvidence = /\b(install|installed|installation|fit|fitted|attend site|on site|site visit)\b/i.test(combined);
+  const hasDeliveryOnlyEvidence = /\b(delivery|deliver|courier|collection|supplied only|supply only)\b/i.test(combined) && !hasInstallEvidence;
+  return {
+    hasInstallEvidence,
+    hasDeliveryOnlyEvidence,
+    evidenceSummary: hasInstallEvidence
+      ? "Corebridge includes installation or site attendance wording."
+      : hasDeliveryOnlyEvidence
+        ? "Corebridge suggests this is supply/delivery rather than installation."
+        : "Corebridge does not clearly say installation happened."
+  };
+}
+
+function sanitizeGeneratedSocialPost(post = "") {
+  let text = normalizeSocialText(post)
+    .replace(/\bexciting news\b[!,.:\s]*/i, "")
+    .replace(/[‐‑‒–—―-]/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n[ \t]+/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+  if (!text) return text;
+  if (/^we'?re thrilled\b/i.test(text)) {
+    text = text.replace(/^we'?re thrilled[^.\n]*[.\n]*/i, "Want to get noticed?\n\n");
+  }
+  return text;
 }
 
 function generateFallbackSocialPost(brief) {
   const customer = brief.customerName || "a client";
   const features = getSocialPostFeaturePhrases(brief);
   const featureSentence = features.length
-    ? `For ${customer}, we brought the brand to life with ${features.join(", ")}.`
+    ? `For ${customer}, we helped with ${features.join(", ")}.`
     : `For ${customer}, we helped turn a detailed signage brief into something bold, polished and built to be noticed.`;
   return [
     "Want to get noticed? Start with signage people actually stop and look at.",
@@ -4593,7 +4633,7 @@ async function generateSocialPostWithAi(brief) {
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   if (!apiKey) {
     return {
-      post: generateFallbackSocialPost(brief),
+      post: sanitizeGeneratedSocialPost(generateFallbackSocialPost(brief)),
       source: "template",
       warning: "OPENAI_API_KEY is not configured, so this used the local fallback rather than reading the tone file with AI.",
       aiStatus
@@ -4606,13 +4646,17 @@ async function generateSocialPostWithAi(brief) {
     "",
     "IMPORTANT TRANSFORMATION:",
     "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
-    "- Read primaryDescription, descriptionCandidates and items to understand what was made and installed.",
+    "- Read primaryDescription, descriptionCandidates and items to understand what was supplied, produced or installed.",
     "- Read toneSummary as historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
+    "- Pay special attention to mannerisms: punchy first line, rhetorical questions, conversational phrases, confidence, personality, emoji placement and how the examples move from broad idea to specific job.",
+    "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
     "- Use a hook, short paragraphs, light emoji use where it fits, and a conversational call to action.",
     "- Mention the customer/project if available. Mention designer credit if the source data or tone examples clearly support it, otherwise do not invent names.",
     "- It is fine to mention simplified product phrases such as illuminated fascia sign, window graphics, wall wraps or layered displays.",
+    "- Only say installed, installation or on site if hasInstallEvidence is true. If hasDeliveryOnlyEvidence is true, treat it as supplied or delivered.",
     "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
+    "- Do not use hyphen or dash characters anywhere in the post.",
     "- Keep it LinkedIn-ready and flowing naturally, not like a quote summary.",
     "- Include 3 to 6 relevant hashtags at the end.",
     "",
@@ -4638,9 +4682,9 @@ async function generateSocialPostWithAi(brief) {
     const payload = await response.json();
     const post = payload?.choices?.[0]?.message?.content?.trim();
     if (!response.ok || !post) throw new Error(payload?.error?.message || "AI generation failed.");
-    return { post, source: "ai", aiStatus };
+    return { post: sanitizeGeneratedSocialPost(post), source: "ai", aiStatus };
   } catch (error) {
-    return { post: generateFallbackSocialPost(brief), source: "template", warning: error.message, aiStatus };
+    return { post: sanitizeGeneratedSocialPost(generateFallbackSocialPost(brief)), source: "template", warning: error.message, aiStatus };
   }
 }
 
@@ -5161,6 +5205,38 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(400).json({ error: error.message || "Could not upload tone of voice." });
     }
+  });
+
+  app.patch("/api/social-post/voices/:id", async (request, response) => {
+    if (!request.user?.canManagePermissions) {
+      response.status(403).json({ error: "Only admins can edit tone of voice files." });
+      return;
+    }
+
+    const store = await readStore();
+    const voices = Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [];
+    const index = voices.findIndex((voice) => String(voice.id) === String(request.params.id));
+    if (index === -1) {
+      response.status(404).json({ error: "Tone of voice not found." });
+      return;
+    }
+
+    const existing = sanitizeSocialToneVoice(voices[index]);
+    const nextVoice = sanitizeSocialToneVoice({
+      ...existing,
+      name: request.body?.name ?? existing.name,
+      content: request.body?.content ?? existing.content,
+      fileName: request.body?.fileName ?? existing.fileName,
+      createdAt: existing.createdAt
+    });
+    if (!nextVoice.content) {
+      response.status(400).json({ error: "Tone content cannot be empty." });
+      return;
+    }
+
+    store.socialPostToneVoices = voices.map((voice, voiceIndex) => (voiceIndex === index ? nextVoice : voice));
+    const savedStore = await writeStore(store);
+    response.json({ voices: (savedStore.socialPostToneVoices || []).map(sanitizeSocialToneVoice), voice: nextVoice });
   });
 
   app.delete("/api/social-post/voices/:id", async (request, response) => {

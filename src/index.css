@@ -6974,6 +6974,10 @@ button {
   color: #166534;
 }
 
+.social-post-tone-button {
+  justify-self: start;
+}
+
 .social-post-order-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -7027,6 +7031,70 @@ button {
   font-size: 0.78rem;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.button-spinner-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.button-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  border-radius: 999px;
+  animation: social-spin 0.8s linear infinite;
+}
+
+@keyframes social-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.social-post-tone-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #d8c8e6;
+  border-radius: 18px;
+  background: #fbf7ff;
+}
+
+.social-post-tone-head,
+.social-post-tone-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.social-post-tone-head h3,
+.social-post-tone-head p {
+  margin: 0;
+}
+
+.social-post-tone-head p,
+.social-post-tone-actions span {
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.social-post-tone-panel textarea {
+  width: 100%;
+  min-height: 300px;
+  border: 1px solid var(--sx-border);
+  border-radius: 12px;
+  padding: 12px;
+  resize: vertical;
+  color: #0f172a;
+  background: #fff;
+  font: inherit;
+  line-height: 1.45;
 }
 
 .notifications-page {
