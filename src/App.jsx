@@ -3096,6 +3096,67 @@ function NotificationsPage({
   );
 }
 
+function HostLaunchIcon({ type }) {
+  const iconProps = {
+    viewBox: "0 0 24 24",
+    "aria-hidden": "true",
+    focusable: "false"
+  };
+  const commonProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: "1.9",
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  };
+  const icons = {
+    attendance: (
+      <svg {...iconProps}><path {...commonProps} d="M8 3v3M16 3v3M4.5 9h15M6 5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><path {...commonProps} d="m8 14 2.2 2.2L16 10.5" /></svg>
+    ),
+    holidays: (
+      <svg {...iconProps}><path {...commonProps} d="M4 20c2.4-2.2 5-3.3 8-3.3s5.6 1.1 8 3.3" /><path {...commonProps} d="M12 16.7V8" /><path {...commonProps} d="M5.5 11.5c1.5-2.8 3.7-4.2 6.5-4.2s5 1.4 6.5 4.2" /><path {...commonProps} d="M8 11.5c.8-2.8 2.1-4.2 4-4.2s3.2 1.4 4 4.2" /></svg>
+    ),
+    mileage: (
+      <svg {...iconProps}><path {...commonProps} d="M5 17.5 7.5 7h9L19 17.5" /><path {...commonProps} d="M7 14h10" /><path {...commonProps} d="M8 18h.1M16 18h.1" /><path {...commonProps} d="M10 7l1-3h2l1 3" /></svg>
+    ),
+    rams: (
+      <svg {...iconProps}><path {...commonProps} d="M7 3.5h7l3 3V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path {...commonProps} d="M14 3.5V7h3" /><path {...commonProps} d="M9 11h6M9 14h6M9 17h3" /></svg>
+    ),
+    vehicle: (
+      <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
+    ),
+    subcontractors: (
+      <svg {...iconProps}><path {...commonProps} d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /><path {...commonProps} d="M2.8 20a5.2 5.2 0 0 1 10.4 0" /><path {...commonProps} d="M17 10.5a2.5 2.5 0 1 0 0-5" /><path {...commonProps} d="M16 14.5a4.2 4.2 0 0 1 5.2 4" /></svg>
+    ),
+    board: (
+      <svg {...iconProps}><path {...commonProps} d="M4 5h16v14H4z" /><path {...commonProps} d="M8 5v14M4 10h16M4 15h16" /></svg>
+    ),
+    permissions: (
+      <svg {...iconProps}><path {...commonProps} d="M12 3 5.5 6v5.2c0 4.1 2.6 7.8 6.5 9.3 3.9-1.5 6.5-5.2 6.5-9.3V6L12 3Z" /><path {...commonProps} d="m9 12 2 2 4-5" /></svg>
+    )
+  };
+  return icons[type] || icons.board;
+}
+
+function HostLaunchCard({ icon, label, description, onClick, disabled = false, status = "", title = "" }) {
+  return (
+    <button
+      className={`host-launch-card ${disabled ? "disabled" : ""}`}
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      title={title || label}
+    >
+      {status ? <span className="host-launch-status">{status}</span> : null}
+      <span className="host-launch-icon"><HostLaunchIcon type={icon} /></span>
+      <span className="host-launch-copy">
+        <strong>{label}</strong>
+        {description ? <small>{description}</small> : null}
+      </span>
+    </button>
+  );
+}
+
 function HostLandingPage({
   currentUser,
   onLogout,
@@ -3128,54 +3189,28 @@ function HostLandingPage({
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
             {canAccessAttendance(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/attendance")}>
-                <strong>Attendance</strong>
-              </button>
+              <HostLaunchCard icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} />
             ) : null}
             {canAccessHolidays(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
-                <strong>Holidays</strong>
-              </button>
+              <HostLaunchCard icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} />
             ) : null}
             {canAccessMileage(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/mileage")}>
-                <strong>Mileage</strong>
-              </button>
+              <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
             ) : null}
             {canAccessRams(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/rams")}>
-                <strong>RAMS</strong>
-              </button>
+              <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
             ) : null}
-            <button
-              className={`host-launch-card ${canAccessVanEstimator(currentUser) ? "" : "disabled"}`}
-              type="button"
-              disabled={!canAccessVanEstimator(currentUser)}
-              onClick={() => goTo("/van-estimator")}
-              title={canAccessVanEstimator(currentUser) ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
-            >
-              <strong>Vehicle Pricing Calculator</strong>
-              {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
-            </button>
-            {canAccessRams(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/rams")}>
-                <strong>RAMS</strong>
-              </button>
+            {canAccessVanEstimator(currentUser) ? (
+              <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
             {canAccessInstaller(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
-                <strong>Subcontractor Database</strong>
-              </button>
+              <HostLaunchCard icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} />
             ) : null}
             {canAccessBoard(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
-                <strong>Installation Board</strong>
-              </button>
+              <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
             ) : null}
             {currentUser?.canManagePermissions ? (
-              <button className="host-launch-card" type="button" onClick={() => setPermissionsOpen(true)}>
-                <strong>Manage Permissions</strong>
-              </button>
+              <HostLaunchCard icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} />
             ) : null}
           </div>
         </section>
@@ -3234,39 +3269,25 @@ function ClientLandingPage({
         <section className="panel host-landing-panel">
           <div className="host-landing-actions">
             {canAccessAttendance(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/attendance")}>
-                <strong>Attendance</strong>
-              </button>
+              <HostLaunchCard icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} />
             ) : null}
             {canAccessHolidays(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/holidays")}>
-                <strong>Holidays</strong>
-              </button>
+              <HostLaunchCard icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} />
             ) : null}
             {canAccessMileage(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/mileage")}>
-                <strong>Mileage</strong>
-              </button>
+              <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
             ) : null}
-            <button
-              className={`host-launch-card ${canAccessVanEstimator(currentUser) ? "" : "disabled"}`}
-              type="button"
-              disabled={!canAccessVanEstimator(currentUser)}
-              onClick={() => goTo("/van-estimator")}
-              title={canAccessVanEstimator(currentUser) ? "Open Vehicle Pricing Calculator" : "Vehicle Pricing Calculator is inactive"}
-            >
-              <strong>Vehicle Pricing Calculator</strong>
-              {!canAccessVanEstimator(currentUser) ? <span className="host-launch-status">Inactive</span> : null}
-            </button>
+            {canAccessRams(currentUser) ? (
+              <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
+            ) : null}
+            {canAccessVanEstimator(currentUser) ? (
+              <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
+            ) : null}
             {canAccessInstaller(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo("/installer")}>
-                <strong>Subcontractor Directory</strong>
-              </button>
+              <HostLaunchCard icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} />
             ) : null}
             {canAccessBoard(currentUser) ? (
-              <button className="host-launch-card" type="button" onClick={() => goTo(getBoardPathForUser(currentUser))}>
-                <strong>Installation Board</strong>
-              </button>
+              <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
             ) : null}
           </div>
         </section>
