@@ -2457,7 +2457,10 @@ function MainNavBar({
               </svg>
               {unreadNotifications.length ? <span className="host-nav-badge">{unreadNotifications.length}</span> : null}
             </button>
-            <span className="host-nav-user">Logged in as <strong>{currentUser.displayName}</strong></span>
+            <span className="host-nav-user">
+              <span>Logged in as:</span>
+              <strong>{currentUser.displayName}</strong>
+            </span>
             <button className="host-nav-logout" type="button" onClick={onLogout}>
               <span className="host-nav-link-label">Log out</span>
             </button>

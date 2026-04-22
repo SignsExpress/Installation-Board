@@ -2871,9 +2871,18 @@ button {
 }
 
 .host-nav-user {
+  display: grid;
+  gap: 2px;
   color: #475569;
   font-size: 0.78rem;
+  line-height: 1.12;
   white-space: nowrap;
+}
+
+.host-nav-user > span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #64748b;
 }
 
 .host-nav-notification-bell {
