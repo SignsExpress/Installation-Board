@@ -4400,6 +4400,29 @@ function getSocialPostTransformationExamples(voice) {
     .slice(0, 40);
 }
 
+function classifySocialCustomer(customerName = "") {
+  const name = String(customerName || "").toLowerCase();
+  if (/\b(council|borough|district council|county council|city council|parish council|local authority)\b/i.test(name)) {
+    return { type: "council", label: "council", avoid: ["business", "company", "brand"] };
+  }
+  if (/\b(leisure|leisure trust|leisure centre|sports centre|community centre)\b/i.test(name)) {
+    return { type: "leisure organisation", label: "leisure organisation", avoid: ["business", "company"] };
+  }
+  if (/\b(school|academy|college|university|nursery)\b/i.test(name)) {
+    return { type: "education", label: "school or education provider", avoid: ["business", "company"] };
+  }
+  if (/\b(nhs|hospital|health|medical centre|surgery|clinic)\b/i.test(name)) {
+    return { type: "healthcare", label: "healthcare organisation", avoid: ["business", "company"] };
+  }
+  if (/\b(charity|foundation|trust|community interest|cic|association)\b/i.test(name)) {
+    return { type: "charity or trust", label: "organisation", avoid: ["business", "company"] };
+  }
+  if (/\b(ltd|limited|plc|llp|group|services|solutions|studio|agency|retail|restaurant|bar|cafe|shop)\b/i.test(name)) {
+    return { type: "business", label: "business", avoid: [] };
+  }
+  return { type: "organisation", label: "organisation", avoid: ["company"] };
+}
+
 function getSocialPostAiStatus() {
   const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
   return {
@@ -4538,6 +4561,7 @@ function buildSocialPostBrief(order, voice) {
   const items = extractSocialOrderItems(order);
   const mainDescription = descriptionCandidates[0]?.text || order.description || items[0]?.description || "";
   const jobEvidence = getSocialJobEvidence(order, items, descriptionCandidates);
+  const customerClassification = classifySocialCustomer(order.customerName);
   const sourceFields = (Array.isArray(order.debugFields) ? order.debugFields : [])
     .filter((field) => isSocialDescriptionKey(field.key) || /(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.\d+/i.test(String(field.key || "")))
     .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1000) }))
@@ -4549,6 +4573,7 @@ function buildSocialPostBrief(order, voice) {
   return {
     orderReference: order.orderReference || "",
     customerName: order.customerName || "",
+    customerClassification,
     primaryDescription: mainDescription,
     description: mainDescription,
     descriptionCandidates,
@@ -4561,6 +4586,7 @@ function buildSocialPostBrief(order, voice) {
     transformationExamples: getSocialPostTransformationExamples(voice),
     debug: {
       chosenDescription: mainDescription,
+      customerClassification,
       descriptionCandidates,
       itemCandidates: items,
       exactDescriptionMatches,
@@ -4647,12 +4673,17 @@ function sanitizeGeneratedSocialPost(post = "") {
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n[ \t]+/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
   if (!text) return text;
   if (/^we'?re thrilled\b/i.test(text)) {
     text = text.replace(/^we'?re thrilled[^.\n]*[.\n]*/i, "Want to get noticed?\n\n");
   }
-  return text;
+  return text
+    .split(/\n{2,}|\n(?=\S)/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function generateFallbackSocialPost(brief) {
@@ -4702,6 +4733,7 @@ async function generateSocialPostWithAi(brief) {
     "- Find repeatable patterns across all transformationExamples, then apply those patterns to the new Corebridge job.",
     "- Read toneSummary as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
     "- Pay special attention to mannerisms: punchy first line, rhetorical questions, conversational phrases, confidence, personality, emoji placement and how the examples move from broad idea to specific job.",
+    "- Check customerClassification before describing the customer. Do not call a council, leisure trust, school, charity, NHS or public sector organisation a business or company. Use organisation, council, venue, team, site or facility instead.",
     "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
     "- Use a hook, short paragraphs, light emoji use where it fits, and a conversational call to action.",
@@ -4710,6 +4742,7 @@ async function generateSocialPostWithAi(brief) {
     "- Only say installed, installation or on site if hasInstallEvidence is true. If hasDeliveryOnlyEvidence is true, treat it as supplied or delivered.",
     "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
     "- Do not use hyphen or dash characters anywhere in the post.",
+    "- Put a blank line between paragraphs so it is easy to read on LinkedIn.",
     "- Keep it LinkedIn-ready and flowing naturally, not like a quote summary.",
     "- Include 3 to 6 relevant hashtags at the end.",
     "",
