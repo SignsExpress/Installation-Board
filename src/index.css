@@ -1365,6 +1365,10 @@
   padding-left: 18px;
 }
 
+.rams-doc-card ul {
+  margin-block: 2px 0;
+}
+
 .rams-document-preview {
   display: grid;
   gap: 7px;
@@ -1447,31 +1451,46 @@
   gap: 6px;
 }
 
+.rams-method-subhead {
+  margin: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.rams-installers-subhead {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .rams-installer-contact-card {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 9px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
   align-items: center;
-  min-height: 74px;
-  border: 1px solid #111827;
-  border-radius: 8px;
-  background: #111827;
-  padding: 8px 10px;
+  min-height: 58px;
+  border: 1px solid #ef4444;
+  border-radius: 0 0 8px 8px;
+  background: #fee2e2;
+  padding: 6px 9px;
   overflow: hidden;
-  color: #fff;
+  color: #7f1d1d;
 }
 
 .rams-installer-photo {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 58px;
+  width: 40px;
+  height: 46px;
   border-radius: 6px;
-  border: 1px solid #374151;
+  border: 1px solid #fca5a5;
   background: #fff;
-  color: #111827;
-  font-size: 0.78rem;
+  color: #991b1b;
+  font-size: 0.72rem;
   font-weight: 900;
   overflow: hidden;
   cursor: pointer;
@@ -1494,18 +1513,18 @@
 }
 
 .rams-installer-contact-card strong {
-  font-size: 0.86rem;
+  font-size: 0.8rem;
 }
 
 .rams-installer-contact-card span {
-  color: #e5e7eb;
-  font-size: 0.76rem;
+  color: #991b1b;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
 .rams-installer-contact-card small {
-  color: #cbd5e1;
-  font-size: 0.7rem;
+  color: #b91c1c;
+  font-size: 0.66rem;
   line-height: 1.2;
 }
 
@@ -1560,6 +1579,17 @@
 .rams-method-info-card.is-purple h5 {
   background: #ede9fe;
   color: #4c1d95;
+}
+
+.rams-method-info-card.is-red {
+  border-color: #ef4444;
+  background: #fff1f2;
+}
+
+.rams-method-info-card.is-red h4,
+.rams-method-info-card.is-red h5 {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 .rams-method-info-card.is-yellow {
@@ -1901,6 +1931,12 @@
   color: #4c1d95;
 }
 
+.rams-doc-method-section .rams-method-info-card.is-red h4,
+.rams-doc-method-section .rams-method-info-card.is-red h5 {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
 .rams-doc-method-section .rams-method-info-card.is-yellow h4,
 .rams-doc-method-section .rams-method-info-card.is-yellow h5 {
   background: #fef3c7;
@@ -1921,9 +1957,9 @@
 .rams-doc-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   display: grid;
-  gap: 6px;
+  gap: 4px;
   break-inside: avoid;
   border-left: 5px solid #d7cbdd;
 }
@@ -2269,6 +2305,11 @@
     background: #f5f3ff !important;
   }
 
+  .rams-method-info-card.is-red {
+    border-color: #ef4444 !important;
+    background: #fff1f2 !important;
+  }
+
   .rams-method-info-card.is-yellow {
     border-color: #fde68a !important;
     background: #fffbeb !important;
@@ -2306,6 +2347,12 @@
     color: #4c1d95 !important;
   }
 
+  .rams-doc-method-section .rams-method-info-card.is-red h4,
+  .rams-doc-method-section .rams-method-info-card.is-red h5 {
+    background: #fee2e2 !important;
+    color: #991b1b !important;
+  }
+
   .rams-doc-method-section .rams-method-info-card.is-yellow h4,
   .rams-doc-method-section .rams-method-info-card.is-yellow h5 {
     background: #fef3c7 !important;
@@ -2324,20 +2371,27 @@
     break-inside: avoid !important;
   }
 
+  .rams-method-subhead {
+    padding: 1.2mm 2mm !important;
+    font-size: 7.5pt !important;
+    border-radius: 1.6mm 1.6mm 0 0 !important;
+  }
+
   .rams-installer-contact-card {
-    grid-template-columns: 10mm minmax(0, 1fr) !important;
-    gap: 1.6mm !important;
-    min-height: 15mm !important;
-    padding: 1.5mm 2mm !important;
-    border-color: #111827 !important;
-    background: #111827 !important;
-    color: #fff !important;
+    grid-template-columns: 9mm minmax(0, 1fr) !important;
+    gap: 1.3mm !important;
+    min-height: 12mm !important;
+    padding: 1.2mm 1.7mm !important;
+    border-color: #ef4444 !important;
+    background: #fee2e2 !important;
+    color: #7f1d1d !important;
   }
 
   .rams-installer-photo {
-    width: 9mm !important;
-    height: 11mm !important;
+    width: 8mm !important;
+    height: 9mm !important;
     border-radius: 1.3mm !important;
+    color: #991b1b !important;
   }
 
   .rams-installer-contact-card strong {
@@ -2347,7 +2401,7 @@
   .rams-installer-contact-card span,
   .rams-installer-contact-card small {
     font-size: 6.6pt !important;
-    color: #e5e7eb !important;
+    color: #991b1b !important;
   }
 
   .rams-ppe-grid {

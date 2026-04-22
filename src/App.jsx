@@ -4630,6 +4630,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                 </div>
                 <div className="rams-doc-section rams-doc-method-section">
                   <h4>Method Statement</h4>
+                  <h5 className="rams-method-subhead rams-installers-subhead">Installers</h5>
                   <div className="rams-installer-contact-grid">
                     {installerContacts.map((contact, index) => (
                       <article key={contact.key} className="rams-installer-contact-card">
@@ -4660,11 +4661,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
                     ))}
                   </div>
                   <div className="rams-method-prep-grid">
-                    <div className="rams-method-info-card is-purple">
+                    <div className="rams-method-info-card is-red">
                       <h5>Tools</h5>
                       <p>{renderEditable("tools", displayedTools || "-")}</p>
                     </div>
-                    <div className="rams-method-info-card is-purple">
+                    <div className="rams-method-info-card is-red">
                       <h5>Access Methods</h5>
                       <p>{renderEditable("access", displayedAccess || "-")}</p>
                     </div>
@@ -5099,28 +5100,31 @@ function ReadOnlyRamsDocument({
         <div className="rams-doc-section rams-doc-method-section">
           <h4>Method Statement</h4>
           {installerContacts.length ? (
-            <div className="rams-installer-contact-grid">
-              {installerContacts.map((contact, index) => (
-                <article key={`${contact.name}-${index}`} className="rams-installer-contact-card">
-                  <div className="rams-installer-photo">
-                    {contact.photoDataUrl ? <img src={contact.photoDataUrl} alt="" /> : <span>{getInitials(contact.name)}</span>}
-                  </div>
-                  <div>
-                    <strong>{contact.name || "Installer"}</strong>
-                    <span>{contact.jobTitle || "Installer"}</span>
-                    <small>{contact.qualifications || "Qualifications to be confirmed"}</small>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <>
+              <h5 className="rams-method-subhead rams-installers-subhead">Installers</h5>
+              <div className="rams-installer-contact-grid">
+                {installerContacts.map((contact, index) => (
+                  <article key={`${contact.name}-${index}`} className="rams-installer-contact-card">
+                    <div className="rams-installer-photo">
+                      {contact.photoDataUrl ? <img src={contact.photoDataUrl} alt="" /> : <span>{getInitials(contact.name)}</span>}
+                    </div>
+                    <div>
+                      <strong>{contact.name || "Installer"}</strong>
+                      <span>{contact.jobTitle || "Installer"}</span>
+                      <small>{contact.qualifications || "Qualifications to be confirmed"}</small>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
           ) : null}
 
           <div className="rams-method-prep-grid">
-            <div className="rams-method-info-card is-purple">
+            <div className="rams-method-info-card is-red">
               <h5>Tools</h5>
               <p>{tools.join(", ") || "-"}</p>
             </div>
-            <div className="rams-method-info-card is-purple">
+            <div className="rams-method-info-card is-red">
               <h5>Access Methods</h5>
               <p>{accessMethods.join(", ") || "-"}</p>
             </div>
