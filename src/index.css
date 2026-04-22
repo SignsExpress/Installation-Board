@@ -1582,6 +1582,68 @@
   gap: 8px;
 }
 
+.client-rams-links a {
+  text-decoration: none;
+}
+
+.client-rams-shell {
+  background: #f8fafc;
+}
+
+.client-rams-page {
+  max-width: 1180px;
+}
+
+.client-rams-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.rams-document-preview-readonly {
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08);
+}
+
+.rams-document-preview-readonly .rams-doc-section p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.24;
+}
+
+.rams-document-preview-readonly .rams-doc-card {
+  cursor: default;
+}
+
+.rams-document-preview-readonly .client-rams-signature-box {
+  margin: 0;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.rams-document-preview-readonly .client-rams-signature-box h4,
+.rams-document-preview-readonly .client-rams-signature-box p {
+  margin: 0;
+}
+
+.rams-document-preview-readonly .client-rams-signature-box h4 {
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+}
+
+.client-rams-panel > .client-rams-amendment-box {
+  margin: 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px;
+}
+
 .client-rams-readonly-card {
   padding: 0;
   overflow: hidden;
@@ -8389,4 +8451,62 @@ button {
     grid-template-columns: 1fr;
   }
 
+}
+
+@media (max-width: 760px) {
+  .client-rams-page {
+    padding: 8px;
+  }
+
+  .client-rams-panel {
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  .rams-document-preview-readonly {
+    padding: 8px;
+    gap: 8px;
+    border-radius: 10px;
+    box-shadow: none;
+  }
+
+  .rams-document-preview-readonly .rams-doc-title {
+    align-items: flex-start;
+  }
+
+  .rams-document-preview-readonly .rams-doc-title img {
+    width: 70px;
+  }
+
+  .rams-document-preview-readonly .rams-doc-meta,
+  .rams-document-preview-readonly .rams-method-prep-grid,
+  .rams-document-preview-readonly .rams-method-safety-grid,
+  .rams-document-preview-readonly .rams-first-aid-section,
+  .rams-document-preview-readonly .rams-emergency-grid,
+  .rams-document-preview-readonly .rams-signoff {
+    grid-template-columns: 1fr;
+  }
+
+  .rams-document-preview-readonly .rams-doc-meta .meta-wide,
+  .rams-document-preview-readonly .rams-doc-meta .meta-full {
+    grid-column: auto;
+  }
+
+  .rams-document-preview-readonly .rams-risk-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rams-document-preview-readonly .rams-risk-table {
+    min-width: 820px;
+  }
+
+  .rams-document-preview-readonly .rams-installer-contact-grid,
+  .rams-document-preview-readonly .rams-ppe-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-rams-amendment-box button {
+    width: 100%;
+  }
 }

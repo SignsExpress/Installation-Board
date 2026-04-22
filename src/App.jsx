@@ -2046,7 +2046,8 @@ function renderJobCardContent({
               type="button"
               onClick={(event) => {
                 event.stopPropagation();
-                if (isClientMode) setActiveClientJob(job);
+                const ramsUrl = `/client/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`;
+                if (isClientMode) window.open(ramsUrl, "_blank", "noopener,noreferrer");
                 else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
               }}
             >
@@ -4927,92 +4928,246 @@ function ReadOnlyRamsDocument({
   const arrangements = Array.isArray(payload.arrangements) ? payload.arrangements : [];
   const risks = Array.isArray(payload.risks) ? payload.risks : [];
   const methods = Array.isArray(payload.methods) ? payload.methods : [];
-  const installers = getInstallerNamesForRams(job);
+  const installers = payload.meta?.find?.((item) => item.label === "Installers")?.value || getInstallerNamesForRams(job);
+  const installerContacts = Array.isArray(payload.installers) ? payload.installers : [];
+  const ppe = Array.isArray(payload.ppe) ? payload.ppe : [];
+  const tools = Array.isArray(payload.tools) ? payload.tools : [];
+  const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
+  const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
+  const emergencyContacts = Array.isArray(payload.emergencyContacts) ? payload.emergencyContacts : [];
+  const officeAddress = payload.officeAddress || "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP";
 
   if (!Object.keys(payload).length) {
     return (
-      <section className="client-rams-view">
-        <h3>{document?.reference || "RAMS"}</h3>
+      <section className="rams-document-preview rams-document-preview-readonly">
+        <div className="rams-doc-title">
+          <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
+          <div>
+            <h3>Risk Assessment and Method Statement</h3>
+            <p>{document?.reference || "RAMS"}</p>
+          </div>
+        </div>
         <p>This RAMS was saved before the mobile read-only view existed. Re-save it from the RAMS builder to publish the full mobile version.</p>
       </section>
     );
   }
 
   return (
-    <section className="client-rams-view">
-      <div className="client-rams-view-head">
-        <div>
-          <span className="panel-kicker">Read-only RAMS</span>
-          <h3>{document?.reference || payload.reference || "Risk Assessment and Method Statement"}</h3>
-        </div>
-        <span>{formatRamsCreatedDate(document?.updatedAt || document?.createdAt)}</span>
-      </div>
-
-      <div className="client-rams-mini-grid">
-        {meta.map((item) => (
-          <div key={`${item.label}-${item.value}`} className="client-rams-mini-card">
-            <strong>{item.label}</strong>
-            <span>{item.value || "-"}</span>
+    <>
+      <section className="rams-document-preview rams-document-preview-readonly">
+        <div className="rams-doc-title">
+          <img src="/branding/signs-express-logo.svg" alt="Signs Express" />
+          <div>
+            <h3>Risk Assessment and Method Statement</h3>
+            <p>{payload.reference || document?.reference || getRamsJobTitle(job)}</p>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="client-rams-section">
-        <h4>Site Details</h4>
-        {site.map((item) => (
-          <p key={`${item.label}-${item.value}`}><strong>{item.label}:</strong> {item.value || "-"}</p>
-        ))}
-      </div>
+        <div className="rams-doc-meta">
+          {meta.map((item, index) => (
+            <span key={`${item.label}-${index}`} className={item.label === "Installers" ? "meta-wide" : ""}>
+              <strong>{item.label}:</strong> {item.value || "-"}
+            </span>
+          ))}
+        </div>
 
-      <div className="client-rams-section">
-        <h4>Method Statement</h4>
-        <p><strong>Installers:</strong> {installers}</p>
-        <p><strong>Tools:</strong> {(payload.tools || []).join(", ") || "-"}</p>
-        <p><strong>Access:</strong> {(payload.accessMethods || []).join(", ") || "-"}</p>
-        <p><strong>PPE:</strong> {(payload.ppe || []).join(", ") || "-"}</p>
-        <p><strong>First aid:</strong> {payload.firstAid?.facility || "-"} | <strong>Box:</strong> {payload.firstAid?.boxLocation || "Signs Express Van"}</p>
-        {methods.map((method) => (
-          <article key={method.title} className="client-rams-method-card">
-            <h5>{method.title}</h5>
-            <ul>
-              {(Array.isArray(method.lines) ? method.lines : []).map((line) => <li key={line}>{line}</li>)}
-            </ul>
-          </article>
-        ))}
-      </div>
+        <div className="rams-doc-section">
+          <h4>Site Details</h4>
+          {site.map((item, index) => (
+            <p key={`${item.label}-${index}`}><strong>{item.label}:</strong> {item.value || "-"}</p>
+          ))}
+        </div>
 
-      <div className="client-rams-section">
-        <h4>Risk Assessment</h4>
-        {risks.map((risk) => (
-          <article key={risk.title} className="client-rams-risk-card">
-            <div>
-              <strong>{risk.title}</strong>
-              <span>Initial {risk.initialL}/{risk.initialC}/{risk.initialR} | Residual {risk.residualL}/{risk.residualC}/{risk.residualR} | {risk.risk}</span>
+        <div className="rams-doc-section">
+          <h4>Arrangements</h4>
+          {arrangements.map((item, index) => (
+            <p key={`${item.label}-${index}`}><strong>{item.label}:</strong> {item.value || "-"}</p>
+          ))}
+        </div>
+
+        <div className="rams-doc-section rams-doc-risk-section">
+          <h4>Risk Assessment</h4>
+          <div className="rams-risk-key">
+            <span><strong>L</strong> Likelihood</span>
+            <span><strong>C</strong> Consequence</span>
+            <span><strong>R</strong> Risk = L x C</span>
+            <span className="risk-none">0-4 N</span>
+            <span className="risk-low">5-10 L</span>
+            <span className="risk-medium">11-15 M</span>
+            <span className="risk-high">16+ H</span>
+          </div>
+          <div className="rams-risk-table-wrap">
+            <table className="rams-risk-table">
+              <colgroup>
+                <col className="rams-col-hazard" />
+                <col className="rams-col-harmed" />
+                <col className="rams-col-score" />
+                <col className="rams-col-score" />
+                <col className="rams-col-score" />
+                <col className="rams-col-controls" />
+                <col className="rams-col-responsibility" />
+                <col className="rams-col-score" />
+                <col className="rams-col-score" />
+                <col className="rams-col-score" />
+                <col className="rams-col-final-risk" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th rowSpan="2">Hazard</th>
+                  <th rowSpan="2">Who may be harmed</th>
+                  <th colSpan="3">Initial risk</th>
+                  <th rowSpan="2">Req'd control measure</th>
+                  <th rowSpan="2">Responsibility</th>
+                  <th colSpan="3">Residual risk</th>
+                  <th rowSpan="2">Risk</th>
+                </tr>
+                <tr>
+                  <th>L</th>
+                  <th>C</th>
+                  <th>R</th>
+                  <th>L</th>
+                  <th>C</th>
+                  <th>R</th>
+                </tr>
+              </thead>
+              <tbody>
+                {risks.map((risk, index) => {
+                  const residualRating = Number(risk.residualR || 0);
+                  const band = getRamsRiskBand(residualRating);
+                  const controls = Array.isArray(risk.controls) ? risk.controls : [];
+                  return (
+                    <tr key={`${risk.title}-${index}`}>
+                      <td><strong>{risk.title || "Risk"}</strong><span>Risk</span></td>
+                      <td>{risk.whoAtRisk || "-"}</td>
+                      <td>{risk.initialL || 0}</td>
+                      <td>{risk.initialC || 0}</td>
+                      <td><strong>{risk.initialR || 0}</strong></td>
+                      <td>
+                        <ul>
+                          {controls.map((line, lineIndex) => <li key={`${risk.title}-control-${lineIndex}`}>{line}</li>)}
+                        </ul>
+                      </td>
+                      <td>{risk.responsibility || installers}</td>
+                      <td>{risk.residualL || 0}</td>
+                      <td>{risk.residualC || 0}</td>
+                      <td><strong>{risk.residualR || 0}</strong></td>
+                      <td className={`rams-risk-final ${band.className}`}><strong>{risk.risk || band.code}</strong></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rams-doc-section rams-doc-method-section">
+          <h4>Method Statement</h4>
+          {installerContacts.length ? (
+            <div className="rams-installer-contact-grid">
+              {installerContacts.map((contact, index) => (
+                <article key={`${contact.name}-${index}`} className="rams-installer-contact-card">
+                  <div className="rams-installer-photo">
+                    {contact.photoDataUrl ? <img src={contact.photoDataUrl} alt="" /> : <span>{getInitials(contact.name)}</span>}
+                  </div>
+                  <div>
+                    <strong>{contact.name || "Installer"}</strong>
+                    <span>{contact.jobTitle || "Installer"}</span>
+                    <small>{contact.qualifications || "Qualifications to be confirmed"}</small>
+                  </div>
+                </article>
+              ))}
             </div>
-            <p><strong>Who may be harmed:</strong> {risk.whoAtRisk}</p>
-            <p><strong>Responsibility:</strong> {risk.responsibility}</p>
-            <ul>
-              {(Array.isArray(risk.controls) ? risk.controls : []).map((line) => <li key={line}>{line}</li>)}
-            </ul>
-          </article>
-        ))}
-      </div>
+          ) : null}
 
-      <div className="client-rams-section">
-        <h4>Emergency Contacts</h4>
-        {(payload.emergencyContacts || []).map((contact) => (
-          <p key={contact.label}><strong>{contact.label}:</strong> {[contact.name, contact.jobTitle, contact.phone].filter(Boolean).join(" - ")}</p>
-        ))}
-        <p><strong>Signs Express Office:</strong> {payload.officeAddress || "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP"}</p>
-      </div>
+          <div className="rams-method-prep-grid">
+            <div className="rams-method-info-card is-green">
+              <h5>Tools</h5>
+              <p>{tools.join(", ") || "-"}</p>
+            </div>
+            <div className="rams-method-info-card is-green">
+              <h5>Access Methods</h5>
+              <p>{accessMethods.join(", ") || "-"}</p>
+            </div>
+          </div>
 
-      <div className="client-rams-signature-box">
-        <h4>Signed By</h4>
-        <p><strong>{installers}</strong></p>
-        <p>
-          By commencing the works, the operatives confirm that they have read and understood this RAMS, consider it suitable for the works being undertaken, and agree to carry out the works in accordance with the stated method statement, control measures and identified risks.
-        </p>
-      </div>
+          <div className="rams-method-safety-grid">
+            <div className="rams-method-info-card rams-site-hazards-section is-green">
+              <h5>Site Specific Hazards or Information</h5>
+              <p>{payload.siteHazards || "N/A"}</p>
+            </div>
+            <div className="rams-method-info-card rams-ppe-section is-green">
+              <h5>PPE Required</h5>
+              <div className="rams-ppe-grid">
+                {ppe.length ? ppe.map((item, index) => {
+                  const ppeItem = RAMS_PPE_ITEMS.find((entry) => entry.label === item || entry.value === item);
+                  return (
+                    <span key={`${item}-${index}`} className="rams-ppe-item">
+                      {ppeItem ? <span className="rams-ppe-icon">{ppeItem.icon}</span> : null}
+                      {ppeItem?.label || item}
+                    </span>
+                  );
+                }) : <span>-</span>}
+              </div>
+            </div>
+          </div>
+
+          <div className="rams-first-aid-section">
+            <div className="rams-method-info-card is-green">
+              <h4>First Aid Facilities</h4>
+              <p>{firstAid.facility || "-"}</p>
+            </div>
+            <div className="rams-method-info-card is-green">
+              <h4>First Aid Box Location</h4>
+              <p>{firstAid.boxLocation || "Signs Express Van"}</p>
+            </div>
+          </div>
+
+          {methods.map((method, index) => (
+            <div key={`${method.title}-${index}`} className="rams-doc-card">
+              <div>
+                <strong>{method.title || "Method"}</strong>
+              </div>
+              <ul>
+                {(Array.isArray(method.lines) ? method.lines : []).map((line, lineIndex) => (
+                  <li key={`${method.title}-${lineIndex}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div className="rams-emergency-grid">
+            <div className="rams-method-info-card is-green">
+              <h5>Emergency Contacts</h5>
+              <div className="rams-emergency-contact-list">
+                {emergencyContacts.map((contact, index) => (
+                  <p key={`${contact.label}-${index}`}>
+                    <strong>{contact.label}:</strong> {[contact.name, contact.jobTitle, contact.phone].filter(Boolean).join(" - ")}
+                  </p>
+                ))}
+              </div>
+            </div>
+            <div className="rams-method-info-card is-green">
+              <h5>Signs Express Office</h5>
+              <p>{officeAddress}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rams-signoff">
+          <span>Prepared by: {emergencyContacts.find((contact) => contact.label === "Prepared by")?.name || "Signs Express"}</span>
+          <span>Accepted by site:</span>
+          <span>Signature:</span>
+          <span>Date:</span>
+        </div>
+
+        <div className="client-rams-signature-box">
+          <h4>Signed By</h4>
+          <p><strong>{installers}</strong></p>
+          <p>
+            By commencing the works, the operatives confirm that they have read and understood this RAMS, consider it suitable for the works being undertaken, and agree to carry out the works in accordance with the stated method statement, control measures and identified risks.
+          </p>
+        </div>
+      </section>
 
       <div className="client-rams-amendment-box">
         <label>
@@ -5032,7 +5187,97 @@ function ReadOnlyRamsDocument({
           {amendmentSaving ? "Sending..." : "Request amendments"}
         </button>
       </div>
-    </section>
+    </>
+  );
+}
+
+function ClientRamsPage() {
+  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const jobId = params.get("jobId") || "";
+  const ramsId = params.get("ramsId") || "";
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [amendmentDraft, setAmendmentDraft] = useState("");
+  const [amendmentSaving, setAmendmentSaving] = useState(false);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadJobs() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/jobs");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load RAMS.");
+        if (mounted) setJobs(Array.isArray(payload) ? payload : []);
+      } catch (error) {
+        console.error(error);
+        if (mounted) setLoadError(error.message || "Could not load RAMS.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    loadJobs();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const job = jobs.find((entry) => String(entry.id || "") === String(jobId)) || null;
+  const document = job && Array.isArray(job.ramsDocuments)
+    ? job.ramsDocuments.find((entry) => String(entry.id || "") === String(ramsId)) || job.ramsDocuments[0] || null
+    : null;
+
+  async function requestAmendment(nextJob, nextDocument, note) {
+    const cleanNote = String(note || "").trim();
+    if (!cleanNote) {
+      setStatus("Add a note explaining what needs changing.");
+      return;
+    }
+    try {
+      setAmendmentSaving(true);
+      setStatus("");
+      const response = await fetch(`/api/jobs/${encodeURIComponent(nextJob.id)}/rams/${encodeURIComponent(nextDocument.id)}/amendments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: cleanNote })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not send amendment request.");
+      setAmendmentDraft("");
+      setStatus("Amendment request sent.");
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || "Could not send amendment request.");
+    } finally {
+      setAmendmentSaving(false);
+    }
+  }
+
+  return (
+    <div className="app-shell client-rams-shell">
+      <div className="page client-rams-page">
+        <section className="panel client-rams-panel">
+          {loading ? <div className="board-loading">Loading RAMS...</div> : null}
+          {loadError ? <div className="flash error">{loadError}</div> : null}
+          {!loading && !loadError && (!job || !document) ? (
+            <div className="flash error">This RAMS document could not be found.</div>
+          ) : null}
+          {status ? <div className={`flash ${status.toLowerCase().includes("sent") ? "success" : "error"}`}>{status}</div> : null}
+          {job && document ? (
+            <ReadOnlyRamsDocument
+              job={job}
+              document={document}
+              amendmentDraft={amendmentDraft}
+              setAmendmentDraft={setAmendmentDraft}
+              amendmentSaving={amendmentSaving}
+              onRequestAmendment={requestAmendment}
+            />
+          ) : null}
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -8736,6 +8981,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
+  const isClientRamsRoute = pathname.startsWith("/client/rams");
   const isClientRoute = pathname.startsWith("/client");
   const isClientBoardRoute = pathname.startsWith("/client/board");
   const isInstallerRoute = pathname.startsWith("/installer");
@@ -8784,9 +9030,6 @@ export default function App() {
   const [activeHolidayId, setActiveHolidayId] = useState("");
   const [jobModalDate, setJobModalDate] = useState("");
   const [activeClientJob, setActiveClientJob] = useState(null);
-  const [activeClientRamsId, setActiveClientRamsId] = useState("");
-  const [ramsAmendmentDraft, setRamsAmendmentDraft] = useState("");
-  const [ramsAmendmentSaving, setRamsAmendmentSaving] = useState(false);
   const [clientCompletePrompt, setClientCompletePrompt] = useState(false);
   const [clientPhotoUploading, setClientPhotoUploading] = useState(false);
   const [clientExporting, setClientExporting] = useState(false);
@@ -8835,14 +9078,15 @@ export default function App() {
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
+  const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -9007,8 +9251,6 @@ export default function App() {
 
   useEffect(() => {
     setClientCompletePrompt(false);
-    setActiveClientRamsId("");
-    setRamsAmendmentDraft("");
     setClientPhotoUploading(false);
     setClientExporting(false);
     if (clientPhotoInputRef.current) {
@@ -9160,12 +9402,12 @@ export default function App() {
       return;
     }
 
-    if ((isBoardRoute || isClientBoardRoute) && !canAccessBoard(currentUser)) {
+    if ((isBoardRoute || isClientBoardRoute || isClientRamsRoute) && !canAccessBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
 
-    if (hostShellMode && isClientRoute && !isClientBoardRoute) {
+    if (hostShellMode && isClientRoute && !isClientBoardRoute && !isClientRamsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -9178,7 +9420,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -10142,33 +10384,6 @@ export default function App() {
     }
   }
 
-  async function requestRamsAmendment(job, document, note) {
-    if (!job || !document) return;
-    const cleanNote = String(note || "").trim();
-    if (!cleanNote) {
-      setMessage(createMessage("Add a note explaining what needs changing.", "error"));
-      return;
-    }
-    try {
-      setRamsAmendmentSaving(true);
-      const response = await fetch(`/api/jobs/${encodeURIComponent(job.id)}/rams/${encodeURIComponent(document.id)}/amendments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: cleanNote })
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not send amendment request.");
-      setRamsAmendmentDraft("");
-      await refreshNotifications();
-      setMessage(createMessage("RAMS amendment request sent.", "success"));
-    } catch (error) {
-      console.error(error);
-      setMessage(createMessage(error.message || "Could not send amendment request.", "error"));
-    } finally {
-      setRamsAmendmentSaving(false);
-    }
-  }
-
   async function undoAdminJobComplete(job) {
     if (!job?.id) return;
     try {
@@ -10882,6 +11097,12 @@ export default function App() {
     );
   }
 
+  if (showClientRams) {
+    return (
+      <ClientRamsPage />
+    );
+  }
+
   if (showNotifications) {
     return (
       <NotificationsPage
@@ -11003,10 +11224,6 @@ export default function App() {
   if (showInstallerDirectory) {
     return <InstallerDirectoryHost currentUser={currentUser} onLogout={handleLogout} readOnly={!installerEditable} />;
   }
-
-  const activeClientRamsDocument = activeClientJob && Array.isArray(activeClientJob.ramsDocuments)
-    ? activeClientJob.ramsDocuments.find((document) => String(document.id || "") === String(activeClientRamsId || "")) || null
-    : null;
 
   return (
     <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
@@ -11790,35 +12007,22 @@ export default function App() {
                   {Array.isArray(activeClientJob.ramsDocuments) && activeClientJob.ramsDocuments.length ? (
                     <div className="client-rams-links">
                       {activeClientJob.ramsDocuments.map((document) => (
-                        <button
+                        <a
                           key={document.id}
                           className="ghost-button"
-                          type="button"
-                          onClick={() => {
-                            setActiveClientRamsId(document.id);
-                            setRamsAmendmentDraft("");
-                          }}
+                          href={`/client/rams?jobId=${encodeURIComponent(activeClientJob.id)}&ramsId=${encodeURIComponent(document.id)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(event) => event.stopPropagation()}
                         >
                           {document.reference || "Open RAMS"}
-                        </button>
+                        </a>
                       ))}
                     </div>
                   ) : (
                     <p>No RAMS saved yet.</p>
                   )}
                 </div>
-                {activeClientRamsDocument ? (
-                  <div className="detail-card detail-card-wide client-rams-readonly-card">
-                    <ReadOnlyRamsDocument
-                      job={activeClientJob}
-                      document={activeClientRamsDocument}
-                      amendmentDraft={ramsAmendmentDraft}
-                      setAmendmentDraft={setRamsAmendmentDraft}
-                      amendmentSaving={ramsAmendmentSaving}
-                      onRequestAmendment={requestRamsAmendment}
-                    />
-                  </div>
-                ) : null}
                 <div className="detail-card detail-card-wide">
                   <strong>Photos</strong>
                   {Array.isArray(activeClientJob.photos) && activeClientJob.photos.length ? (
