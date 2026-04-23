@@ -7020,17 +7020,18 @@ button {
   min-height: 360px;
   resize: none;
   line-height: 1.5;
+  overflow-y: scroll;
 }
 
 .social-post-output-body.has-tone-image textarea {
-  padding-right: 12px;
+  padding-right: 156px;
   padding-bottom: 188px;
 }
 
 .social-post-tone-corner-image {
   position: absolute;
-  right: 0;
-  bottom: 0;
+  right: 16px;
+  bottom: 1px;
   width: 134px;
   height: 184px;
   object-fit: contain;

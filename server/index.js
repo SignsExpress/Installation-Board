@@ -4605,16 +4605,22 @@ function extractSocialOrderItems(order = {}) {
   fields.forEach((field) => {
     const key = String(field.key || "").toLowerCase();
     const value = normalizeSocialText(field.value);
-    if (!isUsefulSocialText(value)) return;
-    if (/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(key)) return;
     const match = key.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
     if (!match) return;
     const group = groups.get(match[1]) || {};
     const leaf = match[2];
+    const numericValue = Number(String(value || "").replace(/[^\d.-]/g, ""));
+    if (/(vat|tax|subtotal|balance)/i.test(key)) return;
     if (leaf.includes("category") && !/vat|tax/i.test(value)) group.category = value;
     if ((leaf.includes("description") || leaf.includes("customerdescription")) && isUsefulSocialText(value)) group.description = value;
     if (!group.description && (leaf.includes("name") || leaf.includes("title") || leaf.includes("product")) && value.length > 22) group.description = value;
     if (leaf.includes("quantity")) group.quantity = value;
+    if (Number.isFinite(numericValue) && numericValue > 0) {
+      if (/(price|amount|total|extended|lineprice|linetotal|sell|revenue)/i.test(leaf)) {
+        group.value = Math.max(Number(group.value || 0), numericValue);
+      }
+      if (leaf.includes("quantity")) group.quantityValue = numericValue;
+    }
     groups.set(match[1], group);
   });
 
@@ -4623,7 +4629,9 @@ function extractSocialOrderItems(order = {}) {
     .map((item) => ({
       ...item,
       category: /vat|tax/i.test(item.category || "") ? "" : item.category,
-      description: item.description || item.category || ""
+      description: item.description || item.category || "",
+      value: Number(item.value || 0),
+      quantityValue: Number(item.quantityValue || String(item.quantity || "").replace(/[^\d.-]/g, "") || 0)
     }))
     .slice(0, 12);
   if (items.length) return items;
@@ -4632,7 +4640,19 @@ function extractSocialOrderItems(order = {}) {
 }
 
 function getSocialLineItemBriefs(items = []) {
-  return items.map((item, index) => {
+  const rankedItems = items
+    .map((item, index) => ({ ...item, originalIndex: index }))
+    .sort((left, right) => {
+      const leftText = `${left.category || ""} ${left.description || ""}`.toLowerCase();
+      const rightText = `${right.category || ""} ${right.description || ""}`.toLowerCase();
+      const leftAdmin = /(delivery|courier|install|installation|attend site|survey|artwork|setup labour|bought in)/i.test(leftText) ? 1 : 0;
+      const rightAdmin = /(delivery|courier|install|installation|attend site|survey|artwork|setup labour|bought in)/i.test(rightText) ? 1 : 0;
+      if (leftAdmin !== rightAdmin) return leftAdmin - rightAdmin;
+      if (Number(right.value || 0) !== Number(left.value || 0)) return Number(right.value || 0) - Number(left.value || 0);
+      if (Number(right.quantityValue || 0) !== Number(left.quantityValue || 0)) return Number(right.quantityValue || 0) - Number(left.quantityValue || 0);
+      return left.originalIndex - right.originalIndex;
+    });
+  return rankedItems.map((item, index) => {
     const description = cleanSocialPostSpec(item.description || "");
     const category = cleanSocialPostSpec(item.category || "");
     const combined = `${category} ${description}`.toLowerCase();
@@ -4641,8 +4661,11 @@ function getSocialLineItemBriefs(items = []) {
     if (/(delivery|install|installation|attend site|survey|artwork|setup labour|bought in)/i.test(combined)) focusScore -= 2;
     return {
       itemNumber: index + 1,
+      originalItemNumber: item.originalIndex + 1,
       category: item.category || "",
       quantity: item.quantity || "",
+      quantityValue: Number(item.quantityValue || 0),
+      estimatedValue: Number(item.value || 0),
       description,
       suggestedTreatment: focusScore >= 4 ? "feature or mention separately" : "skim, group lightly or omit if it makes the post too long"
     };
@@ -4861,9 +4884,11 @@ async function generateSocialPostWithAi(brief) {
     "IMPORTANT TRANSFORMATION:",
     "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
     "- Read primaryDescription, descriptionCandidates, items and lineItems to understand what was supplied, produced or installed.",
+    "- lineItems are pre-ranked. They prioritise non-admin product items first, then highest estimated value, then highest quantity. Treat earlier lineItems as more important.",
     "- Treat each entry in lineItems as a separate quotation line unless the wording explicitly says one item is physically part of another.",
     "- Do not blend two separate line items into one invented product. For example, if one line is a prize wheel and another line is a plinth, describe them as separate pieces of the same project, not as a prize wheel wrapped around a plinth.",
-    "- Decide what deserves space in the post. Feature visually interesting or higher-value lines, lightly mention supporting pieces, and quietly ignore boring low-value/admin/delivery lines if the post would become too long.",
+    "- Decide what deserves space in the post. Feature the highest-value non-delivery/non-installation/non-courier item first. If values are similar or missing, feature the highest-quantity product item. Treat the rest as secondary and sometimes omit them completely.",
+    "- Ignore installation, delivery and courier line items when deciding the main subject, unless there are no product lines or the install itself is genuinely the story.",
     "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
     "- Treat the supporting traits above as the explicit personality and writing rules for the chosen person. Use them alongside the examples and existing posts, not instead of them.",
     "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did the selected writer take from the Corebridge job, what did they ignore, what did they simplify, what did they fluff up, and what hook style did they use?",
