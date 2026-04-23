@@ -289,7 +289,8 @@ function canEditSocialPost(user) {
 }
 
 function canAccessDescriptionPull(user) {
-  return canManagePermissions(user) || canEditBoard(user) || canAccessSocialPost(user);
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "descriptionPull", user?.role === "host" ? "admin" : "none") !== "none";
 }
 
 function toPublicRamsProfile(user = {}) {
@@ -5318,7 +5319,8 @@ function createServer() {
           mileage: request.body?.mileage,
           vanEstimator: request.body?.vanEstimator,
           rams: request.body?.rams,
-          socialPost: request.body?.socialPost
+          socialPost: request.body?.socialPost,
+          descriptionPull: request.body?.descriptionPull
         });
       response.json({ user: updatedUser });
     } catch (error) {

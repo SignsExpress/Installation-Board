@@ -2169,6 +2169,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "descriptionPull"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2257,7 +2261,8 @@ function canEditSocialPost(user) {
 }
 
 function canAccessDescriptionPull(user) {
-  return Boolean(user && (user.canManagePermissions || canEditBoard(user) || canAccessSocialPost(user)));
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "descriptionPull") !== "none";
 }
 
 function usesHostShell(user) {
@@ -2638,6 +2643,7 @@ function PermissionsPanel({
             const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
             const ramsPermission = getPermissionForApp(user, "rams");
             const socialPostPermission = getPermissionForApp(user, "socialPost");
+            const descriptionPullPermission = getPermissionForApp(user, "descriptionPull");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -2877,6 +2883,24 @@ function PermissionsPanel({
                             className={`permission-chip ${socialPostPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:socialPost`}
                             onClick={() => onChangePermission(user.id, "socialPost", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Description Pull</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-description-pull-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${descriptionPullPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:descriptionPull`}
+                            onClick={() => onChangePermission(user.id, "descriptionPull", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -10638,6 +10662,7 @@ export default function App() {
       vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
       rams: getPermissionForApp(targetUser, "rams"),
       socialPost: getPermissionForApp(targetUser, "socialPost"),
+      descriptionPull: getPermissionForApp(targetUser, "descriptionPull"),
       [appKey]: value
     };
     setPermissionSavingKey(`${userId}:${appKey}`);

@@ -44,7 +44,8 @@ function getDefaultPermissions(role) {
       mileage: "admin",
       vanEstimator: "none",
       rams: "admin",
-      socialPost: "admin"
+      socialPost: "admin",
+      descriptionPull: "admin"
     };
   }
 
@@ -56,7 +57,8 @@ function getDefaultPermissions(role) {
     mileage: "user",
     vanEstimator: "none",
     rams: "none",
-    socialPost: "none"
+    socialPost: "none",
+    descriptionPull: "none"
   };
 }
 
@@ -143,7 +145,8 @@ function normalizePermissions(permissions, role) {
     mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage),
     vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator),
     rams: normalizePermissionValue(permissions?.rams, defaults.rams),
-    socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost)
+    socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost),
+    descriptionPull: normalizePermissionValue(permissions?.descriptionPull, defaults.descriptionPull)
   };
 }
 
@@ -163,7 +166,8 @@ function applyOwnerPermissions(user) {
       mileage: "admin",
       vanEstimator: "admin",
       rams: "admin",
-      socialPost: "admin"
+      socialPost: "admin",
+      descriptionPull: "admin"
     }
   };
 }
@@ -233,7 +237,8 @@ function normalizeStore(parsed, options = {}) {
         mileage: "admin",
         vanEstimator: "admin",
         rams: "admin",
-        socialPost: "admin"
+        socialPost: "admin",
+        descriptionPull: "admin"
       };
     }
   }
@@ -415,7 +420,8 @@ async function updateUserPermissions(userId, permissions) {
         mileage: "admin",
         vanEstimator: "admin",
         rams: "admin",
-        socialPost: "admin"
+        socialPost: "admin",
+        descriptionPull: "admin"
       };
     }
   await writeUsersStore(store);
