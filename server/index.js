@@ -67,14 +67,9 @@ const HOLIDAY_STAFF = [
   { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" }
 ];
 const HOLIDAY_RESET_VERSION = 1;
-const RAMS_RISK_BANK_VERSION = 2;
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
-}
-
-function isCurrentRamsLogic(logic) {
-  return Boolean(logic && typeof logic === "object" && !Array.isArray(logic) && Number(logic.riskBankVersion || 0) >= RAMS_RISK_BANK_VERSION);
 }
 
 function getInstallersFile() {
@@ -770,16 +765,13 @@ async function readStore() {
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
-          ramsLogic: isCurrentRamsLogic(parsed.ramsLogic) ? parsed.ramsLogic : null,
+          ramsLogic: parsed.ramsLogic && typeof parsed.ramsLogic === "object" ? parsed.ramsLogic : null,
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
-    if (
-      Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0) ||
-      !isCurrentRamsLogic(parsed.ramsLogic)
-    ) {
+    if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
       await writeStore(migrated);
     }
     return mergeHolidaySeed(migrated);
@@ -839,7 +831,7 @@ async function writeStore(store) {
           if (left.monthId !== right.monthId) return String(right.monthId || "").localeCompare(String(left.monthId || ""));
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
-      ramsLogic: isCurrentRamsLogic(store.ramsLogic) ? store.ramsLogic : null,
+      ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
       vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
