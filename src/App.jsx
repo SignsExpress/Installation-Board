@@ -1692,7 +1692,11 @@ function normalizeRamsLogic(logic = {}) {
       const incomingOptions = Array.isArray(group.options) ? group.options : [];
       const mergedOptions = key === "tools" || key === "access"
         ? [
-            ...defaultOptions,
+            ...defaultOptions.map((defaultOption) => {
+              const defaultValue = String(defaultOption.value || "");
+              const incomingMatch = incomingOptions.find((option) => String(option.value || "") === defaultValue);
+              return incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
+            }),
             ...incomingOptions.filter((option) => {
               const value = String(option.value || "");
               return value && !legacyOptionValues.has(value) && !defaultOptions.some((entry) => String(entry.value) === value);
