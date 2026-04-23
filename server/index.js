@@ -4928,7 +4928,9 @@ async function generateSocialPostWithAi(brief) {
     toneSummary || "No historic posts supplied."
   ].join("\n");
   const prompt = [
-    `Write one LinkedIn post for Signs Express Central Lancashire in ${selectedToneName}'s style.`,
+    `Write one LinkedIn post for Signs Express Central Lancashire & Southport in ${selectedToneName}'s style.`,
+    "AUTHOR IDENTITY: The post is always written by Signs Express Central Lancashire & Southport. Use we/our/us for Signs Express only. Never write as if the customer is speaking, and never make the customer's mission sound like our mission.",
+    "CUSTOMER ROLE: The customer is the client/project recipient. Mention them as the organisation we helped, supplied, delivered to or installed for. Do not open with 'At [customer], we're...' unless the sentence clearly means the job was physically at their site.",
     "Do not default to Matt Rutlidge's style unless Matt Rutlidge is the selected tone of voice.",
     "If there are no paired examples, you must still infer the voice from the supporting traits and existing posts.",
     `Target length: ${targetWords} words. Stay close to this length.`,
@@ -4970,6 +4972,8 @@ async function generateSocialPostWithAi(brief) {
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
     "- Use a hook, short paragraphs, light emoji use where it fits, and a conversational call to action.",
     "- Mention the customer/project if available. Mention designer credit if the source data or tone examples clearly support it, otherwise do not invent names.",
+    "- Check the opening line before returning it. It must be clear that Signs Express Central Lancashire & Southport is speaking, not the customer.",
+    "- Do not say 'we are on a mission' about the customer. If you mention a customer mission, phrase it as their goal or their organisation's purpose, separate from our role.",
     "- It is fine to mention simplified product phrases such as illuminated fascia sign, window graphics, wall wraps or layered displays.",
     "- Only say installed, installation or on site if hasInstallEvidence is true. If hasDeliveryOnlyEvidence is true, treat it as supplied or delivered.",
     technicalMode
