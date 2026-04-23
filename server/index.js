@@ -278,6 +278,11 @@ function canAccessRams(user) {
   return getUserPermission(user, "rams", user?.role === "host" ? "admin" : "none") !== "none";
 }
 
+function canEditRams(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "rams", user?.role === "host" ? "admin" : "none") === "admin";
+}
+
 function canAccessSocialPost(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "socialPost", user?.role === "host" ? "admin" : "none") !== "none";
@@ -513,6 +518,12 @@ function requireRamsAccess(request, response) {
   return false;
 }
 
+function requireRamsAdmin(request, response) {
+  if (canEditRams(request.user)) return true;
+  response.status(403).json({ error: "RAMS admin access required." });
+  return false;
+}
+
 function requireSocialPostAccess(request, response) {
   if (canAccessSocialPost(request.user)) return true;
   response.status(403).json({ error: "Social Post access required." });
@@ -735,6 +746,7 @@ async function readStore() {
             notifications: [],
             attendanceEntries: [],
             mileageClaims: [],
+            ramsLogic: null,
             vehiclePricingSettings: null,
             socialPostToneVoices: [],
             socialPostDeletedToneVoiceIds: []
@@ -753,6 +765,7 @@ async function readStore() {
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
+          ramsLogic: parsed.ramsLogic && typeof parsed.ramsLogic === "object" ? parsed.ramsLogic : null,
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
@@ -773,6 +786,7 @@ async function readStore() {
           notifications: [],
           attendanceEntries: [],
           mileageClaims: [],
+          ramsLogic: null,
           vehiclePricingSettings: null,
           socialPostToneVoices: [],
           socialPostDeletedToneVoiceIds: []
@@ -817,6 +831,7 @@ async function writeStore(store) {
           if (left.monthId !== right.monthId) return String(right.monthId || "").localeCompare(String(left.monthId || ""));
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
+      ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
       vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
@@ -5504,8 +5519,33 @@ function createServer() {
     response.json({
       settingsByTemplate:
         nextStore.vehiclePricingSettings && typeof nextStore.vehiclePricingSettings === "object"
-          ? nextStore.vehiclePricingSettings
+      ? nextStore.vehiclePricingSettings
           : null
+    });
+  });
+
+  app.get("/api/rams/logic", async (request, response) => {
+    if (!requireRamsAccess(request, response)) return;
+    const store = await readStore();
+    response.json({
+      logic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null
+    });
+  });
+
+  app.patch("/api/rams/logic", async (request, response) => {
+    if (!requireRamsAdmin(request, response)) return;
+    const logic = request.body?.logic;
+    if (!logic || typeof logic !== "object" || Array.isArray(logic)) {
+      response.status(400).json({ error: "RAMS logic is required." });
+      return;
+    }
+    const store = await readStore();
+    const nextStore = await writeStore({
+      ...store,
+      ramsLogic: logic
+    });
+    response.json({
+      logic: nextStore.ramsLogic && typeof nextStore.ramsLogic === "object" ? nextStore.ramsLogic : null
     });
   });
 

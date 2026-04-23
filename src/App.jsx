@@ -689,8 +689,6 @@ const RAMS_BASE_CARD_IDS = [
   "completion"
 ];
 
-const RAMS_LOGIC_STORAGE_KEY = "rams-builder-logic-v1";
-
 const RAMS_DEFAULT_LOGIC = {
   optionGroups: [
     {
@@ -1720,21 +1718,27 @@ function normalizeRamsLogic(logic = {}) {
   };
 }
 
-function getStoredRamsLogic() {
-  if (typeof window === "undefined") return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
-  try {
-    const stored = window.localStorage.getItem(RAMS_LOGIC_STORAGE_KEY);
-    if (!stored) return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
-    return normalizeRamsLogic(JSON.parse(stored));
-  } catch (error) {
-    console.error(error);
-    return normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+async function fetchRamsLogic() {
+  const response = await fetch("/api/rams/logic");
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not load shared RAMS logic.");
   }
+  return normalizeRamsLogic(payload.logic || RAMS_DEFAULT_LOGIC);
 }
 
-function saveRamsLogic(logic) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(RAMS_LOGIC_STORAGE_KEY, JSON.stringify(normalizeRamsLogic(logic)));
+async function saveRamsLogic(logic) {
+  const nextLogic = normalizeRamsLogic(logic);
+  const response = await fetch("/api/rams/logic", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ logic: nextLogic })
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Could not save shared RAMS logic.");
+  }
+  return normalizeRamsLogic(payload.logic || nextLogic);
 }
 
 function getRamsCardIdsForQuestions(questions, logic = RAMS_DEFAULT_LOGIC) {
@@ -4118,8 +4122,10 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
 }
 
 function RamsLogicPage({ currentUser, onLogout, notifications }) {
-  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
+  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
   const [logicStatus, setLogicStatus] = useState("");
+  const [logicLoading, setLogicLoading] = useState(true);
+  const [logicSaving, setLogicSaving] = useState(false);
   const [selectedGroupIndex, setSelectedGroupIndex] = useState(0);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState("");
@@ -4170,24 +4176,66 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
     }
   }, [activeCardId, selectedCardId]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadSharedRamsLogic() {
+      try {
+        setLogicLoading(true);
+        const sharedLogic = await fetchRamsLogic();
+        if (!active) return;
+        setRamsLogicDraft(sharedLogic);
+        setLogicStatus("");
+      } catch (error) {
+        console.error(error);
+        if (active) {
+          setLogicStatus(error.message || "Could not load shared RAMS logic.");
+        }
+      } finally {
+        if (active) setLogicLoading(false);
+      }
+    }
+
+    loadSharedRamsLogic();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   function updateRamsLogicDraft(updater) {
     setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
     setLogicStatus("");
   }
 
-  function saveRamsLogicDraft() {
-    const nextLogic = normalizeRamsLogic(ramsLogicDraft);
-    setRamsLogicDraft(nextLogic);
-    saveRamsLogic(nextLogic);
-    setLogicStatus("RAMS logic saved.");
+  async function saveRamsLogicDraft() {
+    try {
+      setLogicSaving(true);
+      const nextLogic = normalizeRamsLogic(ramsLogicDraft);
+      const savedLogic = await saveRamsLogic(nextLogic);
+      setRamsLogicDraft(savedLogic);
+      setLogicStatus("Shared RAMS logic saved.");
+    } catch (error) {
+      console.error(error);
+      setLogicStatus(error.message || "Could not save shared RAMS logic.");
+    } finally {
+      setLogicSaving(false);
+    }
   }
 
-  function restoreDefaultRamsLogic() {
+  async function restoreDefaultRamsLogic() {
     if (!canDeleteRamsLogic) return;
-    const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
-    setRamsLogicDraft(nextLogic);
-    saveRamsLogic(nextLogic);
-    setLogicStatus("Default RAMS logic restored.");
+    try {
+      setLogicSaving(true);
+      const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+      const savedLogic = await saveRamsLogic(nextLogic);
+      setRamsLogicDraft(savedLogic);
+      setLogicStatus("Default shared RAMS logic restored.");
+    } catch (error) {
+      console.error(error);
+      setLogicStatus(error.message || "Could not restore shared RAMS logic.");
+    } finally {
+      setLogicSaving(false);
+    }
   }
 
   function addRamsOption(groupIndex) {
@@ -4378,15 +4426,16 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                 Back to RAMS
               </button>
               {canDeleteRamsLogic ? (
-                <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic}>
+                <button className="ghost-button" type="button" onClick={restoreDefaultRamsLogic} disabled={logicLoading || logicSaving}>
                   Restore defaults
                 </button>
               ) : null}
-              <button className="primary-button" type="button" onClick={saveRamsLogicDraft}>
-                Save logic
+              <button className="primary-button" type="button" onClick={saveRamsLogicDraft} disabled={logicLoading || logicSaving}>
+                {logicSaving ? "Saving..." : "Save logic"}
               </button>
             </div>
           </div>
+          {logicLoading ? <p className="rams-logic-status">Loading shared RAMS logic...</p> : null}
           {logicStatus ? <p className="rams-logic-status">{logicStatus}</p> : null}
 
           <div className="rams-logic-section-tabs" role="tablist" aria-label="RAMS logic section">
@@ -4711,10 +4760,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const [hospitalLookupStatus, setHospitalLookupStatus] = useState("");
   const [loadingHospitals, setLoadingHospitals] = useState(false);
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
-  const [ramsLogic, setRamsLogic] = useState(() => getStoredRamsLogic());
-  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => getStoredRamsLogic());
+  const [ramsLogic, setRamsLogic] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
+  const [ramsLogicDraft, setRamsLogicDraft] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
   const [logicStatus, setLogicStatus] = useState("");
-  const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS, getStoredRamsLogic()));
+  const [logicLoading, setLogicLoading] = useState(true);
+  const [logicSaving, setLogicSaving] = useState(false);
+  const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS, RAMS_DEFAULT_LOGIC));
   const [draggingCardId, setDraggingCardId] = useState("");
   const [ramsEdits, setRamsEdits] = useState({});
   const todayIso = getLocalTodayIso();
@@ -4776,6 +4827,33 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
       setProfileUsers(users);
     }
   }, [profileUsers.length, users]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSharedRamsLogic() {
+      try {
+        setLogicLoading(true);
+        const sharedLogic = await fetchRamsLogic();
+        if (!active) return;
+        setRamsLogic(sharedLogic);
+        setRamsLogicDraft(sharedLogic);
+        setLogicStatus("");
+      } catch (error) {
+        console.error(error);
+        if (active) {
+          setLogicStatus(error.message || "Could not load shared RAMS logic.");
+        }
+      } finally {
+        if (active) setLogicLoading(false);
+      }
+    }
+
+    loadSharedRamsLogic();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const selectedJob = useMemo(
     () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
@@ -4901,20 +4979,36 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     setLogicStatus("");
   }
 
-  function saveRamsLogicDraft() {
-    const nextLogic = normalizeRamsLogic(ramsLogicDraft);
-    setRamsLogic(nextLogic);
-    setRamsLogicDraft(nextLogic);
-    saveRamsLogic(nextLogic);
-    setLogicStatus("RAMS logic saved.");
+  async function saveRamsLogicDraft() {
+    try {
+      setLogicSaving(true);
+      const nextLogic = normalizeRamsLogic(ramsLogicDraft);
+      const savedLogic = await saveRamsLogic(nextLogic);
+      setRamsLogic(savedLogic);
+      setRamsLogicDraft(savedLogic);
+      setLogicStatus("Shared RAMS logic saved.");
+    } catch (error) {
+      console.error(error);
+      setLogicStatus(error.message || "Could not save shared RAMS logic.");
+    } finally {
+      setLogicSaving(false);
+    }
   }
 
-  function restoreDefaultRamsLogic() {
-    const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
-    setRamsLogic(nextLogic);
-    setRamsLogicDraft(nextLogic);
-    saveRamsLogic(nextLogic);
-    setLogicStatus("Default RAMS logic restored.");
+  async function restoreDefaultRamsLogic() {
+    try {
+      setLogicSaving(true);
+      const nextLogic = normalizeRamsLogic(RAMS_DEFAULT_LOGIC);
+      const savedLogic = await saveRamsLogic(nextLogic);
+      setRamsLogic(savedLogic);
+      setRamsLogicDraft(savedLogic);
+      setLogicStatus("Default shared RAMS logic restored.");
+    } catch (error) {
+      console.error(error);
+      setLogicStatus(error.message || "Could not restore shared RAMS logic.");
+    } finally {
+      setLogicSaving(false);
+    }
   }
 
   function addRamsOption(groupIndex) {
