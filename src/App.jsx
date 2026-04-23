@@ -1692,11 +1692,18 @@ function normalizeRamsLogic(logic = {}) {
     ...RAMS_DEFAULT_LOGIC.cards,
     ...RAMS_STANDARD_RISK_CARDS
   };
+  const defaultRiskCardIds = Object.keys(RAMS_STANDARD_RISK_CARDS);
   const hasIncomingCards = Boolean(logic.cards && typeof logic.cards === "object" && Object.keys(logic.cards).length);
   const incomingCards = logic.cards && typeof logic.cards === "object"
     ? Object.fromEntries(Object.entries(logic.cards).filter(([cardId]) => !LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId))))
     : {};
-  const cardsToNormalize = hasIncomingCards ? incomingCards : defaultCards;
+  const hasCurrentRiskCards = Object.keys(incomingCards).some((cardId) => defaultRiskCardIds.includes(String(cardId)));
+  const cardsToNormalize = hasIncomingCards
+    ? {
+        ...(hasCurrentRiskCards ? {} : RAMS_STANDARD_RISK_CARDS),
+        ...incomingCards
+      }
+    : defaultCards;
   const cardEntries = Object.entries(cardsToNormalize).map(([cardId, card]) => [
     cardId,
     normalizeRamsCard(card, defaultCards[cardId])
@@ -1714,19 +1721,17 @@ function normalizeRamsLogic(logic = {}) {
             : []
       );
       const incomingOptions = Array.isArray(group.options) ? group.options : [];
-      const mergedOptions = key === "tools" || key === "access"
-        ? [
-            ...defaultOptions.map((defaultOption) => {
-              const defaultValue = String(defaultOption.value || "");
-              const incomingMatch = incomingOptions.find((option) => String(option.value || "") === defaultValue);
-              return incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
-            }),
-            ...incomingOptions.filter((option) => {
-              const value = String(option.value || "");
-              return value && !legacyOptionValues.has(value) && !defaultOptions.some((entry) => String(entry.value) === value);
-            })
-          ]
-        : incomingOptions;
+      const mergedOptions = [
+        ...defaultOptions.map((defaultOption) => {
+          const defaultValue = String(defaultOption.value || "");
+          const incomingMatch = incomingOptions.find((option) => String(option.value || "") === defaultValue);
+          return incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
+        }),
+        ...incomingOptions.filter((option) => {
+          const value = String(option.value || "");
+          return value && !legacyOptionValues.has(value) && !defaultOptions.some((entry) => String(entry.value) === value);
+        })
+      ];
       return {
         key,
         label: String(group.label || fallback.label || "Question"),
@@ -1742,9 +1747,12 @@ function normalizeRamsLogic(logic = {}) {
       };
     }),
     cards: Object.fromEntries(cardEntries),
-    baseCardIds: Array.isArray(logic.baseCardIds)
-      ? logic.baseCardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
-      : RAMS_BASE_CARD_IDS
+    baseCardIds: (() => {
+      const incomingBase = Array.isArray(logic.baseCardIds)
+        ? logic.baseCardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
+        : [];
+      return hasCurrentRiskCards ? incomingBase : [...new Set([...RAMS_BASE_CARD_IDS, ...incomingBase])];
+    })()
   };
 }
 
