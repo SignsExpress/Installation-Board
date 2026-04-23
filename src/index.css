@@ -6932,12 +6932,30 @@ button {
   margin: 0;
 }
 
-.social-post-card label,
-.social-post-upload {
+.social-post-card label {
   display: grid;
   gap: 7px;
   color: #334155;
   font-weight: 800;
+}
+
+.social-post-upload {
+  border: 1px solid var(--sx-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+
+.social-post-upload summary {
+  cursor: pointer;
+  color: #4f2d66;
+  font-weight: 900;
+}
+
+.social-post-upload-inner {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .social-post-card input,
@@ -7003,16 +7021,16 @@ button {
 }
 
 .social-post-output-body.has-tone-image textarea {
-  padding-right: 132px;
-  padding-bottom: 132px;
+  padding-right: 152px;
+  padding-bottom: 206px;
 }
 
 .social-post-tone-corner-image {
   position: absolute;
-  right: 18px;
-  bottom: 18px;
-  width: 96px;
-  height: 96px;
+  right: 1px;
+  bottom: 1px;
+  width: 148px;
+  height: 204px;
   object-fit: contain;
   pointer-events: none;
 }
@@ -7290,17 +7308,39 @@ button {
 }
 
 .social-post-tone-table td:first-child {
-  width: 150px;
-  color: #4f2d66;
-  font-weight: 900;
-  white-space: nowrap;
+  width: 180px;
 }
 
-.social-post-tone-table td:last-child {
+.social-post-tone-table td {
   color: #334155;
   font-weight: 700;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.social-post-tone-table input,
+.social-post-tone-table textarea {
+  width: 100%;
+  border: 1px solid var(--sx-border);
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 10px;
+}
+
+.social-post-tone-table textarea {
+  min-height: 118px;
+  resize: vertical;
+}
+
+.social-post-tone-add-row td {
+  background: #fbf7ff;
+}
+
+.social-post-tone-add-row .ghost-button {
+  margin-top: 8px;
 }
 
 .social-post-tone-action-buttons {

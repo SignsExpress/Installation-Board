@@ -3398,6 +3398,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [toneDraft, setToneDraft] = useState("");
   const [toneTraitsDraft, setToneTraitsDraft] = useState("");
   const [toneImageDraft, setToneImageDraft] = useState("");
+  const [toneExamplesDraft, setToneExamplesDraft] = useState([]);
+  const [newExampleReference, setNewExampleReference] = useState("");
+  const [newExamplePost, setNewExamplePost] = useState("");
   const [toneSaving, setToneSaving] = useState(false);
   const [toneMessage, setToneMessage] = useState("");
   const [deletingVoiceId, setDeletingVoiceId] = useState("");
@@ -3507,6 +3510,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     setToneDraft(selectedVoice.content || "");
     setToneTraitsDraft(selectedVoice.supportingText || "");
     setToneImageDraft(selectedVoice.toneImage || "");
+    setToneExamplesDraft(Array.isArray(selectedVoice.examples) ? selectedVoice.examples : []);
+    setNewExampleReference("");
+    setNewExamplePost("");
     setToneMessage("");
     setToneViewerOpen(true);
   }
@@ -3544,7 +3550,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           toneImage: toneImageDraft,
           name: toneNameDraft || selectedVoice.name,
           fileName: selectedVoice.fileName,
-          examples: selectedVoice.examples || []
+          examples: toneExamplesDraft
         })
       });
       const payload = await response.json();
@@ -3614,6 +3620,26 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     }
   }
 
+  function addToneExample() {
+    const reference = newExampleReference.trim();
+    const post = newExamplePost.trim();
+    if (!reference || !post) {
+      setToneMessage("Add a reference and finished post first.");
+      return;
+    }
+    setToneExamplesDraft((current) => [...current, { reference, post }]);
+    setNewExampleReference("");
+    setNewExamplePost("");
+    setToneMessage("Example added. Press Save tone to keep it.");
+  }
+
+  function updateToneExample(index, field, value) {
+    setToneExamplesDraft((current) => current.map((example, exampleIndex) => (
+      exampleIndex === index ? { ...example, [field]: value } : example
+    )));
+    setToneMessage("Example updated. Press Save tone to keep it.");
+  }
+
   return (
     <div className="app-shell social-post-shell">
       <div className="page social-post-page">
@@ -3674,24 +3700,27 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               ) : null}
 
               {canAdmin ? (
-                <div className="social-post-upload">
-                  <label>
-                    Add tone name
-                    <input type="text" value={voiceName} placeholder="LinkedIn - Signs Express" onChange={(event) => setVoiceName(event.target.value)} />
-                  </label>
-                  <label className="social-post-file">
-                    Upload Excel / CSV / text tone file
-                    <input
-                      type="file"
-                      accept=".xlsx,.csv,.txt,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                      disabled={uploading}
-                      onChange={(event) => {
-                        uploadVoice(event.target.files?.[0]);
-                        event.target.value = "";
-                      }}
-                    />
-                  </label>
-                </div>
+                <details className="social-post-upload">
+                  <summary>Upload new voice</summary>
+                  <div className="social-post-upload-inner">
+                    <label>
+                      Add tone name
+                      <input type="text" value={voiceName} placeholder="LinkedIn - Signs Express" onChange={(event) => setVoiceName(event.target.value)} />
+                    </label>
+                    <label className="social-post-file">
+                      Upload Excel / CSV / text tone file
+                      <input
+                        type="file"
+                        accept=".xlsx,.csv,.txt,text/plain,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        disabled={uploading}
+                        onChange={(event) => {
+                          uploadVoice(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                </details>
               ) : null}
 
               {error ? <div className="flash error">{error}</div> : null}
@@ -3744,7 +3773,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                     <div className="social-post-tone-image-field">
                       <div>
                         <h4>Tone image</h4>
-                        <p>PNG only. Suggested size: 512 x 512px with a transparent background.</p>
+                        <p>PNG only. Suggested size: 370 x 512px with a transparent background.</p>
                       </div>
                       <div className="social-post-tone-image-controls">
                         {toneImageDraft ? <img src={toneImageDraft} alt="Tone preview" /> : <span>No image</span>}
@@ -3778,30 +3807,61 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   <section className="social-post-tone-examples">
                     <div className="social-post-tone-section-head">
                       <h4>Paired examples</h4>
-                      <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} rows</span>
+                      <span>{toneExamplesDraft.length} rows</span>
                     </div>
-                    {Array.isArray(selectedVoice.examples) && selectedVoice.examples.length ? (
-                      <div className="social-post-tone-table-wrap">
-                        <table className="social-post-tone-table">
-                          <thead>
-                            <tr>
-                              <th>Reference</th>
-                              <th>Finished post</th>
+                    <div className="social-post-tone-table-wrap">
+                      <table className="social-post-tone-table">
+                        <thead>
+                          <tr>
+                            <th>Reference</th>
+                            <th>Finished post</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {toneExamplesDraft.map((example, index) => (
+                            <tr key={`${example.reference}-${index}`}>
+                              <td>
+                                {canAdmin ? (
+                                  <input
+                                    type="text"
+                                    value={example.reference}
+                                    onChange={(event) => updateToneExample(index, "reference", event.target.value)}
+                                  />
+                                ) : example.reference}
+                              </td>
+                              <td>
+                                {canAdmin ? (
+                                  <textarea
+                                    value={example.post}
+                                    onChange={(event) => updateToneExample(index, "post", event.target.value)}
+                                  />
+                                ) : example.post}
+                              </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {selectedVoice.examples.map((example, index) => (
-                              <tr key={`${example.reference}-${index}`}>
-                                <td>{example.reference}</td>
-                                <td>{example.post}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <p className="social-post-tone-empty">No paired examples found in this tone document.</p>
-                    )}
+                          ))}
+                          {canAdmin ? (
+                            <tr className="social-post-tone-add-row">
+                              <td>
+                                <input
+                                  type="text"
+                                  value={newExampleReference}
+                                  placeholder="ORD-1234"
+                                  onChange={(event) => setNewExampleReference(event.target.value)}
+                                />
+                              </td>
+                              <td>
+                                <textarea
+                                  value={newExamplePost}
+                                  placeholder="Paste the finished post here."
+                                  onChange={(event) => setNewExamplePost(event.target.value)}
+                                />
+                                <button className="ghost-button" type="button" onClick={addToneExample}>Add example</button>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
+                    </div>
                   </section>
 
                   {canAdmin ? (
