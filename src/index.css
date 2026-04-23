@@ -7021,16 +7021,16 @@ button {
 }
 
 .social-post-output-body.has-tone-image textarea {
-  padding-right: 152px;
-  padding-bottom: 206px;
+  padding-right: 146px;
+  padding-bottom: 188px;
 }
 
 .social-post-tone-corner-image {
   position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 148px;
-  height: 204px;
+  right: 12px;
+  bottom: 12px;
+  width: 134px;
+  height: 184px;
   object-fit: contain;
   pointer-events: none;
 }
