@@ -4818,8 +4818,40 @@ async function generateSocialPostWithAi(brief) {
   }
 
   const model = aiStatus.model;
+  const selectedToneName = String(brief.toneName || "the selected person").trim() || "the selected person";
+  const toneTraits = String(brief.toneTraits || "").trim();
+  const toneSummary = String(brief.toneSummary || "").trim();
+  const transformationExamples = Array.isArray(brief.transformationExamples) ? brief.transformationExamples : [];
+  const pairedExampleText = transformationExamples.length
+    ? transformationExamples.map((example, index) => [
+        `Example ${index + 1}`,
+        `Reference: ${example.reference || "Unknown"}`,
+        `Finished post: ${example.finishedPost || ""}`
+      ].join("\n")).join("\n\n")
+    : "No paired before/after examples are available for this tone. Use the supporting traits and existing posts instead.";
+  const styleSource = [
+    `SELECTED TONE OF VOICE: ${selectedToneName}`,
+    "",
+    "STYLE SOURCE PRIORITY:",
+    "1. Supporting traits are the explicit personality, rhythm and writing rules. Follow them closely.",
+    "2. Paired examples show exact before/after transformations where available.",
+    "3. Existing posts show the writer's natural rhythm, phrasing, humour, paragraph shape and emoji habits.",
+    "",
+    "SUPPORTING TRAITS:",
+    toneTraits || "No supporting traits supplied.",
+    "",
+    "PAIRED EXAMPLES:",
+    pairedExampleText,
+    "",
+    "EXISTING POSTS / TONE DOCUMENT:",
+    toneSummary || "No historic posts supplied."
+  ].join("\n");
   const prompt = [
-    "Write one LinkedIn post for Signs Express Central Lancashire in Matt Rutlidge's style.",
+    `Write one LinkedIn post for Signs Express Central Lancashire in ${selectedToneName}'s style.`,
+    "Do not default to Matt Rutlidge's style unless Matt Rutlidge is the selected tone of voice.",
+    "If there are no paired examples, you must still infer the voice from the supporting traits and existing posts.",
+    "",
+    styleSource,
     "",
     "IMPORTANT TRANSFORMATION:",
     "- The Corebridge data is raw production language. Do not repeat it as a specification list.",
@@ -4828,16 +4860,16 @@ async function generateSocialPostWithAi(brief) {
     "- Do not blend two separate line items into one invented product. For example, if one line is a prize wheel and another line is a plinth, describe them as separate pieces of the same project, not as a prize wheel wrapped around a plinth.",
     "- Decide what deserves space in the post. Feature visually interesting or higher-value lines, lightly mention supporting pieces, and quietly ignore boring low-value/admin/delivery lines if the post would become too long.",
     "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
-    "- If toneTraits is present, treat it as the explicit personality and writing rules for the chosen person. Use it alongside the examples, not instead of them.",
-    "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did Matt take from the Corebridge job, what did he ignore, what did he simplify, what did he fluff up, and what hook style did he use?",
+    "- Treat the supporting traits above as the explicit personality and writing rules for the chosen person. Use them alongside the examples and existing posts, not instead of them.",
+    "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did the selected writer take from the Corebridge job, what did they ignore, what did they simplify, what did they fluff up, and what hook style did they use?",
     "- Find repeatable patterns across all transformationExamples, then apply those patterns to the new Corebridge job.",
-    "- Read toneSummary as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
-    "- Before writing, internally build a style map from toneSummary and transformationExamples: hook formulas, joke patterns, self-deprecating lines, playful misdirection, favourite emojis, emoji count, emoji placement, sentence length, paragraph length and sign-off habits.",
-    "- Move much closer to Matt's actual mannerisms than generic marketing copy. Matt often opens with a funny or slightly self-deprecating observation, a rhetorical question, or a playful comparison before revealing the job.",
-    "- Example hook flavours to emulate when appropriate: Did I spend hours with a pencil case full of Sharpies and half-chewed crayons, or is this actually one-piece wallpaper? / Simple, effective, and looks tidy. Enough about me though, what do you think of this completed job?",
-    "- Use the examples to infer which emojis Matt likes and where they normally sit. Match the usual emoji density from the tone file rather than adding random emojis.",
-    "- Do not over-polish the humour. It should feel like Matt's version of funny: dry, playful, slightly cheeky, human and not corporate.",
-    "- Avoid words and phrases Matt would not use, including pizzazz, jazzed up, glow up, game changer, elevate your brand, stunning solution and proud to announce.",
+    "- Read the existing posts as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
+    "- Before writing, internally build a style map from the supporting traits, existing posts and paired examples: hook formulas, joke patterns, self-deprecating lines, playful misdirection, favourite emojis, emoji count, emoji placement, sentence length, paragraph length and sign-off habits.",
+    "- Move much closer to the selected person's actual mannerisms than generic marketing copy. The post should feel like that person wrote it, not like a corporate template.",
+    "- If the tone source clearly supports dry humour, playful comparisons or rhetorical questions, use that kind of hook. If it does not, follow the selected writer's own hook style instead.",
+    "- Use the tone source to infer which emojis the selected person likes and where they normally sit. Match the usual emoji density from the tone file rather than adding random emojis.",
+    "- Do not over-polish the humour. It should feel human, specific and natural to the selected writer, not corporate.",
+    "- Avoid generic AI marketing phrases including pizzazz, jazzed up, glow up, game changer, elevate your brand, stunning solution and proud to announce.",
     "- Check customerClassification before describing the customer. Do not call a council, leisure trust, school, charity, NHS or public sector organisation a business or company. Use organisation, council, venue, team, site or facility instead.",
     "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
@@ -4864,7 +4896,7 @@ async function generateSocialPostWithAi(brief) {
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a senior LinkedIn copywriter for a UK signage company. You convert technical signage job descriptions into warm, bold, human social posts in the user's proven tone of voice." },
+          { role: "system", content: "You are a senior LinkedIn copywriter for a UK signage company. You convert technical signage job descriptions into warm, bold, human social posts in the selected person's proven tone of voice. The selected voice may not be Matt Rutlidge." },
           { role: "user", content: prompt }
         ],
         temperature: 0.82
