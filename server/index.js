@@ -4546,6 +4546,19 @@ function isSocialDescriptionKey(key = "") {
   );
 }
 
+function isSocialTechnicalKey(key = "") {
+  const lowerKey = String(key || "").toLowerCase();
+  if (/(vat|tax|price|cost|amount|total|subtotal|balance|locator|phone|email|postcode|zip)/i.test(lowerKey)) return false;
+  return /(works?order|workorder|production|material|substrate|vinyl|film|colour|color|ink|print|laminat|finish|method|spec|size|height|width|dimension|precolou?r|pre-colou?r|metamark|contra|reflective|dibond|acm|foamex|foam pvc|aluminium|acrylic|polycarbonate|manifestation|graphic|panel|sign)/i.test(lowerKey);
+}
+
+function isSocialTechnicalText(value = "") {
+  const text = normalizeSocialText(value);
+  if (!isUsefulSocialText(text)) return false;
+  if (/(vat|tax|subtotal|balance|invoice|payment)/i.test(text)) return false;
+  return /(metamark|pre-?colou?r(?:ed)? vinyl|contra-?vision|reflective|one[- ]way|perforated|laminat|polymeric|monomeric|cast vinyl|wrap film|foam pvc|foamex|dibond|acm|aluminium composite|acrylic|polycarbonate|mm\b|colour\(s\)|printed vinyl|cut vinyl|plotter|digital print|vehicle livery|window graphic)/i.test(text);
+}
+
 function normalizeSocialText(value = "") {
   return decodeXmlEntities(value)
     .replace(/<br\s*\/?>/gi, "\n")
@@ -4684,6 +4697,14 @@ function buildSocialPostBrief(order, voice) {
     .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1000) }))
     .filter((field) => field.value)
     .slice(0, 80);
+  const technicalSourceFields = (Array.isArray(order.debugFields) ? order.debugFields : [])
+    .filter((field) => {
+      const key = String(field.key || "");
+      return isSocialTechnicalKey(key) || isSocialTechnicalText(field.value) || /(?:works?order|workorder|materials?|production|items?|orderdestinationitems?|estimateitems?|lineitems?)\.\d+/i.test(key);
+    })
+    .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1200) }))
+    .filter((field) => field.value)
+    .slice(0, 120);
   const exactDescriptionMatches = (Array.isArray(order.debugFields) ? order.debugFields : [])
     .filter((field) => matchesKnownSocialDescription(field.value))
     .map((field) => ({ key: field.key, value: normalizeSocialText(field.value).slice(0, 1500) }));
@@ -4700,6 +4721,8 @@ function buildSocialPostBrief(order, voice) {
     items,
     lineItemCount: items.length,
     lineItems,
+    sourceFields,
+    technicalSourceFields,
     toneName: voice?.name || "LinkedIn",
     toneSummary: getSocialPostToneSummary(voice),
     toneTraits: getSocialPostToneTraits(voice),
@@ -4713,6 +4736,7 @@ function buildSocialPostBrief(order, voice) {
       exactDescriptionMatches,
       jobEvidence,
       sourceFields,
+      technicalSourceFields,
       toneName: voice?.name || "Matt Rutlidge",
       toneExcerpt: getSocialPostToneSummary(voice).slice(0, 3000),
       transformationExamples: getSocialPostTransformationExamples(voice).slice(0, 8),
@@ -4793,6 +4817,7 @@ function sanitizeGeneratedSocialPost(post = "") {
     .replace(/\bpizzazz\b/gi, "impact")
     .replace(/\bjazz(?:ed)?\s+up\b/gi, "made stand out")
     .replace(/\btalk about a glow up!?/gi, "it made a proper difference")
+    .replace(/#[A-Za-z0-9_]+/g, "")
     .replace(/[‐‑‒–—―-]/g, " ")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n[ \t]+/g, "\n")
@@ -4827,9 +4852,7 @@ function generateFallbackSocialPost(brief) {
     "",
     "At Signs Express (Central Lancashire) & Signs Express (Southport), we bring bold ideas to life.",
     "",
-    "Ready to be the business people talk about? Let's make it happen.",
-    "",
-    "#SignsExpress #Signage #Branding #VehicleGraphics #BusinessBranding"
+    "Ready to be the business people talk about? Let's make it happen."
   ].join("\n");
 }
 
@@ -4887,8 +4910,8 @@ async function generateSocialPostWithAi(brief) {
     "Do not default to Matt Rutlidge's style unless Matt Rutlidge is the selected tone of voice.",
     "If there are no paired examples, you must still infer the voice from the supporting traits and existing posts.",
     `Target length: ${targetWords} words. Stay close to this length.`,
-    topicSteer ? `Topic steer: ${topicSteer}. Weave this in cleverly while still making the CoreBridge job the main subject.` : "",
-    technicalMode ? "Technical mode is on. Be more technically minded. Explain relevant technical terms naturally, for example if Contra-vision appears, briefly explain that it is one-way/perforated window film that allows graphics outside while maintaining visibility/light from inside." : "",
+    topicSteer ? `Post topic: ${topicSteer}. Treat this as a thinking lens, not a phrase to wedge in. Work out how the product, material, customer, use case or visual result genuinely relates to this topic, then build the post around that useful connection while keeping the CoreBridge job as the proof point.` : "",
+    technicalMode ? "Technical mode is on. Be more technically minded. If the customer description is light, inspect technicalSourceFields, sourceFields, lineItems, works-order wording and material/product fields for useful clues such as vinyl type, film, colours, size, substrate or product names. Use those clues to explain why the material or production choice is useful in plain English. You may use general product knowledge for common materials, but do not invent exact specs that are not in the data." : "",
     changeItUp ? "CHANGE IT UP MODE: This is a regeneration. Write from a noticeably different angle, with a different opening hook, different sentence rhythm and different emphasis from the previous attempt." : "",
     previousPost ? `PREVIOUS ATTEMPT TO AVOID COPYING:\n${previousPost}` : "",
     "",
@@ -4902,6 +4925,9 @@ async function generateSocialPostWithAi(brief) {
     "- Do not blend two separate line items into one invented product. For example, if one line is a prize wheel and another line is a plinth, describe them as separate pieces of the same project, not as a prize wheel wrapped around a plinth.",
     "- Decide what deserves space in the post. Feature the highest-value non-delivery/non-installation/non-courier item first. If values are similar or missing, feature the highest-quantity product item. Treat the rest as secondary and sometimes omit them completely.",
     "- Ignore installation, delivery and courier line items when deciding the main subject, unless there are no product lines or the install itself is genuinely the story.",
+    "- If a post topic is supplied, do not just mention the topic at the start and end. Think about the real bridge between the signage and the topic: a practical benefit, seasonal problem, customer story, buying lesson, material advantage or moment where the finished sign matters.",
+    "- Example topic logic: if the job is reflective vehicle graphics and the topic is winter, connect reflective detail to darker nights, safer visibility and a tradesperson's van acting like a mobile office that still gets noticed after dark.",
+    "- If the supplied topic does not naturally fit, make a light intelligent connection or ignore the topic rather than forcing a clumsy paragraph.",
     "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
     "- Treat the supporting traits above as the explicit personality and writing rules for the chosen person. Use them alongside the examples and existing posts, not instead of them.",
     "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did the selected writer take from the Corebridge job, what did they ignore, what did they simplify, what did they fluff up, and what hook style did they use?",
@@ -4924,11 +4950,13 @@ async function generateSocialPostWithAi(brief) {
     "- Mention the customer/project if available. Mention designer credit if the source data or tone examples clearly support it, otherwise do not invent names.",
     "- It is fine to mention simplified product phrases such as illuminated fascia sign, window graphics, wall wraps or layered displays.",
     "- Only say installed, installation or on site if hasInstallEvidence is true. If hasDeliveryOnlyEvidence is true, treat it as supplied or delivered.",
-    "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
+    technicalMode
+      ? "- Technical mode may include useful dimensions, colour/material names or product names when they help explain the benefit. Still avoid VAT/tax/price/admin lines, HTML entities and list-style quoting."
+      : "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
     "- Do not use hyphen or dash characters anywhere in the post.",
     "- Put a blank line between paragraphs so it is easy to read on LinkedIn.",
     "- Keep it LinkedIn-ready and flowing naturally, not like a quote summary.",
-    "- Include 3 to 6 relevant hashtags at the end.",
+    "- Do not include hashtags.",
     "",
     JSON.stringify(brief, null, 2)
   ].join("\n");
