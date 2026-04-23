@@ -895,7 +895,8 @@
   font-weight: 900;
 }
 
-.rams-tag-matrix label {
+.rams-tag-matrix label,
+.rams-tag-toggle {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -906,18 +907,32 @@
   cursor: pointer;
   font-size: 0.82rem;
   font-weight: 700;
+  width: 100%;
+  text-align: left;
 }
 
-.rams-tag-matrix label.is-checked {
+.rams-tag-matrix label.is-checked,
+.rams-tag-toggle.is-checked {
   border-color: #86efac;
   background: #f0fdf4;
   color: #166534;
 }
 
-.rams-tag-matrix input {
+.rams-tag-matrix input,
+.rams-tag-toggle input {
   width: auto;
   min-height: auto;
   flex: 0 0 auto;
+  pointer-events: none;
+}
+
+.rams-tag-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.rams-tag-toggle span {
+  display: block;
 }
 
 .rams-tag-admin-drawer {

@@ -4437,7 +4437,11 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                       onClick={() => setSelectedCardId(cardId)}
                     >
                       <strong>{card.title}</strong>
-                      <span>{tagCount} trigger{tagCount === 1 ? "" : "s"}</span>
+                      <span>
+                        {tagCount === 0 && ramsLogicDraft.baseCardIds.includes(cardId)
+                          ? "Always on RAMS"
+                          : `${tagCount} trigger${tagCount === 1 ? "" : "s"}`}
+                      </span>
                       {card.type !== "Method" ? <small className={`rams-mini-risk ${band.className}`}>{band.code}</small> : null}
                     </button>
                   );
@@ -4461,7 +4465,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                         checked={ramsLogicDraft.baseCardIds.includes(activeCardId)}
                         onChange={() => toggleBaseRamsCard(activeCardId)}
                       />
-                      Always include on every RAMS, no matter what job tags are chosen
+                      Always on RAMS
                     </label>
                   </div>
                   <label className="rams-field-wide">
@@ -4576,19 +4580,26 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                               <button type="button" onClick={() => setGroupCardLinks(groupIndex, activeCardId, false)}>None</button>
                             </span>
                           </legend>
-                          {group.options.map((option, optionIndex) => (
-                            <label
-                              key={`${group.key}-${option.value}-${optionIndex}`}
-                              className={option.cardIds.includes(activeCardId) ? "is-checked" : ""}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={option.cardIds.includes(activeCardId)}
-                                onChange={() => toggleOptionCard(groupIndex, optionIndex, activeCardId)}
-                              />
-                              {option.label}
-                            </label>
-                          ))}
+                          {group.options.map((option, optionIndex) => {
+                            const isChecked = option.cardIds.includes(activeCardId);
+                            return (
+                              <button
+                                key={`${group.key}-${option.value}-${optionIndex}`}
+                                type="button"
+                                className={`rams-tag-toggle ${isChecked ? "is-checked" : ""}`}
+                                onClick={() => toggleOptionCard(groupIndex, optionIndex, activeCardId)}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  readOnly
+                                  tabIndex={-1}
+                                  aria-hidden="true"
+                                />
+                                <span>{option.label}</span>
+                              </button>
+                            );
+                          })}
                         </fieldset>
                       ))}
                     </div>
