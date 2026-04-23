@@ -7043,9 +7043,10 @@ button {
 
 .social-post-tone-modal {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
   width: min(900px, 100%);
-  max-height: min(760px, 88vh);
+  max-height: min(760px, 88dvh);
   overflow: hidden;
   padding: 18px;
   border: 1px solid #d8c8e6;
@@ -7074,20 +7075,24 @@ button {
   font-weight: 800;
 }
 
-.social-post-tone-modal textarea {
+.social-post-tone-modal textarea,
+.social-post-tone-modal input {
   width: 100%;
-  min-height: 360px;
-  max-height: 56vh;
   border: 1px solid var(--sx-border);
   border-radius: 12px;
   padding: 12px;
-  resize: vertical;
   color: #0f172a;
   background: #fff;
   font-family: inherit;
   font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.48;
+}
+
+.social-post-tone-modal textarea {
+  min-height: 360px;
+  max-height: 56vh;
+  resize: vertical;
 }
 
 .social-post-tone-layout {
@@ -7105,6 +7110,32 @@ button {
   border-radius: 14px;
   background: #fff;
   padding: 12px;
+}
+
+.social-post-tone-extra {
+  border: 1px solid var(--sx-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+
+.social-post-tone-extra summary {
+  cursor: pointer;
+  color: #4f2d66;
+  font-weight: 900;
+}
+
+.social-post-tone-extra[open] {
+  display: grid;
+  gap: 12px;
+}
+
+.social-post-tone-name-field {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 900;
 }
 
 .social-post-tone-traits h4,
@@ -7199,12 +7230,6 @@ button {
   font-weight: 700;
   line-height: 1.45;
   white-space: pre-wrap;
-}
-
-.social-post-tone-source summary {
-  cursor: pointer;
-  color: #4f2d66;
-  font-weight: 900;
 }
 
 .social-post-tone-action-buttons {
