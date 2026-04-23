@@ -3389,6 +3389,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [orderReference, setOrderReference] = useState("");
   const [voiceName, setVoiceName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [postLength, setPostLength] = useState("normal");
+  const [postTopic, setPostTopic] = useState("");
+  const [technicalPost, setTechnicalPost] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -3496,7 +3499,10 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           orderReference,
           voiceId,
           changeItUp: options.changeItUp === true,
-          previousPost: options.changeItUp ? result?.post || "" : ""
+          previousPost: options.changeItUp ? result?.post || "" : "",
+          postLength,
+          postTopic,
+          technicalPost
         })
       });
       const payload = await response.json();
@@ -3739,9 +3745,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             <div className="social-post-card social-post-output">
               <div className="social-post-output-head">
                 <h3>Suggested post</h3>
-                <button className="ghost-button" type="button" onClick={() => generatePost({ changeItUp: true })} disabled={loading || !orderReference.trim()}>
-                  {loading ? "Working..." : "Change it up"}
-                </button>
               </div>
               <div className={`social-post-output-body ${selectedVoice?.toneImage ? "has-tone-image" : ""}`}>
                 <textarea
@@ -3752,6 +3755,35 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                 {selectedVoice?.toneImage ? (
                   <img className="social-post-tone-corner-image" src={selectedVoice.toneImage} alt={`${selectedVoice.name} tone`} />
                 ) : null}
+              </div>
+              <div className="social-post-steers">
+                <div className="social-post-length-toggle" aria-label="Post length">
+                  {["short", "normal", "long"].map((lengthOption) => (
+                    <button
+                      key={lengthOption}
+                      className={postLength === lengthOption ? "active" : ""}
+                      type="button"
+                      onClick={() => setPostLength(lengthOption)}
+                    >
+                      {lengthOption}
+                    </button>
+                  ))}
+                </div>
+                <label className="social-post-topic-field">
+                  Topic
+                  <input
+                    type="text"
+                    value={postTopic}
+                    placeholder="Optional angle or point to weave in"
+                    onChange={(event) => setPostTopic(event.target.value)}
+                  />
+                </label>
+                <button className={`ghost-button ${technicalPost ? "active" : ""}`} type="button" onClick={() => setTechnicalPost((current) => !current)}>
+                  Technical
+                </button>
+                <button className="ghost-button" type="button" onClick={() => generatePost({ changeItUp: true })} disabled={loading || !orderReference.trim()}>
+                  {loading ? "Working..." : "Change it up"}
+                </button>
               </div>
             </div>
           </div>

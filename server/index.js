@@ -4852,6 +4852,12 @@ async function generateSocialPostWithAi(brief) {
   const transformationExamples = Array.isArray(brief.transformationExamples) ? brief.transformationExamples : [];
   const changeItUp = brief.changeItUp === true;
   const previousPost = String(brief.previousPost || "").trim().slice(0, 3000);
+  const lengthMode = ["short", "normal", "long"].includes(String(brief.postLength || "").toLowerCase())
+    ? String(brief.postLength).toLowerCase()
+    : "normal";
+  const targetWords = lengthMode === "short" ? 50 : lengthMode === "long" ? 150 : 100;
+  const topicSteer = String(brief.postTopic || "").replace(/\s+/g, " ").trim().slice(0, 500);
+  const technicalMode = brief.technicalPost === true;
   const pairedExampleText = transformationExamples.length
     ? transformationExamples.map((example, index) => [
         `Example ${index + 1}`,
@@ -4880,6 +4886,9 @@ async function generateSocialPostWithAi(brief) {
     `Write one LinkedIn post for Signs Express Central Lancashire in ${selectedToneName}'s style.`,
     "Do not default to Matt Rutlidge's style unless Matt Rutlidge is the selected tone of voice.",
     "If there are no paired examples, you must still infer the voice from the supporting traits and existing posts.",
+    `Target length: ${targetWords} words. Stay close to this length.`,
+    topicSteer ? `Topic steer: ${topicSteer}. Weave this in cleverly while still making the CoreBridge job the main subject.` : "",
+    technicalMode ? "Technical mode is on. Be more technically minded. Explain relevant technical terms naturally, for example if Contra-vision appears, briefly explain that it is one-way/perforated window film that allows graphics outside while maintaining visibility/light from inside." : "",
     changeItUp ? "CHANGE IT UP MODE: This is a regeneration. Write from a noticeably different angle, with a different opening hook, different sentence rhythm and different emphasis from the previous attempt." : "",
     previousPost ? `PREVIOUS ATTEMPT TO AVOID COPYING:\n${previousPost}` : "",
     "",
@@ -5566,6 +5575,11 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const brief = buildSocialPostBrief(order, selectedVoice);
       brief.changeItUp = request.body?.changeItUp === true;
       brief.previousPost = String(request.body?.previousPost || "").trim().slice(0, 3000);
+      brief.postLength = ["short", "normal", "long"].includes(String(request.body?.postLength || "").toLowerCase())
+        ? String(request.body.postLength).toLowerCase()
+        : "normal";
+      brief.postTopic = String(request.body?.postTopic || "").trim().slice(0, 500);
+      brief.technicalPost = request.body?.technicalPost === true;
       brief.lookupAttempts = lookupAttempts;
       brief.debug.lookupAttempts = lookupAttempts;
       brief.debug.selectedVoice = {
