@@ -68,6 +68,7 @@ const HOLIDAY_STAFF = [
 ];
 const HOLIDAY_RESET_VERSION = 1;
 const RAMS_RISK_BANK_VERSION = 2;
+const RAMS_LOGIC_RESET_VERSION = 1;
 const LEGACY_RAMS_RISK_CARD_IDS = new Set([
   "accessEgress",
   "injuryIncident",
@@ -791,7 +792,8 @@ async function readStore() {
             ramsLogic: null,
             vehiclePricingSettings: null,
             socialPostToneVoices: [],
-            socialPostDeletedToneVoiceIds: []
+            socialPostDeletedToneVoiceIds: [],
+            ramsLogicResetVersion: RAMS_LOGIC_RESET_VERSION
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -811,11 +813,17 @@ async function readStore() {
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
-          holidayResetVersion: Number(parsed.holidayResetVersion || 0)
+          holidayResetVersion: Number(parsed.holidayResetVersion || 0),
+          ramsLogicResetVersion: Number(parsed.ramsLogicResetVersion || 0)
         });
+    if (Number(migrated.ramsLogicResetVersion || 0) !== RAMS_LOGIC_RESET_VERSION) {
+      migrated.ramsLogic = null;
+      migrated.ramsLogicResetVersion = RAMS_LOGIC_RESET_VERSION;
+    }
     if (
       Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0) ||
-      !isCurrentRamsLogic(parsed.ramsLogic)
+      !isCurrentRamsLogic(parsed.ramsLogic) ||
+      Number(parsed.ramsLogicResetVersion || 0) !== RAMS_LOGIC_RESET_VERSION
     ) {
       await writeStore(migrated);
     }
@@ -834,7 +842,8 @@ async function readStore() {
           ramsLogic: null,
           vehiclePricingSettings: null,
           socialPostToneVoices: [],
-          socialPostDeletedToneVoiceIds: []
+          socialPostDeletedToneVoiceIds: [],
+          ramsLogicResetVersion: RAMS_LOGIC_RESET_VERSION
         });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -883,7 +892,8 @@ async function writeStore(store) {
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
-      holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
+      holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION),
+      ramsLogicResetVersion: Number(store.ramsLogicResetVersion || RAMS_LOGIC_RESET_VERSION)
     };
   await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
   return nextStore;
