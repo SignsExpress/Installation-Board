@@ -654,6 +654,8 @@ const LEGACY_RAMS_RISK_CARD_IDS = new Set([
   "weather"
 ]);
 
+const RAMS_RISK_BANK_VERSION = 2;
+
 function getDefaultRamsToolCardIds(toolValue = "") {
   switch (toolValue) {
     case "scalpel":
@@ -1693,15 +1695,20 @@ function normalizeRamsLogic(logic = {}) {
     ...RAMS_STANDARD_RISK_CARDS
   };
   const defaultRiskCardIds = Object.keys(RAMS_STANDARD_RISK_CARDS);
+  const requiresRiskBankReset = Number(logic.riskBankVersion || 0) < RAMS_RISK_BANK_VERSION;
   const hasIncomingCards = Boolean(logic.cards && typeof logic.cards === "object" && Object.keys(logic.cards).length);
   const incomingCards = logic.cards && typeof logic.cards === "object"
     ? Object.fromEntries(Object.entries(logic.cards).filter(([cardId]) => !LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId))))
     : {};
-  const hasCurrentRiskCards = Object.keys(incomingCards).some((cardId) => defaultRiskCardIds.includes(String(cardId)));
+  const incomingMethodCards = Object.fromEntries(
+    Object.entries(incomingCards).filter(([, card]) => String(card?.type || "").toLowerCase() === "method")
+  );
+  const workingCards = requiresRiskBankReset ? incomingMethodCards : incomingCards;
+  const hasCurrentRiskCards = Object.keys(workingCards).some((cardId) => defaultRiskCardIds.includes(String(cardId)));
   const cardsToNormalize = hasIncomingCards
     ? {
         ...(hasCurrentRiskCards ? {} : RAMS_STANDARD_RISK_CARDS),
-        ...incomingCards
+        ...workingCards
       }
     : defaultCards;
   const cardEntries = Object.entries(cardsToNormalize).map(([cardId, card]) => [
@@ -1725,7 +1732,11 @@ function normalizeRamsLogic(logic = {}) {
         ...defaultOptions.map((defaultOption) => {
           const defaultValue = String(defaultOption.value || "");
           const incomingMatch = incomingOptions.find((option) => String(option.value || "") === defaultValue);
-          return incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
+          const nextOption = incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
+          if (requiresRiskBankReset) {
+            return { ...nextOption, cardIds: defaultOption.cardIds || [] };
+          }
+          return nextOption;
         }),
         ...incomingOptions.filter((option) => {
           const value = String(option.value || "");
@@ -1751,8 +1762,12 @@ function normalizeRamsLogic(logic = {}) {
       const incomingBase = Array.isArray(logic.baseCardIds)
         ? logic.baseCardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
         : [];
-      return hasCurrentRiskCards ? incomingBase : [...new Set([...RAMS_BASE_CARD_IDS, ...incomingBase])];
-    })()
+      const methodBaseIds = incomingBase.filter((cardId) => String(cardsToNormalize[cardId]?.type || "").toLowerCase() === "method");
+      return requiresRiskBankReset || !hasCurrentRiskCards
+        ? [...new Set([...RAMS_BASE_CARD_IDS, ...methodBaseIds])]
+        : incomingBase;
+    })(),
+    riskBankVersion: RAMS_RISK_BANK_VERSION
   };
 }
 
