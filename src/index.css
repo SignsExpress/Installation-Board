@@ -6889,11 +6889,13 @@ button {
 
 .social-post-page {
   max-width: 1240px;
+  min-height: calc(100dvh - 92px);
+  display: grid;
+  align-items: center;
 }
 
 .social-post-panel {
   display: grid;
-  gap: 18px;
   padding: 22px;
 }
 

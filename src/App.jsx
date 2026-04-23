@@ -3646,14 +3646,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         <MainNavBar currentUser={currentUser} active="social-post" onLogout={onLogout} notifications={notifications} />
 
         <section className="panel social-post-panel">
-          <div className="social-post-head">
-            <div>
-              <p className="eyebrow">Social Post</p>
-              <h2>LinkedIn post generator</h2>
-              <p>Fetch a Corebridge order, choose a tone of voice, then generate a draft post to copy.</p>
-            </div>
-          </div>
-
           <div className="social-post-grid">
             <div className="social-post-card">
               <h3>Order</h3>
@@ -3689,16 +3681,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               <button className="ghost-button social-post-tone-button" type="button" onClick={openToneViewer} disabled={!selectedVoice}>
                 Manage tone voice
               </button>
-              {socialStatus ? (
-                <div className={`social-post-status ${socialStatus.ai?.configured ? "is-ok" : "is-warning"}`}>
-                  <span>{socialStatus.ai?.configured ? "AI connected" : "AI key not visible to Render"}</span>
-                  <span>{Array.isArray(socialStatus.voices) && socialStatus.voices.length ? `${socialStatus.voices.length} tone file${socialStatus.voices.length === 1 ? "" : "s"} saved` : "No uploaded tone file saved"}</span>
-                  {selectedVoice ? <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired examples</span> : null}
-                  {selectedVoice?.supportingText ? <span>Traits attached</span> : null}
-                  {selectedVoice?.toneImage ? <span>Image attached</span> : null}
-                </div>
-              ) : null}
-
               {canAdmin ? (
                 <details className="social-post-upload">
                   <summary>Upload new voice</summary>
