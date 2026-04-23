@@ -110,21 +110,21 @@ const RAMS_WORK_AREA_OPTIONS = [
 ];
 
 const RAMS_TOOL_OPTIONS = [
-  { value: "scalpel", label: "Scalpel", cardIds: ["tools"] },
-  { value: "felt-edge-squeegee", label: "Felt Edge Squeegee", cardIds: ["tools"] },
-  { value: "stanley-knife", label: "Stanley Knife", cardIds: ["tools"] },
-  { value: "18v-impact-driver", label: "18v Cordless Battery Powered Impact Driver", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "18v-sds-drill", label: "18v Cordless Battery Powered SDS Drill", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "petrol-generator", label: "Petrol Generator", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "230v-110v-breaker", label: "230v or 110v Breaker", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "corded-jigsaw", label: "Corded Jigsaw", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "18v-grinder", label: "18V Cordless Battery Powered Grinder", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "cat-scanner", label: "CAT Scanner", cardIds: ["tools", "equipmentFailure"] },
-  { value: "corded-heat-gun", label: "Corded Heat Gun", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "plunge-saw-guide-rail", label: "Plunge Saw with Guide Rail & Sawhorse", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "multi-tool", label: "Multi Tool", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] },
-  { value: "non-powered-digging-tools", label: "Non-Powered Digging Tools", cardIds: ["tools", "digging"] },
-  { value: "powered-belt-disc-sander", label: "Powered Belt or Disc Sander", cardIds: ["tools", "electricalEquipment", "equipmentFailure"] }
+  { value: "scalpel", label: "Scalpel" },
+  { value: "felt-edge-squeegee", label: "Felt Edge Squeegee" },
+  { value: "stanley-knife", label: "Stanley Knife" },
+  { value: "18v-impact-driver", label: "18v Cordless Battery Powered Impact Driver" },
+  { value: "18v-sds-drill", label: "18v Cordless Battery Powered SDS Drill" },
+  { value: "petrol-generator", label: "Petrol Generator" },
+  { value: "230v-110v-breaker", label: "230v or 110v Breaker" },
+  { value: "corded-jigsaw", label: "Corded Jigsaw" },
+  { value: "18v-grinder", label: "18V Cordless Battery Powered Grinder" },
+  { value: "cat-scanner", label: "CAT Scanner" },
+  { value: "corded-heat-gun", label: "Corded Heat Gun" },
+  { value: "plunge-saw-guide-rail", label: "Plunge Saw with Guide Rail & Sawhorse" },
+  { value: "multi-tool", label: "Multi Tool" },
+  { value: "non-powered-digging-tools", label: "Non-Powered Digging Tools" },
+  { value: "powered-belt-disc-sander", label: "Powered Belt or Disc Sander" }
 ];
 
 const RAMS_DEFAULT_QUESTIONS = {
@@ -206,213 +206,277 @@ const RAMS_PPE_ITEMS = [
 ];
 
 const RAMS_STANDARD_RISK_CARDS = {
-  accessEgress: {
-    title: "Access & Egress",
+  competencyTraining: {
+    title: "Competency / Training /",
     type: "Risk",
-    trigger: "Always included",
-    whoAtRisk: "Employees\nThird parties",
+    trigger: "Selected equipment or powered access requires competence checks",
+    whoAtRisk: "Employees",
     initialLikelihood: 3,
-    initialConsequence: 2,
+    initialConsequence: 5,
     residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "An agreed route to and from place of work will be kept to. Traffic movement will be done in a safe and orderly manner in conjunction with site manager's instruction.",
-    content: ["An agreed route to and from place of work will be kept to. Traffic movement will be done in a safe and orderly manner in conjunction with site manager's instruction."]
+    residualConsequence: 5,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Only trained, competent and authorised persons to use equipment.\nEvidence of competency to be checked before work starts.",
+    content: [
+      "Only trained, competent and authorised persons to use equipment.",
+      "Evidence of competency to be checked before work starts."
+    ]
   },
-  injuryIncident: {
-    title: "Risk of Injury or Incident",
+  electrocutionElectricShock: {
+    title: "Electrocution / Electric Shock",
     type: "Risk",
-    trigger: "Always included",
-    whoAtRisk: "Employees\nThird parties",
-    initialLikelihood: 3,
-    initialConsequence: 3,
-    residualLikelihood: 1,
-    residualConsequence: 2,
-    responsibility: "Matt Carroll",
-    controlMeasure: "All fitters undergo training for work positioning and correct use of tools and equipment. In compliance with current guidelines, a safety rescue plan is discussed and decided prior to any work being carried out. First aid facilities available. An accident report will be filed after any incident.",
-    content: ["All fitters undergo training for work positioning and correct use of tools and equipment.", "Safety rescue plan to be discussed before works start.", "First aid facilities available and accident report completed after any incident."]
-  },
-  musculoskeletal: {
-    title: "Musculoskeletal Disorders",
-    type: "Risk",
-    trigger: "Heavy or awkward lifting selected",
+    trigger: "Electrical or powered equipment selected",
     whoAtRisk: "Employees",
     initialLikelihood: 2,
-    initialConsequence: 2,
+    initialConsequence: 5,
     residualLikelihood: 1,
-    residualConsequence: 2,
-    responsibility: "Matt Carroll",
-    controlMeasure: "All fitters undergo training for correct manual handling techniques which are to be adhered to at all times.",
-    content: ["All fitters undergo training for correct manual handling techniques which are to be adhered to at all times."]
+    residualConsequence: 5,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Visual checks of tools, plugs, leads and cords before use.\nUse RCD-protected supply where applicable.",
+    content: [
+      "Visual checks of tools, plugs, leads and cords before use.",
+      "Use RCD-protected supply where applicable."
+    ]
   },
-  ppeUnsuitable: {
-    title: "Injury to Fitters Due to PPE Unsuitable for the Environment Being Worked In",
+  dustFumesAirborneParticles: {
+    title: "Dust / Fumes / Airborne Particles",
     type: "Risk",
-    trigger: "Always included",
-    whoAtRisk: "Employees\nThird parties",
-    initialLikelihood: 3,
-    initialConsequence: 3,
-    residualLikelihood: 1,
-    residualConsequence: 2,
-    responsibility: "Matt Carroll",
-    controlMeasure: "PPE is provided and worn by fitters. PPE will be appropriate not only to the job being undertaken but also meeting the requirements of the site as a whole.",
-    content: ["PPE is provided and worn by fitters.", "PPE will be appropriate to the job and the requirements of the site as a whole."]
-  },
-  poorLighting: {
-    title: "Risk of Injury Due to Poor Lighting",
-    type: "Risk",
-    trigger: "Internal or low light works",
+    trigger: "Dust-creating or powered cutting equipment selected",
     whoAtRisk: "Employees",
-    initialLikelihood: 2,
-    initialConsequence: 3,
+    initialLikelihood: 3,
+    initialConsequence: 4,
     residualLikelihood: 1,
-    residualConsequence: 2,
-    responsibility: "Matt Carroll",
-    controlMeasure: "External work to be carried out in daylight. Site lighting to be used for internal work where required.",
-    content: ["External work to be carried out in daylight.", "Site lighting to be used for internal work where required."]
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Work in well ventilated areas with suitable respiratory protection where required.\nUse task-specific dust suppression and extraction controls.",
+    content: [
+      "Work in well ventilated areas with suitable respiratory protection where required.",
+      "Use task-specific dust suppression and extraction controls."
+    ]
   },
-  height: {
-    title: "Falls from Height",
+  silicaExposure: {
+    title: "Silica Exposure",
     type: "Risk",
-    trigger: "Steps, ladders or MEWP",
+    trigger: "Breaker or masonry disturbance selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 4,
+    initialConsequence: 4,
+    residualLikelihood: 1,
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Use wet methods, local extraction or other suitable silica controls.\nUse the lowest dust method reasonably practicable.",
+    content: [
+      "Use wet methods, local extraction or other suitable silica controls.",
+      "Use the lowest dust method reasonably practicable."
+    ]
+  },
+  noiseHearingDamage: {
+    title: "Noise / Hearing Damage",
+    type: "Risk",
+    trigger: "High-noise equipment selected",
     whoAtRisk: "Employees",
     initialLikelihood: 2,
     initialConsequence: 4,
     residualLikelihood: 1,
     residualConsequence: 4,
-    responsibility: "Matt Carroll",
-    controlMeasure: "All work to be carried out by competent fitters who have undertaken ladder and step-up training. Fitters will not erect scaffolds and will supervise any other colleagues when erecting or using scaffold.",
-    content: ["Use the lowest-risk access method suitable for the task and inspect access equipment before use.", "Competent fitters only to work at height and avoid overreaching.", "Do not work at height in unsafe weather, poor ground conditions or uncontrolled public areas."]
+    responsibility: "Installers from selected job",
+    controlMeasure: "Suitable hearing protection worn where required.\nEnsure hearing protection is suitable, in good condition and worn correctly.",
+    content: [
+      "Suitable hearing protection worn where required.",
+      "Ensure hearing protection is suitable, in good condition and worn correctly."
+    ]
   },
-  public: {
-    title: "Injury to the General Public During Course of Work",
+  vibrationHavs: {
+    title: "Vibration / HAVS",
     type: "Risk",
-    trigger: "Public or occupied area",
-    whoAtRisk: "Third parties",
-    initialLikelihood: 2,
-    initialConsequence: 2,
+    trigger: "High-vibration equipment selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 3,
+    initialConsequence: 4,
     residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Report all hazardous activity to site management. Ensure a fitter is present with the ability to communicate with workers and emergency services.",
-    content: ["Set a clear exclusion zone using cones, barriers or signage suitable for the work area.", "Keep tools, materials and waste within the controlled area and maintain safe pedestrian routes.", "Suspend work if the exclusion zone cannot be maintained."]
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Operators instructed on vibration symptoms and limits.\nCheck vibration ratings and monitor trigger times.",
+    content: [
+      "Operators instructed on vibration symptoms and limits.",
+      "Check vibration ratings and monitor trigger times."
+    ]
   },
-  fallingObjects: {
-    title: "Falling Objects",
+  burnsHotSurfaces: {
+    title: "Burns / Hot Surfaces /",
     type: "Risk",
-    trigger: "Steps, ladders or MEWP",
-    whoAtRisk: "Employees\nThird parties",
+    trigger: "Heat, generator or hot equipment selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 3,
+    residualLikelihood: 1,
+    residualConsequence: 2,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Operators wear suitable PPE including heat-resistant hand protection where needed.\nAllow equipment and components to cool before handling or storing.",
+    content: [
+      "Operators wear suitable PPE including heat-resistant hand protection where needed.",
+      "Allow equipment and components to cool before handling or storing."
+    ]
+  },
+  slipsTripsFalls: {
+    title: "Slips / Trips / Falls /",
+    type: "Risk",
+    trigger: "Movement of tools, cables or materials on site",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 4,
+    residualLikelihood: 1,
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Work areas kept tidy and cleaned regularly.\nMaintain good housekeeping throughout the task.",
+    content: [
+      "Work areas kept tidy and cleaned regularly.",
+      "Maintain good housekeeping throughout the task."
+    ]
+  },
+  entanglementEntrapment: {
+    title: "Entanglement / Entrapment /",
+    type: "Risk",
+    trigger: "Rotating or moving equipment selected",
+    whoAtRisk: "Employees",
     initialLikelihood: 2,
     initialConsequence: 5,
     residualLikelihood: 1,
     residualConsequence: 5,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Area cordoned off with cones and safety barriers. Provision to be made to allow building occupants to escape if blocking escape route. All small tools and materials will be carried in a bag or on a belt. All large tools should have carry straps. All scaffold to have toe boards.",
-    content: ["Area cordoned off with cones and safety barriers.", "Small tools and materials to be carried in a bag or on a belt.", "Large tools should have carry straps and scaffold should have toe boards."]
+    responsibility: "Installers from selected job",
+    controlMeasure: "Guards and safety devices kept in place.\nClearly mark safe working zones and use tools in accordance with manufacturer guidance.",
+    content: [
+      "Guards and safety devices kept in place.",
+      "Clearly mark safe working zones and use tools in accordance with manufacturer guidance."
+    ]
   },
-  electricalEquipment: {
-    title: "Electric Shock from Equipment",
+  cutsStabbingPuncture: {
+    title: "Cuts / Stabbing / Puncture /",
     type: "Risk",
-    trigger: "Power tools / drilling selected",
-    whoAtRisk: "Employees",
-    initialLikelihood: 0,
-    initialConsequence: 0,
-    residualLikelihood: 0,
-    residualConsequence: 0,
-    responsibility: "Matt Carroll",
-    controlMeasure: "No electrical equipment will be used and no work will be done on fixed electrical system. All drills etc are battery operated or powered by 110v generator.",
-    content: ["No electrical equipment will be used and no work will be done on fixed electrical system.", "All drills etc are battery operated or powered by 110v generator."]
-  },
-  equipmentFailure: {
-    title: "Equipment Failure",
-    type: "Risk",
-    trigger: "Power tools / drilling selected",
+    trigger: "Bladed or cutting tools selected",
     whoAtRisk: "Employees",
     initialLikelihood: 2,
-    initialConsequence: 2,
+    initialConsequence: 4,
     residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Ensure equipment is routinely checked. Routine inspection of all equipment prior to commencement of job. Routine testing and maintenance schedule established and in operation. All electrical equipment has been PAT tested.",
-    content: ["Ensure equipment is routinely checked.", "Routine inspection of all equipment prior to commencement of job.", "Routine testing and maintenance schedule established and in operation."]
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Correct guards and tool accessories used.\nDo not place tools down until blades or discs are safe and controlled.",
+    content: [
+      "Correct guards and tool accessories used.",
+      "Do not place tools down until blades or discs are safe and controlled."
+    ]
   },
-  fittersFatigue: {
-    title: "Fitters Feeling Fatigue",
+  flyingDebrisParticlesEye: {
+    title: "Flying Debris / Particles / Eye",
     type: "Risk",
-    trigger: "Always included",
+    trigger: "Grinding, drilling or cutting equipment selected",
     whoAtRisk: "Employees",
-    initialLikelihood: 1,
-    initialConsequence: 2,
-    residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "The supervisor will keep in contact with the fitters regularly. If they become tired another fitter will take over.",
-    content: ["The supervisor will keep in contact with the fitters regularly.", "If they become tired another fitter will take over."]
-  },
-  slipsTrips: {
-    title: "Slips, Trips & Falls",
-    type: "Risk",
-    trigger: "Always included",
-    whoAtRisk: "Employees\nThird parties",
     initialLikelihood: 2,
-    initialConsequence: 2,
-    residualLikelihood: 1,
+    initialConsequence: 4,
+    residualLikelihood: 2,
     residualConsequence: 2,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Area to be inspected for hazards and any objects removed if possible. If not, advise others. All areas of work to be coned off.",
-    content: ["Area to be inspected for hazards and any objects removed if possible.", "If hazards cannot be removed, advise others.", "All areas of work to be coned off."]
+    responsibility: "Installers from selected job",
+    controlMeasure: "Eye protection or goggles worn where required.\nInspect wheels, discs, bits and materials before use.",
+    content: [
+      "Eye protection or goggles worn where required.",
+      "Inspect wheels, discs, bits and materials before use."
+    ]
   },
-  badWeather: {
-    title: "Bad Weather",
+  serviceStrikeUnderground: {
+    title: "Service Strike / Underground",
     type: "Risk",
-    trigger: "External works",
+    trigger: "Breaking, scanning or digging activity selected",
     whoAtRisk: "Employees",
-    initialLikelihood: 1,
-    initialConsequence: 1,
+    initialLikelihood: 3,
+    initialConsequence: 5,
     residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Work to be called off if weather conditions become unsafe.",
-    content: ["Work to be called off if weather conditions become unsafe."]
+    residualConsequence: 5,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Service drawings checked before work starts.\nContact service owners to isolate supplies or confirm safe digging routes before breaking ground.",
+    content: [
+      "Service drawings checked before work starts.",
+      "Contact service owners to isolate supplies or confirm safe digging routes before breaking ground."
+    ]
   },
-  diggingHoles: {
-    title: "Digging Holes",
-    type: "Risk",
-    trigger: "Ground works",
-    whoAtRisk: "Employees\nThird parties",
-    initialLikelihood: 1,
-    initialConsequence: 2,
-    residualLikelihood: 1,
-    residualConsequence: 1,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Area to be CAT scanned prior to any digging.",
-    content: ["Area to be CAT scanned prior to any digging."]
-  },
-  windowBreakage: {
-    title: "Accidental Breakage of Windows",
-    type: "Risk",
-    trigger: "Window graphics selected",
-    whoAtRisk: "Employees\nThird parties",
-    initialLikelihood: 2,
-    initialConsequence: 3,
-    residualLikelihood: 1,
-    residualConsequence: 3,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Care to be taken to ensure that materials and tools are kept away from any glass.",
-    content: ["Care to be taken to ensure that materials and tools are kept away from any glass."]
-  },
-  emergencyIncidents: {
-    title: "Emergency Incidents on Site",
+  manualHandlingLoad: {
+    title: "Manual Handling / Load",
     type: "Risk",
     trigger: "Always included",
     whoAtRisk: "Employees",
     initialLikelihood: 2,
     initialConsequence: 3,
     residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Loads assessed before movement and routes cleared in advance.\nBreak loads down into smaller parts where practicable.",
+    content: [
+      "Loads assessed before movement and routes cleared in advance.",
+      "Break loads down into smaller parts where practicable."
+    ]
+  },
+  fireFuelExplosionLeaks: {
+    title: "Fire / Fuel / Explosion / Leaks",
+    type: "Risk",
+    trigger: "Fuel or generator equipment selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 3,
+    initialConsequence: 3,
+    residualLikelihood: 1,
     residualConsequence: 3,
-    responsibility: "Matt Carroll",
-    controlMeasure: "Procedures for emergency incidents on site to be agreed with Signs Express personnel and site manager prior to operation.",
-    content: ["Procedures for emergency incidents on site to be agreed with Signs Express personnel and site manager prior to operation."]
+    responsibility: "Installers from selected job",
+    controlMeasure: "Fuel stored in suitable containers and kept away from ignition sources.\nCarry out daily checks for leaks, storage condition and safe ventilation.",
+    content: [
+      "Fuel stored in suitable containers and kept away from ignition sources.",
+      "Carry out daily checks for leaks, storage condition and safe ventilation."
+    ]
+  },
+  generalOperationalInjury: {
+    title: "General Operational Injury /",
+    type: "Risk",
+    trigger: "Always included",
+    whoAtRisk: "Employees",
+    initialLikelihood: 3,
+    initialConsequence: 3,
+    residualLikelihood: 2,
+    residualConsequence: 3,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Equipment used only for intended purpose.\nProvide supervision where required and reinforce safe systems of work.",
+    content: [
+      "Equipment used only for intended purpose.",
+      "Provide supervision where required and reinforce safe systems of work."
+    ]
+  },
+  uvOutdoorExposure: {
+    title: "UV / Outdoor Exposure",
+    type: "Risk",
+    trigger: "Outdoor power work selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 2,
+    initialConsequence: 2,
+    residualLikelihood: 1,
+    residualConsequence: 1,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Suitable clothing worn including long sleeves and weather-appropriate PPE.\nPlan work to reduce prolonged exposure and maintain hydration.",
+    content: [
+      "Suitable clothing worn including long sleeves and weather-appropriate PPE.",
+      "Plan work to reduce prolonged exposure and maintain hydration."
+    ]
+  },
+  plantVehicleTrailerOperation: {
+    title: "Plant / Vehicle / Trailer Operation",
+    type: "Risk",
+    trigger: "Vehicle movement or powered access selected",
+    whoAtRisk: "Employees",
+    initialLikelihood: 5,
+    initialConsequence: 5,
+    residualLikelihood: 1,
+    residualConsequence: 4,
+    responsibility: "Installers from selected job",
+    controlMeasure: "Operators and drivers trained and competent with pre-use checks completed.\nSecond-person check on loading, securing and manoeuvring where required.",
+    content: [
+      "Operators and drivers trained and competent with pre-use checks completed.",
+      "Second-person check on loading, securing and manoeuvring where required."
+    ]
   }
 };
 
@@ -489,42 +553,6 @@ const RAMS_CARD_LIBRARY = {
       "Photograph completed works where required for job records or client sign-off."
     ]
   },
-  public: {
-    title: "Public, Staff and Third-Party Interface",
-    type: "Risk",
-    trigger: "Public or occupied area",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Set a clear exclusion zone using cones, barriers or signage suitable for the work area.",
-      "Keep tools, materials and waste within the controlled area and maintain safe pedestrian routes.",
-      "Suspend work if the exclusion zone cannot be maintained."
-    ]
-  },
-  slipsTrips: {
-    title: "Slips, Trips and Housekeeping",
-    type: "Risk",
-    trigger: "Always included",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Keep walkways, access routes and the working area clear of tools, packaging, trailing leads and loose materials.",
-      "Clean up debris as work progresses and remove waste from site or place it in the agreed waste area.",
-      "Do not leave materials where they could fall, blow away or create a trip hazard."
-    ]
-  },
-  traffic: {
-    title: "Vehicle Movement and Deliveries",
-    type: "Risk",
-    trigger: "Vehicle movement nearby",
-    initialRisk: "High",
-    residualRisk: "Low",
-    content: [
-      "Agree safe parking, unloading and working positions with site before work starts.",
-      "Use a banksman where visibility is restricted or materials are moved near vehicle routes.",
-      "Wear hi-vis PPE and do not work in live traffic routes without suitable segregation."
-    ]
-  },
   construction: {
     title: "Construction Site Controls",
     type: "Method",
@@ -535,18 +563,6 @@ const RAMS_CARD_LIBRARY = {
       "Follow principal contractor rules, daily briefings and permit systems.",
       "Wear site-required PPE as a minimum and keep the work area tidy.",
       "Coordinate with other trades before drilling, lifting or closing access routes."
-    ]
-  },
-  height: {
-    title: "Working at Height",
-    type: "Risk",
-    trigger: "Steps, ladders or MEWP",
-    initialRisk: "High",
-    residualRisk: "Low",
-    content: [
-      "Use the lowest-risk access method suitable for the task and inspect access equipment before use.",
-      "Maintain three points of contact where applicable and avoid overreaching.",
-      "Do not work at height in unsafe weather, poor ground conditions or uncontrolled public areas."
     ]
   },
   ladders: {
@@ -573,66 +589,6 @@ const RAMS_CARD_LIBRARY = {
       "Wear harness and lanyard where required by the platform type and site rules."
     ]
   },
-  tools: {
-    title: "Hand Tools, Cutting and Drilling",
-    type: "Risk",
-    trigger: "Tools selected",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Use the correct tool for the task and check tools before use.",
-      "Wear eye protection when drilling, cutting or fixing.",
-      "Control dust and debris, and check for hidden services before drilling."
-    ]
-  },
-  substances: {
-    title: "Adhesives, Cleaners and Substances",
-    type: "COSHH",
-    trigger: "Adhesives / cleaners selected",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Use only required quantities and follow product safety data sheets.",
-      "Maintain ventilation, avoid ignition sources and wear suitable gloves where needed.",
-      "Store containers securely and remove waste from site."
-    ]
-  },
-  lifting: {
-    title: "Manual Handling and Material Movement",
-    type: "Risk",
-    trigger: "Heavy or awkward lifting selected",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Assess size, weight, route and fixing position before lifting.",
-      "Use team lifts, trolleys or mechanical aids for heavy or awkward items.",
-      "Keep routes clear and avoid twisting while carrying materials."
-    ]
-  },
-  electrical: {
-    title: "Electrical Services and Isolation",
-    type: "Risk",
-    trigger: "Electrical work nearby",
-    initialRisk: "High",
-    residualRisk: "Low",
-    content: [
-      "Signs Express operatives must not work on live electrical systems unless specifically competent and authorised.",
-      "Confirm isolation or safe routing before drilling near lighting, cables or illuminated sign supplies.",
-      "Stop work if unknown services are found."
-    ]
-  },
-  electricalEquipment: {
-    title: "Electric Shock from Equipment",
-    type: "Risk",
-    trigger: "Power tools / drilling selected",
-    initialRisk: "High",
-    residualRisk: "Low",
-    content: [
-      "Use battery-powered tools where reasonably practicable and check tools, chargers and leads before use.",
-      "Do not use damaged electrical equipment, exposed cables or improvised connections.",
-      "Keep electrical equipment away from wet surfaces and route leads to avoid damage or trip hazards."
-    ]
-  },
   vehicle: {
     title: "Vehicle Graphics Installation",
     type: "Method",
@@ -643,18 +599,6 @@ const RAMS_CARD_LIBRARY = {
       "Confirm vehicle is parked safely with adequate space around the work area.",
       "Clean and prepare surfaces using approved products before applying graphics.",
       "Keep blades controlled and dispose of backing paper, application tape and waste safely."
-    ]
-  },
-  weather: {
-    title: "Weather and External Conditions",
-    type: "Risk",
-    trigger: "External works",
-    initialRisk: "Medium",
-    residualRisk: "Low",
-    content: [
-      "Check weather conditions before external installation starts.",
-      "Do not install in high wind, heavy rain, icy conditions or temperatures unsuitable for the materials.",
-      "Secure loose materials and postpone work if conditions become unsafe."
     ]
   },
   completion: {
@@ -673,14 +617,10 @@ const RAMS_CARD_LIBRARY = {
 
 const RAMS_BASE_CARD_IDS = [
   "induction",
-  "accessEgress",
-  "injuryIncident",
-  "slipsTrips",
-  "ppeUnsuitable",
-  "fittersFatigue",
-  "emergencyIncidents",
-  "tools",
-  "lifting",
+  "competencyTraining",
+  "slipsTripsFalls",
+  "manualHandlingLoad",
+  "generalOperationalInjury",
   "siteSetup",
   "surveyCheck",
   "accessSetup",
@@ -688,6 +628,100 @@ const RAMS_BASE_CARD_IDS = [
   "qualityCheck",
   "completion"
 ];
+
+const LEGACY_RAMS_RISK_CARD_IDS = new Set([
+  "accessEgress",
+  "injuryIncident",
+  "musculoskeletal",
+  "ppeUnsuitable",
+  "poorLighting",
+  "height",
+  "public",
+  "fallingObjects",
+  "electricalEquipment",
+  "equipmentFailure",
+  "fittersFatigue",
+  "slipsTrips",
+  "badWeather",
+  "diggingHoles",
+  "windowBreakage",
+  "emergencyIncidents",
+  "traffic",
+  "tools",
+  "substances",
+  "lifting",
+  "electrical",
+  "weather"
+]);
+
+function getDefaultRamsToolCardIds(toolValue = "") {
+  switch (toolValue) {
+    case "scalpel":
+    case "felt-edge-squeegee":
+    case "stanley-knife":
+      return ["cutsStabbingPuncture"];
+    case "18v-impact-driver":
+      return ["competencyTraining", "electrocutionElectricShock", "noiseHearingDamage", "entanglementEntrapment"];
+    case "18v-sds-drill":
+      return ["competencyTraining", "electrocutionElectricShock", "dustFumesAirborneParticles", "noiseHearingDamage", "vibrationHavs", "flyingDebrisParticlesEye", "generalOperationalInjury"];
+    case "petrol-generator":
+      return ["burnsHotSurfaces", "slipsTripsFalls", "fireFuelExplosionLeaks", "generalOperationalInjury"];
+    case "230v-110v-breaker":
+      return ["electrocutionElectricShock", "dustFumesAirborneParticles", "silicaExposure", "noiseHearingDamage", "vibrationHavs", "burnsHotSurfaces", "serviceStrikeUnderground", "generalOperationalInjury", "uvOutdoorExposure"];
+    case "corded-jigsaw":
+      return ["electrocutionElectricShock", "slipsTripsFalls", "cutsStabbingPuncture", "flyingDebrisParticlesEye", "generalOperationalInjury"];
+    case "18v-grinder":
+      return ["competencyTraining", "dustFumesAirborneParticles", "noiseHearingDamage", "flyingDebrisParticlesEye"];
+    case "cat-scanner":
+      return ["serviceStrikeUnderground"];
+    case "corded-heat-gun":
+      return ["electrocutionElectricShock", "burnsHotSurfaces", "generalOperationalInjury"];
+    case "plunge-saw-guide-rail":
+      return ["electrocutionElectricShock", "dustFumesAirborneParticles", "noiseHearingDamage", "cutsStabbingPuncture", "flyingDebrisParticlesEye", "generalOperationalInjury"];
+    case "multi-tool":
+      return ["electrocutionElectricShock", "dustFumesAirborneParticles", "noiseHearingDamage", "cutsStabbingPuncture", "flyingDebrisParticlesEye", "generalOperationalInjury"];
+    case "non-powered-digging-tools":
+      return ["serviceStrikeUnderground", "manualHandlingLoad"];
+    case "powered-belt-disc-sander":
+      return ["electrocutionElectricShock", "dustFumesAirborneParticles", "noiseHearingDamage", "cutsStabbingPuncture", "flyingDebrisParticlesEye", "generalOperationalInjury"];
+    default:
+      return [];
+  }
+}
+
+function getDefaultRamsAccessCardIds(accessValue = "") {
+  switch (accessValue) {
+    case "triple-extension-ladder":
+      return ["ladders"];
+    case "electric-scissor-lift":
+    case "diesel-scissor-lift":
+    case "electric-boom-lift":
+    case "diesel-boom-lift":
+      return ["mewp", "plantVehicleTrailerOperation", "competencyTraining"];
+    default:
+      return [];
+  }
+}
+
+function getDefaultRamsActivityCardIds(activityValue = "") {
+  switch (activityValue) {
+    case "vehicle":
+      return ["vehicle"];
+    default:
+      return [];
+  }
+}
+
+function getDefaultRamsWorkAreaCardIds(workAreaValue = "") {
+  switch (workAreaValue) {
+    case "construction":
+      return ["construction"];
+    case "traffic":
+      return ["plantVehicleTrailerOperation"];
+    default:
+      return [];
+  }
+}
 
 const RAMS_DEFAULT_LOGIC = {
   optionGroups: [
@@ -698,14 +732,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: true,
       options: RAMS_ACTIVITY_OPTIONS.map((option) => ({
         ...option,
-        cardIds:
-          option.value === "external"
-            ? ["weather"]
-            : option.value === "window"
-              ? ["weather"]
-              : option.value === "vehicle"
-                ? ["vehicle"]
-                : []
+        cardIds: getDefaultRamsActivityCardIds(option.value)
       }))
     },
     {
@@ -715,7 +742,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: true,
       options: RAMS_ACCESS_OPTIONS.map((option) => ({
         ...option,
-        cardIds: option.cardIds || []
+        cardIds: getDefaultRamsAccessCardIds(option.value)
       }))
     },
     {
@@ -725,14 +752,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: false,
       options: RAMS_WORK_AREA_OPTIONS.map((option) => ({
         ...option,
-        cardIds:
-          option.value === "public"
-            ? ["public"]
-            : option.value === "traffic"
-              ? ["traffic"]
-              : option.value === "construction"
-                ? ["construction"]
-                : []
+        cardIds: getDefaultRamsWorkAreaCardIds(option.value)
       }))
     },
     {
@@ -742,7 +762,7 @@ const RAMS_DEFAULT_LOGIC = {
       multi: true,
       options: RAMS_TOOL_OPTIONS.map((option) => ({
         ...option,
-        cardIds: option.cardIds || []
+        cardIds: getDefaultRamsToolCardIds(option.value)
       }))
     }
   ],
@@ -1672,7 +1692,9 @@ function normalizeRamsLogic(logic = {}) {
     ...RAMS_DEFAULT_LOGIC.cards,
     ...RAMS_STANDARD_RISK_CARDS
   };
-  const incomingCards = logic.cards && typeof logic.cards === "object" ? logic.cards : {};
+  const incomingCards = logic.cards && typeof logic.cards === "object"
+    ? Object.fromEntries(Object.entries(logic.cards).filter(([cardId]) => !LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId))))
+    : {};
   const cardEntries = Object.entries({ ...defaultCards, ...incomingCards }).map(([cardId, card]) => [
     cardId,
     normalizeRamsCard(card, defaultCards[cardId])
@@ -1711,13 +1733,15 @@ function normalizeRamsLogic(logic = {}) {
         options: mergedOptions.map((option, optionIndex) => ({
           value: String(option.value || `option-${optionIndex}`),
           label: String(option.label || option.value || "Option"),
-          cardIds: Array.isArray(option.cardIds) ? option.cardIds.map(String).filter(Boolean) : []
+          cardIds: Array.isArray(option.cardIds)
+            ? option.cardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
+            : []
         }))
       };
     }),
     cards: Object.fromEntries(cardEntries),
     baseCardIds: Array.isArray(logic.baseCardIds)
-      ? logic.baseCardIds.map(String).filter(Boolean)
+      ? logic.baseCardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
       : RAMS_BASE_CARD_IDS
   };
 }
