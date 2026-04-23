@@ -288,6 +288,10 @@ function canEditSocialPost(user) {
   return getUserPermission(user, "socialPost", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
+function canAccessDescriptionPull(user) {
+  return canManagePermissions(user) || canEditBoard(user) || canAccessSocialPost(user);
+}
+
 function toPublicRamsProfile(user = {}) {
   const safeUser = sanitizeUser(user);
   return {
@@ -583,6 +587,12 @@ function requireVanEstimatorAccess(request, response) {
 function requireVanEstimatorAdmin(request, response) {
   if (canEditVanEstimator(request.user)) return true;
   response.status(403).json({ error: "Vehicle pricing admin access required." });
+  return false;
+}
+
+function requireDescriptionPullAccess(request, response) {
+  if (canAccessDescriptionPull(request.user)) return true;
+  response.status(403).json({ error: "Description Pull access required." });
   return false;
 }
 
@@ -4707,6 +4717,100 @@ function getSocialLineItemBriefs(items = []) {
   });
 }
 
+function extractDescriptionPullLines(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const groups = new Map();
+
+  function scoreDescriptionField(leaf, value) {
+    let score = 0;
+    if (/customerdescription/i.test(leaf)) score += 80;
+    if (/customer.description/i.test(leaf)) score += 70;
+    if (/descriptiontext/i.test(leaf)) score += 45;
+    if (/lineitemdescription|itemdescription|productdescription/i.test(leaf)) score += 30;
+    if (/description/i.test(leaf)) score += 15;
+    if (/notes|memo/i.test(leaf)) score += 5;
+    if (/<\/?[a-z][\s\S]*>/i.test(String(value || ""))) score += 4;
+    score += Math.min(String(value || "").length, 1600) / 1600;
+    return score;
+  }
+
+  function scoreNameField(leaf) {
+    if (/lineitemname/i.test(leaf)) return 70;
+    if (/itemname|productname/i.test(leaf)) return 45;
+    if (/(^|\.|_)name$/i.test(leaf)) return 25;
+    if (/title|category/i.test(leaf)) return 10;
+    return 0;
+  }
+
+  fields.forEach((field) => {
+    const key = String(field.key || "");
+    const lowerKey = key.toLowerCase();
+    const value = normalizeSocialText(field.value);
+    const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+    if (!match || !value) return;
+
+    const group = groups.get(match[1]) || {
+      index: Number(match[1]),
+      name: "",
+      nameScore: -1,
+      description: "",
+      descriptionScore: -1
+    };
+    const leaf = match[2];
+
+    if (
+      /(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf) &&
+      isUsefulSocialText(value)
+    ) {
+      const nextScore = scoreDescriptionField(leaf, field.value);
+      if (nextScore > group.descriptionScore) {
+        group.description = value;
+        group.descriptionScore = nextScore;
+      }
+    }
+
+    if (
+      /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
+      !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
+    ) {
+      const nextScore = scoreNameField(leaf);
+      if (nextScore > group.nameScore) {
+        group.name = value;
+        group.nameScore = nextScore;
+      }
+    }
+
+    groups.set(match[1], group);
+  });
+
+  const lines = [...groups.values()]
+    .filter((group) => isUsefulSocialText(group.description))
+    .sort((left, right) => left.index - right.index)
+    .map((group) => ({
+      lineItemName: group.name || `Line Item ${group.index + 1}`,
+      customerDescription: group.description
+    }));
+
+  if (lines.length) return lines;
+
+  return getSocialDescriptionCandidates(order).slice(0, 8).map((candidate, index) => ({
+    lineItemName: candidate.key || `Description ${index + 1}`,
+    customerDescription: candidate.text
+  }));
+}
+
+function formatDescriptionPullText(payload = {}) {
+  const heading = `${payload.customerName || "Unknown Customer"} - ${payload.orderReference || ""}`.trim();
+  const sections = (payload.lines || []).map((line) =>
+    [
+      `Line Item Name: ${line.lineItemName || "-"}`,
+      "Customer Description:",
+      line.customerDescription || "-"
+    ].join("\n")
+  );
+  return [heading, "", ...sections].join("\n\n").trim();
+}
+
 function buildSocialPostBrief(order, voice) {
   const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
@@ -5102,7 +5206,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -5693,6 +5797,61 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(error.statusCode || 500).json({
         error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not generate the social post.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.post("/api/description-pull", async (request, response) => {
+    if (!requireDescriptionPullAccess(request, response)) return;
+    try {
+      const orderReference = String(request.body?.orderReference || "").trim();
+      if (!orderReference) {
+        response.status(400).json({ error: "Enter a Corebridge order reference." });
+        return;
+      }
+
+      const lookupReferences = getSocialLookupReferences(orderReference);
+      const lookupAttempts = [];
+      let lookup = null;
+      let order = null;
+
+      for (const reference of lookupReferences) {
+        try {
+          const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+          const candidateOrder = (candidateLookup.orders || [])[0];
+          lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
+          if (candidateOrder) {
+            lookup = candidateLookup;
+            order = candidateOrder;
+            break;
+          }
+        } catch (lookupError) {
+          lookupAttempts.push({ reference, found: false, error: lookupError.message || "Lookup failed" });
+        }
+      }
+
+      if (!order) {
+        response.status(404).json({ error: "No Corebridge order found for that reference." });
+        return;
+      }
+
+      const payload = {
+        orderReference: order.orderReference || orderReference,
+        customerName: order.customerName || "",
+        lines: extractDescriptionPullLines(order),
+        lookupAttempts
+      };
+
+      response.json({
+        ...payload,
+        text: formatDescriptionPullText(payload),
+        order,
+        lookup
+      });
+    } catch (error) {
+      response.status(error.statusCode || 500).json({
+        error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not pull descriptions.",
         detail: error.message
       });
     }

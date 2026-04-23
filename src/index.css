@@ -7098,6 +7098,49 @@ button {
   background: #f8fafc;
 }
 
+.muted-copy {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.description-pull-grid {
+  grid-template-columns: minmax(320px, 0.7fr) minmax(0, 1.3fr);
+}
+
+.description-pull-output textarea {
+  min-height: 520px;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.description-pull-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.description-pull-summary span,
+.description-pull-summary strong {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 .button-spinner-label {
   display: inline-flex;
   align-items: center;

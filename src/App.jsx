@@ -2256,10 +2256,14 @@ function canEditSocialPost(user) {
   return getPermissionForApp(user, "socialPost") === "admin";
 }
 
+function canAccessDescriptionPull(user) {
+  return Boolean(user && (user.canManagePermissions || canEditBoard(user) || canAccessSocialPost(user)));
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || user.canManagePermissions)
   );
 }
 
@@ -2404,6 +2408,7 @@ function MainNavBar({
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
+  const descriptionPullAllowed = canAccessDescriptionPull(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -2413,6 +2418,7 @@ function MainNavBar({
   const vanEstimatorPath = "/van-estimator";
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
+  const descriptionPullPath = "/description-pull";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -2425,6 +2431,7 @@ function MainNavBar({
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
+    { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
@@ -3287,6 +3294,9 @@ function HostLandingPage({
             {canAccessSocialPost(currentUser) ? (
               <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
             ) : null}
+            {canAccessDescriptionPull(currentUser) ? (
+              <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
+            ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -3370,6 +3380,9 @@ function ClientLandingPage({
             {canAccessSocialPost(currentUser) ? (
               <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
             ) : null}
+            {canAccessDescriptionPull(currentUser) ? (
+              <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
+            ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -3382,6 +3395,118 @@ function ClientLandingPage({
           </div>
         </section>
 
+      </div>
+    </div>
+  );
+}
+
+function DescriptionPullPage({ currentUser, onLogout, notifications }) {
+  const [orderReference, setOrderReference] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+
+  async function copyText(text) {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus("Copied to clipboard.");
+    } catch (copyError) {
+      console.warn(copyError);
+      setCopyStatus("Ready to copy.");
+    }
+  }
+
+  async function pullDescriptions(event) {
+    event.preventDefault();
+    const reference = orderReference.trim();
+    if (!reference) {
+      setError("Enter a Corebridge order reference.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      setCopyStatus("");
+      setResult(null);
+
+      const response = await fetch("/api/description-pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderReference: reference })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not pull descriptions.");
+      }
+
+      setResult(payload);
+      await copyText(payload.text || "");
+    } catch (pullError) {
+      setError(pullError.message || "Could not pull descriptions.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const outputText = result?.text || "";
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page description-pull-page">
+        <MainNavBar currentUser={currentUser} active="description-pull" onLogout={onLogout} notifications={notifications} />
+
+        <section className="panel social-post-panel">
+          <div className="social-post-grid description-pull-grid">
+            <form className="social-post-card" onSubmit={pullDescriptions}>
+              <h3>Description Pull</h3>
+              <p className="muted-copy">Pull every CoreBridge customer description for an order, formatted ready to paste.</p>
+              <label>
+                Corebridge order reference
+                <div className="social-post-order-row">
+                  <input
+                    value={orderReference}
+                    onChange={(event) => setOrderReference(event.target.value)}
+                    placeholder="ORD-3386"
+                  />
+                  <button className="primary-button" type="submit" disabled={loading}>
+                    {loading ? "Pulling..." : "Pull"}
+                  </button>
+                </div>
+              </label>
+              {error ? <p className="form-error">{error}</p> : null}
+              {result ? (
+                <div className="description-pull-summary">
+                  <strong>{result.customerName || "Unknown Customer"}</strong>
+                  <span>{result.orderReference}</span>
+                  <span>{Array.isArray(result.lines) ? result.lines.length : 0} descriptions</span>
+                </div>
+              ) : null}
+            </form>
+
+            <div className="social-post-card social-post-output description-pull-output">
+              <div className="social-post-output-head">
+                <h3>Pulled descriptions</h3>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  disabled={!outputText}
+                  onClick={() => copyText(outputText)}
+                >
+                  Copy
+                </button>
+              </div>
+              <textarea
+                readOnly
+                value={outputText}
+                placeholder="Pulled customer descriptions will appear here."
+              />
+              {copyStatus ? <p className="muted-copy">{copyStatus}</p> : null}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -9842,6 +9967,7 @@ export default function App() {
   const isMileageRoute = pathname.startsWith("/mileage");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
+  const isDescriptionPullRoute = pathname.startsWith("/description-pull");
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
@@ -9930,6 +10056,7 @@ export default function App() {
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
+  const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
@@ -9939,8 +10066,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -10246,6 +10373,11 @@ export default function App() {
       return;
     }
 
+    if (isDescriptionPullRoute && !canAccessDescriptionPull(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isRamsRoute && !canAccessRams(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -10271,7 +10403,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -10279,7 +10411,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -12015,6 +12147,16 @@ export default function App() {
   if (showSocialPost) {
     return (
       <SocialPostPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showDescriptionPull) {
+    return (
+      <DescriptionPullPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
