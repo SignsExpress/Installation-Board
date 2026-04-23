@@ -68,50 +68,13 @@ const HOLIDAY_STAFF = [
 ];
 const HOLIDAY_RESET_VERSION = 1;
 const RAMS_RISK_BANK_VERSION = 2;
-const LEGACY_RAMS_RISK_CARD_IDS = new Set([
-  "accessEgress",
-  "injuryIncident",
-  "musculoskeletal",
-  "ppeUnsuitable",
-  "poorLighting",
-  "height",
-  "public",
-  "fallingObjects",
-  "electricalEquipment",
-  "equipmentFailure",
-  "fittersFatigue",
-  "slipsTrips",
-  "badWeather",
-  "diggingHoles",
-  "windowBreakage",
-  "emergencyIncidents",
-  "traffic",
-  "tools",
-  "substances",
-  "lifting",
-  "electrical",
-  "weather"
-]);
-const REQUIRED_RAMS_RISK_CARD_IDS = [
-  "competencyTraining",
-  "electrocutionElectricShock",
-  "manualHandlingLoad",
-  "generalOperationalInjury",
-  "slipsTripsFalls"
-];
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
 }
 
 function isCurrentRamsLogic(logic) {
-  if (!logic || typeof logic !== "object" || Array.isArray(logic)) return false;
-  if (Number(logic.riskBankVersion || 0) < RAMS_RISK_BANK_VERSION) return false;
-  const cards = logic.cards && typeof logic.cards === "object" && !Array.isArray(logic.cards) ? logic.cards : null;
-  if (!cards) return false;
-  const cardIds = Object.keys(cards);
-  if (cardIds.some((cardId) => LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId)))) return false;
-  return REQUIRED_RAMS_RISK_CARD_IDS.every((cardId) => cardIds.includes(cardId));
+  return Boolean(logic && typeof logic === "object" && !Array.isArray(logic) && Number(logic.riskBankVersion || 0) >= RAMS_RISK_BANK_VERSION);
 }
 
 function getInstallersFile() {
