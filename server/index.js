@@ -4260,6 +4260,9 @@ function sanitizeSocialToneVoice(voice = {}) {
     fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
     content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 100000),
     supportingText: String(voice.supportingText || "").replace(/\u0000/g, "").trim().slice(0, 30000),
+    toneImage: /^data:image\/png;base64,[a-z0-9+/=]+$/i.test(String(voice.toneImage || "").trim())
+      ? String(voice.toneImage || "").trim().slice(0, 2500000)
+      : "",
     examples,
     createdAt: String(voice.createdAt || new Date().toISOString()),
     seeded: voice.seeded === true
@@ -4415,6 +4418,7 @@ function getDefaultSocialToneVoice() {
         fileName: "Tone of Voice - Linkedin - Corebridge.xlsx",
         content: parsed.content,
         supportingText: "",
+        toneImage: "",
         examples: parsed.examples,
         createdAt: "2026-04-22T00:00:00.000Z",
         seeded: true
@@ -4431,6 +4435,7 @@ function getDefaultSocialToneVoice() {
     fileName: "",
     content: "Friendly, practical LinkedIn posts for completed signage work. Use natural hooks, short paragraphs, occasional emojis and plain language.",
     supportingText: "",
+    toneImage: "",
     examples: [],
     createdAt: "2026-04-22T00:00:00.000Z",
     seeded: true
@@ -5404,6 +5409,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         fileName: voice.fileName,
         contentLength: voice.content.length,
         supportingTextLength: voice.supportingText.length,
+        toneImageLength: voice.toneImage.length,
         exampleCount: voice.examples.length,
         createdAt: voice.createdAt,
         seeded: voice.seeded
@@ -5455,6 +5461,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       name: request.body?.name ?? existing.name,
       content: request.body?.content ?? existing.content,
       supportingText: request.body?.supportingText ?? existing.supportingText,
+      toneImage: request.body?.toneImage ?? existing.toneImage,
       examples: request.body?.examples ?? existing.examples,
       fileName: request.body?.fileName ?? existing.fileName,
       createdAt: existing.createdAt,

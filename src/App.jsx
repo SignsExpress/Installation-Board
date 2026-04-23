@@ -3397,6 +3397,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [toneNameDraft, setToneNameDraft] = useState("");
   const [toneDraft, setToneDraft] = useState("");
   const [toneTraitsDraft, setToneTraitsDraft] = useState("");
+  const [toneImageDraft, setToneImageDraft] = useState("");
   const [toneSaving, setToneSaving] = useState(false);
   const [toneMessage, setToneMessage] = useState("");
   const [deletingVoiceId, setDeletingVoiceId] = useState("");
@@ -3459,6 +3460,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
             supportingTextLength: String(voice.supportingText || "").length,
+            toneImageLength: String(voice.toneImage || "").length,
             exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
             createdAt: voice.createdAt,
             seeded: voice.seeded === true
@@ -3504,8 +3506,28 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     setToneNameDraft(selectedVoice.name || "");
     setToneDraft(selectedVoice.content || "");
     setToneTraitsDraft(selectedVoice.supportingText || "");
+    setToneImageDraft(selectedVoice.toneImage || "");
     setToneMessage("");
     setToneViewerOpen(true);
+  }
+
+  function uploadToneImage(file) {
+    if (!file || !canAdmin) return;
+    if (file.type !== "image/png") {
+      setToneMessage("Please upload a PNG image.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setToneMessage("Please keep the PNG under 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setToneImageDraft(String(reader.result || ""));
+      setToneMessage("Image ready to save.");
+    };
+    reader.onerror = () => setToneMessage("Could not read that image.");
+    reader.readAsDataURL(file);
   }
 
   async function saveToneDraft() {
@@ -3519,6 +3541,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         body: JSON.stringify({
           content: toneDraft,
           supportingText: toneTraitsDraft,
+          toneImage: toneImageDraft,
           name: toneNameDraft || selectedVoice.name,
           fileName: selectedVoice.fileName,
           examples: selectedVoice.examples || []
@@ -3537,6 +3560,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
             supportingTextLength: String(voice.supportingText || "").length,
+            toneImageLength: String(voice.toneImage || "").length,
             exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
             createdAt: voice.createdAt,
             seeded: voice.seeded === true
@@ -3577,6 +3601,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           fileName: entry.fileName,
           contentLength: String(entry.content || "").length,
           supportingTextLength: String(entry.supportingText || "").length,
+          toneImageLength: String(entry.toneImage || "").length,
           exampleCount: Array.isArray(entry.examples) ? entry.examples.length : 0,
           createdAt: entry.createdAt,
           seeded: entry.seeded === true
@@ -3644,6 +3669,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   <span>{Array.isArray(socialStatus.voices) && socialStatus.voices.length ? `${socialStatus.voices.length} tone file${socialStatus.voices.length === 1 ? "" : "s"} saved` : "No uploaded tone file saved"}</span>
                   {selectedVoice ? <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired examples</span> : null}
                   {selectedVoice?.supportingText ? <span>Traits attached</span> : null}
+                  {selectedVoice?.toneImage ? <span>Image attached</span> : null}
                 </div>
               ) : null}
 
@@ -3675,11 +3701,16 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               <div className="social-post-output-head">
                 <h3>Suggested post</h3>
               </div>
-              <textarea
-                value={result?.post || ""}
-                placeholder="Your generated post will appear here."
-                onChange={(event) => setResult((current) => ({ ...(current || {}), post: event.target.value }))}
-              />
+              <div className={`social-post-output-body ${selectedVoice?.toneImage ? "has-tone-image" : ""}`}>
+                <textarea
+                  value={result?.post || ""}
+                  placeholder="Your generated post will appear here."
+                  onChange={(event) => setResult((current) => ({ ...(current || {}), post: event.target.value }))}
+                />
+                {selectedVoice?.toneImage ? (
+                  <img className="social-post-tone-corner-image" src={selectedVoice.toneImage} alt={`${selectedVoice.name} tone`} />
+                ) : null}
+              </div>
             </div>
           </div>
 
@@ -3709,6 +3740,31 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   ) : null}
                   <h4>Supporting traits / style notes</h4>
                   <p>Saved alongside this tone document and used with the examples when generating posts.</p>
+                  {canAdmin ? (
+                    <div className="social-post-tone-image-field">
+                      <div>
+                        <h4>Tone image</h4>
+                        <p>PNG only. Suggested size: 512 x 512px with a transparent background.</p>
+                      </div>
+                      <div className="social-post-tone-image-controls">
+                        {toneImageDraft ? <img src={toneImageDraft} alt="Tone preview" /> : <span>No image</span>}
+                        <label className="ghost-button">
+                          Upload PNG
+                          <input
+                            type="file"
+                            accept="image/png"
+                            onChange={(event) => {
+                              uploadToneImage(event.target.files?.[0]);
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                        {toneImageDraft ? (
+                          <button className="text-button danger" type="button" onClick={() => setToneImageDraft("")}>Remove</button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   <textarea
                     value={toneTraitsDraft}
                     readOnly={!canAdmin}
