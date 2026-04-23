@@ -268,6 +268,11 @@ function canAccessVanEstimator(user) {
   return getUserPermission(user, "vanEstimator", "none") !== "none";
 }
 
+function canEditVanEstimator(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "vanEstimator", "none") === "admin";
+}
+
 function canAccessRams(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "rams", user?.role === "host" ? "admin" : "none") !== "none";
@@ -569,13 +574,25 @@ function requireMileageAdmin(request, response) {
   return false;
 }
 
+function requireVanEstimatorAccess(request, response) {
+  if (canAccessVanEstimator(request.user)) return true;
+  response.status(403).json({ error: "Vehicle pricing access required." });
+  return false;
+}
+
+function requireVanEstimatorAdmin(request, response) {
+  if (canEditVanEstimator(request.user)) return true;
+  response.status(403).json({ error: "Vehicle pricing admin access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
     if (!fs.existsSync(file)) {
       fs.writeFileSync(
         file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [] }, null, 2)}\n`,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], vehiclePricingSettings: null, socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [] }, null, 2)}\n`,
         "utf8"
       );
     }
@@ -611,6 +628,7 @@ function mergeHolidaySeed(store) {
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
+        vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
         socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
         socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : []
       };
@@ -706,6 +724,7 @@ async function readStore() {
             notifications: [],
             attendanceEntries: [],
             mileageClaims: [],
+            vehiclePricingSettings: null,
             socialPostToneVoices: [],
             socialPostDeletedToneVoiceIds: []
           });
@@ -723,6 +742,7 @@ async function readStore() {
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
+          vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
@@ -742,6 +762,7 @@ async function readStore() {
           notifications: [],
           attendanceEntries: [],
           mileageClaims: [],
+          vehiclePricingSettings: null,
           socialPostToneVoices: [],
           socialPostDeletedToneVoiceIds: []
         });
@@ -787,6 +808,7 @@ async function writeStore(store) {
         }),
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
+      vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
@@ -5312,6 +5334,37 @@ function createServer() {
     if (!requireBoardOrRamsAccess(request, response)) return;
     const store = await readStore();
     response.json(toPublicJobs(store.jobs));
+  });
+
+  app.get("/api/vehicle-pricing/settings", async (request, response) => {
+    if (!requireVanEstimatorAccess(request, response)) return;
+    const store = await readStore();
+    response.json({
+      settingsByTemplate:
+        store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object"
+          ? store.vehiclePricingSettings
+          : null
+    });
+  });
+
+  app.post("/api/vehicle-pricing/settings", async (request, response) => {
+    if (!requireVanEstimatorAdmin(request, response)) return;
+    const settingsByTemplate = request.body?.settingsByTemplate;
+    if (!settingsByTemplate || typeof settingsByTemplate !== "object" || Array.isArray(settingsByTemplate)) {
+      response.status(400).json({ error: "Vehicle pricing settings are required." });
+      return;
+    }
+    const store = await readStore();
+    const nextStore = await writeStore({
+      ...store,
+      vehiclePricingSettings: settingsByTemplate
+    });
+    response.json({
+      settingsByTemplate:
+        nextStore.vehiclePricingSettings && typeof nextStore.vehiclePricingSettings === "object"
+          ? nextStore.vehiclePricingSettings
+          : null
+    });
   });
 
   app.get("/api/rams/hospitals", async (request, response) => {

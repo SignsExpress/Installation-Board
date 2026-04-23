@@ -1103,6 +1103,27 @@ function getDefaultVehiclePricingSettingsByTemplate() {
   );
 }
 
+function normalizeVehiclePricingSettingsByTemplate(settingsByTemplate = {}) {
+  return Object.fromEntries(
+    VEHICLE_TEMPLATE_OPTIONS.map((template) => {
+      const storedTemplateSettings = settingsByTemplate?.[template.id] || {};
+      const defaultsVersion = getTemplatePricingDefaultsVersion(template);
+      const storedVersion = Number(storedTemplateSettings.__defaultsVersion || 0);
+      const shouldRefreshTemplateDefaults = defaultsVersion > storedVersion;
+      const mergedSettings = shouldRefreshTemplateDefaults
+        ? mergeVehiclePricingSettings(template.pricingSettings || {})
+        : mergeVehiclePricingSettings(storedTemplateSettings || template.pricingSettings || {});
+      return [
+        template.id,
+        {
+          ...mergedSettings,
+          __defaultsVersion: defaultsVersion
+        }
+      ];
+    })
+  );
+}
+
 function getStoredVehiclePricingSettingsByTemplate() {
   const defaultSettings = getDefaultVehiclePricingSettingsByTemplate();
   if (typeof window === "undefined") return defaultSettings;
@@ -1113,24 +1134,7 @@ function getStoredVehiclePricingSettingsByTemplate() {
 
     if (looksLikeVehiclePricingSettings(parsedSettings)) return defaultSettings;
 
-    return Object.fromEntries(
-      VEHICLE_TEMPLATE_OPTIONS.map((template) => {
-        const storedTemplateSettings = parsedSettings?.[template.id] || {};
-        const defaultsVersion = getTemplatePricingDefaultsVersion(template);
-        const storedVersion = Number(storedTemplateSettings.__defaultsVersion || 0);
-        const shouldRefreshTemplateDefaults = defaultsVersion > storedVersion;
-        const mergedSettings = shouldRefreshTemplateDefaults
-          ? mergeVehiclePricingSettings(template.pricingSettings || {})
-          : mergeVehiclePricingSettings(storedTemplateSettings || template.pricingSettings || {});
-        return [
-          template.id,
-          {
-            ...mergedSettings,
-            __defaultsVersion: defaultsVersion
-          }
-        ];
-      })
-    );
+    return normalizeVehiclePricingSettingsByTemplate(parsedSettings);
   } catch (error) {
     return defaultSettings;
   }
@@ -7484,6 +7488,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const [smartPriceImportOpen, setSmartPriceImportOpen] = useState(false);
   const [smartPriceImportText, setSmartPriceImportText] = useState("");
   const [smartPriceImportStatus, setSmartPriceImportStatus] = useState("");
+  const [pricingSyncStatus, setPricingSyncStatus] = useState("");
   const [priceTrainingBank, setPriceTrainingBank] = useState(getStoredVehiclePriceTrainingBank);
   const [trainingTargetPrice, setTrainingTargetPrice] = useState("");
   const [trainingStatus, setTrainingStatus] = useState("");
@@ -7503,6 +7508,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const overlaySvgRef = useRef(null);
   const vehicleBodyPathsRef = useRef([]);
   const wrapLinesRef = useRef([]);
+  const vehiclePricingSeededRef = useRef(false);
 
   const selectedTemplateTrainingBank = useMemo(
     () => priceTrainingBank.filter((sample) => sample.templateId === selectedTemplate.id),
@@ -7569,6 +7575,52 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setTrainingSuggestion(null);
     setTrainingStatus("");
   }, [selectedTemplate.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSharedPricingSettings() {
+      try {
+        const response = await fetch("/api/vehicle-pricing/settings");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Could not load shared vehicle pricing.");
+        if (!active) return;
+
+        if (payload.settingsByTemplate && typeof payload.settingsByTemplate === "object") {
+          const nextSettingsByTemplate = normalizeVehiclePricingSettingsByTemplate(payload.settingsByTemplate);
+          setPricingSettingsByTemplate(nextSettingsByTemplate);
+          saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
+          setPricingSyncStatus("Shared pricing loaded.");
+          return;
+        }
+
+        if (pricingEditable && !vehiclePricingSeededRef.current) {
+          vehiclePricingSeededRef.current = true;
+          const seedSettings = normalizeVehiclePricingSettingsByTemplate(pricingSettingsByTemplate);
+          const saveResponse = await fetch("/api/vehicle-pricing/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settingsByTemplate: seedSettings })
+          });
+          const savePayload = await saveResponse.json().catch(() => ({}));
+          if (!saveResponse.ok) throw new Error(savePayload.error || "Could not publish vehicle pricing.");
+          if (!active) return;
+          const nextSettingsByTemplate = normalizeVehiclePricingSettingsByTemplate(savePayload.settingsByTemplate || seedSettings);
+          setPricingSettingsByTemplate(nextSettingsByTemplate);
+          saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
+          setPricingSyncStatus("Shared pricing published.");
+        }
+      } catch (error) {
+        console.error(error);
+        if (active) setPricingSyncStatus("Using this browser's saved pricing.");
+      }
+    }
+
+    loadSharedPricingSettings();
+    return () => {
+      active = false;
+    };
+  }, [pricingEditable]);
 
   useEffect(() => {
     saveVehiclePriceTrainingBank(priceTrainingBank);
@@ -9107,17 +9159,38 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setTrainingStatus("Suggested values applied to the draft pricing settings. Press Save to keep them.");
   }
 
-  function savePricingSettings() {
+  async function savePricingSettings() {
     const nextSettings = mergeVehiclePricingSettings(pricingDraftSettings);
     setPricingDraftSettings(nextSettings);
+    const nextSettingsByTemplate = {
+      ...pricingSettingsByTemplate,
+      [selectedTemplate.id]: nextSettings
+    };
     setPricingSettingsByTemplate((current) => {
-      const nextSettingsByTemplate = {
+      const nextSettingsByTemplateForState = {
         ...current,
         [selectedTemplate.id]: nextSettings
       };
-      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
-      return nextSettingsByTemplate;
+      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplateForState);
+      return nextSettingsByTemplateForState;
     });
+    setPricingSyncStatus("Saving shared pricing...");
+    try {
+      const response = await fetch("/api/vehicle-pricing/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settingsByTemplate: nextSettingsByTemplate })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not save shared vehicle pricing.");
+      const sharedSettings = normalizeVehiclePricingSettingsByTemplate(payload.settingsByTemplate || nextSettingsByTemplate);
+      setPricingSettingsByTemplate(sharedSettings);
+      saveVehiclePricingSettingsByTemplate(sharedSettings);
+      setPricingSyncStatus("Shared pricing saved.");
+    } catch (error) {
+      console.error(error);
+      setPricingSyncStatus("Saved in this browser, but shared pricing did not update.");
+    }
   }
 
   function resetPricingDraft() {
@@ -9130,17 +9203,38 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
     setPricingDraftSettings(pricingSettings);
   }
 
-  function restoreDefaultPricingSettings() {
+  async function restoreDefaultPricingSettings() {
     const defaultSettings = mergeVehiclePricingSettings(selectedTemplate.pricingSettings || {});
     setPricingDraftSettings(defaultSettings);
+    const nextSettingsByTemplate = {
+      ...pricingSettingsByTemplate,
+      [selectedTemplate.id]: defaultSettings
+    };
     setPricingSettingsByTemplate((current) => {
-      const nextSettingsByTemplate = {
+      const nextSettingsByTemplateForState = {
         ...current,
         [selectedTemplate.id]: defaultSettings
       };
-      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplate);
-      return nextSettingsByTemplate;
+      saveVehiclePricingSettingsByTemplate(nextSettingsByTemplateForState);
+      return nextSettingsByTemplateForState;
     });
+    setPricingSyncStatus("Saving shared defaults...");
+    try {
+      const response = await fetch("/api/vehicle-pricing/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settingsByTemplate: nextSettingsByTemplate })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not save shared vehicle pricing.");
+      const sharedSettings = normalizeVehiclePricingSettingsByTemplate(payload.settingsByTemplate || nextSettingsByTemplate);
+      setPricingSettingsByTemplate(sharedSettings);
+      saveVehiclePricingSettingsByTemplate(sharedSettings);
+      setPricingSyncStatus("Shared defaults saved.");
+    } catch (error) {
+      console.error(error);
+      setPricingSyncStatus("Defaults saved in this browser, but shared pricing did not update.");
+    }
   }
 
   return (
@@ -9518,6 +9612,7 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
                   <p className="vinyl-pricing-context">
                     Editing pricing for <strong>{selectedTemplate.sizeName}</strong> ({selectedTemplate.exampleName}).
                   </p>
+                  {pricingSyncStatus ? <p className="vinyl-pricing-context">{pricingSyncStatus}</p> : null}
                   <div className="smart-price-import">
                     <button
                       className="ghost-button smart-price-import-toggle"
