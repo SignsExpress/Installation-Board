@@ -1692,10 +1692,12 @@ function normalizeRamsLogic(logic = {}) {
     ...RAMS_DEFAULT_LOGIC.cards,
     ...RAMS_STANDARD_RISK_CARDS
   };
+  const hasIncomingCards = Boolean(logic.cards && typeof logic.cards === "object" && Object.keys(logic.cards).length);
   const incomingCards = logic.cards && typeof logic.cards === "object"
     ? Object.fromEntries(Object.entries(logic.cards).filter(([cardId]) => !LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId))))
     : {};
-  const cardEntries = Object.entries({ ...defaultCards, ...incomingCards }).map(([cardId, card]) => [
+  const cardsToNormalize = hasIncomingCards ? incomingCards : defaultCards;
+  const cardEntries = Object.entries(cardsToNormalize).map(([cardId, card]) => [
     cardId,
     normalizeRamsCard(card, defaultCards[cardId])
   ]);
