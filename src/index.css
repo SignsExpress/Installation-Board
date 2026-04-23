@@ -6991,12 +6991,6 @@ button {
   gap: 10px;
 }
 
-.social-post-output-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .social-post-output textarea {
   min-height: 360px;
   resize: vertical;
@@ -7017,20 +7011,6 @@ button {
   padding: 6px 8px;
   border-radius: 999px;
   background: #f8fafc;
-}
-
-.social-post-debug {
-  max-height: 320px;
-  overflow: auto;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
-  background: #f8fafc;
-  color: #334155;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
 }
 
 .button-spinner-label {
@@ -7110,6 +7090,131 @@ button {
   line-height: 1.48;
 }
 
+.social-post-tone-layout {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.social-post-tone-traits,
+.social-post-tone-examples,
+.social-post-tone-source {
+  border: 1px solid var(--sx-border);
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+}
+
+.social-post-tone-traits h4,
+.social-post-tone-traits p,
+.social-post-tone-examples h4,
+.social-post-tone-empty {
+  margin: 0;
+}
+
+.social-post-tone-traits p,
+.social-post-tone-section-head span,
+.social-post-tone-empty {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.social-post-tone-traits {
+  display: grid;
+  gap: 8px;
+}
+
+.social-post-tone-layout textarea {
+  min-height: 0;
+  max-height: none;
+}
+
+.social-post-tone-traits textarea {
+  min-height: 140px;
+  max-height: 220px;
+}
+
+.social-post-tone-source textarea {
+  margin-top: 10px;
+  min-height: 180px;
+  max-height: 300px;
+}
+
+.social-post-tone-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.social-post-tone-table-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.social-post-tone-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.social-post-tone-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f8fafc;
+  color: #4f2d66;
+  text-align: left;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.social-post-tone-table th,
+.social-post-tone-table td {
+  padding: 9px 10px;
+  border-top: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+
+.social-post-tone-table tr:first-child td,
+.social-post-tone-table thead tr:first-child th {
+  border-top: 0;
+}
+
+.social-post-tone-table td:first-child {
+  width: 150px;
+  color: #4f2d66;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.social-post-tone-table td:last-child {
+  color: #334155;
+  font-weight: 700;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.social-post-tone-source summary {
+  cursor: pointer;
+  color: #4f2d66;
+  font-weight: 900;
+}
+
+.social-post-tone-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 700px) {
   .social-post-tone-backdrop {
     padding: 10px;
@@ -7120,9 +7225,19 @@ button {
     padding: 14px;
   }
 
-  .social-post-tone-modal textarea {
-    min-height: 50vh;
+  .social-post-tone-layout {
+    max-height: 68vh;
+  }
+
+  .social-post-tone-traits textarea,
+  .social-post-tone-source textarea {
+    min-height: 150px;
     font-size: 0.82rem;
+  }
+
+  .social-post-tone-table td:first-child {
+    width: 110px;
+    white-space: normal;
   }
 }
 

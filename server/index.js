@@ -575,7 +575,7 @@ function ensureStoreFile() {
     if (!fs.existsSync(file)) {
       fs.writeFileSync(
         file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], socialPostToneVoices: [] }, null, 2)}\n`,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [] }, null, 2)}\n`,
         "utf8"
       );
     }
@@ -611,7 +611,8 @@ function mergeHolidaySeed(store) {
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
-        socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : []
+        socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
+        socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : []
       };
 
   seed.holidays.forEach((holiday) => {
@@ -705,7 +706,8 @@ async function readStore() {
             notifications: [],
             attendanceEntries: [],
             mileageClaims: [],
-            socialPostToneVoices: []
+            socialPostToneVoices: [],
+            socialPostDeletedToneVoiceIds: []
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -722,6 +724,7 @@ async function readStore() {
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
+          socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -739,7 +742,8 @@ async function readStore() {
           notifications: [],
           attendanceEntries: [],
           mileageClaims: [],
-          socialPostToneVoices: []
+          socialPostToneVoices: [],
+          socialPostDeletedToneVoiceIds: []
         });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -782,6 +786,7 @@ async function writeStore(store) {
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
+      socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
@@ -4254,6 +4259,7 @@ function sanitizeSocialToneVoice(voice = {}) {
     name: String(voice.name || "LinkedIn").replace(/\s+/g, " ").trim().slice(0, 80) || "LinkedIn",
     fileName: String(voice.fileName || "").replace(/\s+/g, " ").trim().slice(0, 160),
     content: String(voice.content || "").replace(/\u0000/g, "").trim().slice(0, 100000),
+    supportingText: String(voice.supportingText || "").replace(/\u0000/g, "").trim().slice(0, 30000),
     examples,
     createdAt: String(voice.createdAt || new Date().toISOString()),
     seeded: voice.seeded === true
@@ -4362,7 +4368,7 @@ function parseXlsxText(buffer) {
   return parseXlsxToneData(buffer).content;
 }
 
-function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
+function parseToneVoiceUpload({ name, fileName, dataUrl, text, supportingText }) {
   const rawName = String(name || "").trim();
   const rawFileName = String(fileName || "").trim();
   let content = String(text || "").trim();
@@ -4378,6 +4384,7 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
         name: rawName || rawFileName.replace(/\.[^.]+$/, "") || "LinkedIn tone",
         fileName: rawFileName,
         content,
+        supportingText,
         examples: parsed.examples
       });
     } else {
@@ -4389,6 +4396,7 @@ function parseToneVoiceUpload({ name, fileName, dataUrl, text }) {
     name: rawName || rawFileName.replace(/\.[^.]+$/, "") || "LinkedIn tone",
     fileName: rawFileName,
     content,
+    supportingText,
     examples: []
   });
 }
@@ -4406,6 +4414,7 @@ function getDefaultSocialToneVoice() {
         name: "Matt Rutlidge",
         fileName: "Tone of Voice - Linkedin - Corebridge.xlsx",
         content: parsed.content,
+        supportingText: "",
         examples: parsed.examples,
         createdAt: "2026-04-22T00:00:00.000Z",
         seeded: true
@@ -4421,6 +4430,7 @@ function getDefaultSocialToneVoice() {
     name: "Matt Rutlidge",
     fileName: "",
     content: "Friendly, practical LinkedIn posts for completed signage work. Use natural hooks, short paragraphs, occasional emojis and plain language.",
+    supportingText: "",
     examples: [],
     createdAt: "2026-04-22T00:00:00.000Z",
     seeded: true
@@ -4429,16 +4439,26 @@ function getDefaultSocialToneVoice() {
 }
 
 function getSocialPostVoices(store = {}) {
+  const deletedIds = new Set(
+    (Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [])
+      .map((id) => String(id || ""))
+      .filter(Boolean)
+  );
   const savedVoices = (Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : []).map(sanitizeSocialToneVoice);
   const hasMattVoice = savedVoices.some(
     (voice) => String(voice.id) === "matt-rutlidge-default" || voice.name.toLowerCase() === "matt rutlidge"
   );
-  return hasMattVoice ? savedVoices : [getDefaultSocialToneVoice(), ...savedVoices];
+  const voices = hasMattVoice ? savedVoices : [getDefaultSocialToneVoice(), ...savedVoices];
+  return voices.filter((voice) => !deletedIds.has(String(voice.id)));
 }
 
 function getSocialPostToneSummary(voice) {
   const text = String(voice?.content || "").replace(/\s+/g, " ").trim();
   return text.slice(0, 20000);
+}
+
+function getSocialPostToneTraits(voice) {
+  return String(voice?.supportingText || "").replace(/\s+/g, " ").trim().slice(0, 12000);
 }
 
 function getSocialPostTransformationExamples(voice) {
@@ -4654,6 +4674,7 @@ function buildSocialPostBrief(order, voice) {
     lineItems,
     toneName: voice?.name || "LinkedIn",
     toneSummary: getSocialPostToneSummary(voice),
+    toneTraits: getSocialPostToneTraits(voice),
     transformationExamples: getSocialPostTransformationExamples(voice),
     debug: {
       chosenDescription: mainDescription,
@@ -4807,6 +4828,7 @@ async function generateSocialPostWithAi(brief) {
     "- Do not blend two separate line items into one invented product. For example, if one line is a prize wheel and another line is a plinth, describe them as separate pieces of the same project, not as a prize wheel wrapped around a plinth.",
     "- Decide what deserves space in the post. Feature visually interesting or higher-value lines, lightly mention supporting pieces, and quietly ignore boring low-value/admin/delivery lines if the post would become too long.",
     "- The tone file may contain spreadsheet rows where column A is a Corebridge job reference and column B is Matt's finished LinkedIn post for that exact job.",
+    "- If toneTraits is present, treat it as the explicit personality and writing rules for the chosen person. Use it alongside the examples, not instead of them.",
     "- Read transformationExamples as paired before/after training examples. For each row, mentally ask: what did Matt take from the Corebridge job, what did he ignore, what did he simplify, what did he fluff up, and what hook style did he use?",
     "- Find repeatable patterns across all transformationExamples, then apply those patterns to the new Corebridge job.",
     "- Read toneSummary as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
@@ -5349,6 +5371,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: voice.name,
         fileName: voice.fileName,
         contentLength: voice.content.length,
+        supportingTextLength: voice.supportingText.length,
         exampleCount: voice.examples.length,
         createdAt: voice.createdAt,
         seeded: voice.seeded
@@ -5370,6 +5393,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       }
       const store = await readStore();
       const voices = Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [];
+      store.socialPostDeletedToneVoiceIds = (store.socialPostDeletedToneVoiceIds || []).filter((id) => String(id) !== String(voice.id));
       store.socialPostToneVoices = [voice, ...voices.filter((entry) => String(entry.id) !== String(voice.id))].slice(0, 20);
       const savedStore = await writeStore(store);
       response.json({ voices: getSocialPostVoices(savedStore), voice });
@@ -5398,6 +5422,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       ...existing,
       name: request.body?.name ?? existing.name,
       content: request.body?.content ?? existing.content,
+      supportingText: request.body?.supportingText ?? existing.supportingText,
       examples: request.body?.examples ?? existing.examples,
       fileName: request.body?.fileName ?? existing.fileName,
       createdAt: existing.createdAt,
@@ -5421,7 +5446,11 @@ app.get("/api/corebridge/orders", async (request, response) => {
       return;
     }
     const store = await readStore();
-    store.socialPostToneVoices = (store.socialPostToneVoices || []).filter((voice) => String(voice.id) !== String(request.params.id));
+    const deletedId = String(request.params.id || "");
+    store.socialPostToneVoices = (store.socialPostToneVoices || []).filter((voice) => String(voice.id) !== deletedId);
+    store.socialPostDeletedToneVoiceIds = [
+      ...new Set([...(store.socialPostDeletedToneVoiceIds || []).map(String), deletedId].filter(Boolean))
+    ];
     const savedStore = await writeStore(store);
     response.json({ voices: getSocialPostVoices(savedStore) });
   });
@@ -5470,6 +5499,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: selectedVoice.name,
         fileName: selectedVoice.fileName,
         contentLength: selectedVoice.content.length,
+        supportingTextLength: selectedVoice.supportingText.length,
         exampleCount: selectedVoice.examples.length,
         isFallback: !voices.length
       };

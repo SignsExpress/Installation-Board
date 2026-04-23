@@ -3388,16 +3388,18 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [voiceId, setVoiceId] = useState("");
   const [orderReference, setOrderReference] = useState("");
   const [voiceName, setVoiceName] = useState("");
+  const [voiceSupportingText, setVoiceSupportingText] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
-  const [debugOpen, setDebugOpen] = useState(false);
   const [socialStatus, setSocialStatus] = useState(null);
   const [toneViewerOpen, setToneViewerOpen] = useState(false);
   const [toneDraft, setToneDraft] = useState("");
+  const [toneTraitsDraft, setToneTraitsDraft] = useState("");
   const [toneSaving, setToneSaving] = useState(false);
   const [toneMessage, setToneMessage] = useState("");
+  const [deletingVoiceId, setDeletingVoiceId] = useState("");
 
   const canAdmin = canEditSocialPost(currentUser);
   const selectedVoice = voices.find((voice) => String(voice.id) === String(voiceId)) || voices[0] || null;
@@ -3442,7 +3444,8 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           body: JSON.stringify({
             name: voiceName || file.name.replace(/\.[^.]+$/, ""),
             fileName: file.name,
-            dataUrl: reader.result
+            dataUrl: reader.result,
+            supportingText: voiceSupportingText
           })
         });
         const payload = await response.json();
@@ -3456,6 +3459,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             name: voice.name,
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
+            supportingTextLength: String(voice.supportingText || "").length,
             exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
             createdAt: voice.createdAt,
             seeded: voice.seeded === true
@@ -3463,6 +3467,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         } : current);
         setVoiceId(payload.voice?.id || nextVoices[0]?.id || "");
         setVoiceName("");
+        setVoiceSupportingText("");
       } catch (uploadError) {
         setError(uploadError.message || "Could not upload tone voice.");
       } finally {
@@ -3480,7 +3485,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     setLoading(true);
     setError("");
     setResult(null);
-    setDebugOpen(false);
     try {
       const response = await fetch("/api/social-post/generate", {
         method: "POST",
@@ -3497,14 +3501,10 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     }
   }
 
-  async function copyPost() {
-    if (!result?.post) return;
-    await navigator.clipboard?.writeText(result.post);
-  }
-
   function openToneViewer() {
     if (!selectedVoice) return;
     setToneDraft(selectedVoice.content || "");
+    setToneTraitsDraft(selectedVoice.supportingText || "");
     setToneMessage("");
     setToneViewerOpen(true);
   }
@@ -3517,7 +3517,13 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
       const response = await fetch(`/api/social-post/voices/${encodeURIComponent(selectedVoice.id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: toneDraft, name: selectedVoice.name, fileName: selectedVoice.fileName })
+        body: JSON.stringify({
+          content: toneDraft,
+          supportingText: toneTraitsDraft,
+          name: selectedVoice.name,
+          fileName: selectedVoice.fileName,
+          examples: selectedVoice.examples || []
+        })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not save tone examples.");
@@ -3531,6 +3537,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
           name: voice.name,
             fileName: voice.fileName,
             contentLength: String(voice.content || "").length,
+            supportingTextLength: String(voice.supportingText || "").length,
             exampleCount: Array.isArray(voice.examples) ? voice.examples.length : 0,
             createdAt: voice.createdAt,
             seeded: voice.seeded === true
@@ -3541,6 +3548,45 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
       setToneMessage(saveError.message || "Could not save tone examples.");
     } finally {
       setToneSaving(false);
+    }
+  }
+
+  async function deleteVoice(voice) {
+    if (!voice || !canAdmin) return;
+    const confirmed = window.confirm(`Delete "${voice.name}" from the tone of voice list?`);
+    if (!confirmed) return;
+    setDeletingVoiceId(voice.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/social-post/voices/${encodeURIComponent(voice.id)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not delete tone of voice.");
+      const nextVoices = Array.isArray(payload.voices) ? payload.voices : [];
+      setVoices(nextVoices);
+      setVoiceId((current) => {
+        if (nextVoices.some((entry) => String(entry.id) === String(current))) return current;
+        return nextVoices[0]?.id || "";
+      });
+      setToneViewerOpen(false);
+      setSocialStatus((current) => current ? {
+        ...current,
+        voices: nextVoices.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          fileName: entry.fileName,
+          contentLength: String(entry.content || "").length,
+          supportingTextLength: String(entry.supportingText || "").length,
+          exampleCount: Array.isArray(entry.examples) ? entry.examples.length : 0,
+          createdAt: entry.createdAt,
+          seeded: entry.seeded === true
+        }))
+      } : current);
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete tone of voice.");
+    } finally {
+      setDeletingVoiceId("");
     }
   }
 
@@ -3591,13 +3637,14 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                 </select>
               </label>
               <button className="ghost-button social-post-tone-button" type="button" onClick={openToneViewer} disabled={!selectedVoice}>
-                View tone examples
+                Manage tone voice
               </button>
               {socialStatus ? (
                 <div className={`social-post-status ${socialStatus.ai?.configured ? "is-ok" : "is-warning"}`}>
                   <span>{socialStatus.ai?.configured ? "AI connected" : "AI key not visible to Render"}</span>
                   <span>{Array.isArray(socialStatus.voices) && socialStatus.voices.length ? `${socialStatus.voices.length} tone file${socialStatus.voices.length === 1 ? "" : "s"} saved` : "No uploaded tone file saved"}</span>
                   {selectedVoice ? <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired examples</span> : null}
+                  {selectedVoice?.supportingText ? <span>Traits attached</span> : null}
                 </div>
               ) : null}
 
@@ -3606,6 +3653,15 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   <label>
                     Add tone name
                     <input type="text" value={voiceName} placeholder="LinkedIn - Signs Express" onChange={(event) => setVoiceName(event.target.value)} />
+                  </label>
+                  <label>
+                    Supporting traits / style notes
+                    <textarea
+                      rows={5}
+                      value={voiceSupportingText}
+                      placeholder="Paste the personality traits, tone rules, favourite phrases and writing habits for this person."
+                      onChange={(event) => setVoiceSupportingText(event.target.value)}
+                    />
                   </label>
                   <label className="social-post-file">
                     Upload Excel / CSV / text tone file
@@ -3628,12 +3684,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             <div className="social-post-card social-post-output">
               <div className="social-post-output-head">
                 <h3>Suggested post</h3>
-                <div className="social-post-output-actions">
-                  <button className="ghost-button" type="button" onClick={() => setDebugOpen((current) => !current)} disabled={!result}>
-                    {debugOpen ? "Hide debug" : "Debug"}
-                  </button>
-                  <button className="ghost-button" type="button" onClick={copyPost} disabled={!result?.post}>Copy</button>
-                </div>
               </div>
               <textarea
                 value={result?.post || ""}
@@ -3649,11 +3699,6 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   {result.warning ? <span>{result.warning}</span> : null}
                 </div>
               ) : null}
-              {debugOpen && result ? (
-                <pre className="social-post-debug">
-                  {JSON.stringify(result.debug || result.brief?.debug || {}, null, 2)}
-                </pre>
-              ) : null}
             </div>
           </div>
 
@@ -3664,22 +3709,73 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                 <div>
                   <p className="eyebrow">Tone examples</p>
                   <h3 id="social-post-tone-title">{selectedVoice.name}</h3>
-                  <p>{selectedVoice.fileName || "Saved tone examples"} · {Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired A/B examples</p>
+                  <p>{selectedVoice.fileName || "Saved tone examples"} - {Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} paired A/B examples</p>
                 </div>
                 <button className="icon-button" type="button" onClick={() => setToneViewerOpen(false)} aria-label="Close tone examples">x</button>
               </div>
-              <textarea
-                value={toneDraft}
-                readOnly={!canAdmin}
-                onChange={(event) => setToneDraft(event.target.value)}
-                placeholder="Paste example posts, hook styles, phrases and mannerisms here."
-              />
-              <div className="social-post-tone-actions">
-                {toneMessage ? <span>{toneMessage}</span> : <span>{toneDraft.length.toLocaleString()} characters</span>}
+              <div className="social-post-tone-layout">
+                <section className="social-post-tone-traits">
+                  <h4>Supporting traits</h4>
+                  <p>Saved alongside this tone document and used with the examples when generating posts.</p>
+                  <textarea
+                    value={toneTraitsDraft}
+                    readOnly={!canAdmin}
+                    onChange={(event) => setToneTraitsDraft(event.target.value)}
+                    placeholder="Paste personality traits, rhythm, favourite phrases, humour rules, emoji habits and writing do/don't notes here."
+                  />
+                </section>
+
+                <section className="social-post-tone-examples">
+                  <div className="social-post-tone-section-head">
+                    <h4>Paired examples</h4>
+                    <span>{Array.isArray(selectedVoice.examples) ? selectedVoice.examples.length : 0} rows</span>
+                  </div>
+                  {Array.isArray(selectedVoice.examples) && selectedVoice.examples.length ? (
+                    <div className="social-post-tone-table-wrap">
+                      <table className="social-post-tone-table">
+                        <thead>
+                          <tr>
+                            <th>Reference</th>
+                            <th>Finished post</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedVoice.examples.map((example, index) => (
+                            <tr key={`${example.reference}-${index}`}>
+                              <td>{example.reference}</td>
+                              <td>{example.post}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="social-post-tone-empty">No paired examples found in this tone document.</p>
+                  )}
+                </section>
+
                 {canAdmin ? (
-                  <button className="primary-button" type="button" onClick={saveToneDraft} disabled={toneSaving || !toneDraft.trim()}>
-                    {toneSaving ? <span className="button-spinner-label"><span className="button-spinner" />Saving...</span> : "Save tone examples"}
-                  </button>
+                  <details className="social-post-tone-source">
+                    <summary>Source text</summary>
+                    <textarea
+                      value={toneDraft}
+                      onChange={(event) => setToneDraft(event.target.value)}
+                      placeholder="Raw imported tone text."
+                    />
+                  </details>
+                ) : null}
+              </div>
+              <div className="social-post-tone-actions">
+                {toneMessage ? <span>{toneMessage}</span> : <span>{toneTraitsDraft.length.toLocaleString()} traits characters - {toneDraft.length.toLocaleString()} source characters</span>}
+                {canAdmin ? (
+                  <div className="social-post-tone-action-buttons">
+                    <button className="text-button danger" type="button" onClick={() => deleteVoice(selectedVoice)} disabled={toneSaving || deletingVoiceId === selectedVoice.id}>
+                      {deletingVoiceId === selectedVoice.id ? "Deleting..." : "Delete tone"}
+                    </button>
+                    <button className="primary-button" type="button" onClick={saveToneDraft} disabled={toneSaving || !toneDraft.trim()}>
+                      {toneSaving ? <span className="button-spinner-label"><span className="button-spinner" />Saving...</span> : "Save tone"}
+                    </button>
+                  </div>
                 ) : null}
               </div>
               </div>
