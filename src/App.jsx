@@ -3498,11 +3498,26 @@ function DescriptionPullPage({ currentUser, onLogout, notifications }) {
                   Copy
                 </button>
               </div>
-              <textarea
-                readOnly
-                value={outputText}
-                placeholder="Pulled customer descriptions will appear here."
-              />
+              <div className="description-pull-preview" aria-live="polite">
+                {result ? (
+                  <>
+                    <div className="description-pull-heading">
+                      {result.customerName || "Unknown Customer"} - {result.orderReference}
+                    </div>
+                    <div className="description-pull-items">
+                      {(result.lines || []).map((line, index) => (
+                        <section key={`${line.lineItemName}-${index}`} className="description-pull-item">
+                          {line.quantity ? <span className="description-pull-quantity">Qty: {line.quantity}</span> : null}
+                          <strong>{line.lineItemName || "-"}</strong>
+                          <p>{line.customerDescription || "-"}</p>
+                        </section>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted-copy">Pulled customer descriptions will appear here.</p>
+                )}
+              </div>
               {copyStatus ? <p className="muted-copy">{copyStatus}</p> : null}
             </div>
           </div>

@@ -7125,6 +7125,52 @@ button {
   white-space: pre-wrap;
 }
 
+.description-pull-preview {
+  min-height: 520px;
+  padding: 14px;
+  border: 1px solid var(--sx-border);
+  border-radius: 16px;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.description-pull-heading {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.description-pull-items {
+  display: grid;
+  gap: 16px;
+}
+
+.description-pull-item {
+  display: grid;
+  gap: 4px;
+}
+
+.description-pull-item strong {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.description-pull-item p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.description-pull-quantity {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: #dc2626;
+}
+
 .description-pull-summary {
   display: flex;
   flex-wrap: wrap;

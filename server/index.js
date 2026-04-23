@@ -4309,7 +4309,18 @@ function decodeXmlEntities(value = "") {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+    .replace(/&lsquo;/gi, "'")
+    .replace(/&rsquo;/gi, "'")
+    .replace(/&ldquo;/gi, '"')
+    .replace(/&rdquo;/gi, '"')
+    .replace(/&ndash;/gi, "-")
+    .replace(/&mdash;/gi, "-")
+    .replace(/&hellip;/gi, "...")
     .replace(/&#160;/g, " ")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
     .replace(/&#xA0;/gi, " ");
 }
 
@@ -4742,6 +4753,13 @@ function extractDescriptionPullLines(order = {}) {
     return 0;
   }
 
+  function scoreQuantityField(leaf) {
+    if (/^quantity$/i.test(leaf)) return 60;
+    if (/lineitemquantity|itemquantity|orderedquantity/i.test(leaf)) return 45;
+    if (/qty/i.test(leaf)) return 35;
+    return 0;
+  }
+
   fields.forEach((field) => {
     const key = String(field.key || "");
     const lowerKey = key.toLowerCase();
@@ -4753,6 +4771,8 @@ function extractDescriptionPullLines(order = {}) {
       index: Number(match[1]),
       name: "",
       nameScore: -1,
+      quantity: "",
+      quantityScore: -1,
       description: "",
       descriptionScore: -1
     };
@@ -4780,6 +4800,14 @@ function extractDescriptionPullLines(order = {}) {
       }
     }
 
+    if (/(quantity|qty)/i.test(leaf)) {
+      const nextScore = scoreQuantityField(leaf);
+      if (nextScore > group.quantityScore) {
+        group.quantity = value;
+        group.quantityScore = nextScore;
+      }
+    }
+
     groups.set(match[1], group);
   });
 
@@ -4788,6 +4816,7 @@ function extractDescriptionPullLines(order = {}) {
     .sort((left, right) => left.index - right.index)
     .map((group) => ({
       lineItemName: group.name || `Line Item ${group.index + 1}`,
+      quantity: group.quantity || "",
       customerDescription: group.description
     }));
 
@@ -4795,6 +4824,7 @@ function extractDescriptionPullLines(order = {}) {
 
   return getSocialDescriptionCandidates(order).slice(0, 8).map((candidate, index) => ({
     lineItemName: candidate.key || `Description ${index + 1}`,
+    quantity: "",
     customerDescription: candidate.text
   }));
 }
@@ -4803,10 +4833,12 @@ function formatDescriptionPullText(payload = {}) {
   const heading = `${payload.customerName || "Unknown Customer"} - ${payload.orderReference || ""}`.trim();
   const sections = (payload.lines || []).map((line) =>
     [
-      `Line Item Name: ${line.lineItemName || "-"}`,
-      "Customer Description:",
-      line.customerDescription || "-"
-    ].join("\n")
+      line.quantity ? `Qty: ${line.quantity}` : "",
+      `${line.lineItemName || "-"}`,
+      `${line.customerDescription || "-"}`
+    ]
+      .filter(Boolean)
+      .join("\n")
   );
   return [heading, "", ...sections].join("\n\n").trim();
 }
