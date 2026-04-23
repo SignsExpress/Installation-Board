@@ -7018,19 +7018,19 @@ button {
 .social-post-output-body textarea {
   width: 100%;
   min-height: 360px;
-  resize: vertical;
+  resize: none;
   line-height: 1.5;
 }
 
 .social-post-output-body.has-tone-image textarea {
-  padding-right: 146px;
+  padding-right: 12px;
   padding-bottom: 188px;
 }
 
 .social-post-tone-corner-image {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: 0;
+  bottom: 0;
   width: 134px;
   height: 184px;
   object-fit: contain;
