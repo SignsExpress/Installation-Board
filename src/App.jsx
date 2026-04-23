@@ -3484,15 +3484,20 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
     reader.readAsDataURL(file);
   }
 
-  async function generatePost() {
+  async function generatePost(options = {}) {
     setLoading(true);
     setError("");
-    setResult(null);
+    if (!options.changeItUp) setResult(null);
     try {
       const response = await fetch("/api/social-post/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderReference, voiceId })
+        body: JSON.stringify({
+          orderReference,
+          voiceId,
+          changeItUp: options.changeItUp === true,
+          previousPost: options.changeItUp ? result?.post || "" : ""
+        })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || payload.error || "Could not generate post.");
@@ -3734,6 +3739,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
             <div className="social-post-card social-post-output">
               <div className="social-post-output-head">
                 <h3>Suggested post</h3>
+                <button className="ghost-button" type="button" onClick={() => generatePost({ changeItUp: true })} disabled={loading || !orderReference.trim()}>
+                  {loading ? "Working..." : "Change it up"}
+                </button>
               </div>
               <div className={`social-post-output-body ${selectedVoice?.toneImage ? "has-tone-image" : ""}`}>
                 <textarea

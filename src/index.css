@@ -7031,7 +7031,7 @@ button {
 .social-post-tone-corner-image {
   position: absolute;
   right: 16px;
-  bottom: 1px;
+  bottom: 8px;
   width: 134px;
   height: 184px;
   object-fit: contain;

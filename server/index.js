@@ -4850,6 +4850,8 @@ async function generateSocialPostWithAi(brief) {
   const toneTraits = String(brief.toneTraits || "").trim();
   const toneSummary = String(brief.toneSummary || "").trim();
   const transformationExamples = Array.isArray(brief.transformationExamples) ? brief.transformationExamples : [];
+  const changeItUp = brief.changeItUp === true;
+  const previousPost = String(brief.previousPost || "").trim().slice(0, 3000);
   const pairedExampleText = transformationExamples.length
     ? transformationExamples.map((example, index) => [
         `Example ${index + 1}`,
@@ -4878,6 +4880,8 @@ async function generateSocialPostWithAi(brief) {
     `Write one LinkedIn post for Signs Express Central Lancashire in ${selectedToneName}'s style.`,
     "Do not default to Matt Rutlidge's style unless Matt Rutlidge is the selected tone of voice.",
     "If there are no paired examples, you must still infer the voice from the supporting traits and existing posts.",
+    changeItUp ? "CHANGE IT UP MODE: This is a regeneration. Write from a noticeably different angle, with a different opening hook, different sentence rhythm and different emphasis from the previous attempt." : "",
+    previousPost ? `PREVIOUS ATTEMPT TO AVOID COPYING:\n${previousPost}` : "",
     "",
     styleSource,
     "",
@@ -4902,6 +4906,8 @@ async function generateSocialPostWithAi(brief) {
     "- Avoid generic AI marketing phrases including pizzazz, jazzed up, glow up, game changer, elevate your brand, stunning solution and proud to announce.",
     "- Check customerClassification before describing the customer. Do not call a council, leisure trust, school, charity, NHS or public sector organisation a business or company. Use organisation, council, venue, team, site or facility instead.",
     "- Learn hook style from the examples. Do not start with generic AI phrases like Exciting news, We are thrilled, We are delighted, In today's fast-paced world, or Transform your space.",
+    "- Vary the hook. Do not repeat the same catchphrase or opener every time, even if it appears often in the tone file. Repeated catchphrases can be used occasionally, but not as the default.",
+    "- If a specific opener has been used in the previous attempt, do not use that opener again. Find a new angle instead: visual impact, customer problem, production challenge, funny observation, finished result, team effort or practical benefit.",
     "- Turn overcomplicated production wording into a natural post about impact, branding, visibility, design and the finished result.",
     "- Use a hook, short paragraphs, light emoji use where it fits, and a conversational call to action.",
     "- Mention the customer/project if available. Mention designer credit if the source data or tone examples clearly support it, otherwise do not invent names.",
@@ -4929,7 +4935,9 @@ async function generateSocialPostWithAi(brief) {
           { role: "system", content: "You are a senior LinkedIn copywriter for a UK signage company. You convert technical signage job descriptions into warm, bold, human social posts in the selected person's proven tone of voice. The selected voice may not be Matt Rutlidge." },
           { role: "user", content: prompt }
         ],
-        temperature: 0.82
+        temperature: changeItUp ? 1.02 : 0.88,
+        presence_penalty: changeItUp ? 0.45 : 0.2,
+        frequency_penalty: changeItUp ? 0.55 : 0.25
       })
     });
     const payload = await response.json();
@@ -5556,6 +5564,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
         return;
       }
       const brief = buildSocialPostBrief(order, selectedVoice);
+      brief.changeItUp = request.body?.changeItUp === true;
+      brief.previousPost = String(request.body?.previousPost || "").trim().slice(0, 3000);
       brief.lookupAttempts = lookupAttempts;
       brief.debug.lookupAttempts = lookupAttempts;
       brief.debug.selectedVoice = {
