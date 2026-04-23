@@ -650,9 +650,11 @@ function mergeHolidaySeed(store) {
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
+        ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
         vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
         socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
-        socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : []
+        socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : [],
+        holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
       };
 
   seed.holidays.forEach((holiday) => {
