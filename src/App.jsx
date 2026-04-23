@@ -3770,11 +3770,10 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   ))}
                 </div>
                 <label className="social-post-topic-field">
-                  Topic
                   <input
                     type="text"
                     value={postTopic}
-                    placeholder="Optional angle or point to weave in"
+                    placeholder="Post topic"
                     onChange={(event) => setPostTopic(event.target.value)}
                   />
                 </label>
@@ -3782,7 +3781,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                   Technical
                 </button>
                 <button className="ghost-button" type="button" onClick={() => generatePost({ changeItUp: true })} disabled={loading || !orderReference.trim()}>
-                  {loading ? "Working..." : "Change it up"}
+                  {loading ? "Working..." : "Go again"}
                 </button>
               </div>
             </div>

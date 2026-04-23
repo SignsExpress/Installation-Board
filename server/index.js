@@ -4909,6 +4909,8 @@ async function generateSocialPostWithAi(brief) {
     "- Read the existing posts as additional historic LinkedIn examples. Infer the structure, rhythm, emoji use, hooks, line breaks, calls to action and level of technical simplification.",
     "- Before writing, internally build a style map from the supporting traits, existing posts and paired examples: hook formulas, joke patterns, self-deprecating lines, playful misdirection, favourite emojis, emoji count, emoji placement, sentence length, paragraph length and sign-off habits.",
     "- Move much closer to the selected person's actual mannerisms than generic marketing copy. The post should feel like that person wrote it, not like a corporate template.",
+    "- Vocabulary rule: use words, phrases and sentence shapes that the selected person actually uses in the supporting traits, paired examples and existing posts. Do not introduce polished marketing language that does not sound like them.",
+    "- Exception to the vocabulary rule: if a post topic is supplied, or Technical mode is on, you may use the specific topic/technical vocabulary needed to explain that subject clearly, but keep the surrounding voice in the selected person's style.",
     "- If the tone source clearly supports dry humour, playful comparisons or rhetorical questions, use that kind of hook. If it does not, follow the selected writer's own hook style instead.",
     "- Use the tone source to infer which emojis the selected person likes and where they normally sit. Match the usual emoji density from the tone file rather than adding random emojis.",
     "- Do not over-polish the humour. It should feel human, specific and natural to the selected writer, not corporate.",
