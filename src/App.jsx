@@ -4390,6 +4390,9 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
     const isMethod = logicSection === "method";
     updateRamsLogicDraft((current) => ({
       ...current,
+      baseCardIds: isMethod || current.baseCardIds.includes(cardId)
+        ? current.baseCardIds
+        : [...current.baseCardIds, cardId],
       cards: {
         ...current.cards,
         [cardId]: {
@@ -5130,6 +5133,9 @@ function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
     const cardId = `custom-${Date.now()}`;
     updateRamsLogicDraft((current) => ({
       ...current,
+      baseCardIds: current.baseCardIds.includes(cardId)
+        ? current.baseCardIds
+        : [...current.baseCardIds, cardId],
       cards: {
         ...current.cards,
         [cardId]: {
