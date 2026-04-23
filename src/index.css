@@ -7085,7 +7085,7 @@ button {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
-  width: min(900px, 100%);
+  width: min(1180px, 96vw);
   max-height: min(760px, 88dvh);
   overflow: hidden;
   padding: 18px;
@@ -7311,6 +7311,12 @@ button {
 
 .social-post-tone-table td:first-child {
   width: 180px;
+}
+
+.social-post-tone-table th:last-child,
+.social-post-tone-table td:last-child {
+  width: 92px;
+  text-align: right;
 }
 
 .social-post-tone-table td {

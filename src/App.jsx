@@ -3545,7 +3545,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          content: toneDraft,
+          content: buildToneSourceFromExamples(),
           supportingText: toneTraitsDraft,
           toneImage: toneImageDraft,
           name: toneNameDraft || selectedVoice.name,
@@ -3638,6 +3638,29 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
       exampleIndex === index ? { ...example, [field]: value } : example
     )));
     setToneMessage("Example updated. Press Save tone to keep it.");
+  }
+
+  function deleteToneExample(index) {
+    setToneExamplesDraft((current) => current.filter((example, exampleIndex) => exampleIndex !== index));
+    setToneMessage("Example deleted. Press Save tone to keep it.");
+  }
+
+  function buildToneSourceFromExamples() {
+    const examplesText = toneExamplesDraft
+      .map((example) => [
+        `Reference: ${String(example.reference || "").trim()}`,
+        String(example.post || "").trim()
+      ].filter(Boolean).join("\n"))
+      .filter(Boolean)
+      .join("\n\n---\n\n");
+    const existingSource = String(toneDraft || "").trim();
+    if (!examplesText) return existingSource.replace(/\n*MANAGED PAIRED EXAMPLES[\s\S]*$/i, "").trim();
+    const sourceWithoutManagedExamples = existingSource.replace(/\n*MANAGED PAIRED EXAMPLES[\s\S]*$/i, "").trim();
+    return [
+      sourceWithoutManagedExamples,
+      "MANAGED PAIRED EXAMPLES",
+      examplesText
+    ].filter(Boolean).join("\n\n");
   }
 
   return (
@@ -3797,6 +3820,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                           <tr>
                             <th>Reference</th>
                             <th>Finished post</th>
+                            {canAdmin ? <th>Actions</th> : null}
                           </tr>
                         </thead>
                         <tbody>
@@ -3819,6 +3843,11 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                                   />
                                 ) : example.post}
                               </td>
+                              {canAdmin ? (
+                                <td>
+                                  <button className="text-button danger" type="button" onClick={() => deleteToneExample(index)}>Delete</button>
+                                </td>
+                              ) : null}
                             </tr>
                           ))}
                           {canAdmin ? (
@@ -3839,6 +3868,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
                                 />
                                 <button className="ghost-button" type="button" onClick={addToneExample}>Add example</button>
                               </td>
+                              <td></td>
                             </tr>
                           ) : null}
                         </tbody>
