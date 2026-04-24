@@ -5065,22 +5065,39 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
       }
     ]
   };
-  const stageLineItems = (stageDraft.lineItems || []).slice(0, 2);
-  const stageSnippets = {
-    title: stageDraft.headline || "Pro Forma Invoice",
-    logo: "Signs Express",
-    billing: `${stageDraft.customerName || ""}\n${stageDraft.billingAddress || stageDraft.address || ""}`.trim(),
-    company: "Signs Express (Central Lancashire)\nUnit 3\nSherdley Road Lostock Hall\nPreston, Lancashire PR5 5LP\n01772797800\naccounts.preston@signsexpress.co.uk",
-    metaLeft: `Date of Invoice: 24/04/2026\nDescription: ${stageDraft.notes || "-"}\nOrder Ref: ${stageDraft.orderReference || "-"}`,
-    metaRight: "Payment Terms: NET 30 End of Month",
-    table: stageLineItems.map((item) => `${(item.sortIndex ?? 0) + 1}  ${item.name}\n${item.description}\nQty ${item.quantity}   ${formatProFormaMoney(item.unitPrice || 0)}`).join("\n\n"),
-    bank: "Bank details:\nAccount name: Signs Preston Limited\nSort code: 01-67-14\nAccount No.: 71603603\nIBAN: GB98NWBK01671471603603",
-    totals: "Sub Total £360.30\nOrder Discount -£36.03\nPre-Tax Total £324.27\nVAT £64.85\nTOTAL £389.12",
-    approval: "I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.",
-    paymentTerms: stageDraft.termsText || "Payment due before production / installation unless agreed otherwise.",
-    accreditations: "",
-    footerMeta: "Generated on: 24/04/2026    Page 1 of 3"
-  };
+  const stageSubtotal = roundProFormaMoney((stageDraft.lineItems || []).reduce((sum, item) => {
+    const quantity = Math.max(Number(item.quantity) || 0, 0);
+    const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
+    return sum + (quantity * unitPrice);
+  }, 0));
+  const stageDiscountAmount = Math.max(roundProFormaMoney(Number(stageDraft.discountAmount) || 0), 0);
+  const stagePreTaxTotal = Math.max(roundProFormaMoney(stageSubtotal - stageDiscountAmount), 0);
+  const stageVatRate = Number(stageDraft.vatRate) || 20;
+  const stageVatAmount = roundProFormaMoney(stagePreTaxTotal * (stageVatRate / 100));
+  const stageTotal = roundProFormaMoney(stagePreTaxTotal + stageVatAmount);
+  const stageDepositAmount = stageDraft.depositType
+    ? (stageDraft.depositType === "fixed"
+      ? Math.min(roundProFormaMoney(Number(stageDraft.depositValue) || 0), stageTotal)
+      : Math.min(roundProFormaMoney(stageTotal * ((Number(stageDraft.depositValue) || 0) / 100)), stageTotal))
+    : 0;
+  const stagePreviewHtml = buildProFormaPreviewHtml(
+    stageDraft,
+    {
+      subtotal: stageSubtotal,
+      discountAmount: stageDiscountAmount,
+      preTaxTotal: stagePreTaxTotal,
+      vatAmount: stageVatAmount,
+      total: stageTotal,
+      depositAmount: stageDepositAmount,
+      totalPaid: 0,
+      balanceDue: stageTotal
+    },
+    {
+      ...template,
+      referencePdfAsset: null,
+      termsPdfAsset: null
+    }
+  );
 
   return (
     <div className="app-shell social-post-shell">
@@ -5188,10 +5205,11 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
             <div className="social-post-card pro-forma-template-stage-card">
               <div className="pro-forma-template-stage-head">
                 <h3>A4 Template Stage</h3>
-                <p className="muted-copy">Drag the blocks to line them up over the reference PDF. The builder saves in millimetres so it stays tied to A4 output.</p>
+                <p className="muted-copy">You are editing the live invoice preview here. Drag the guides to line sections up over your reference PDF and save the layout once it feels exact.</p>
               </div>
               <div className="pro-forma-stage-shell">
                 <div ref={stageRef} className="pro-forma-stage">
+                  <iframe title="Live invoice stage" className="pro-forma-stage-preview" srcDoc={stagePreviewHtml} />
                   {referenceOverlayUrl ? (
                     <div className="pro-forma-stage-underlay" style={{ opacity: template.overlayOpacity }}>
                       <iframe title="Reference underlay" src={referenceOverlayUrl} />
@@ -5215,17 +5233,6 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                         onClick={() => setSelectedSection(key)}
                       >
                         <span>{label}</span>
-                        {key !== "accreditations" ? <div className="pro-forma-stage-block-copy">{stageSnippets[key]}</div> : null}
-                        {key === "accreditations" && accreditationPreview.length ? (
-                          <div className="pro-forma-stage-inline-images">
-                            {accreditationPreview.slice(0, 6).map((src, index) => (
-                              <img key={`${src}-${index}`} src={src} alt="Accreditation" />
-                            ))}
-                          </div>
-                        ) : null}
-                        {key === "accreditations" && !accreditationPreview.length ? (
-                          <div className="pro-forma-stage-block-copy">Upload accreditation PNGs here</div>
-                        ) : null}
                       </button>
                     );
                   })}
