@@ -122,12 +122,17 @@ function normalizePhotoDataUrl(value) {
   return raw.length <= 750000 ? raw : "";
 }
 
+function normalizeUiSkin(value) {
+  return String(value || "").trim().toLowerCase() === "aero" ? "aero" : "classic";
+}
+
 function normalizeUserProfile(user) {
   return {
     jobTitle: normalizeProfileText(user?.jobTitle || ""),
     phoneNumber: normalizeProfileText(user?.phoneNumber || "", 40),
     qualifications: normalizeQualifications(user?.qualifications),
-    photoDataUrl: normalizePhotoDataUrl(user?.photoDataUrl)
+    photoDataUrl: normalizePhotoDataUrl(user?.photoDataUrl),
+    uiSkin: normalizeUiSkin(user?.uiSkin)
   };
 }
 
@@ -342,6 +347,7 @@ async function createUser({ displayName, role = "client", password = "" }) {
     phoneNumber: "",
     qualifications: [],
     photoDataUrl: "",
+    uiSkin: "classic",
     passwordSalt: "",
     passwordHash: "",
     passwordUpdatedAt: ""
@@ -457,6 +463,7 @@ async function updateUserProfile(userId, profile) {
   user.phoneNumber = nextProfile.phoneNumber;
   user.qualifications = nextProfile.qualifications;
   user.photoDataUrl = nextProfile.photoDataUrl;
+  user.uiSkin = nextProfile.uiSkin;
   await writeUsersStore(store);
   return sanitizeUser(user);
 }
