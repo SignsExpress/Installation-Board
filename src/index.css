@@ -6741,12 +6741,15 @@ button {
   pointer-events: none;
   z-index: 1;
   filter: grayscale(0.1);
+  overflow: hidden;
 }
 
 .pro-forma-stage-underlay iframe {
   width: 100%;
   height: 100%;
   border: 0;
+  transform: scale(1.01);
+  transform-origin: top left;
 }
 
 .pro-forma-stage-block {

@@ -3756,6 +3756,18 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
     metaLeft: { x: 12.5, y: 100, w: 84, h: 25 },
     metaRight: { x: 128, y: 100, w: 66, h: 13 },
     table: { x: 12.5, y: 124, w: 182, h: 86 },
+    tableHeaderBand: { x: 12.5, y: 124, w: 182, h: 14 },
+    tableHeaderNumber: { x: 12.5, y: 124, w: 14, h: 14 },
+    tableHeaderTitle: { x: 26.5, y: 124, w: 74, h: 14 },
+    tableHeaderQty: { x: 111, y: 124, w: 14, h: 14 },
+    tableHeaderUnitPrice: { x: 127, y: 124, w: 25, h: 14 },
+    tableHeaderLineTotal: { x: 156, y: 124, w: 38.5, h: 14 },
+    tableNumber: { x: 14.5, y: 145, w: 8, h: 8 },
+    tableTitle: { x: 28, y: 143.5, w: 72, h: 8 },
+    tableQty: { x: 112.5, y: 143.5, w: 12, h: 8 },
+    tableUnitPrice: { x: 133, y: 143.5, w: 20, h: 8 },
+    tableLineTotal: { x: 173.5, y: 143.5, w: 18, h: 8 },
+    tableDescription: { x: 28, y: 154.5, w: 146, h: 16 },
     bank: { x: 12.5, y: 218, w: 78, h: 27 },
     totals: { x: 140, y: 214, w: 55, h: 43 },
     approval: { x: 12.5, y: 251, w: 108, h: 11 },
@@ -3869,21 +3881,42 @@ function buildProFormaPreviewHtml(draft, summary, templateInput) {
   const completionBalance = hasDeposit
     ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
     : summary.balanceDue;
-  const lineRows = (draft.lineItems || []).map((item) => {
+  const tableLeft = section.table.x;
+  const tableTopAbsolute = section.table.y;
+  const localLeft = (value) => value - tableLeft;
+  const localTop = (value) => value - tableTopAbsolute;
+  const rowAnchorTop = Math.min(
+    section.tableNumber.y,
+    section.tableTitle.y,
+    section.tableQty.y,
+    section.tableUnitPrice.y,
+    section.tableLineTotal.y,
+    section.tableDescription.y
+  );
+  const rowAnchorBottom = Math.max(
+    section.tableNumber.y + section.tableNumber.h,
+    section.tableTitle.y + section.tableTitle.h,
+    section.tableQty.y + section.tableQty.h,
+    section.tableUnitPrice.y + section.tableUnitPrice.h,
+    section.tableLineTotal.y + section.tableLineTotal.h,
+    section.tableDescription.y + section.tableDescription.h
+  );
+  const rowPitch = Math.max(Number((rowAnchorBottom - rowAnchorTop + 4).toFixed(2)), 18);
+  const lineRows = (draft.lineItems || []).map((item, index) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
+    const rowOffset = index * rowPitch;
     return `
-      <tr>
-        <td class="line-number">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</td>
-        <td>
-          <strong>${escapeHtml(item.name || "-")}</strong>
-          ${item.description ? `<div class="invoice-desc">${escapeHtml(item.description)}</div>` : ""}
-        </td>
-        <td class="qty">${escapeHtml(item.quantity || "1")}</td>
-        <td class="num">${escapeHtml(formatProFormaMoney(unitPrice))}</td>
-        <td class="num">${escapeHtml(formatProFormaMoney(lineTotal))}</td>
-      </tr>
+      <div class="invoice-line-row" style="top:${localTop(rowAnchorTop) + rowOffset}mm; height:${rowPitch}mm;">
+        <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
+        <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;"><strong>${escapeHtml(item.name || "-")}</strong></div>
+        <div class="line-cell line-qty" style="left:${localLeft(section.tableQty.x)}mm; top:${localTop(section.tableQty.y) - localTop(rowAnchorTop)}mm; width:${section.tableQty.w}mm; min-height:${section.tableQty.h}mm;">${escapeHtml(item.quantity || "1")}</div>
+        <div class="line-cell line-unit" style="left:${localLeft(section.tableUnitPrice.x)}mm; top:${localTop(section.tableUnitPrice.y) - localTop(rowAnchorTop)}mm; width:${section.tableUnitPrice.w}mm; min-height:${section.tableUnitPrice.h}mm;">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
+        <div class="line-cell line-total" style="left:${localLeft(section.tableLineTotal.x)}mm; top:${localTop(section.tableLineTotal.y) - localTop(rowAnchorTop)}mm; width:${section.tableLineTotal.w}mm; min-height:${section.tableLineTotal.h}mm;">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
+        ${item.description ? `<div class="line-cell line-description" style="left:${localLeft(section.tableDescription.x)}mm; top:${localTop(section.tableDescription.y) - localTop(rowAnchorTop)}mm; width:${section.tableDescription.w}mm; min-height:${section.tableDescription.h}mm;">${escapeHtml(item.description)}</div>` : ""}
+        <div class="line-divider"></div>
+      </div>
     `;
   }).join("");
 
@@ -3987,57 +4020,73 @@ function buildProFormaPreviewHtml(draft, summary, templateInput) {
         margin-top: ${tableTop}mm;
         margin-left: ${section.table.x}mm;
         width: ${section.table.w}mm;
+        min-height: ${section.table.h}mm;
+        position: relative;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      thead th {
+      .table-header-band {
+        position: absolute;
+        left: ${localLeft(section.tableHeaderBand.x)}mm;
+        top: ${localTop(section.tableHeaderBand.y)}mm;
+        width: ${section.tableHeaderBand.w}mm;
+        min-height: ${section.tableHeaderBand.h}mm;
         background: #0f98a5;
+      }
+      .table-header-cell {
+        position: absolute;
         color: #fff;
         font-size: 10px;
         font-weight: 700;
-        padding: 11px 12px;
-        text-align: left;
-        border-right: 1px solid rgba(255,255,255,0.35);
+        display: flex;
+        align-items: center;
+        padding: 0 8px;
+        z-index: 1;
       }
-      thead th:last-child {
-        border-right: 0;
-      }
-      thead th.num {
+      .table-header-cell.num {
         text-align: center;
+        justify-content: center;
       }
-      tbody td {
-        padding: 12px 10px 15px;
+      .table-lines {
+        position: relative;
+        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2, 16)}mm;
+        min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2), 40)}mm;
+      }
+      .invoice-line-row {
+        position: absolute;
+        left: 0;
+        width: 100%;
+      }
+      .line-cell {
+        position: absolute;
         font-size: 11px;
-        vertical-align: top;
-        border-bottom: 0;
-      }
-      tbody tr {
-        border-bottom: 1px solid #d7e2e5;
-      }
-      .line-number {
-        width: 56px;
-        padding-left: 6px;
-        text-align: left;
-      }
-      .item-name {
-        margin-bottom: 7px;
-      }
-      .invoice-desc {
-        margin-top: 5px;
-        color: #000;
-        white-space: pre-wrap;
-        max-width: 98%;
         line-height: 1.18;
       }
-      .num {
+      .line-number {
+        text-align: left;
+        padding-left: 2px;
+      }
+      .line-title strong {
+        font-weight: 700;
+      }
+      .line-description {
+        white-space: pre-wrap;
+        color: #000;
+      }
+      .line-unit,
+      .line-total {
         text-align: right;
         white-space: nowrap;
       }
-      .qty {
+      .line-qty {
         text-align: center;
         white-space: nowrap;
+      }
+      .line-divider {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 1px;
+        background: #d7e2e5;
       }
       .bottom-row {
         display: grid;
@@ -4179,20 +4228,15 @@ function buildProFormaPreviewHtml(draft, summary, templateInput) {
       </div>
 
       <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:56px;">Items</th>
-              <th>Description</th>
-              <th class="num" style="width:90px;">Qty</th>
-              <th class="num" style="width:130px;">Unit Price</th>
-              <th class="num" style="width:150px;">Line Item Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${lineRows || `<tr><td colspan="5">No line items</td></tr>`}
-          </tbody>
-        </table>
+        <div class="table-header-band"></div>
+        <div class="table-header-cell" style="left:${localLeft(section.tableHeaderNumber.x)}mm; top:${localTop(section.tableHeaderNumber.y)}mm; width:${section.tableHeaderNumber.w}mm; min-height:${section.tableHeaderNumber.h}mm;">Items</div>
+        <div class="table-header-cell" style="left:${localLeft(section.tableHeaderTitle.x)}mm; top:${localTop(section.tableHeaderTitle.y)}mm; width:${section.tableHeaderTitle.w}mm; min-height:${section.tableHeaderTitle.h}mm;">Description</div>
+        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderQty.x)}mm; top:${localTop(section.tableHeaderQty.y)}mm; width:${section.tableHeaderQty.w}mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
+        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderUnitPrice.x)}mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:${section.tableHeaderUnitPrice.w}mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
+        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
+        <div class="table-lines">
+          ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
+        </div>
       </div>
 
       <div class="bottom-row">
@@ -4846,7 +4890,19 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
     ["company", "Company address"],
     ["metaLeft", "Meta left"],
     ["metaRight", "Meta right"],
-    ["table", "Items table"],
+    ["table", "Items table area"],
+    ["tableHeaderBand", "Table header band"],
+    ["tableHeaderNumber", "Header: item no"],
+    ["tableHeaderTitle", "Header: description"],
+    ["tableHeaderQty", "Header: qty"],
+    ["tableHeaderUnitPrice", "Header: unit price"],
+    ["tableHeaderLineTotal", "Header: line total"],
+    ["tableNumber", "Row: item no"],
+    ["tableTitle", "Row: item title"],
+    ["tableQty", "Row: qty"],
+    ["tableUnitPrice", "Row: unit price"],
+    ["tableLineTotal", "Row: line total"],
+    ["tableDescription", "Row: description"],
     ["bank", "Bank details"],
     ["totals", "Totals box"],
     ["approval", "Approval copy"],
@@ -5037,7 +5093,10 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
   }
 
   const selectedRect = template.sections[selectedSection];
-  const referenceOverlayUrl = getProFormaTemplateAssetUrl(template.referencePdfAsset);
+  const rawReferenceOverlayUrl = getProFormaTemplateAssetUrl(template.referencePdfAsset);
+  const referenceOverlayUrl = rawReferenceOverlayUrl
+    ? `${rawReferenceOverlayUrl}${rawReferenceOverlayUrl.includes("#") ? "&" : "#"}page=1&toolbar=0&navpanes=0&scrollbar=0&view=FitH`
+    : "";
   const accreditationPreview = template.accreditationAssets
     .map((asset) => getProFormaTemplateAssetUrl(asset))
     .filter(Boolean);
@@ -5117,7 +5176,7 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
               <div className="pro-forma-template-head">
                 <div>
                   <h3>Pro-Forma Template Builder</h3>
-                  <p className="muted-copy">Use the A4 stage to line everything up against your current PDF. Upload your reference underneath, drag the blocks around, then save the template.</p>
+                  <p className="muted-copy">Use the live invoice as the base, then line it up against page one of your existing PDF. Every guide here maps directly onto the finished output.</p>
                 </div>
                 <div className="pro-forma-template-actions">
                   <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma")}>
