@@ -5038,27 +5038,36 @@ function shouldAcceptProFormaMoneyValue(meta, key = "") {
 }
 
 function scoreProFormaUnitPriceField(leaf) {
+  if (/pricewithallchildren/i.test(leaf)) return 130;
+  if (/sellingprice/i.test(leaf)) return 110;
   if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
   if (/lineitemprice|priceeach/i.test(leaf)) return 70;
+  if (/pricecomputed|pricepretax|priceunitpretax|taxinfo.*price/i.test(leaf)) return 42;
   if (/^price$/i.test(leaf)) return 50;
   return 0;
 }
 
 function scoreProFormaLineTotalField(leaf) {
+  if (/pricewithallchildren/i.test(leaf)) return 132;
+  if (/sellingprice/i.test(leaf)) return 112;
+  if (/pricetotal/i.test(leaf)) return 108;
   if (/itemtotal/i.test(leaf)) return 95;
-  if (/sellingprice/i.test(leaf)) return 72;
   if (/linetotal|extended|extendedprice|extendedamount|lineprice|lineamount/i.test(leaf)) return 90;
+  if (/pricecomputed|pricepretax|priceunitpretax|taxinfo.*price/i.test(leaf)) return 38;
   if (/total|amount|sell|revenue|price/i.test(leaf)) return 40;
   return 0;
 }
 
 function scoreProFormaRawMoneyField(leaf = "") {
   let score = 0;
-  if (/(pre.?discount|post.?discount|sellingprice|sellprice|unitprice|priceperitem|itemtotal|linetotal|extendedamount|extendedprice|lineamount|lineprice)/i.test(leaf)) score += 90;
+  if (/pricewithallchildren/i.test(leaf)) score += 150;
+  else if (/pricetotal/i.test(leaf)) score += 122;
+  else if (/(pre.?discount|post.?discount|sellingprice|sellprice|unitprice|priceperitem|itemtotal|linetotal|extendedamount|extendedprice|lineamount|lineprice)/i.test(leaf)) score += 90;
   else if (/(price|amount|total|sell|revenue)/i.test(leaf)) score += 48;
   if (/(components?|childcomponents?)\./i.test(leaf)) score += 12;
   if (/assemblydatajson/i.test(leaf)) score -= 8;
   if (/(machine|labou?r|labor|material|perimeter|area|sheet|time|minutes?|hours?)/i.test(leaf)) score -= 28;
+  if (/(pricecomputed|pricepretax|priceunitpretax|taxinfo.*price)/i.test(leaf)) score -= 18;
   if (/(discounttable|markuptable|minimumprice|partcost|sourcedgoods)/i.test(leaf)) score -= 40;
   return score;
 }
@@ -5363,13 +5372,24 @@ function extractProFormaLineItems(order = {}) {
     if (moneyMeta && shouldAcceptProFormaMoneyValue(moneyMeta, leaf) && !shouldIgnoreProFormaMoneyField(leaf)) {
       const moneyValue = moneyMeta.amount;
       const moneyConfidence = getProFormaMoneyConfidence(moneyMeta, leaf);
-      const unitPriceScore = scoreProFormaUnitPriceField(leaf) + moneyConfidence;
+      let unitPriceScore = scoreProFormaUnitPriceField(leaf) + moneyConfidence;
+      let lineTotalScore = scoreProFormaLineTotalField(leaf) + moneyConfidence;
+      if (/pricewithallchildren/i.test(leaf)) {
+        unitPriceScore += 24;
+        lineTotalScore += 30;
+      }
+      if (/pricetotal/i.test(leaf)) {
+        lineTotalScore += 18;
+      }
+      if (/(pricecomputed|pricepretax|priceunitpretax|taxinfo.*price)/i.test(leaf)) {
+        unitPriceScore -= 16;
+        lineTotalScore -= 16;
+      }
       if (unitPriceScore > group.unitPriceScore) {
         group.unitPrice = moneyValue;
         group.unitPriceScore = unitPriceScore;
       }
 
-      const lineTotalScore = scoreProFormaLineTotalField(leaf) + moneyConfidence;
       if (lineTotalScore > group.lineTotalScore) {
         group.lineTotal = moneyValue;
         group.lineTotalScore = lineTotalScore;
