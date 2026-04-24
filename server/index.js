@@ -3662,6 +3662,39 @@ function pickBestCoreBridgeAddress(flatRecord) {
   ]);
 }
 
+function getCoreBridgeBillingAddress(record) {
+  if (!record || typeof record !== "object") return "";
+
+  const flat = flattenRecord(record);
+  const roles = getCoreBridgeRoles(record);
+  const preferredRole = pickPreferredCoreBridgeContactRole(record);
+  const billingRole =
+    roles.find((role) => /bill|invoice|account/i.test(String(role?.RoleType || "")) && buildAddressFromRole(role)) ||
+    (preferredRole && !/shipto/i.test(String(preferredRole?.RoleType || "")) && buildAddressFromRole(preferredRole) ? preferredRole : null);
+
+  const roleAddress = billingRole ? buildAddressFromRole(billingRole) : "";
+  if (roleAddress) return roleAddress;
+
+  const companyAddress = buildAddressFromAliases(flat, [
+    ["company.location.street1", "company.address1", "company.street1", "billtoaddress1", "invoiceaddress1"],
+    ["company.location.street2", "company.address2", "company.street2", "billtoaddress2", "invoiceaddress2"],
+    ["company.location.street3", "company.address3", "company.street3", "billtoaddress3", "invoiceaddress3"],
+    ["company.location.city", "company.city", "billtocity", "invoicecity"],
+    ["company.location.state", "company.location.county", "company.state", "company.county", "billtocounty", "invoicecounty"],
+    ["company.location.postalcode", "company.location.postcode", "company.postalcode", "company.postcode", "billtopostcode", "invoicepostcode"]
+  ]);
+
+  if (companyAddress) return companyAddress;
+
+  return pickFirst(flat, [
+    "company.location.formattedaddress",
+    "company.formattedaddress",
+    "billingaddress",
+    "billtoaddress",
+    "invoiceaddress"
+  ]);
+}
+
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
   const preferredRole = pickPreferredCoreBridgeContactRole(record);
@@ -3678,6 +3711,7 @@ function normalizeCoreBridgeOrder(record, index) {
   const destinationRoleAddress =
     buildAddressFromRole(destinationRole) ||
     pickDestinationAddressFromFlat(flat);
+  const billingAddress = getCoreBridgeBillingAddress(record);
   const preferredRolePhone = buildPhoneFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
     "contactroles.0.ordercontactrolelocators.1.locator",
@@ -3726,7 +3760,9 @@ function normalizeCoreBridgeOrder(record, index) {
       "customercontact"
     ]),
     number: orderDestinationPhone || preferredRolePhone || directRolePhone,
-    address: orderDestinationAddress || destinationRoleAddress,
+    address: billingAddress || orderDestinationAddress || destinationRoleAddress,
+    billingAddress: billingAddress || "",
+    siteAddress: orderDestinationAddress || destinationRoleAddress || "",
     notes: pickFirst(flat, [
       "notes.0.note",
       "note",
@@ -5059,7 +5095,7 @@ function extractCoreBridgeMediaAssets(order = {}) {
 
 function getProFormaTargetSubtotal(order = {}) {
   const totals = extractProFormaTotals(order, 0, 0);
-  return Number(totals.preTaxTotal || totals.subtotal || 0);
+  return Number(totals.subtotal || totals.preTaxTotal || 0);
 }
 
 function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
@@ -5414,7 +5450,9 @@ function buildProFormaPayload(order = {}) {
     customerName: order.customerName || "",
     contact: order.contact || "",
     number: order.number || "",
-    address: order.address || "",
+    address: order.address || order.billingAddress || "",
+    billingAddress: order.billingAddress || order.address || "",
+    siteAddress: order.siteAddress || "",
     headline: "Pro Forma Invoice",
     description: order.description || "",
     lineItems,
@@ -8162,3 +8200,4 @@ module.exports = {
   normalizeCoreBridgeOrder,
   startServer
 };
+

@@ -6204,25 +6204,40 @@ button {
 }
 
 .pro-forma-page .social-post-panel {
-  padding: 18px;
+  padding: 14px;
 }
 
 .pro-forma-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(250px, 300px) minmax(0, 1fr);
+  gap: 14px;
   align-items: start;
 }
 
 .pro-forma-fetch-card,
 .pro-forma-editor-card {
   display: grid;
-  gap: 16px;
+  gap: 12px;
+}
+
+.pro-forma-fetch-card h3,
+.pro-forma-editor-head h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.pro-forma-fetch-card .muted-copy,
+.pro-forma-editor-head .muted-copy,
+.pro-forma-fetch-card p,
+.pro-forma-editor-card p {
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .pro-forma-deposit-tools {
   display: grid;
-  gap: 12px;
+  gap: 8px;
   padding-top: 8px;
   border-top: 1px solid #e2e8f0;
 }
@@ -6230,11 +6245,15 @@ button {
 .pro-forma-deposit-tools h4,
 .pro-forma-lines-head h4 {
   margin: 0;
+  font-size: 0.86rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
 }
 
 .pro-forma-deposit-buttons {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .pro-forma-upload-button {
@@ -6242,13 +6261,13 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  padding: 0 16px;
+  min-height: 40px;
+  padding: 0 14px;
   border: 1px dashed #cbd5e1;
-  border-radius: 16px;
+  border-radius: 12px;
   background: #f8fafc;
   color: #334155;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -6262,64 +6281,73 @@ button {
 .pro-forma-asset-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: #475569;
 }
 
 .pro-forma-custom-deposit {
   display: grid;
-  grid-template-columns: minmax(0, 120px) minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: minmax(0, 110px) minmax(0, 1fr) auto;
+  gap: 8px;
 }
 
 .pro-forma-editor-head {
   display: flex;
   justify-content: space-between;
   align-items: start;
-  gap: 16px;
+  gap: 14px;
 }
 
 .pro-forma-editor-actions {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-items: end;
-}
-
-.pro-forma-editor-head h3 {
-  margin: 0;
 }
 
 .pro-forma-total-pill {
   display: inline-flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   justify-content: center;
-  min-height: 52px;
-  padding: 0 18px;
-  border-radius: 16px;
+  min-height: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #5f3c74, #2d1c53);
   color: #fff;
-  font-size: 1.2rem;
-  font-weight: 800;
   white-space: nowrap;
+}
+
+.pro-forma-total-pill span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+.pro-forma-total-pill strong {
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 .pro-forma-editor {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .pro-forma-meta-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .pro-forma-meta-grid label,
 .pro-forma-terms-card label {
   display: grid;
-  gap: 8px;
+  gap: 6px;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #334155;
 }
@@ -6332,13 +6360,15 @@ button {
 .pro-forma-lines-row input,
 .pro-forma-lines-row textarea {
   width: 100%;
-  min-height: 48px;
+  min-height: 38px;
   border: 1px solid #d7cbdd;
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 12px;
+  padding: 8px 10px;
   background: #fff;
   color: #0f172a;
   font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .pro-forma-meta-grid textarea,
@@ -6355,66 +6385,66 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .pro-forma-lines-table {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .pro-forma-lines-row {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(240px, 2fr) 90px 120px 120px auto;
-  gap: 10px;
+  grid-template-columns: minmax(140px, 1.05fr) minmax(220px, 2fr) 82px 110px 110px auto;
+  gap: 8px;
   align-items: center;
 }
 
 .pro-forma-lines-header {
-  padding: 0 4px;
+  padding: 0 2px;
   color: #64748b;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .pro-forma-lines-row strong {
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: #0f172a;
 }
 
 .pro-forma-bottom-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 360px);
-  gap: 18px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(250px, 320px);
+  gap: 14px;
   align-items: start;
 }
 
 .pro-forma-terms-card,
 .pro-forma-summary-card {
   border: 1px solid #e2e8f0;
-  border-radius: 20px;
+  border-radius: 14px;
   background: #fff;
-  padding: 16px;
+  padding: 14px;
 }
 
 .pro-forma-terms-card {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .pro-forma-summary-card {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .pro-forma-summary-card > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding-bottom: 12px;
+  gap: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -6425,58 +6455,59 @@ button {
 
 .pro-forma-summary-card span {
   color: #475569;
+  font-size: 0.88rem;
   font-weight: 700;
 }
 
 .pro-forma-summary-card strong {
   color: #0f172a;
-  font-size: 1rem;
+  font-size: 0.94rem;
 }
 
 .pro-forma-preview-shell {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .pro-forma-preview-compare {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .pro-forma-preview-panel {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pro-forma-preview-label {
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: #64748b;
 }
 
 .pro-forma-preview-frame {
   width: 100%;
-  min-height: 980px;
+  min-height: 900px;
   border: 1px solid #d7cbdd;
-  border-radius: 20px;
+  border-radius: 14px;
   background: #fff;
 }
 
 .pro-forma-preview-empty {
-  min-height: 980px;
+  min-height: 900px;
   border: 1px dashed #d7cbdd;
-  border-radius: 20px;
+  border-radius: 14px;
   background: #fbfbfd;
   color: #64748b;
-  padding: 20px;
+  padding: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 @media (max-width: 1100px) {

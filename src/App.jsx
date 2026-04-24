@@ -4184,8 +4184,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       contact: payload.contact || "",
       number: payload.number || "",
       address: payload.address || "",
-      billingAddress: payload.address || "",
-      siteAddress: payload.address || "",
+      billingAddress: payload.billingAddress || payload.address || "",
+      siteAddress: payload.siteAddress || "",
       description: payload.description || "",
       lineItems: Array.isArray(payload.lineItems) && payload.lineItems.length
         ? payload.lineItems.map((item, index) => ({
@@ -4386,7 +4386,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
               </label>
 
               <div className="pro-forma-deposit-tools">
-                <h4>Deposit shortcuts</h4>
+                <h4>Deposit</h4>
                 <div className="pro-forma-deposit-buttons">
                   <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(25)}>25% deposit</button>
                   <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(50)}>50% deposit</button>
@@ -4437,7 +4437,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   <p className="muted-copy">Edit the document on the left, then use the live invoice preview on the right to sense-check the finished layout.</p>
                 </div>
                 <div className="pro-forma-editor-actions">
-                  <div className="pro-forma-total-pill">{formatProFormaMoney(total)}</div>
+                  <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
                   <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
                     {printing ? "Opening..." : "Print / Save PDF"}
                   </button>
