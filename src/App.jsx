@@ -4514,13 +4514,17 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <span>Line total</span>
                       <span />
                     </div>
-                    {draft.lineItems.map((item) => {
+                    {draft.lineItems.map((item, index) => {
                       const quantity = Math.max(Number(item.quantity) || 0, 0);
                       const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
                       const lineTotal = roundProFormaMoney(quantity * unitPrice);
+                      const lineNumber = Number.isFinite(item.sortIndex) ? item.sortIndex + 1 : index + 1;
                       return (
                         <div key={item.id} className="pro-forma-lines-row">
-                          <input value={item.name} onChange={(event) => updateLineItem(item.id, "name", event.target.value)} />
+                          <div className="pro-forma-item-cell">
+                            <span className="pro-forma-item-index">{lineNumber}</span>
+                            <input value={item.name} onChange={(event) => updateLineItem(item.id, "name", event.target.value)} />
+                          </div>
                           <textarea rows={3} value={item.description} onChange={(event) => updateLineItem(item.id, "description", event.target.value)} />
                           <input value={item.quantity} inputMode="decimal" onChange={(event) => updateLineItem(item.id, "quantity", event.target.value)} />
                           <input value={item.unitPrice} inputMode="decimal" onChange={(event) => updateLineItem(item.id, "unitPrice", event.target.value)} />

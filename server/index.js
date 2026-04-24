@@ -5059,7 +5059,42 @@ function isGenericProFormaName(value = "") {
 }
 
 function shouldIgnoreProFormaMoneyField(leaf = "") {
-  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|id$|classtype|account|locator|version|sequence)/i.test(leaf);
+  return /(cost|margin|markup|discounttable|discountamount|discounttotal|discount|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|id$|classtype|account|locator|version|sequence)/i.test(leaf);
+}
+
+function extractProFormaAssemblyMoneyCandidates(value, leaf = "") {
+  const raw = String(value || "").trim();
+  if (!raw.startsWith("{")) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    const results = [];
+
+    function visit(node, pathParts = []) {
+      if (Array.isArray(node)) {
+        node.forEach((entry, index) => visit(entry, [...pathParts, String(index)]));
+        return;
+      }
+      if (!node || typeof node !== "object") return;
+
+      Object.entries(node).forEach(([key, next]) => {
+        const nextPath = [...pathParts, key];
+        if (next && typeof next === "object" && Object.prototype.hasOwnProperty.call(next, "Value")) {
+          const fullKey = leaf + "." + nextPath.join(".") + ".Value";
+          const moneyMeta = inspectProFormaMoneyValue(next.Value);
+          if (moneyMeta && shouldAcceptProFormaMoneyValue(moneyMeta, fullKey) && !shouldIgnoreProFormaMoneyField(fullKey)) {
+            results.push({ key: fullKey, amount: moneyMeta.amount, meta: moneyMeta });
+          }
+        }
+        visit(next, nextPath);
+      });
+    }
+
+    visit(parsed);
+    return results;
+  } catch (error) {
+    return [];
+  }
 }
 
 function extractCoreBridgeMediaAssets(order = {}) {
@@ -5095,7 +5130,8 @@ function extractCoreBridgeMediaAssets(order = {}) {
 
 function getProFormaTargetSubtotal(order = {}) {
   const totals = extractProFormaTotals(order, 0, 0);
-  return Number(totals.subtotal || totals.preTaxTotal || 0);
+  const reconstructedSubtotal = Math.round(((Number(totals.preTaxTotal) || 0) + (Number(totals.discountAmount) || 0)) * 100) / 100;
+  return Number(Math.max(Number(totals.subtotal) || 0, reconstructedSubtotal || 0, Number(totals.preTaxTotal) || 0));
 }
 
 function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
@@ -5219,7 +5255,6 @@ function extractProFormaLineItems(order = {}) {
     const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
     if (!match) return;
     const leaf = match[2];
-    if (/(^|\.)(components?|childcomponents?)\./i.test(leaf)) return;
 
     const index = Number(match[1]);
     const textValue = normalizeSocialText(field.value);
@@ -5237,6 +5272,47 @@ function extractProFormaLineItems(order = {}) {
       lineTotalScore: -1,
       moneyCandidates: []
     };
+
+    if (/assemblydatajson/i.test(leaf)) {
+      const assemblyCandidates = extractProFormaAssemblyMoneyCandidates(field.value, leaf);
+      assemblyCandidates.forEach((candidate) => {
+        const moneyConfidence = getProFormaMoneyConfidence(candidate.meta, candidate.key);
+        let unitPriceScore = scoreProFormaUnitPriceField(candidate.key) + moneyConfidence + 14;
+        let lineTotalScore = scoreProFormaLineTotalField(candidate.key) + moneyConfidence + 10;
+        if (/prediscount|pre.?discount|postdiscount/i.test(candidate.key)) {
+          unitPriceScore += 20;
+          lineTotalScore += 20;
+        }
+        if (/price\.value|price$/i.test(candidate.key)) unitPriceScore += 24;
+        if (/itemtotal|linetotal|extendedprice|extendedamount/i.test(candidate.key)) lineTotalScore += 28;
+        if (unitPriceScore > group.unitPriceScore) {
+          group.unitPrice = candidate.amount;
+          group.unitPriceScore = unitPriceScore;
+        }
+        if (lineTotalScore > group.lineTotalScore) {
+          group.lineTotal = candidate.amount;
+          group.lineTotalScore = lineTotalScore;
+        }
+        const candidateScore = Math.max(unitPriceScore, lineTotalScore);
+        if (candidateScore > 0) {
+          group.moneyCandidates.push({
+            rawValue: candidate.amount,
+            raw: candidate.meta.raw,
+            unitPrice: unitPriceScore > 0 ? candidate.amount : 0,
+            lineTotal: lineTotalScore > 0 ? candidate.amount : 0,
+            score: candidateScore,
+            leaf: candidate.key
+          });
+        }
+      });
+      groups.set(match[1], group);
+      return;
+    }
+
+    if (/(^|\.)(components?|childcomponents?)\./i.test(leaf)) {
+      groups.set(match[1], group);
+      return;
+    }
 
     if (
       /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
@@ -5342,7 +5418,7 @@ function extractProFormaLineItems(order = {}) {
         })
         .filter((candidate) => candidate.lineTotal > 0)
         .reduce((unique, candidate) => {
-          const key = `${candidate.lineTotal.toFixed(2)}|${candidate.unitPrice.toFixed(2)}`;
+          const key = candidate.lineTotal.toFixed(2) + '|' + candidate.unitPrice.toFixed(2);
           const existing = unique.get(key);
           if (!existing || candidate.score > existing.score) unique.set(key, candidate);
           return unique;
@@ -5360,16 +5436,16 @@ function extractProFormaLineItems(order = {}) {
           lineTotal: Math.round(normalizedLineTotal * 100) / 100,
           unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
           score: 1,
-          leaf: "fallback"
+          leaf: 'fallback'
         });
       }
 
       return {
         group,
-        id: `pro-forma-line-${group.index + 1}`,
+        id: 'pro-forma-line-' + (group.index + 1),
         sortIndex: group.index,
-        name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || `Line Item ${group.index + 1}`),
-        description: group.description || (!isGenericProFormaName(group.name) ? group.name : ""),
+        name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || ('Line Item ' + (group.index + 1))),
+        description: group.description || (!isGenericProFormaName(group.name) ? group.name : ''),
         quantity: String(group.quantity || normalizedQuantity || 1),
         normalizedQuantity,
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,

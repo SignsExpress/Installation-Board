@@ -6223,16 +6223,18 @@ button {
 .pro-forma-fetch-card h3,
 .pro-forma-editor-head h3 {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.96rem;
   line-height: 1.2;
+  font-weight: 700;
 }
 
 .pro-forma-fetch-card .muted-copy,
 .pro-forma-editor-head .muted-copy,
 .pro-forma-fetch-card p,
 .pro-forma-editor-card p {
-  font-size: 0.9rem;
-  line-height: 1.45;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  font-weight: 500;
 }
 
 .pro-forma-deposit-tools {
@@ -6245,8 +6247,8 @@ button {
 .pro-forma-deposit-tools h4,
 .pro-forma-lines-head h4 {
   margin: 0;
-  font-size: 0.86rem;
-  letter-spacing: 0.06em;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #64748b;
 }
@@ -6320,7 +6322,7 @@ button {
 }
 
 .pro-forma-total-pill span {
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -6328,8 +6330,8 @@ button {
 }
 
 .pro-forma-total-pill strong {
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-size: 0.94rem;
+  font-weight: 700;
 }
 
 .pro-forma-editor {
@@ -6360,15 +6362,16 @@ button {
 .pro-forma-lines-row input,
 .pro-forma-lines-row textarea {
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
   border: 1px solid #d7cbdd;
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: #fff;
   color: #0f172a;
   font: inherit;
-  font-size: 0.92rem;
-  line-height: 1.35;
+  font-size: 0.84rem;
+  line-height: 1.3;
+  font-weight: 500;
 }
 
 .pro-forma-meta-grid textarea,
@@ -6395,7 +6398,7 @@ button {
 
 .pro-forma-lines-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1.05fr) minmax(220px, 2fr) 82px 110px 110px auto;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(220px, 2fr) 76px 100px 100px auto;
   gap: 8px;
   align-items: center;
 }
@@ -6403,15 +6406,30 @@ button {
 .pro-forma-lines-header {
   padding: 0 2px;
   color: #64748b;
-  font-size: 0.72rem;
-  font-weight: 800;
+  font-size: 0.68rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
 .pro-forma-lines-row strong {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   color: #0f172a;
+  font-weight: 600;
+}
+
+.pro-forma-item-cell {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.pro-forma-item-index {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
 }
 
 .pro-forma-bottom-grid {
@@ -6455,13 +6473,14 @@ button {
 
 .pro-forma-summary-card span {
   color: #475569;
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .pro-forma-summary-card strong {
   color: #0f172a;
-  font-size: 0.94rem;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .pro-forma-preview-shell {
