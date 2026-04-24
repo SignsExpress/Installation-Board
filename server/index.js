@@ -5534,18 +5534,6 @@ function extractProFormaLineItems(order = {}) {
 
   let bestSelection = null;
 
-  const preferredSellSelection = preparedGroups.map((item) => item.preferredSellCandidate).filter(Boolean);
-  if (preferredSellSelection.length === preparedGroups.length) {
-    const preferredSellTotal = Math.round(preferredSellSelection.reduce((sum, candidate) => sum + Number(candidate.lineTotal || 0), 0) * 100) / 100;
-    if (!targetSubtotal || Math.abs(preferredSellTotal - targetSubtotal) <= 0.02) {
-      bestSelection = {
-        diff: targetSubtotal ? Math.abs(preferredSellTotal - targetSubtotal) : 0,
-        score: preferredSellSelection.reduce((sum, candidate) => sum + Number(candidate.score || 0), 0) + 500,
-        picks: preferredSellSelection
-      };
-    }
-  }
-
   if (!bestSelection && targetSubtotal > 0 && preparedGroups.length && preparedGroups.length <= 8) {
     const tolerance = 0.02;
     const search = (index, runningTotal, runningScore, picks) => {
@@ -5575,16 +5563,19 @@ function extractProFormaLineItems(order = {}) {
   }
 
   return preparedGroups.map((item, index) => {
+    const direct = item.preferredSellCandidate;
     const chosen = bestSelection?.picks?.[index];
+    const finalUnitPrice = direct?.unitPrice ?? chosen?.unitPrice ?? item.unitPrice;
+    const finalLineTotal = direct?.lineTotal ?? chosen?.lineTotal ?? item.lineTotal;
     return {
       id: item.id,
       sortIndex: item.sortIndex,
       name: item.name,
       description: item.description,
       quantity: item.quantity,
-      unitPrice: chosen?.unitPrice ?? item.unitPrice,
-      lineTotal: chosen?.lineTotal ?? item.lineTotal,
-      chosenSource: chosen?.leaf || 'fallback',
+      unitPrice: finalUnitPrice,
+      lineTotal: finalLineTotal,
+      chosenSource: direct?.leaf || chosen?.leaf || 'fallback',
       candidates: item.candidates,
       rawMoneyFields: item.rawMoneyFields
     };
