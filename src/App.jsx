@@ -3798,15 +3798,6 @@ function getProFormaTemplateAssetUrl(asset) {
   return "";
 }
 
-function readFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(reader.error || new Error("Could not read the selected file."));
-    reader.readAsDataURL(file);
-  });
-}
-
 function formatProFormaMoney(value) {
   const numeric = Number(value) || 0;
   return new Intl.NumberFormat("en-GB", {
