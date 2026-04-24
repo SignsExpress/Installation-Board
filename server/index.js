@@ -94,7 +94,7 @@ function createEmptyBoardStore() {
 
 function getDefaultProFormaTemplate() {
   return {
-    version: 1,
+    version: 2,
     overlayOpacity: 0.34,
     referencePdfAsset: null,
     termsPdfAsset: null,
@@ -107,6 +107,18 @@ function getDefaultProFormaTemplate() {
       metaLeft: { x: 12.5, y: 100, w: 84, h: 25 },
       metaRight: { x: 128, y: 100, w: 66, h: 13 },
       table: { x: 12.5, y: 124, w: 182, h: 86 },
+      tableHeaderBand: { x: 12.5, y: 124, w: 182, h: 14 },
+      tableHeaderNumber: { x: 12.5, y: 124, w: 14, h: 14 },
+      tableHeaderTitle: { x: 26.5, y: 124, w: 74, h: 14 },
+      tableHeaderQty: { x: 111, y: 124, w: 14, h: 14 },
+      tableHeaderUnitPrice: { x: 127, y: 124, w: 25, h: 14 },
+      tableHeaderLineTotal: { x: 156, y: 124, w: 38.5, h: 14 },
+      tableNumber: { x: 14.5, y: 145, w: 8, h: 8 },
+      tableTitle: { x: 28, y: 143.5, w: 72, h: 8 },
+      tableQty: { x: 112.5, y: 143.5, w: 12, h: 8 },
+      tableUnitPrice: { x: 133, y: 143.5, w: 20, h: 8 },
+      tableLineTotal: { x: 173.5, y: 143.5, w: 18, h: 8 },
+      tableDescription: { x: 28, y: 154.5, w: 146, h: 16 },
       bank: { x: 12.5, y: 218, w: 78, h: 27 },
       totals: { x: 140, y: 214, w: 55, h: 43 },
       approval: { x: 12.5, y: 251, w: 108, h: 11 },

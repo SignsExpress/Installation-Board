@@ -3743,7 +3743,7 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
 }
 
 const DEFAULT_PRO_FORMA_TEMPLATE = {
-  version: 1,
+  version: 2,
   overlayOpacity: 0.34,
   referencePdfAsset: null,
   termsPdfAsset: null,
@@ -3776,6 +3776,10 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
     footerMeta: { x: 12.5, y: 292, w: 182, h: 4.5 }
   }
 };
+
+function cloneDefaultProFormaTemplate() {
+  return sanitizeProFormaTemplate(DEFAULT_PRO_FORMA_TEMPLATE);
+}
 
 function sanitizeProFormaTemplate(template) {
   const source = template && typeof template === "object" ? template : {};
@@ -4876,7 +4880,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
 }
 
 function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
-  const [template, setTemplate] = useState(DEFAULT_PRO_FORMA_TEMPLATE);
+  const [template, setTemplate] = useState(cloneDefaultProFormaTemplate());
   const [selectedSection, setSelectedSection] = useState("title");
   const [sampleReference, setSampleReference] = useState("ORD-3379");
   const [sampleDraft, setSampleDraft] = useState(null);
@@ -5101,6 +5105,34 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
     }
   }
 
+  async function revertTemplateToDefault() {
+    const confirmed = window.confirm("Revert the Pro-Forma template back to the default layout?");
+    if (!confirmed) return;
+    const nextTemplate = cloneDefaultProFormaTemplate();
+    setTemplate(nextTemplate);
+    setSelectedSection("title");
+    setMessage("");
+    setError("");
+    try {
+      setSaving(true);
+      const response = await fetch("/api/pro-forma/template", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template: nextTemplate })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not revert the Pro-Forma template.");
+      }
+      setTemplate(sanitizeProFormaTemplate(payload.template));
+      setMessage("Template reverted to default.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not revert the Pro-Forma template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const selectedRect = template.sections[selectedSection];
   const rawReferenceOverlayUrl = getProFormaTemplateAssetUrl(template.referencePdfAsset);
   const referenceOverlayUrl = rawReferenceOverlayUrl
@@ -5191,6 +5223,9 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                   <p className="muted-copy">Use the live invoice as the base, then line it up against page one of your existing PDF. Every guide here maps directly onto the finished output.</p>
                 </div>
                 <div className="pro-forma-template-actions">
+                  <button type="button" className="ghost-button" disabled={saving || loading} onClick={revertTemplateToDefault}>
+                    Revert to default
+                  </button>
                   <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma")}>
                     Back to Pro-Forma
                   </button>
@@ -5287,25 +5322,19 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                     </div>
                   ) : null}
 
-                  {[...sectionOptions].sort(([keyA], [keyB]) => {
-                    if (keyA === selectedSection) return 1;
-                    if (keyB === selectedSection) return -1;
-                    return 0;
-                  }).map(([key, label]) => {
+                  {sectionOptions.filter(([key]) => key === selectedSection).map(([key, label]) => {
                     const rect = template.sections[key];
-                    const isSelected = key === selectedSection;
                     return (
                       <button
                         key={key}
                         type="button"
-                        className={`pro-forma-stage-block ${isSelected ? "active" : "passive"}`}
+                        className="pro-forma-stage-block active"
                         style={{
                           left: `${(rect.x / 210) * 100}%`,
                           top: `${(rect.y / 297) * 100}%`,
                           width: `${(rect.w / 210) * 100}%`,
                           height: `${(rect.h / 297) * 100}%`,
-                          zIndex: isSelected ? 4 : 1,
-                          pointerEvents: isSelected ? "auto" : "none"
+                          zIndex: 4
                         }}
                         onMouseDown={(event) => startDrag(key, event)}
                         onClick={() => setSelectedSection(key)}
