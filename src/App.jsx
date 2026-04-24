@@ -3782,6 +3782,10 @@ function buildProFormaPreviewHtml(draft, summary) {
   ];
   const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
   const accreditationImages = (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
+  const hasDeposit = Number(summary.depositAmount || 0) > 0;
+  const completionBalance = hasDeposit
+    ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
+    : summary.balanceDue;
   const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
@@ -4100,8 +4104,8 @@ function buildProFormaPreviewHtml(draft, summary) {
           <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
           <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
           <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
-          <div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>
-          <div class="total-row"><span>Balance Due</span><strong>${escapeHtml(formatProFormaMoney(summary.balanceDue))}</strong></div>
+          ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
+          <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
         </div>
       </div>
 
@@ -4157,6 +4161,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   }, [draft, total]);
 
   const remainingBalance = useMemo(() => Math.max(roundProFormaMoney(total - totalPaid), 0), [total, totalPaid]);
+  const completionBalance = useMemo(
+    () => draft?.depositType
+      ? Math.max(roundProFormaMoney(total - depositAmount), 0)
+      : remainingBalance,
+    [draft, total, depositAmount, remainingBalance]
+  );
   const previewHtml = useMemo(() => buildProFormaPreviewHtml(draft, {
     subtotal,
     discountAmount,
@@ -4617,8 +4627,17 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <div><span>Pre-Tax Total</span><strong>{formatProFormaMoney(preTaxTotal)}</strong></div>
                       <div><span>VAT</span><strong>{formatProFormaMoney(vatAmount)}</strong></div>
                       <div><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
-                      <div><span>Total paid</span><strong>{formatProFormaMoney(totalPaid)}</strong></div>
-                      <div><span>Balance due</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
+                      {draft.depositType ? (
+                        <>
+                          <div><span>Deposit required{draft.depositType === "percent" ? `, ${draft.depositValue}%` : ""}</span><strong>{formatProFormaMoney(depositAmount)}</strong></div>
+                          <div><span>Balance due on completion</span><strong>{formatProFormaMoney(completionBalance)}</strong></div>
+                        </>
+                      ) : (
+                        <>
+                          <div><span>Total paid</span><strong>{formatProFormaMoney(totalPaid)}</strong></div>
+                          <div><span>Balance due</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
+                        </>
+                      )}
                     </div>
                   </div>
 
