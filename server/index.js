@@ -5,6 +5,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const zlib = require("node:zlib");
+const { snapshotFile } = require("./backup-store");
 const {
   bootstrapPasswordsFromEnv,
   createUser,
@@ -800,6 +801,8 @@ async function readStore() {
 
 async function writeStore(store) {
   ensureStoreFile();
+  const dataFile = getDataFile();
+  await snapshotFile(dataFile, "jobs-store");
   const nextStore = {
     jobs: [...store.jobs].sort((left, right) => {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
@@ -842,7 +845,7 @@ async function writeStore(store) {
       ),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
-  await fsp.writeFile(getDataFile(), `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
+  await fsp.writeFile(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
   return nextStore;
 }
 
@@ -886,7 +889,9 @@ async function writeInstallersStore(installers) {
   const nextInstallers = [...installers].sort((left, right) =>
     String(left.name || "").localeCompare(String(right.name || ""))
   );
-  await fsp.writeFile(getInstallersFile(), `${JSON.stringify(nextInstallers, null, 2)}\n`, "utf8");
+  const installersFile = getInstallersFile();
+  await snapshotFile(installersFile, "installers");
+  await fsp.writeFile(installersFile, `${JSON.stringify(nextInstallers, null, 2)}\n`, "utf8");
   return nextInstallers;
 }
 
@@ -908,7 +913,9 @@ async function writeRequestsStore(requests) {
   const nextRequests = [...requests].sort((left, right) =>
     String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
   );
-  await fsp.writeFile(getRequestsFile(), `${JSON.stringify(nextRequests, null, 2)}\n`, "utf8");
+  const requestsFile = getRequestsFile();
+  await snapshotFile(requestsFile, "requests");
+  await fsp.writeFile(requestsFile, `${JSON.stringify(nextRequests, null, 2)}\n`, "utf8");
   return nextRequests;
 }
 
@@ -5305,6 +5312,43 @@ function createServer() {
       response.json({ user });
     } catch (error) {
       response.status(400).json({ error: error.message || "Could not create user." });
+    }
+  });
+
+  app.get("/api/auth/backup-export", async (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
+    request.user = session.user;
+    if (!requirePermissionsManager(request, response)) return;
+
+    try {
+      const [store, usersStore, installers, requests] = await Promise.all([
+        readStore(),
+        readUsersStore(),
+        readInstallersStore(),
+        readRequestsStore()
+      ]);
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        exportedBy: sanitizeUser(request.user),
+        data: {
+          boardStore: store,
+          usersStore,
+          installers,
+          requests
+        }
+      };
+      response.setHeader("Content-Type", "application/json; charset=utf-8");
+      response.setHeader("Content-Disposition", `attachment; filename="sx-portal-backup-${stamp}.json"`);
+      response.send(`${JSON.stringify(payload, null, 2)}\n`);
+    } catch (error) {
+      console.error(error);
+      response.status(500).json({ error: error.message || "Could not export backup." });
     }
   });
 

@@ -2586,7 +2586,8 @@ function PermissionsPanel({
   onUpdateUserProfile,
   onCreateUser,
   onResetPassword,
-  onDeleteUser
+  onDeleteUser,
+  onDownloadBackup
 }) {
   const [createForm, setCreateForm] = useState({ displayName: "", role: "client", password: "" });
   const [passwordDrafts, setPasswordDrafts] = useState({});
@@ -2686,6 +2687,14 @@ function PermissionsPanel({
           disabled={!createForm.displayName.trim() || !createForm.password}
         >
           Add user
+        </button>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={onDownloadBackup}
+          disabled={savingKey === "download-backup"}
+        >
+          {savingKey === "download-backup" ? "Exporting..." : "Download backup"}
         </button>
       </div>
       <div className="permissions-grid">
@@ -3340,6 +3349,7 @@ function HostLandingPage({
   onCreateUser,
   onResetPassword,
   onDeleteUser,
+  onDownloadBackup,
   notifications
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
@@ -3417,6 +3427,7 @@ function HostLandingPage({
                 onCreateUser={onCreateUser}
                 onResetPassword={onResetPassword}
                 onDeleteUser={onDeleteUser}
+                onDownloadBackup={onDownloadBackup}
               />
           </div>
         </div>
@@ -11015,6 +11026,42 @@ export default function App() {
     }
   }
 
+  async function handleDownloadBackup() {
+    if (!currentUser?.canManagePermissions) return;
+    setPermissionSavingKey("download-backup");
+    try {
+      const response = await fetch("/api/auth/backup-export");
+      if (!response.ok) {
+        let message = "Could not export backup.";
+        try {
+          const payload = await response.json();
+          message = payload.error || message;
+        } catch (error) {
+          console.error(error);
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      const contentDisposition = response.headers.get("Content-Disposition") || "";
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i);
+      anchor.href = downloadUrl;
+      anchor.download = filenameMatch?.[1] || "sx-portal-backup.json";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      setMessage(createMessage("Backup downloaded.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not export backup.", "error"));
+    } finally {
+      setPermissionSavingKey("");
+    }
+  }
+
   async function markNotificationRead(notificationId) {
     setNotifications((current) =>
       current.map((entry) =>
@@ -12293,6 +12340,7 @@ export default function App() {
           onCreateUser={handleCreateUser}
           onResetPassword={handleResetUserPassword}
           onDeleteUser={handleDeleteUser}
+          onDownloadBackup={handleDownloadBackup}
           notifications={notifications}
         />
     );

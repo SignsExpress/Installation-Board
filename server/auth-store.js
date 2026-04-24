@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const { snapshotFile } = require("./backup-store");
 
 const DEFAULT_USERS_FILE = path.join(__dirname, "..", "data", "users.json");
 const PERMISSION_VALUES = ["admin", "user", "none"];
@@ -283,7 +284,9 @@ async function readUsersStore() {
 async function writeUsersStore(store) {
   ensureUsersFile();
   const normalized = normalizeStore(store);
-  await fsp.writeFile(getUsersFile(), `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+  const usersFile = getUsersFile();
+  await snapshotFile(usersFile, "users");
+  await fsp.writeFile(usersFile, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   return normalized;
 }
 
