@@ -5493,7 +5493,9 @@ function extractProFormaLineItems(order = {}) {
       description: item.description,
       quantity: item.quantity,
       unitPrice: chosen?.unitPrice ?? item.unitPrice,
-      lineTotal: chosen?.lineTotal ?? item.lineTotal
+      lineTotal: chosen?.lineTotal ?? item.lineTotal,
+      chosenSource: chosen?.leaf || 'fallback',
+      candidates: item.candidates
     };
   });
 }

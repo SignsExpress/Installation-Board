@@ -6223,7 +6223,7 @@ button {
 .pro-forma-fetch-card h3,
 .pro-forma-editor-head h3 {
   margin: 0;
-  font-size: 0.96rem;
+  font-size: 0.88rem;
   line-height: 1.2;
   font-weight: 700;
 }
@@ -6232,8 +6232,8 @@ button {
 .pro-forma-editor-head .muted-copy,
 .pro-forma-fetch-card p,
 .pro-forma-editor-card p {
-  font-size: 0.84rem;
-  line-height: 1.4;
+  font-size: 0.78rem;
+  line-height: 1.35;
   font-weight: 500;
 }
 
@@ -6348,9 +6348,9 @@ button {
 .pro-forma-meta-grid label,
 .pro-forma-terms-card label {
   display: grid;
-  gap: 6px;
-  font-size: 0.82rem;
-  font-weight: 700;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
   color: #334155;
 }
 
@@ -6360,17 +6360,19 @@ button {
 .pro-forma-custom-deposit input,
 .pro-forma-custom-deposit select,
 .pro-forma-lines-row input,
-.pro-forma-lines-row textarea {
+.pro-forma-lines-row textarea,
+.pro-forma-line-top input,
+.pro-forma-line-description textarea {
   width: 100%;
-  min-height: 36px;
+  min-height: 34px;
   border: 1px solid #d7cbdd;
-  border-radius: 12px;
-  padding: 7px 10px;
+  border-radius: 10px;
+  padding: 6px 9px;
   background: #fff;
   color: #0f172a;
   font: inherit;
-  font-size: 0.84rem;
-  line-height: 1.3;
+  font-size: 0.78rem;
+  line-height: 1.25;
   font-weight: 500;
 }
 
@@ -6391,9 +6393,15 @@ button {
   gap: 10px;
 }
 
+.pro-forma-lines-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .pro-forma-lines-table {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .pro-forma-lines-row {
@@ -6406,16 +6414,58 @@ button {
 .pro-forma-lines-header {
   padding: 0 2px;
   color: #64748b;
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .pro-forma-lines-row strong {
-  font-size: 0.84rem;
+  font-size: 0.8rem;
   color: #0f172a;
   font-weight: 600;
+}
+
+.pro-forma-line-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.pro-forma-line-top {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.8fr) 76px 100px 110px auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.pro-forma-line-top label,
+.pro-forma-line-description {
+  display: grid;
+  gap: 4px;
+}
+
+.pro-forma-line-top label span,
+.pro-forma-line-description span,
+.pro-forma-line-total-block span {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pro-forma-line-total-block {
+  display: grid;
+  gap: 4px;
+  align-items: end;
+}
+
+.pro-forma-line-total-block strong {
+  font-size: 0.86rem;
 }
 
 .pro-forma-item-cell {
@@ -6426,10 +6476,47 @@ button {
 }
 
 .pro-forma-item-index {
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: #475569;
   text-align: center;
+}
+
+.pro-forma-line-debug {
+  border-top: 1px dashed #d7cbdd;
+  padding-top: 8px;
+}
+
+.pro-forma-line-debug summary {
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.pro-forma-line-debug-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pro-forma-line-debug-card,
+.pro-forma-line-debug-empty {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #334155;
+}
+
+.pro-forma-line-debug-card strong {
+  font-size: 0.72rem;
+  word-break: break-word;
 }
 
 .pro-forma-bottom-grid {
