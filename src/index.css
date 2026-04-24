@@ -6944,6 +6944,18 @@ button {
   align-items: start;
 }
 
+.social-suggestion-view {
+  display: grid;
+  gap: 18px;
+}
+
+.social-suggestion-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .social-post-card {
   display: grid;
   gap: 14px;
@@ -7119,6 +7131,10 @@ button {
   padding: 6px 8px;
   border-radius: 999px;
   background: #f8fafc;
+}
+
+.social-suggestion-photo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 
 .muted-copy {
@@ -8937,6 +8953,7 @@ button {
   }
 
   .social-post-grid,
+  .social-suggestion-grid,
   .social-post-order-row {
     grid-template-columns: 1fr;
   }

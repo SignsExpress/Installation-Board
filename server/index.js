@@ -615,7 +615,7 @@ function ensureStoreFile() {
     if (!fs.existsSync(file)) {
       fs.writeFileSync(
         file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], vehiclePricingSettings: null, socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [] }, null, 2)}\n`,
+        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], vehiclePricingSettings: null, socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [], socialPostSuggestions: [] }, null, 2)}\n`,
         "utf8"
       );
     }
@@ -655,6 +655,7 @@ function mergeHolidaySeed(store) {
         vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
         socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
         socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : [],
+        socialPostSuggestions: Array.isArray(store.socialPostSuggestions) ? [...store.socialPostSuggestions] : [],
         holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
       };
 
@@ -752,7 +753,8 @@ async function readStore() {
             ramsLogic: null,
             vehiclePricingSettings: null,
             socialPostToneVoices: [],
-            socialPostDeletedToneVoiceIds: []
+            socialPostDeletedToneVoiceIds: [],
+            socialPostSuggestions: []
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -772,6 +774,7 @@ async function readStore() {
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
+          socialPostSuggestions: Array.isArray(parsed.socialPostSuggestions) ? parsed.socialPostSuggestions : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -792,7 +795,8 @@ async function readStore() {
           ramsLogic: null,
           vehiclePricingSettings: null,
           socialPostToneVoices: [],
-          socialPostDeletedToneVoiceIds: []
+          socialPostDeletedToneVoiceIds: [],
+          socialPostSuggestions: []
         });
     await writeStore(migrated);
     return mergeHolidaySeed(migrated);
@@ -839,6 +843,9 @@ async function writeStore(store) {
       ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
+      socialPostSuggestions: [...(store.socialPostSuggestions || [])]
+        .map((entry) => sanitizeSocialPostSuggestion(entry))
+        .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || ""))),
       vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
@@ -4326,6 +4333,23 @@ function sanitizeSocialToneVoice(voice = {}) {
   };
 }
 
+function sanitizeSocialPostSuggestion(entry = {}) {
+  return {
+    id: String(entry.id || makeId()),
+    userId: String(entry.userId || "").trim(),
+    jobId: String(entry.jobId || "").trim(),
+    orderReference: String(entry.orderReference || "").replace(/\s+/g, " ").trim().slice(0, 80),
+    customerName: String(entry.customerName || "").replace(/\s+/g, " ").trim().slice(0, 160),
+    toneVoiceId: String(entry.toneVoiceId || "").trim(),
+    toneVoiceName: String(entry.toneVoiceName || "").replace(/\s+/g, " ").trim().slice(0, 120),
+    post: String(entry.post || "").replace(/\u0000/g, "").trim().slice(0, 30000),
+    source: String(entry.source || "template").trim().toLowerCase(),
+    warning: String(entry.warning || "").trim().slice(0, 1000),
+    createdAt: String(entry.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function decodeXmlEntities(value = "") {
   return String(value)
     .replace(/&nbsp;/gi, " ")
@@ -4523,6 +4547,35 @@ function getSocialPostVoices(store = {}) {
   );
   const voices = hasMattVoice ? savedVoices : [getDefaultSocialToneVoice(), ...savedVoices];
   return voices.filter((voice) => !deletedIds.has(String(voice.id)));
+}
+
+function normalizePersonName(value = "") {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getRandomArrayItem(items = []) {
+  if (!Array.isArray(items) || !items.length) return null;
+  return items[Math.floor(Math.random() * items.length)] || items[0] || null;
+}
+
+function pickSocialPostVoiceForUser(user, voices = []) {
+  const safeVoices = Array.isArray(voices) ? voices : [];
+  if (!safeVoices.length) return null;
+  const displayName = normalizePersonName(user?.displayName || "");
+  if (displayName) {
+    const exactMatch = safeVoices.find((voice) => normalizePersonName(voice.name) === displayName);
+    if (exactMatch) return exactMatch;
+    const partialMatch = safeVoices.find((voice) => {
+      const voiceName = normalizePersonName(voice.name);
+      return voiceName && (voiceName.includes(displayName) || displayName.includes(voiceName));
+    });
+    if (partialMatch) return partialMatch;
+  }
+  return getRandomArrayItem(safeVoices);
 }
 
 function getSocialPostToneSummary(voice) {
@@ -4934,6 +4987,99 @@ function getSocialLookupReferences(reference = "") {
   if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "ORD-"));
   if (/^ord-/i.test(trimmed)) references.push(trimmed.replace(/^ord-/i, "INV-"));
   return [...new Set(references.filter(Boolean))];
+}
+
+async function fetchSocialPostOrderByReference(orderReference = "") {
+  const lookupReferences = getSocialLookupReferences(orderReference);
+  const lookupAttempts = [];
+  let lookup = null;
+  let order = null;
+
+  for (const reference of lookupReferences) {
+    try {
+      const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const candidateOrder = (candidateLookup.orders || [])[0];
+      lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
+      if (candidateOrder) {
+        lookup = candidateLookup;
+        order = candidateOrder;
+        break;
+      }
+    } catch (lookupError) {
+      lookupAttempts.push({ reference, found: false, error: lookupError.message || "Lookup failed" });
+    }
+  }
+
+  return {
+    lookup,
+    order,
+    lookupAttempts
+  };
+}
+
+async function createAutoSocialSuggestionsForCompletedJob({ store, users, job, actorName = "" }) {
+  if (!job?.id || !String(job.orderReference || "").trim()) return;
+  const voices = getSocialPostVoices(store);
+  if (!voices.length) return;
+
+  const recipients = (Array.isArray(users) ? users : []).filter((user) => canAccessSocialPost(user));
+  if (!recipients.length) return;
+
+  const { lookup, order, lookupAttempts } = await fetchSocialPostOrderByReference(job.orderReference);
+  if (!order || !lookup) return;
+
+  const publicJob = toPublicJob(job);
+  const photoCount = Array.isArray(publicJob.photos) ? publicJob.photos.length : 0;
+  const photoSummary = photoCount === 1 ? "1 photo attached" : `${photoCount} photos attached`;
+  store.socialPostSuggestions = Array.isArray(store.socialPostSuggestions) ? store.socialPostSuggestions : [];
+  store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+
+  for (const user of recipients) {
+    const voice = pickSocialPostVoiceForUser(user, voices) || voices[0];
+    if (!voice) continue;
+
+    const brief = buildSocialPostBrief(order, voice);
+    brief.lookupAttempts = lookupAttempts;
+    brief.debug.lookupAttempts = lookupAttempts;
+    brief.debug.selectedVoice = {
+      id: voice.id,
+      name: voice.name,
+      fileName: voice.fileName,
+      contentLength: voice.content.length,
+      supportingTextLength: voice.supportingText.length,
+      exampleCount: voice.examples.length,
+      isFallback: false,
+      autoGeneratedForUser: String(user.displayName || "").trim()
+    };
+
+    const generated = await generateSocialPostWithAi(brief);
+    const suggestion = sanitizeSocialPostSuggestion({
+      userId: user.id,
+      jobId: publicJob.id,
+      orderReference: publicJob.orderReference,
+      customerName: publicJob.customerName,
+      toneVoiceId: voice.id,
+      toneVoiceName: voice.name,
+      post: generated.post,
+      source: generated.source,
+      warning: generated.warning || ""
+    });
+
+    store.socialPostSuggestions = [
+      suggestion,
+      ...store.socialPostSuggestions.filter((entry) => String(entry.id || "") !== suggestion.id)
+    ].slice(0, 500);
+
+    store.notifications.unshift(
+      createNotification({
+        userId: user.id,
+        type: "social-post",
+        title: "Suggested social post ready",
+        link: `/social-post?suggestion=${encodeURIComponent(suggestion.id)}`,
+        message: `${getJobNotificationSummary(publicJob)} was completed by ${actorName || "a user"}. ${photoSummary}. A suggested post in ${voice.name}'s tone is ready.`
+      })
+    );
+  }
 }
 
 function cleanSocialPostSpec(value = "") {
@@ -5847,6 +5993,23 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json({ voices: getSocialPostVoices(savedStore) });
   });
 
+  app.get("/api/social-post/suggestions/:id", async (request, response) => {
+    if (!requireSocialPostAccess(request, response)) return;
+    const store = await readStore();
+    const suggestions = Array.isArray(store.socialPostSuggestions) ? store.socialPostSuggestions.map(sanitizeSocialPostSuggestion) : [];
+    const suggestion = suggestions.find((entry) => String(entry.id || "") === String(request.params.id || ""));
+    if (!suggestion || String(suggestion.userId || "") !== String(request.user?.id || "")) {
+      response.status(404).json({ error: "Suggested post not found." });
+      return;
+    }
+
+    const job = store.jobs.find((entry) => String(entry.id || "") === String(suggestion.jobId || ""));
+    response.json({
+      suggestion,
+      job: job ? toPublicJob(job) : null
+    });
+  });
+
   app.post("/api/social-post/generate", async (request, response) => {
     if (!requireSocialPostAccess(request, response)) return;
     try {
@@ -5861,24 +6024,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         name: "Matt Rutlidge",
         content: "Friendly, practical LinkedIn posts for completed signage work. Mention the customer, what was produced, and the installation or finish where relevant."
       });
-      const lookupReferences = getSocialLookupReferences(orderReference);
-      let lookup = null;
-      let order = null;
-      const lookupAttempts = [];
-      for (const reference of lookupReferences) {
-        try {
-          const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
-          const candidateOrder = (candidateLookup.orders || [])[0];
-          lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
-          if (candidateOrder) {
-            lookup = candidateLookup;
-            order = candidateOrder;
-            break;
-          }
-        } catch (lookupError) {
-          lookupAttempts.push({ reference, found: false, error: lookupError.message || "Lookup failed" });
-        }
-      }
+      const { lookup, order, lookupAttempts } = await fetchSocialPostOrderByReference(orderReference);
       if (!order) {
         response.status(404).json({ error: "No Corebridge order found for that reference." });
         return;
@@ -6222,6 +6368,16 @@ app.get("/api/corebridge/orders", async (request, response) => {
           title: "Job marked complete",
           message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
         }));
+      try {
+        await createAutoSocialSuggestionsForCompletedJob({
+          store,
+          users: usersStore.users || [],
+          job: nextJob,
+          actorName: request.user?.displayName || "a user"
+        });
+      } catch (socialError) {
+        console.error("Could not auto-create social post suggestions.", socialError);
+      }
     }
     const savedStore = await writeStore(store);
     const payload = {

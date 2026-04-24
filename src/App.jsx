@@ -2430,6 +2430,9 @@ function getNotificationCategory(notification) {
   const message = String(notification?.message || "").toLowerCase();
   const link = String(notification?.link || "").toLowerCase();
 
+  if (link.includes("/social-post") || title.includes("social post") || message.includes("suggested post")) {
+    return { label: "Social", icon: NotificationIcon, className: "notification-type-message" };
+  }
   if (link.includes("/holidays") || title.includes("holiday") || message.includes("holiday")) {
     return { label: "Holiday", icon: HolidayIcon, className: "notification-type-holiday" };
   }
@@ -3174,6 +3177,7 @@ function NotificationsPage({
     { value: "unread", label: "Unread" },
     { value: "holiday", label: "Holidays" },
     { value: "board", label: "Jobs" },
+    { value: "social", label: "Social" },
     { value: "mileage", label: "Mileage" },
     { value: "message", label: "Messages" }
   ];
@@ -3624,6 +3628,10 @@ function DescriptionPullPage({ currentUser, onLogout, notifications }) {
 }
 
 function SocialPostPage({ currentUser, onLogout, notifications }) {
+  const suggestionId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("suggestion") || ""
+      : "";
   const [voices, setVoices] = useState([]);
   const [voiceId, setVoiceId] = useState("");
   const [orderReference, setOrderReference] = useState("");
@@ -3647,6 +3655,9 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
   const [toneSaving, setToneSaving] = useState(false);
   const [toneMessage, setToneMessage] = useState("");
   const [deletingVoiceId, setDeletingVoiceId] = useState("");
+  const [activeSuggestion, setActiveSuggestion] = useState(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState("");
 
   const canAdmin = canEditSocialPost(currentUser);
   const selectedVoice = voices.find((voice) => String(voice.id) === String(voiceId)) || voices[0] || null;
@@ -3677,6 +3688,41 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadSuggestion() {
+      if (!suggestionId) {
+        setActiveSuggestion(null);
+        setSuggestionError("");
+        return;
+      }
+      setSuggestionLoading(true);
+      setSuggestionError("");
+      try {
+        const response = await fetch(`/api/social-post/suggestions/${encodeURIComponent(suggestionId)}`);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load the suggested post.");
+        if (!active) return;
+        setActiveSuggestion(payload);
+      } catch (loadError) {
+        if (active) {
+          setActiveSuggestion(null);
+          setSuggestionError(loadError.message || "Could not load the suggested post.");
+        }
+      } finally {
+        if (active) setSuggestionLoading(false);
+      }
+    }
+    loadSuggestion();
+    return () => {
+      active = false;
+    };
+  }, [suggestionId]);
+
+  function leaveSuggestionView() {
+    window.location.assign("/social-post");
+  }
 
   async function uploadVoice(file) {
     if (!file || !canAdmin) return;
@@ -3920,6 +3966,74 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
         <MainNavBar currentUser={currentUser} active="social-post" onLogout={onLogout} notifications={notifications} />
 
         <section className="panel social-post-panel">
+          {suggestionId ? (
+            <div className="social-suggestion-view">
+              <div className="social-post-head">
+                <div>
+                  <p className="eyebrow">Social post</p>
+                  <h2>Suggested post</h2>
+                  <p>Generated automatically from the completed job and its uploaded photos.</p>
+                </div>
+                <button className="ghost-button" type="button" onClick={leaveSuggestionView}>Back to generator</button>
+              </div>
+
+              {suggestionError ? <div className="flash error">{suggestionError}</div> : null}
+              {suggestionLoading ? <div className="board-loading">Loading suggested post...</div> : null}
+
+              {!suggestionLoading && activeSuggestion ? (
+                <div className="social-suggestion-grid">
+                  <div className="social-post-card social-post-output">
+                    <div className="social-post-output-head">
+                      <h3>{activeSuggestion.suggestion?.customerName || activeSuggestion.job?.customerName || "Suggested post"}</h3>
+                      <div className="social-post-summary">
+                        <span>{activeSuggestion.suggestion?.orderReference || activeSuggestion.job?.orderReference || "-"}</span>
+                        <strong>{activeSuggestion.suggestion?.toneVoiceName || "Tone selected"}</strong>
+                      </div>
+                    </div>
+                    <div className="social-post-output-body">
+                      <textarea
+                        readOnly
+                        value={activeSuggestion.suggestion?.post || ""}
+                        placeholder="Suggested post will appear here."
+                      />
+                    </div>
+                    {activeSuggestion.suggestion?.warning ? (
+                      <p className="muted-copy">{activeSuggestion.suggestion.warning}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="social-post-card">
+                    <h3>Uploaded photos</h3>
+                    {Array.isArray(activeSuggestion.job?.photos) && activeSuggestion.job.photos.length ? (
+                      <div className="job-photo-grid social-suggestion-photo-grid">
+                        {activeSuggestion.job.photos.map((photo) => (
+                          <div key={photo.id} className="job-photo-tile">
+                            <a
+                              className="job-photo-link"
+                              href={photo.url || buildJobPhotoUrl(activeSuggestion.job.id, photo.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={photo.fileName || "job-photo.jpg"}
+                            >
+                              <img
+                                src={photo.url || buildJobPhotoUrl(activeSuggestion.job.id, photo.id)}
+                                alt={photo.fileName || "Job photo"}
+                              />
+                            </a>
+                            <div className="job-photo-meta">
+                              <small>{photo.uploadedByName || "Uploaded photo"}</small>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted-copy">No uploaded photos are available for this job yet.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
           <div className="social-post-grid">
             <div className="social-post-card">
               <h3>Order</h3>
@@ -4026,6 +4140,7 @@ function SocialPostPage({ currentUser, onLogout, notifications }) {
               </div>
             </div>
           </div>
+          )}
 
           {toneViewerOpen && selectedVoice ? (
             <div className="modal-backdrop social-post-tone-backdrop" onMouseDown={() => setToneViewerOpen(false)}>
@@ -11554,11 +11669,11 @@ export default function App() {
     }
 
     try {
-      if (!job.isCompleted) {
-        await completeJob(job.id);
-      }
       if (files.length) {
         await uploadJobPhotos(job.id, files);
+      }
+      if (!job.isCompleted) {
+        await completeJob(job.id);
       }
       setClientCompletePrompt(false);
       setMessage(
@@ -11586,11 +11701,11 @@ export default function App() {
     }
 
     try {
-      if (!job.isCompleted) {
-        await completeJob(job.id);
-      }
       if (files.length) {
         await uploadJobPhotos(job.id, files);
+      }
+      if (!job.isCompleted) {
+        await completeJob(job.id);
       }
       setAdminCompletePrompt(false);
       setMessage(
