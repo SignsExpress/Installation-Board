@@ -1687,6 +1687,14 @@ function normalizeRamsCard(card = {}, fallback = {}) {
   };
 }
 
+function getRamsOptionIdentity(groupKey, option = {}, optionIndex = 0) {
+  const explicitId = String(option?.id || "").trim();
+  if (explicitId) return explicitId;
+  const optionValue = String(option?.value || "").trim();
+  if (optionValue) return `${groupKey}::${optionValue}`;
+  return `${groupKey}::option-${optionIndex}`;
+}
+
 function normalizeRamsLogic(logic = {}) {
   const defaultGroups = RAMS_DEFAULT_LOGIC.optionGroups;
   const incomingGroups = Array.isArray(logic.optionGroups) ? logic.optionGroups : defaultGroups;
@@ -1730,21 +1738,23 @@ function normalizeRamsLogic(logic = {}) {
       const incomingOptions = Array.isArray(group.options) ? group.options : [];
       const mergedOptions = [
         ...defaultOptions.map((defaultOption, optionIndex) => {
-          const defaultValue = String(defaultOption.value || "");
+          const defaultId = getRamsOptionIdentity(key, defaultOption, optionIndex);
           const incomingMatch =
+            incomingOptions.find((option, incomingOptionIndex) => getRamsOptionIdentity(key, option, incomingOptionIndex) === defaultId) ||
             incomingOptions[optionIndex] ||
-            incomingOptions.find((option) => String(option.value || "") === defaultValue);
+            incomingOptions.find((option) => String(option.value || "") === String(defaultOption.value || ""));
           const nextOption = incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
           if (requiresRiskBankReset) {
-            return { ...nextOption, cardIds: defaultOption.cardIds || [] };
+            return { ...nextOption, id: defaultId, cardIds: defaultOption.cardIds || [] };
           }
-          return nextOption;
+          return { ...nextOption, id: defaultId };
         }),
         ...incomingOptions.filter((option, optionIndex) => {
+          const optionId = getRamsOptionIdentity(key, option, optionIndex);
           const value = String(option.value || "");
           if (!value || legacyOptionValues.has(value)) return false;
           if (optionIndex < defaultOptions.length) return false;
-          return !defaultOptions.some((entry) => String(entry.value) === value);
+          return !defaultOptions.some((entry, defaultIndex) => getRamsOptionIdentity(key, entry, defaultIndex) === optionId);
         })
       ];
       return {
@@ -1753,6 +1763,7 @@ function normalizeRamsLogic(logic = {}) {
         input: key === "access" || key === "activity" ? "checkboxes" : ["buttons", "select", "checkboxes"].includes(group.input) ? group.input : fallback.input || "buttons",
         multi: key === "access" || key === "activity" ? true : Boolean(group.multi ?? fallback.multi),
         options: mergedOptions.map((option, optionIndex) => ({
+          id: getRamsOptionIdentity(key, option, optionIndex),
           value: String(option.value || `option-${optionIndex}`),
           label: String(option.label || option.value || "Option"),
           cardIds: Array.isArray(option.cardIds)
@@ -4430,7 +4441,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
           ...group,
           options: [
             ...group.options,
-            { value: `${group.key}-${Date.now()}`, label: `New option ${nextIndex}`, cardIds: [] }
+            { id: `${group.key}-${Date.now()}`, value: `${group.key}-${Date.now()}`, label: `New option ${nextIndex}`, cardIds: [] }
           ]
         };
       });
@@ -4885,7 +4896,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications }) {
                   <div className="rams-logic-choice-list">
                     {activeGroup.options.map((option, optionIndex) => (
                       <button
-                        key={`${activeGroup.key}-${option.value}-${optionIndex}`}
+                        key={option.id || `${activeGroup.key}-${option.value}-${optionIndex}`}
                         type="button"
                         className={`rams-logic-choice ${optionIndex === activeOptionIndex ? "active" : ""}`}
                         onClick={() => setSelectedOptionIndex(optionIndex)}
