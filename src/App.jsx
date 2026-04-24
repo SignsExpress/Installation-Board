@@ -4538,6 +4538,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 </div>
               </label>
 
+              {canEditProForma(currentUser) ? (
+                <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma/template")}>
+                  Open template builder
+                </button>
+              ) : null}
+
               <div className="pro-forma-deposit-tools">
                 <h4>Deposit</h4>
                 <div className="pro-forma-deposit-buttons">
@@ -14154,10 +14160,10 @@ export default function App() {
     return (
       <ProFormaTemplateBuilderPage
         currentUser={currentUser}
-        onLogout={logout}
+        onLogout={handleLogout}
         notifications={notifications}
         aeroEnabled={aeroEnabled}
-        onToggleAero={toggleUiSkin}
+        onToggleAero={handleToggleAero}
       />
     );
   }
