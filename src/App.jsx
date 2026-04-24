@@ -3790,12 +3790,28 @@ function sanitizeProFormaTemplate(template) {
 
 function getProFormaTemplateAssetUrl(asset) {
   if (!asset) return "";
+  if (asset.previewUrl) return asset.previewUrl;
   if (asset.dataUrl) return asset.dataUrl;
   if (asset.storedName) {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return `${origin}/api/pro-forma/template-asset/${encodeURIComponent(asset.storedName)}`;
   }
   return "";
+}
+
+async function ensureTemplateAssetDataUrl(asset) {
+  if (!asset) return null;
+  if (asset.dataUrl || asset.storedName) {
+    return asset;
+  }
+  if (asset.file instanceof File) {
+    return {
+      originalName: asset.originalName || asset.file.name,
+      contentType: asset.contentType || asset.file.type,
+      dataUrl: await readFileAsDataUrl(asset.file)
+    };
+  }
+  return asset;
 }
 
 function formatProFormaMoney(value) {
@@ -4813,6 +4829,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
 function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
   const [template, setTemplate] = useState(DEFAULT_PRO_FORMA_TEMPLATE);
   const [selectedSection, setSelectedSection] = useState("title");
+  const [sampleReference, setSampleReference] = useState("ORD-3379");
+  const [sampleDraft, setSampleDraft] = useState(null);
+  const [sampleLoading, setSampleLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -4926,13 +4945,14 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
 
   async function setSingleAsset(field, file) {
     if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
+    const previewUrl = URL.createObjectURL(file);
     setTemplate((current) => ({
       ...current,
       [field]: {
         originalName: file.name,
         contentType: file.type,
-        dataUrl
+        previewUrl,
+        file
       }
     }));
   }
@@ -4955,7 +4975,8 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
     const assets = await Promise.all(files.map(async (file) => ({
       originalName: file.name,
       contentType: file.type,
-      dataUrl: await readFileAsDataUrl(file)
+      previewUrl: URL.createObjectURL(file),
+      file
     })));
     setTemplate((current) => ({
       ...current,
@@ -4963,15 +4984,44 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
     }));
   }
 
+  async function loadSampleReference() {
+    const reference = String(sampleReference || "").trim();
+    if (!reference) return;
+    try {
+      setSampleLoading(true);
+      setError("");
+      const response = await fetch("/api/pro-forma/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderReference: reference })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not load the sample invoice.");
+      }
+      setSampleDraft(buildDraftFromPayload(payload));
+    } catch (loadError) {
+      setError(loadError.message || "Could not load the sample invoice.");
+    } finally {
+      setSampleLoading(false);
+    }
+  }
+
   async function saveTemplate() {
     try {
       setSaving(true);
       setMessage("");
       setError("");
+      const payloadTemplate = {
+        ...template,
+        referencePdfAsset: await ensureTemplateAssetDataUrl(template.referencePdfAsset),
+        termsPdfAsset: await ensureTemplateAssetDataUrl(template.termsPdfAsset),
+        accreditationAssets: await Promise.all((template.accreditationAssets || []).map((asset) => ensureTemplateAssetDataUrl(asset)))
+      };
       const response = await fetch("/api/pro-forma/template", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ template })
+        body: JSON.stringify({ template: payloadTemplate })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -4991,6 +5041,46 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
   const accreditationPreview = template.accreditationAssets
     .map((asset) => getProFormaTemplateAssetUrl(asset))
     .filter(Boolean);
+  const stageDraft = sampleDraft || {
+    headline: "Pro Forma Invoice",
+    customerName: "Ian Barton Print",
+    billingAddress: "144 The Ridings\nPreston, Lancashire\nPR3 2DD",
+    notes: "Sponsor Boards & Plaque",
+    orderReference: sampleReference || "ORD-3379",
+    termsText: "25% deposit required upon order - balance due on completion.",
+    lineItems: [
+      {
+        sortIndex: 0,
+        name: "RSM Board",
+        description: "2440x915mm 3mm Aluminium composite panel with digitally printed vinyl graphics to face. Protective gloss laminate.",
+        quantity: "1",
+        unitPrice: "188.36"
+      },
+      {
+        sortIndex: 1,
+        name: "Fitness Plus Board",
+        description: "2440x610mm 3mm Aluminium composite panel with digitally printed vinyl graphics to face. Protective gloss laminate.",
+        quantity: "1",
+        unitPrice: "127.50"
+      }
+    ]
+  };
+  const stageLineItems = (stageDraft.lineItems || []).slice(0, 2);
+  const stageSnippets = {
+    title: stageDraft.headline || "Pro Forma Invoice",
+    logo: "Signs Express",
+    billing: `${stageDraft.customerName || ""}\n${stageDraft.billingAddress || stageDraft.address || ""}`.trim(),
+    company: "Signs Express (Central Lancashire)\nUnit 3\nSherdley Road Lostock Hall\nPreston, Lancashire PR5 5LP\n01772797800\naccounts.preston@signsexpress.co.uk",
+    metaLeft: `Date of Invoice: 24/04/2026\nDescription: ${stageDraft.notes || "-"}\nOrder Ref: ${stageDraft.orderReference || "-"}`,
+    metaRight: "Payment Terms: NET 30 End of Month",
+    table: stageLineItems.map((item) => `${(item.sortIndex ?? 0) + 1}  ${item.name}\n${item.description}\nQty ${item.quantity}   ${formatProFormaMoney(item.unitPrice || 0)}`).join("\n\n"),
+    bank: "Bank details:\nAccount name: Signs Preston Limited\nSort code: 01-67-14\nAccount No.: 71603603\nIBAN: GB98NWBK01671471603603",
+    totals: "Sub Total £360.30\nOrder Discount -£36.03\nPre-Tax Total £324.27\nVAT £64.85\nTOTAL £389.12",
+    approval: "I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.",
+    paymentTerms: stageDraft.termsText || "Payment due before production / installation unless agreed otherwise.",
+    accreditations: "",
+    footerMeta: "Generated on: 24/04/2026    Page 1 of 3"
+  };
 
   return (
     <div className="app-shell social-post-shell">
@@ -5024,6 +5114,15 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
 
               <div className="pro-forma-template-controls">
                 <div className="pro-forma-template-upload-group">
+                  <label>
+                    Sample invoice / estimate ref
+                    <div className="social-post-order-row">
+                      <input value={sampleReference} onChange={(event) => setSampleReference(event.target.value)} placeholder="ORD-3379 or EST-3379" />
+                      <button type="button" className="ghost-button" onClick={loadSampleReference} disabled={sampleLoading}>
+                        {sampleLoading ? "Loading..." : "Load sample"}
+                      </button>
+                    </div>
+                  </label>
                   <label className="pro-forma-upload-button">
                     <input type="file" accept="application/pdf" onChange={handleReferencePdfUpload} />
                     <span>{template.referencePdfAsset?.originalName || "Upload reference PDF underlay"}</span>
@@ -5116,12 +5215,16 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                         onClick={() => setSelectedSection(key)}
                       >
                         <span>{label}</span>
+                        {key !== "accreditations" ? <div className="pro-forma-stage-block-copy">{stageSnippets[key]}</div> : null}
                         {key === "accreditations" && accreditationPreview.length ? (
                           <div className="pro-forma-stage-inline-images">
                             {accreditationPreview.slice(0, 6).map((src, index) => (
                               <img key={`${src}-${index}`} src={src} alt="Accreditation" />
                             ))}
                           </div>
+                        ) : null}
+                        {key === "accreditations" && !accreditationPreview.length ? (
+                          <div className="pro-forma-stage-block-copy">Upload accreditation PNGs here</div>
                         ) : null}
                       </button>
                     );
