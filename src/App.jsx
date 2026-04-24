@@ -3851,8 +3851,9 @@ function formatProFormaDate(value) {
   }).format(parsed);
 }
 
-function buildProFormaPreviewHtml(draft, summary, templateInput) {
+function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   if (!draft) return "";
+  const builderMode = options.builderMode === true;
   const template = sanitizeProFormaTemplate(templateInput);
   const section = template.sections;
   const companyLines = [
@@ -3876,7 +3877,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput) {
     ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset) })).filter((asset) => asset.url)
     : (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
   const fallbackAccreditationStrip = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
-  const termsPdfUrl = getProFormaTemplateAssetUrl(template.termsPdfAsset);
+  const termsPdfUrl = builderMode ? "" : getProFormaTemplateAssetUrl(template.termsPdfAsset);
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
   const completionBalance = hasDeposit
     ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
@@ -3945,18 +3946,22 @@ function buildProFormaPreviewHtml(draft, summary, templateInput) {
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
-        background: #f4f5f7;
+        width: 100%;
+        min-height: 100%;
+        background: ${builderMode ? "#ffffff" : "#f4f5f7"};
         font-family: Arial, Helvetica, sans-serif;
         color: #000;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
+        overflow: hidden;
       }
       .sheet {
-        width: 210mm;
-        min-height: 297mm;
-        margin: 0 auto;
+        width: ${builderMode ? "100%" : "210mm"};
+        min-height: ${builderMode ? "100%" : "297mm"};
+        margin: ${builderMode ? "0" : "0 auto"};
         background: #fff;
         padding: 0;
+        overflow: hidden;
       }
       .top-row {
         position: relative;
@@ -4987,6 +4992,10 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
   }
 
   function startDrag(key, event) {
+    if (selectedSection !== key) {
+      setSelectedSection(key);
+      return;
+    }
     const rect = template.sections[key];
     dragStateRef.current = {
       key,
@@ -5155,6 +5164,9 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
       ...template,
       referencePdfAsset: null,
       termsPdfAsset: null
+    },
+    {
+      builderMode: true
     }
   );
 
@@ -5275,7 +5287,11 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                     </div>
                   ) : null}
 
-                  {sectionOptions.map(([key, label]) => {
+                  {[...sectionOptions].sort(([keyA], [keyB]) => {
+                    if (keyA === selectedSection) return 1;
+                    if (keyB === selectedSection) return -1;
+                    return 0;
+                  }).map(([key, label]) => {
                     const rect = template.sections[key];
                     return (
                       <button
@@ -5286,7 +5302,8 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                           left: `${(rect.x / 210) * 100}%`,
                           top: `${(rect.y / 297) * 100}%`,
                           width: `${(rect.w / 210) * 100}%`,
-                          height: `${(rect.h / 297) * 100}%`
+                          height: `${(rect.h / 297) * 100}%`,
+                          zIndex: key === selectedSection ? 4 : 2
                         }}
                         onMouseDown={(event) => startDrag(key, event)}
                         onClick={() => setSelectedSection(key)}
