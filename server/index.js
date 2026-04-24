@@ -4964,14 +4964,135 @@ function parseMoneyValue(value) {
 
 function scoreProFormaUnitPriceField(leaf) {
   if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
+  if (/lineitemprice|priceeach|sell/i.test(leaf)) return 70;
   if (/^price$/i.test(leaf)) return 50;
   return 0;
 }
 
 function scoreProFormaLineTotalField(leaf) {
+  if (/ordertotal|itemtotal|sellingprice/i.test(leaf)) return 95;
   if (/linetotal|extended|extendedprice|extendedamount|lineprice|lineamount/i.test(leaf)) return 90;
   if (/total|amount|sell|revenue|price/i.test(leaf)) return 40;
   return 0;
+}
+
+function isGenericProFormaName(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return true;
+  return /^(item\s*\d+|line item\s*\d+|panel with vinyl print to surface\.?|stand-?offs?,? screw covers?,? hanging kits? ?&? holes?|category|graphics|installation|delivery)$/i.test(text);
+}
+
+function shouldIgnoreProFormaMoneyField(leaf = "") {
+  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount)/i.test(leaf);
+}
+
+function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const totals = {
+    subtotal: 0,
+    subtotalScore: -1,
+    discountAmount: 0,
+    discountScore: -1,
+    preTaxTotal: 0,
+    preTaxScore: -1,
+    vatAmount: 0,
+    vatScore: -1,
+    total: 0,
+    totalScore: -1,
+    totalPaid: 0,
+    totalPaidScore: -1,
+    balanceDue: 0,
+    balanceDueScore: -1
+  };
+
+  fields.forEach((field) => {
+    const key = String(field.key || "").toLowerCase();
+    if (/(?:items?|orderdestinationitems?|estimateitems?|lineitems?|components?|childcomponents?)\./i.test(key)) return;
+    const value = parseMoneyValue(field.value);
+    if (!Number.isFinite(value)) return;
+
+    if (/(orderdiscount|discountamount|discounttotal|discount)/i.test(key)) {
+      const score = /orderdiscount/i.test(key) ? 95 : 70;
+      if (score > totals.discountScore) {
+        totals.discountAmount = Math.abs(value);
+        totals.discountScore = score;
+      }
+      return;
+    }
+
+    if (value < 0) return;
+
+    if (/(pretax|pre-tax|taxexclusive|nettotal|subtotalafterdiscount|subtotallessdiscount)/i.test(key)) {
+      const score = /pretax|pre-tax/i.test(key) ? 95 : 75;
+      if (score > totals.preTaxScore) {
+        totals.preTaxTotal = value;
+        totals.preTaxScore = score;
+      }
+      return;
+    }
+
+    if (/(subtotal|sub total)/i.test(key) && !/(pretax|pre-tax|afterdiscount|lessdiscount)/i.test(key)) {
+      const score = /^subtotal$/i.test(key.split(".").slice(-1)[0] || "") ? 95 : 70;
+      if (score > totals.subtotalScore) {
+        totals.subtotal = value;
+        totals.subtotalScore = score;
+      }
+      return;
+    }
+
+    if (/(vatamount|vattotal|taxtotal|taxamount|sales tax)/i.test(key)) {
+      const score = /vatamount|vattotal/i.test(key) ? 95 : 80;
+      if (score > totals.vatScore) {
+        totals.vatAmount = value;
+        totals.vatScore = score;
+      }
+      return;
+    }
+
+    if (/(totalpaid|amountpaid|paidtotal|paymentreceived|paymentsreceived)/i.test(key)) {
+      const score = /totalpaid|amountpaid/i.test(key) ? 95 : 80;
+      if (score > totals.totalPaidScore) {
+        totals.totalPaid = value;
+        totals.totalPaidScore = score;
+      }
+      return;
+    }
+
+    if (/(balancedue|amountdue|outstanding|balance)/i.test(key) && !/(openingbalance|balancebroughtforward)/i.test(key)) {
+      const score = /balancedue|amountdue/i.test(key) ? 95 : 70;
+      if (score > totals.balanceDueScore) {
+        totals.balanceDue = value;
+        totals.balanceDueScore = score;
+      }
+      return;
+    }
+
+    if (/(grandtotal|ordertotal|invoiceamount|total)/i.test(key) && !/(subtotal|vat|tax|paid|balance|discount|pretax|pre-tax)/i.test(key)) {
+      const score = /grandtotal|ordertotal/i.test(key) ? 95 : 60;
+      if (score > totals.totalScore) {
+        totals.total = value;
+        totals.totalScore = score;
+      }
+    }
+  });
+
+  const resolvedSubtotal = totals.subtotalScore >= 0 ? totals.subtotal : subtotal;
+  const resolvedDiscount = totals.discountScore >= 0 ? totals.discountAmount : 0;
+  const resolvedPreTax = totals.preTaxScore >= 0 ? totals.preTaxTotal : Math.max(Math.round((resolvedSubtotal - resolvedDiscount) * 100) / 100, 0);
+  const resolvedVat = totals.vatScore >= 0 ? totals.vatAmount : Math.round(resolvedPreTax * (vatRate / 100) * 100) / 100;
+  const resolvedTotal = totals.totalScore >= 0 ? totals.total : Math.round((resolvedPreTax + resolvedVat) * 100) / 100;
+  const resolvedTotalPaid = totals.totalPaidScore >= 0 ? totals.totalPaid : 0;
+  const resolvedBalanceDue = totals.balanceDueScore >= 0 ? totals.balanceDue : Math.max(Math.round((resolvedTotal - resolvedTotalPaid) * 100) / 100, 0);
+
+  return {
+    subtotal: resolvedSubtotal,
+    discountAmount: resolvedDiscount,
+    preTaxTotal: resolvedPreTax,
+    vatAmount: resolvedVat,
+    total: resolvedTotal,
+    totalPaid: resolvedTotalPaid,
+    balanceDue: resolvedBalanceDue
+  };
 }
 
 function extractProFormaLineItems(order = {}) {
@@ -4983,9 +5104,10 @@ function extractProFormaLineItems(order = {}) {
     const lowerKey = key.toLowerCase();
     const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
     if (!match) return;
+    const leaf = match[2];
+    if (/(^|\.)(components?|childcomponents?)\./i.test(leaf)) return;
 
     const index = Number(match[1]);
-    const leaf = match[2];
     const textValue = normalizeSocialText(field.value);
     const group = groups.get(match[1]) || {
       index,
@@ -5005,7 +5127,7 @@ function extractProFormaLineItems(order = {}) {
       /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
       !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
     ) {
-      const nextScore = /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : 20;
+      const nextScore = /^orderitem\.name$/i.test(leaf) ? 85 : /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : 20;
       if (textValue && nextScore > group.nameScore) {
         group.name = textValue;
         group.nameScore = nextScore;
@@ -5017,6 +5139,7 @@ function extractProFormaLineItems(order = {}) {
       textValue
     ) {
       const nextScore =
+        /^orderitem\.description$/i.test(leaf) ? 110 :
         /customerdescription/i.test(leaf) ? 90 :
         /descriptiontext/i.test(leaf) ? 70 :
         /lineitemdescription|itemdescription|productdescription/i.test(leaf) ? 55 : 25;
@@ -5035,7 +5158,7 @@ function extractProFormaLineItems(order = {}) {
     }
 
     const moneyValue = parseMoneyValue(field.value);
-    if (moneyValue > 0) {
+    if (moneyValue > 0 && !shouldIgnoreProFormaMoneyField(leaf)) {
       const unitPriceScore = scoreProFormaUnitPriceField(leaf);
       if (unitPriceScore > group.unitPriceScore) {
         group.unitPrice = moneyValue;
@@ -5072,8 +5195,8 @@ function extractProFormaLineItems(order = {}) {
       return {
         id: `pro-forma-line-${group.index + 1}`,
         sortIndex: group.index,
-        name: group.name || `Line Item ${group.index + 1}`,
-        description: group.description || group.name || "",
+        name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || `Line Item ${group.index + 1}`),
+        description: group.description || (!isGenericProFormaName(group.name) ? group.name : ""),
         quantity: String(group.quantity || normalizedQuantity || 1),
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
         lineTotal: Math.round(normalizedLineTotal * 100) / 100
@@ -5101,11 +5224,10 @@ function pickProFormaVatRate(order = {}) {
 
 function buildProFormaPayload(order = {}) {
   const lineItems = extractProFormaLineItems(order);
-  const subtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
+  const rawSubtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
   const vatRate = pickProFormaVatRate(order);
-  const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100;
-  const total = Math.round((subtotal + vatAmount) * 100) / 100;
   const reference = String(order.orderReference || "");
+  const totals = extractProFormaTotals(order, rawSubtotal, vatRate);
 
   return {
     orderReference: reference,
@@ -5116,10 +5238,14 @@ function buildProFormaPayload(order = {}) {
     headline: "Pro Forma Invoice",
     description: order.description || "",
     lineItems,
-    subtotal,
+    subtotal: totals.subtotal,
+    discountAmount: totals.discountAmount,
+    preTaxTotal: totals.preTaxTotal,
     vatRate,
-    vatAmount,
-    total,
+    vatAmount: totals.vatAmount,
+    total: totals.total,
+    totalPaid: totals.totalPaid,
+    balanceDue: totals.balanceDue,
     termsHeading: "Payment terms",
     termsText: "Payment due before production / installation unless agreed otherwise.",
     referenceLabel: "Reference"

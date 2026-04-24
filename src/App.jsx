@@ -3773,12 +3773,6 @@ function buildProFormaPreviewHtml(draft, summary) {
     "01772 797800",
     "centrallancashire@signsexpress.co.uk"
   ];
-  const paymentBreakdown = draft.depositType
-    ? [
-        { label: "Deposit due now", value: summary.depositAmount },
-        { label: "Balance remaining", value: summary.remainingBalance }
-      ]
-    : [{ label: "Amount due", value: summary.total }];
   const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
@@ -4053,9 +4047,12 @@ function buildProFormaPreviewHtml(draft, summary) {
         </div>
         <div class="summary-box">
           <div class="summary-row"><span>Subtotal</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
-          <div class="summary-row"><span>VAT (${escapeHtml(String(draft.vatRate || 0))}%)</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
+          ${summary.discountAmount > 0 ? `<div class="summary-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
+          <div class="summary-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
+          <div class="summary-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
           <div class="summary-row total"><span>Total</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
-          ${paymentBreakdown.map((row) => `<div class="summary-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(formatProFormaMoney(row.value))}</strong></div>`).join("")}
+          <div class="summary-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>
+          <div class="summary-row"><span>Balance Due</span><strong>${escapeHtml(formatProFormaMoney(summary.balanceDue))}</strong></div>
         </div>
       </div>
 
@@ -4087,9 +4084,15 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     [draft]
   );
 
+  const discountAmount = Math.max(roundProFormaMoney(Number(draft?.discountAmount) || 0), 0);
+  const preTaxTotal = useMemo(
+    () => Math.max(roundProFormaMoney(subtotal - discountAmount), 0),
+    [subtotal, discountAmount]
+  );
   const vatRate = Number(draft?.vatRate) || 0;
-  const vatAmount = useMemo(() => roundProFormaMoney(subtotal * (vatRate / 100)), [subtotal, vatRate]);
-  const total = useMemo(() => roundProFormaMoney(subtotal + vatAmount), [subtotal, vatAmount]);
+  const vatAmount = useMemo(() => roundProFormaMoney(preTaxTotal * (vatRate / 100)), [preTaxTotal, vatRate]);
+  const total = useMemo(() => roundProFormaMoney(preTaxTotal + vatAmount), [preTaxTotal, vatAmount]);
+  const totalPaid = Math.max(roundProFormaMoney(Number(draft?.totalPaid) || 0), 0);
 
   const depositAmount = useMemo(() => {
     if (!draft?.depositType) return 0;
@@ -4100,14 +4103,17 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     return Math.min(roundProFormaMoney(total * (percent / 100)), total);
   }, [draft, total]);
 
-  const remainingBalance = useMemo(() => Math.max(roundProFormaMoney(total - depositAmount), 0), [total, depositAmount]);
+  const remainingBalance = useMemo(() => Math.max(roundProFormaMoney(total - totalPaid), 0), [total, totalPaid]);
   const previewHtml = useMemo(() => buildProFormaPreviewHtml(draft, {
     subtotal,
+    discountAmount,
+    preTaxTotal,
     vatAmount,
     total,
     depositAmount,
-    remainingBalance
-  }), [draft, subtotal, vatAmount, total, depositAmount, remainingBalance]);
+    totalPaid,
+    balanceDue: remainingBalance
+  }), [draft, subtotal, discountAmount, preTaxTotal, vatAmount, total, depositAmount, totalPaid, remainingBalance]);
 
   useEffect(() => {
     return () => {
@@ -4144,11 +4150,13 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             quantity: "1",
             unitPrice: "0"
           }],
+      discountAmount: String(roundProFormaMoney(payload.discountAmount || 0)),
       vatRate: String(payload.vatRate ?? 20),
       termsHeading: payload.termsHeading || "Payment terms",
       termsText: payload.termsText || "Payment due before production / installation unless agreed otherwise.",
       notes: payload.description || "",
       footerText: "Thank you for your order.",
+      totalPaid: String(roundProFormaMoney(payload.totalPaid || 0)),
       depositType: "",
       depositValue: ""
     };
@@ -4404,8 +4412,16 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input value={draft.number} onChange={(event) => updateDraft("number", event.target.value)} />
                     </label>
                     <label className="pro-forma-vat-field">
+                      Discount
+                      <input value={draft.discountAmount} onChange={(event) => updateDraft("discountAmount", event.target.value)} inputMode="decimal" />
+                    </label>
+                    <label className="pro-forma-vat-field">
                       VAT %
                       <input value={draft.vatRate} onChange={(event) => updateDraft("vatRate", event.target.value)} inputMode="decimal" />
+                    </label>
+                    <label className="pro-forma-vat-field">
+                      Total paid
+                      <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
                     <label className="span-2">
                       Billing address
@@ -4464,10 +4480,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                     </div>
                     <div className="pro-forma-summary-card">
                       <div><span>Subtotal</span><strong>{formatProFormaMoney(subtotal)}</strong></div>
-                      <div><span>VAT ({vatRate || 0}%)</span><strong>{formatProFormaMoney(vatAmount)}</strong></div>
+                      {discountAmount > 0 ? <div><span>Order discount</span><strong>-{formatProFormaMoney(discountAmount)}</strong></div> : null}
+                      <div><span>Pre-Tax Total</span><strong>{formatProFormaMoney(preTaxTotal)}</strong></div>
+                      <div><span>VAT</span><strong>{formatProFormaMoney(vatAmount)}</strong></div>
                       <div><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
-                      <div><span>Deposit due</span><strong>{formatProFormaMoney(depositAmount)}</strong></div>
-                      <div><span>Remaining balance</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
+                      <div><span>Total paid</span><strong>{formatProFormaMoney(totalPaid)}</strong></div>
+                      <div><span>Balance due</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
                     </div>
                   </div>
 
