@@ -6203,6 +6203,231 @@ button {
   color: #b91c1c;
 }
 
+.pro-forma-page .social-post-panel {
+  padding: 18px;
+}
+
+.pro-forma-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.pro-forma-fetch-card,
+.pro-forma-editor-card {
+  display: grid;
+  gap: 16px;
+}
+
+.pro-forma-deposit-tools {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pro-forma-deposit-tools h4,
+.pro-forma-lines-head h4 {
+  margin: 0;
+}
+
+.pro-forma-deposit-buttons {
+  display: grid;
+  gap: 10px;
+}
+
+.pro-forma-custom-deposit {
+  display: grid;
+  grid-template-columns: minmax(0, 120px) minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.pro-forma-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.pro-forma-editor-head h3 {
+  margin: 0;
+}
+
+.pro-forma-total-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #5f3c74, #2d1c53);
+  color: #fff;
+  font-size: 1.2rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pro-forma-editor {
+  display: grid;
+  gap: 18px;
+}
+
+.pro-forma-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pro-forma-meta-grid label,
+.pro-forma-terms-card label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.pro-forma-meta-grid input,
+.pro-forma-meta-grid textarea,
+.pro-forma-terms-card textarea,
+.pro-forma-custom-deposit input,
+.pro-forma-custom-deposit select,
+.pro-forma-lines-row input,
+.pro-forma-lines-row textarea {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d7cbdd;
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.pro-forma-meta-grid textarea,
+.pro-forma-lines-row textarea,
+.pro-forma-terms-card textarea {
+  resize: vertical;
+}
+
+.pro-forma-meta-grid .span-2 {
+  grid-column: span 2;
+}
+
+.pro-forma-lines-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.pro-forma-lines-table {
+  display: grid;
+  gap: 10px;
+}
+
+.pro-forma-lines-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(240px, 2fr) 90px 120px 120px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.pro-forma-lines-header {
+  padding: 0 4px;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pro-forma-lines-row strong {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.pro-forma-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 360px);
+  gap: 18px;
+  align-items: start;
+}
+
+.pro-forma-terms-card,
+.pro-forma-summary-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #fff;
+  padding: 16px;
+}
+
+.pro-forma-terms-card {
+  display: grid;
+  gap: 14px;
+}
+
+.pro-forma-summary-card {
+  display: grid;
+  gap: 12px;
+}
+
+.pro-forma-summary-card > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pro-forma-summary-card > div:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.pro-forma-summary-card span {
+  color: #475569;
+  font-weight: 700;
+}
+
+.pro-forma-summary-card strong {
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .pro-forma-grid,
+  .pro-forma-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pro-forma-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .pro-forma-meta-grid,
+  .pro-forma-custom-deposit,
+  .pro-forma-lines-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pro-forma-meta-grid .span-2 {
+    grid-column: span 1;
+  }
+
+  .pro-forma-lines-header {
+    display: none;
+  }
+
+  .pro-forma-editor-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .holiday-calendar-wrap {
   overflow-x: auto;
   padding-bottom: 6px;

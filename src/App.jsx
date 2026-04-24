@@ -2775,6 +2775,7 @@ function PermissionsPanel({
             const ramsPermission = getPermissionForApp(user, "rams");
             const socialPostPermission = getPermissionForApp(user, "socialPost");
             const descriptionPullPermission = getPermissionForApp(user, "descriptionPull");
+            const proFormaPermission = getPermissionForApp(user, "proForma");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -3032,6 +3033,24 @@ function PermissionsPanel({
                             className={`permission-chip ${descriptionPullPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:descriptionPull`}
                             onClick={() => onChangePermission(user.id, "descriptionPull", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Pro-Forma</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-pro-forma-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${proFormaPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:proForma`}
+                            onClick={() => onChangePermission(user.id, "proForma", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3378,6 +3397,9 @@ function HostLaunchIcon({ type }) {
     social: (
       <svg {...iconProps}><path {...commonProps} d="M5 5h14v10H8l-3 3V5Z" /><path {...commonProps} d="M9 9h6M9 12h4" /><path {...commonProps} d="M17 18l2 2 3-4" /></svg>
     ),
+    invoice: (
+      <svg {...iconProps}><path {...commonProps} d="M7 3.5h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path {...commonProps} d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path {...commonProps} d="M15.5 18.5h2.5" /></svg>
+    ),
     vehicle: (
       <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
     ),
@@ -3466,6 +3488,9 @@ function HostLandingPage({
             ) : null}
             {canAccessDescriptionPull(currentUser) ? (
               <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
+            ) : null}
+            {canAccessProForma(currentUser) ? (
+              <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo("/pro-forma")} />
             ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
@@ -3557,6 +3582,9 @@ function ClientLandingPage({
             ) : null}
             {canAccessDescriptionPull(currentUser) ? (
               <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
+            ) : null}
+            {canAccessProForma(currentUser) ? (
+              <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo("/pro-forma")} />
             ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
@@ -3701,6 +3729,364 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
                 )}
               </div>
               {copyStatus ? <p className="muted-copy">{copyStatus}</p> : null}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function formatProFormaMoney(value) {
+  const numeric = Number(value) || 0;
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(numeric);
+}
+
+function roundProFormaMoney(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const [orderReference, setOrderReference] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [customDepositMode, setCustomDepositMode] = useState("percent");
+  const [customDepositValue, setCustomDepositValue] = useState("");
+  const [draft, setDraft] = useState(null);
+
+  const subtotal = useMemo(
+    () => roundProFormaMoney((draft?.lineItems || []).reduce((sum, item) => {
+      const quantity = Math.max(Number(item.quantity) || 0, 0);
+      const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
+      return sum + (quantity * unitPrice);
+    }, 0)),
+    [draft]
+  );
+
+  const vatRate = Number(draft?.vatRate) || 0;
+  const vatAmount = useMemo(() => roundProFormaMoney(subtotal * (vatRate / 100)), [subtotal, vatRate]);
+  const total = useMemo(() => roundProFormaMoney(subtotal + vatAmount), [subtotal, vatAmount]);
+
+  const depositAmount = useMemo(() => {
+    if (!draft?.depositType) return 0;
+    if (draft.depositType === "fixed") {
+      return Math.min(roundProFormaMoney(Number(draft.depositValue) || 0), total);
+    }
+    const percent = Math.max(Number(draft.depositValue) || 0, 0);
+    return Math.min(roundProFormaMoney(total * (percent / 100)), total);
+  }, [draft, total]);
+
+  const remainingBalance = useMemo(() => Math.max(roundProFormaMoney(total - depositAmount), 0), [total, depositAmount]);
+
+  function buildDraftFromPayload(payload = {}) {
+    const reference = String(payload.orderReference || "").trim();
+    return {
+      headline: payload.headline || "Pro-Forma Invoice",
+      date: new Date().toISOString().slice(0, 10),
+      referenceLabel: payload.referenceLabel || (/^est-/i.test(reference) ? "Estimate reference" : "Order reference"),
+      orderReference: reference,
+      customerName: payload.customerName || "",
+      contact: payload.contact || "",
+      number: payload.number || "",
+      address: payload.address || "",
+      description: payload.description || "",
+      lineItems: Array.isArray(payload.lineItems) && payload.lineItems.length
+        ? payload.lineItems.map((item, index) => ({
+            id: item.id || `pro-forma-line-${index + 1}`,
+            name: item.name || `Line Item ${index + 1}`,
+            description: item.description || "",
+            quantity: String(item.quantity || "1"),
+            unitPrice: String(roundProFormaMoney(item.unitPrice || 0))
+          }))
+        : [{
+            id: "pro-forma-line-1",
+            name: "Line Item 1",
+            description: "",
+            quantity: "1",
+            unitPrice: "0"
+          }],
+      vatRate: String(payload.vatRate ?? 20),
+      termsHeading: payload.termsHeading || "Payment terms",
+      termsText: payload.termsText || "Payment due before production / installation unless agreed otherwise.",
+      notes: payload.description || "",
+      footerText: "Thank you for your order.",
+      depositType: "",
+      depositValue: ""
+    };
+  }
+
+  function updateDraft(field, value) {
+    setDraft((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  function updateLineItem(lineId, field, value) {
+    setDraft((current) => current ? {
+      ...current,
+      lineItems: current.lineItems.map((item) => (
+        item.id === lineId ? { ...item, [field]: value } : item
+      ))
+    } : current);
+  }
+
+  function addLineItem() {
+    setDraft((current) => current ? {
+      ...current,
+      lineItems: [
+        ...current.lineItems,
+        {
+          id: `pro-forma-line-${Date.now()}`,
+          name: `Line Item ${current.lineItems.length + 1}`,
+          description: "",
+          quantity: "1",
+          unitPrice: "0"
+        }
+      ]
+    } : current);
+  }
+
+  function removeLineItem(lineId) {
+    setDraft((current) => {
+      if (!current) return current;
+      const nextItems = current.lineItems.filter((item) => item.id !== lineId);
+      return {
+        ...current,
+        lineItems: nextItems.length ? nextItems : [{
+          id: "pro-forma-line-1",
+          name: "Line Item 1",
+          description: "",
+          quantity: "1",
+          unitPrice: "0"
+        }]
+      };
+    });
+  }
+
+  function applyDepositPreset(percent) {
+    const safePercent = Math.max(Number(percent) || 0, 0);
+    setDraft((current) => current ? {
+      ...current,
+      depositType: "percent",
+      depositValue: String(safePercent),
+      termsText: safePercent >= 100
+        ? "Full payment required before production / installation."
+        : `${safePercent}% deposit required with order. Remaining balance due before production / installation.`
+    } : current);
+  }
+
+  function applyCustomDeposit() {
+    const value = Math.max(Number(customDepositValue) || 0, 0);
+    if (!draft || value <= 0) return;
+    if (customDepositMode === "fixed") {
+      const safeAmount = Math.min(roundProFormaMoney(value), total);
+      setDraft({
+        ...draft,
+        depositType: "fixed",
+        depositValue: String(safeAmount),
+        termsText: `${formatProFormaMoney(safeAmount)} deposit required with order. Remaining balance due before production / installation.`
+      });
+      return;
+    }
+    applyDepositPreset(value);
+  }
+
+  async function pullProForma(event) {
+    event.preventDefault();
+    const reference = orderReference.trim();
+    if (!reference) {
+      setError("Enter an EST or ORD reference.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      setDraft(null);
+      const response = await fetch("/api/pro-forma/pull", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderReference: reference })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not pull the Pro-Forma details.");
+      }
+      setDraft(buildDraftFromPayload(payload));
+    } catch (pullError) {
+      setError(pullError.message || "Could not pull the Pro-Forma details.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page pro-forma-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="pro-forma"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+
+        <section className="panel social-post-panel pro-forma-panel">
+          <div className="pro-forma-grid">
+            <form className="social-post-card pro-forma-fetch-card" onSubmit={pullProForma}>
+              <h3>Pull Pro-Forma</h3>
+              <p className="muted-copy">Enter an `EST` or `ORD` reference, pull the CoreBridge detail, then tidy the draft before sending it out.</p>
+              <label>
+                CoreBridge reference
+                <div className="social-post-order-row">
+                  <input
+                    value={orderReference}
+                    onChange={(event) => setOrderReference(event.target.value)}
+                    placeholder="EST-3379 or ORD-3379"
+                  />
+                  <button className="primary-button" type="submit" disabled={loading}>
+                    {loading ? "Pulling..." : "Pull"}
+                  </button>
+                </div>
+              </label>
+
+              <div className="pro-forma-deposit-tools">
+                <h4>Deposit shortcuts</h4>
+                <div className="pro-forma-deposit-buttons">
+                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(25)}>25% deposit</button>
+                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(50)}>50% deposit</button>
+                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(100)}>Full payment</button>
+                </div>
+                <div className="pro-forma-custom-deposit">
+                  <select value={customDepositMode} onChange={(event) => setCustomDepositMode(event.target.value)} disabled={!draft}>
+                    <option value="percent">Custom %</option>
+                    <option value="fixed">Custom amount</option>
+                  </select>
+                  <input
+                    value={customDepositValue}
+                    onChange={(event) => setCustomDepositValue(event.target.value)}
+                    inputMode="decimal"
+                    placeholder={customDepositMode === "fixed" ? "2500" : "35"}
+                    disabled={!draft}
+                  />
+                  <button type="button" className="primary-button" disabled={!draft} onClick={applyCustomDeposit}>Apply</button>
+                </div>
+              </div>
+
+              {error ? <p className="form-error">{error}</p> : null}
+            </form>
+
+            <div className="social-post-card pro-forma-editor-card">
+              <div className="pro-forma-editor-head">
+                <div>
+                  <h3>{draft?.headline || "Editable Pro-Forma"}</h3>
+                  <p className="muted-copy">Edit anything you need. PDF/export can sit on top of this once the draft flow feels right.</p>
+                </div>
+                <div className="pro-forma-total-pill">{formatProFormaMoney(total)}</div>
+              </div>
+
+              {draft ? (
+                <div className="pro-forma-editor">
+                  <div className="pro-forma-meta-grid">
+                    <label>
+                      Title
+                      <input value={draft.headline} onChange={(event) => updateDraft("headline", event.target.value)} />
+                    </label>
+                    <label>
+                      Date
+                      <input type="date" value={draft.date} onChange={(event) => updateDraft("date", event.target.value)} />
+                    </label>
+                    <label>
+                      Reference label
+                      <input value={draft.referenceLabel} onChange={(event) => updateDraft("referenceLabel", event.target.value)} />
+                    </label>
+                    <label>
+                      Reference
+                      <input value={draft.orderReference} onChange={(event) => updateDraft("orderReference", event.target.value)} />
+                    </label>
+                    <label>
+                      Customer name
+                      <input value={draft.customerName} onChange={(event) => updateDraft("customerName", event.target.value)} />
+                    </label>
+                    <label>
+                      Contact
+                      <input value={draft.contact} onChange={(event) => updateDraft("contact", event.target.value)} />
+                    </label>
+                    <label>
+                      Phone number
+                      <input value={draft.number} onChange={(event) => updateDraft("number", event.target.value)} />
+                    </label>
+                    <label className="pro-forma-vat-field">
+                      VAT %
+                      <input value={draft.vatRate} onChange={(event) => updateDraft("vatRate", event.target.value)} inputMode="decimal" />
+                    </label>
+                    <label className="span-2">
+                      Address
+                      <textarea rows={4} value={draft.address} onChange={(event) => updateDraft("address", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Notes / scope
+                      <textarea rows={4} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
+                    </label>
+                  </div>
+
+                  <div className="pro-forma-lines-head">
+                    <h4>Line items</h4>
+                    <button type="button" className="ghost-button" onClick={addLineItem}>Add line</button>
+                  </div>
+                  <div className="pro-forma-lines-table">
+                    <div className="pro-forma-lines-row pro-forma-lines-header">
+                      <span>Item</span>
+                      <span>Description</span>
+                      <span>Qty</span>
+                      <span>Unit price</span>
+                      <span>Line total</span>
+                      <span />
+                    </div>
+                    {draft.lineItems.map((item) => {
+                      const quantity = Math.max(Number(item.quantity) || 0, 0);
+                      const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
+                      const lineTotal = roundProFormaMoney(quantity * unitPrice);
+                      return (
+                        <div key={item.id} className="pro-forma-lines-row">
+                          <input value={item.name} onChange={(event) => updateLineItem(item.id, "name", event.target.value)} />
+                          <textarea rows={3} value={item.description} onChange={(event) => updateLineItem(item.id, "description", event.target.value)} />
+                          <input value={item.quantity} inputMode="decimal" onChange={(event) => updateLineItem(item.id, "quantity", event.target.value)} />
+                          <input value={item.unitPrice} inputMode="decimal" onChange={(event) => updateLineItem(item.id, "unitPrice", event.target.value)} />
+                          <strong>{formatProFormaMoney(lineTotal)}</strong>
+                          <button type="button" className="text-button" onClick={() => removeLineItem(item.id)}>Remove</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="pro-forma-bottom-grid">
+                    <div className="pro-forma-terms-card">
+                      <label>
+                        {draft.termsHeading}
+                        <textarea rows={5} value={draft.termsText} onChange={(event) => updateDraft("termsText", event.target.value)} />
+                      </label>
+                      <label>
+                        Footer text
+                        <textarea rows={3} value={draft.footerText} onChange={(event) => updateDraft("footerText", event.target.value)} />
+                      </label>
+                    </div>
+                    <div className="pro-forma-summary-card">
+                      <div><span>Subtotal</span><strong>{formatProFormaMoney(subtotal)}</strong></div>
+                      <div><span>VAT ({vatRate || 0}%)</span><strong>{formatProFormaMoney(vatAmount)}</strong></div>
+                      <div><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
+                      <div><span>Deposit due</span><strong>{formatProFormaMoney(depositAmount)}</strong></div>
+                      <div><span>Remaining balance</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="muted-copy">Your editable pro-forma draft will appear here once you pull a CoreBridge reference.</p>
+              )}
             </div>
           </div>
         </section>
@@ -10423,6 +10809,7 @@ export default function App() {
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
+  const isProFormaRoute = pathname.startsWith("/pro-forma");
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
@@ -10515,6 +10902,7 @@ export default function App() {
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
+  const showProForma = Boolean(currentUser && canAccessProForma(currentUser) && isProFormaRoute);
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
@@ -10524,8 +10912,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -10846,6 +11234,11 @@ export default function App() {
       return;
     }
 
+    if (isProFormaRoute && !canAccessProForma(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isRamsRoute && !canAccessRams(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -10871,7 +11264,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -10879,7 +11272,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -11092,6 +11485,7 @@ export default function App() {
       rams: getPermissionForApp(targetUser, "rams"),
       socialPost: getPermissionForApp(targetUser, "socialPost"),
       descriptionPull: getPermissionForApp(targetUser, "descriptionPull"),
+      proForma: getPermissionForApp(targetUser, "proForma"),
       [appKey]: value
     };
     setPermissionSavingKey(`${userId}:${appKey}`);
@@ -12689,6 +13083,18 @@ export default function App() {
   if (showDescriptionPull) {
     return (
       <DescriptionPullPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showProForma) {
+    return (
+      <ProFormaPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
