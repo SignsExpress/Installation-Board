@@ -6586,32 +6586,30 @@ app.get("/api/corebridge/orders", async (request, response) => {
     });
 
     store.jobs[index] = nextJob;
-    if (!existing.isCompleted) {
-      const usersStore = await readUsersStore();
-      const jobSummary = getJobNotificationSummary(nextJob);
-      const photoCount = Array.isArray(nextJob.photos) ? nextJob.photos.length : 0;
-      const photoSummary =
-        photoCount === 0
-          ? "No photos were uploaded."
-          : photoCount === 1
-            ? "1 photo was uploaded."
-            : `${photoCount} photos were uploaded.`;
-        pushBoardNotification(store, usersStore.users || [], () => ({
-          jobId: nextJob.id,
-          type: "job-completed",
-          title: "Job marked complete",
-          message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
-        }));
-      try {
-        await createAutoSocialSuggestionsForCompletedJob({
-          store,
-          users: usersStore.users || [],
-          job: nextJob,
-          actorName: request.user?.displayName || "a user"
-        });
-      } catch (socialError) {
-        console.error("Could not auto-create social post suggestions.", socialError);
-      }
+    const usersStore = await readUsersStore();
+    const jobSummary = getJobNotificationSummary(nextJob);
+    const photoCount = Array.isArray(nextJob.photos) ? nextJob.photos.length : 0;
+    const photoSummary =
+      photoCount === 0
+        ? "No photos were uploaded."
+        : photoCount === 1
+          ? "1 photo was uploaded."
+          : `${photoCount} photos were uploaded.`;
+    pushBoardNotification(store, usersStore.users || [], () => ({
+      jobId: nextJob.id,
+      type: "job-completed",
+      title: "Job marked complete",
+      message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
+    }));
+    try {
+      await createAutoSocialSuggestionsForCompletedJob({
+        store,
+        users: usersStore.users || [],
+        job: nextJob,
+        actorName: request.user?.displayName || "a user"
+      });
+    } catch (socialError) {
+      console.error("Could not auto-create social post suggestions.", socialError);
     }
     const savedStore = await writeStore(store);
     const payload = {
