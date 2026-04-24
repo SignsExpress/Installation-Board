@@ -1732,9 +1732,8 @@ function normalizeRamsLogic(logic = {}) {
         ...defaultOptions.map((defaultOption, optionIndex) => {
           const defaultValue = String(defaultOption.value || "");
           const incomingMatch =
-            (key === "tools" || key === "access")
-              ? incomingOptions[optionIndex] || incomingOptions.find((option) => String(option.value || "") === defaultValue)
-              : incomingOptions.find((option) => String(option.value || "") === defaultValue);
+            incomingOptions[optionIndex] ||
+            incomingOptions.find((option) => String(option.value || "") === defaultValue);
           const nextOption = incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
           if (requiresRiskBankReset) {
             return { ...nextOption, cardIds: defaultOption.cardIds || [] };
@@ -1744,7 +1743,7 @@ function normalizeRamsLogic(logic = {}) {
         ...incomingOptions.filter((option, optionIndex) => {
           const value = String(option.value || "");
           if (!value || legacyOptionValues.has(value)) return false;
-          if ((key === "tools" || key === "access") && optionIndex < defaultOptions.length) return false;
+          if (optionIndex < defaultOptions.length) return false;
           return !defaultOptions.some((entry) => String(entry.value) === value);
         })
       ];
