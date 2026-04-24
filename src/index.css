@@ -6259,6 +6259,15 @@ button {
   cursor: pointer;
 }
 
+.pro-forma-asset-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
 .pro-forma-custom-deposit {
   display: grid;
   grid-template-columns: minmax(0, 120px) minmax(0, 1fr) auto;

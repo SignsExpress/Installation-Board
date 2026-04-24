@@ -4964,13 +4964,14 @@ function parseMoneyValue(value) {
 
 function scoreProFormaUnitPriceField(leaf) {
   if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
-  if (/lineitemprice|priceeach|sell/i.test(leaf)) return 70;
+  if (/lineitemprice|priceeach/i.test(leaf)) return 70;
   if (/^price$/i.test(leaf)) return 50;
   return 0;
 }
 
 function scoreProFormaLineTotalField(leaf) {
-  if (/ordertotal|itemtotal|sellingprice/i.test(leaf)) return 95;
+  if (/itemtotal/i.test(leaf)) return 95;
+  if (/sellingprice/i.test(leaf)) return 72;
   if (/linetotal|extended|extendedprice|extendedamount|lineprice|lineamount/i.test(leaf)) return 90;
   if (/total|amount|sell|revenue|price/i.test(leaf)) return 40;
   return 0;
@@ -4983,7 +4984,31 @@ function isGenericProFormaName(value = "") {
 }
 
 function shouldIgnoreProFormaMoneyField(leaf = "") {
-  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount)/i.test(leaf);
+  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|ordertotal|grandtotal|invoiceamount)/i.test(leaf);
+}
+
+function extractCoreBridgeMediaAssets(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const assets = [];
+
+  fields.forEach((field) => {
+    const key = String(field.key || "");
+    const value = String(field.value || "").trim();
+    if (!value) return;
+
+    const looksLikeFile = /\.(png|jpg|jpeg|svg|webp|pdf)(\?|$)/i.test(value);
+    const looksLikeUrl = /^https?:\/\//i.test(value);
+    const fileishKey = /(file|document|attachment|asset|image|media|artwork|logo)/i.test(key);
+    if (!(looksLikeFile || (looksLikeUrl && fileishKey))) return;
+
+    assets.push({
+      key,
+      url: value,
+      type: /\.(pdf)(\?|$)/i.test(value) ? "pdf" : "image"
+    });
+  });
+
+  return assets.filter((asset, index, array) => array.findIndex((entry) => entry.url === asset.url) === index).slice(0, 20);
 }
 
 function getProFormaTargetSubtotal(order = {}) {
@@ -5351,6 +5376,7 @@ function buildProFormaPayload(order = {}) {
     total: totals.total,
     totalPaid: totals.totalPaid,
     balanceDue: totals.balanceDue,
+    brandingAssets: extractCoreBridgeMediaAssets(order),
     termsHeading: "Payment terms",
     termsText: "Payment due before production / installation unless agreed otherwise.",
     referenceLabel: "Reference"

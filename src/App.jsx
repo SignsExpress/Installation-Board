@@ -3805,6 +3805,12 @@ function buildProFormaPreviewHtml(draft, summary) {
     <meta charset="utf-8" />
     <title>${escapeHtml(draft.headline || "Invoice")}</title>
     <style>
+      @font-face {
+        font-family: "Bebas Neue";
+        src: url("${window.location.origin}/fonts/BebasNeue-Regular.ttf") format("truetype");
+        font-weight: 400;
+        font-style: normal;
+      }
       @page { size: A4 portrait; margin: 10mm; }
       * { box-sizing: border-box; }
       html, body {
@@ -3832,7 +3838,8 @@ function buildProFormaPreviewHtml(draft, summary) {
         font-size: 29px;
         line-height: 1;
         letter-spacing: 0.03em;
-        font-weight: 500;
+        font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
+        font-weight: 400;
         color: #0f98a5;
         margin-top: 4px;
       }
@@ -4183,6 +4190,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       notes: payload.description || "",
       footerText: "Thank you for your order.",
       totalPaid: String(roundProFormaMoney(payload.totalPaid || 0)),
+      brandingAssets: Array.isArray(payload.brandingAssets) ? payload.brandingAssets : [],
       depositType: "",
       depositValue: ""
     };
@@ -4387,6 +4395,16 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   <span>{referencePdfName || "Load sample invoice PDF"}</span>
                 </label>
                 <p className="muted-copy">Load the attached invoice here and we can compare your generated version beside it.</p>
+                {draft?.brandingAssets?.length ? (
+                  <div className="pro-forma-asset-list">
+                    <strong>CoreBridge assets found:</strong>
+                    {draft.brandingAssets.map((asset) => (
+                      <span key={`${asset.key}-${asset.url}`} className="social-post-chip">
+                        {asset.type}: {asset.key}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               {error ? <p className="form-error">{error}</p> : null}
