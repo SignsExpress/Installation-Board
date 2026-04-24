@@ -3781,6 +3781,7 @@ function buildProFormaPreviewHtml(draft, summary) {
     ["SWIFT", "NWBKGB2L"]
   ];
   const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
+  const accreditationImages = (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
   const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
@@ -3792,7 +3793,7 @@ function buildProFormaPreviewHtml(draft, summary) {
           <strong>${escapeHtml(item.name || "-")}</strong>
           ${item.description ? `<div class="invoice-desc">${escapeHtml(item.description)}</div>` : ""}
         </td>
-        <td class="num">${escapeHtml(item.quantity || "1")}</td>
+        <td class="qty">${escapeHtml(item.quantity || "1")}</td>
         <td class="num">${escapeHtml(formatProFormaMoney(unitPrice))}</td>
         <td class="num">${escapeHtml(formatProFormaMoney(lineTotal))}</td>
       </tr>
@@ -3851,13 +3852,13 @@ function buildProFormaPreviewHtml(draft, summary) {
       .address-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        margin-top: 38px;
+        gap: 26px;
+        margin-top: 34px;
       }
       .address-block {
-        font-size: 12px;
-        line-height: 1.34;
-        min-height: 132px;
+        font-size: 11.6px;
+        line-height: 1.28;
+        min-height: 128px;
       }
       .address-block.right {
         text-align: right;
@@ -3868,10 +3869,10 @@ function buildProFormaPreviewHtml(draft, summary) {
       .meta-split {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        margin-top: 44px;
-        font-size: 12px;
-        line-height: 1.45;
+        gap: 26px;
+        margin-top: 40px;
+        font-size: 11.8px;
+        line-height: 1.52;
       }
       .meta-split p {
         margin: 0 0 10px;
@@ -3891,7 +3892,7 @@ function buildProFormaPreviewHtml(draft, summary) {
         color: #fff;
         font-size: 11px;
         font-weight: 700;
-        padding: 11px 12px;
+        padding: 10px 12px;
         text-align: left;
         border-right: 1px solid rgba(255,255,255,0.35);
       }
@@ -3902,8 +3903,8 @@ function buildProFormaPreviewHtml(draft, summary) {
         text-align: center;
       }
       tbody td {
-        padding: 12px 10px 18px;
-        font-size: 12px;
+        padding: 13px 10px 16px;
+        font-size: 11.8px;
         vertical-align: top;
         border-bottom: 0;
       }
@@ -3911,17 +3912,19 @@ function buildProFormaPreviewHtml(draft, summary) {
         border-bottom: 1px solid #d7e2e5;
       }
       .line-number {
-        width: 50px;
-        padding-left: 4px;
+        width: 56px;
+        padding-left: 6px;
+        text-align: left;
       }
       .item-name {
         margin-bottom: 8px;
       }
       .invoice-desc {
-        margin-top: 7px;
+        margin-top: 6px;
         color: #000;
         white-space: pre-wrap;
         max-width: 98%;
+        line-height: 1.22;
       }
       .num {
         text-align: right;
@@ -3929,17 +3932,18 @@ function buildProFormaPreviewHtml(draft, summary) {
       }
       .qty {
         text-align: center;
+        white-space: nowrap;
       }
       .bottom-row {
         display: grid;
         grid-template-columns: 1.25fr 0.75fr;
         gap: 28px;
-        margin-top: 22px;
+        margin-top: 18px;
         align-items: start;
       }
       .bank-block {
-        font-size: 12px;
-        line-height: 1.35;
+        font-size: 11.8px;
+        line-height: 1.34;
       }
       .bank-grid {
         display: grid;
@@ -3949,8 +3953,8 @@ function buildProFormaPreviewHtml(draft, summary) {
       }
       .totals-box {
         border: 3px solid #0f98a5;
-        padding: 10px 14px;
-        font-size: 12px;
+        padding: 12px 16px;
+        font-size: 11.8px;
       }
       .total-row {
         display: flex;
@@ -3968,8 +3972,8 @@ function buildProFormaPreviewHtml(draft, summary) {
         font-weight: 700;
       }
       .approval {
-        margin-top: 66px;
-        font-size: 12px;
+        margin-top: 52px;
+        font-size: 11.8px;
       }
       .payment-terms-footer {
         margin-top: 24px;
@@ -3981,14 +3985,29 @@ function buildProFormaPreviewHtml(draft, summary) {
       .footer-strip {
         margin-top: 34px;
         background: #0f98a5;
-        height: 48px;
+        min-height: 48px;
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
+        padding: 6px 10px;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.04em;
+      }
+      .footer-strip img {
+        max-width: 100%;
+        max-height: 36px;
+        display: block;
+        object-fit: contain;
+      }
+      .footer-strip-images {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        width: 100%;
       }
       .footer-meta {
         margin-top: 10px;
@@ -4086,7 +4105,7 @@ function buildProFormaPreviewHtml(draft, summary) {
         </div>
       </div>
 
-      <div class="footer-strip">NHS Approved Supplier  |  Dementia Friends  |  Constructionline  |  CHAS  |  PASMA  |  IPAF  |  FESPA</div>
+      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}" alt="Accreditation" />`).join("")}</div>` : `NHS Approved Supplier  |  Dementia Friends  |  Constructionline  |  CHAS  |  PASMA  |  IPAF  |  FESPA`}</div>
       <div class="footer-meta">
         <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
         <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
@@ -4173,6 +4192,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             id: item.id || `pro-forma-line-${index + 1}`,
             name: item.name || `Line Item ${index + 1}`,
             description: item.description || "",
+            sortIndex: item.sortIndex ?? index,
             quantity: String(item.quantity || "1"),
             unitPrice: String(roundProFormaMoney(item.unitPrice || 0))
           }))

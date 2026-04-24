@@ -4672,7 +4672,7 @@ function isUsefulSocialText(value = "") {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   if (text.length < 12) return false;
   if (/^(vat|tax|sales tax|discount|subtotal|total|balance|paid|installation|delivery|courier|0|none|n\/a)$/i.test(text)) return false;
-  if (/^[\d\s.,£€$-]+$/.test(text)) return false;
+  if (/^[\d\s.,$-]+$/.test(text)) return false;
   if (/^\d+\s*:\s*(vat|tax)$/i.test(text)) return false;
   return /[a-z]{4,}/i.test(text);
 }
@@ -4962,6 +4962,45 @@ function parseMoneyValue(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function inspectProFormaMoneyValue(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || /^(true|false|null|undefined|n\/a)$/i.test(raw)) return null;
+  const normalized = raw.replace(/,/g, "").replace(/[\u00A3\s]/gu, "");
+  if (!/^-?\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount)) return null;
+  return {
+    amount,
+    raw,
+    integerOnly: /^-?\d+$/.test(normalized),
+    hasCurrency: raw.includes("\u00A3"),
+    hasDecimals: /[\.,]\d{2,}\b/.test(raw),
+    hasFormatting: /[\u00A3,]/u.test(raw) || /\.\d+\b/.test(raw)
+  };
+}
+
+function getProFormaMoneyConfidence(meta, key = "") {
+  const text = String(key || "");
+  let score = 0;
+  if (meta.hasCurrency) score += 24;
+  if (meta.hasDecimals) score += 20;
+  if (meta.hasFormatting) score += 8;
+  if (meta.integerOnly && Math.abs(meta.amount) >= 1000) score -= 38;
+  if (meta.integerOnly && Math.abs(meta.amount) >= 10000) score -= 28;
+  if (/(price|amount|total|subtotal|vat|tax|balance|discount|paid|due|sell)/i.test(text)) score += 10;
+  if (/(id|code|account|class|type|number|locator|sequence|sort|status|quantity|qty|version)/i.test(text)) score -= 60;
+  return score;
+}
+
+function shouldAcceptProFormaMoneyValue(meta, key = "") {
+  if (!meta || !Number.isFinite(meta.amount) || meta.amount === 0) return false;
+  const text = String(key || "");
+  if (/(id|code|account|class|type|number|locator|sequence|sort|status|version)/i.test(text)) return false;
+  if (meta.hasCurrency || meta.hasDecimals) return true;
+  if (!meta.integerOnly) return true;
+  return /(unitprice|priceperitem|sellprice|sellunit|lineitemprice|priceeach|itemtotal|linetotal|extendedprice|extendedamount|lineprice|lineamount|subtotal|pretax|pre-tax|taxexclusive|nettotal|vatamount|vattotal|taxtotal|taxamount|grandtotal|ordertotal|invoiceamount|totalpaid|amountpaid|balancedue|amountdue|discountamount|discounttotal)/i.test(text) && Math.abs(meta.amount) < 1000;
+}
+
 function scoreProFormaUnitPriceField(leaf) {
   if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
   if (/lineitemprice|priceeach/i.test(leaf)) return 70;
@@ -4984,7 +5023,7 @@ function isGenericProFormaName(value = "") {
 }
 
 function shouldIgnoreProFormaMoneyField(leaf = "") {
-  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|ordertotal|grandtotal|invoiceamount)/i.test(leaf);
+  return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|id$|classtype|account|locator|version|sequence)/i.test(leaf);
 }
 
 function extractCoreBridgeMediaAssets(order = {}) {
@@ -4998,7 +5037,7 @@ function extractCoreBridgeMediaAssets(order = {}) {
 
     const looksLikeFile = /\.(png|jpg|jpeg|svg|webp|pdf)(\?|$)/i.test(value);
     const looksLikeUrl = /^https?:\/\//i.test(value);
-    const fileishKey = /(file|document|attachment|asset|image|media|artwork|logo)/i.test(key);
+    const fileishKey = /(file|document|attachment|asset|image|media|artwork|logo|accredit)/i.test(key);
     if (!(looksLikeFile || (looksLikeUrl && fileishKey))) return;
 
     assets.push({
@@ -5008,7 +5047,14 @@ function extractCoreBridgeMediaAssets(order = {}) {
     });
   });
 
-  return assets.filter((asset, index, array) => array.findIndex((entry) => entry.url === asset.url) === index).slice(0, 20);
+  return assets
+    .filter((asset, index, array) => array.findIndex((entry) => entry.url === asset.url) === index)
+    .sort((left, right) => {
+      const leftScore = /(accredit|nhs|dementia|constructionline|chas|pasma|ipaf|fespa)/i.test(left.key + " " + left.url) ? 2 : 0;
+      const rightScore = /(accredit|nhs|dementia|constructionline|chas|pasma|ipaf|fespa)/i.test(right.key + " " + right.url) ? 2 : 0;
+      return rightScore - leftScore;
+    })
+    .slice(0, 20);
 }
 
 function getProFormaTargetSubtotal(order = {}) {
@@ -5038,8 +5084,9 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   fields.forEach((field) => {
     const key = String(field.key || "").toLowerCase();
     if (/(?:items?|orderdestinationitems?|estimateitems?|lineitems?|components?|childcomponents?)\./i.test(key)) return;
-    const value = parseMoneyValue(field.value);
-    if (!Number.isFinite(value)) return;
+    const moneyMeta = inspectProFormaMoneyValue(field.value);
+    if (!moneyMeta || !shouldAcceptProFormaMoneyValue(moneyMeta, key)) return;
+    const value = moneyMeta.amount;
 
     if (/(orderdiscount|discountamount|discounttotal|discount)/i.test(key)) {
       const score = /orderdiscount/i.test(key) ? 95 : 70;
@@ -5189,15 +5236,17 @@ function extractProFormaLineItems(order = {}) {
       }
     }
 
-    const moneyValue = parseMoneyValue(field.value);
-    if (moneyValue > 0 && !shouldIgnoreProFormaMoneyField(leaf)) {
-      const unitPriceScore = scoreProFormaUnitPriceField(leaf);
+    const moneyMeta = inspectProFormaMoneyValue(field.value);
+    if (moneyMeta && shouldAcceptProFormaMoneyValue(moneyMeta, leaf) && !shouldIgnoreProFormaMoneyField(leaf)) {
+      const moneyValue = moneyMeta.amount;
+      const moneyConfidence = getProFormaMoneyConfidence(moneyMeta, leaf);
+      const unitPriceScore = scoreProFormaUnitPriceField(leaf) + moneyConfidence;
       if (unitPriceScore > group.unitPriceScore) {
         group.unitPrice = moneyValue;
         group.unitPriceScore = unitPriceScore;
       }
 
-      const lineTotalScore = scoreProFormaLineTotalField(leaf);
+      const lineTotalScore = scoreProFormaLineTotalField(leaf) + moneyConfidence;
       if (lineTotalScore > group.lineTotalScore) {
         group.lineTotal = moneyValue;
         group.lineTotalScore = lineTotalScore;
@@ -5207,6 +5256,7 @@ function extractProFormaLineItems(order = {}) {
       if (candidateScore > 0) {
         group.moneyCandidates.push({
           rawValue: moneyValue,
+          raw: moneyMeta.raw,
           unitPrice: unitPriceScore > 0 ? moneyValue : 0,
           lineTotal: lineTotalScore > 0 ? moneyValue : 0,
           score: candidateScore,
@@ -6590,6 +6640,46 @@ app.get("/api/corebridge/orders", async (request, response) => {
         error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not pull descriptions.",
         detail: error.message
       });
+    }
+  });
+
+  app.get("/api/pro-forma/asset", async (request, response) => {
+    if (!requireProFormaAccess(request, response)) return;
+    try {
+      const rawUrl = String(request.query?.url || "").trim();
+      if (!rawUrl) {
+        response.status(400).json({ error: "Asset url is required." });
+        return;
+      }
+      const config = getCoreBridgeConfig();
+      if (!config.token || !config.subscriptionKey) {
+        response.status(503).json({ error: "CoreBridge is not configured yet." });
+        return;
+      }
+      const base = new URL(config.baseUrl);
+      const targetUrl = new URL(rawUrl, config.baseUrl);
+      if (targetUrl.hostname !== base.hostname) {
+        response.status(400).json({ error: "Asset host is not allowed." });
+        return;
+      }
+      const assetResponse = await fetch(targetUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+          Accept: "image/*,application/pdf,*/*"
+        }
+      });
+      if (!assetResponse.ok) {
+        response.status(assetResponse.status).json({ error: "Could not load the CoreBridge asset." });
+        return;
+      }
+      const contentType = String(assetResponse.headers.get("content-type") || "application/octet-stream");
+      const arrayBuffer = await assetResponse.arrayBuffer();
+      response.setHeader("Content-Type", contentType);
+      response.setHeader("Cache-Control", "private, max-age=3600");
+      response.send(Buffer.from(arrayBuffer));
+    } catch (error) {
+      response.status(500).json({ error: "Could not proxy the CoreBridge asset.", detail: error.message });
     }
   });
 
