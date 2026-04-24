@@ -5072,6 +5072,10 @@ function scoreProFormaRawMoneyField(leaf = "") {
   return score;
 }
 
+function isPreferredProFormaSellLeaf(leaf = "") {
+  return /^orderitem\.components\.0\.pricewithallchildren$/i.test(String(leaf || "").trim());
+}
+
 function isGenericProFormaName(value = "") {
   const text = String(value || "").trim();
   if (!text) return true;
@@ -5470,6 +5474,10 @@ function extractProFormaLineItems(order = {}) {
         })
         .slice(0, 8);
 
+      const preferredSellCandidate = normalizedCandidates.find((candidate) => isPreferredProFormaSellLeaf(candidate.leaf))
+        || normalizedCandidates.find((candidate) => /(?:^|\.)(?:components?|childcomponents?)\.\d+\.pricewithallchildren$/i.test(candidate.leaf))
+        || null;
+
       const rawMoneyFields = [...group.rawMoneyFields]
         .sort((left, right) => {
           if (right.score !== left.score) return right.score - left.score;
@@ -5501,13 +5509,26 @@ function extractProFormaLineItems(order = {}) {
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
         lineTotal: Math.round(normalizedLineTotal * 100) / 100,
         candidates: normalizedCandidates,
-        rawMoneyFields: [...rawMoneyFields.values()].slice(0, 18)
+        rawMoneyFields: [...rawMoneyFields.values()].slice(0, 18),
+        preferredSellCandidate
       };
     });
 
   let bestSelection = null;
 
-  if (targetSubtotal > 0 && preparedGroups.length && preparedGroups.length <= 8) {
+  const preferredSellSelection = preparedGroups.map((item) => item.preferredSellCandidate).filter(Boolean);
+  if (preferredSellSelection.length === preparedGroups.length) {
+    const preferredSellTotal = Math.round(preferredSellSelection.reduce((sum, candidate) => sum + Number(candidate.lineTotal || 0), 0) * 100) / 100;
+    if (!targetSubtotal || Math.abs(preferredSellTotal - targetSubtotal) <= 0.02) {
+      bestSelection = {
+        diff: targetSubtotal ? Math.abs(preferredSellTotal - targetSubtotal) : 0,
+        score: preferredSellSelection.reduce((sum, candidate) => sum + Number(candidate.score || 0), 0) + 500,
+        picks: preferredSellSelection
+      };
+    }
+  }
+
+  if (!bestSelection && targetSubtotal > 0 && preparedGroups.length && preparedGroups.length <= 8) {
     const tolerance = 0.02;
     const search = (index, runningTotal, runningScore, picks) => {
       if (index >= preparedGroups.length) {
