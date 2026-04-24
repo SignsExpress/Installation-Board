@@ -4986,6 +4986,11 @@ function shouldIgnoreProFormaMoneyField(leaf = "") {
   return /(cost|margin|markup|discounttable|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount)/i.test(leaf);
 }
 
+function getProFormaTargetSubtotal(order = {}) {
+  const totals = extractProFormaTotals(order, 0, 0);
+  return Number(totals.preTaxTotal || totals.subtotal || 0);
+}
+
 function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
   const totals = {
@@ -5098,6 +5103,7 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
 function extractProFormaLineItems(order = {}) {
   const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
   const groups = new Map();
+  const targetSubtotal = getProFormaTargetSubtotal(order);
 
   fields.forEach((field) => {
     const key = String(field.key || "");
@@ -5120,7 +5126,8 @@ function extractProFormaLineItems(order = {}) {
       unitPrice: 0,
       unitPriceScore: -1,
       lineTotal: 0,
-      lineTotalScore: -1
+      lineTotalScore: -1,
+      moneyCandidates: []
     };
 
     if (
@@ -5170,12 +5177,23 @@ function extractProFormaLineItems(order = {}) {
         group.lineTotal = moneyValue;
         group.lineTotalScore = lineTotalScore;
       }
+
+      const candidateScore = Math.max(unitPriceScore, lineTotalScore);
+      if (candidateScore > 0) {
+        group.moneyCandidates.push({
+          rawValue: moneyValue,
+          unitPrice: unitPriceScore > 0 ? moneyValue : 0,
+          lineTotal: lineTotalScore > 0 ? moneyValue : 0,
+          score: candidateScore,
+          leaf
+        });
+      }
     }
 
     groups.set(match[1], group);
   });
 
-  const items = [...groups.values()]
+  const preparedGroups = [...groups.values()]
     .filter((group) => group.name || group.description || group.lineTotal > 0)
     .sort((left, right) => left.index - right.index)
     .map((group) => {
@@ -5192,18 +5210,105 @@ function extractProFormaLineItems(order = {}) {
           ? normalizedLineTotal / normalizedQuantity
           : 0;
 
+      const candidates = group.moneyCandidates
+        .map((candidate) => {
+          const candidateLineTotal = candidate.lineTotal > 0
+            ? candidate.lineTotal
+            : candidate.unitPrice > 0
+              ? candidate.unitPrice * normalizedQuantity
+              : 0;
+          const candidateUnitPrice = candidate.unitPrice > 0
+            ? candidate.unitPrice
+            : candidateLineTotal > 0 && normalizedQuantity > 0
+              ? candidateLineTotal / normalizedQuantity
+              : 0;
+          return {
+            lineTotal: Math.round(candidateLineTotal * 100) / 100,
+            unitPrice: Math.round(candidateUnitPrice * 100) / 100,
+            score: candidate.score,
+            leaf: candidate.leaf
+          };
+        })
+        .filter((candidate) => candidate.lineTotal > 0)
+        .reduce((unique, candidate) => {
+          const key = `${candidate.lineTotal.toFixed(2)}|${candidate.unitPrice.toFixed(2)}`;
+          const existing = unique.get(key);
+          if (!existing || candidate.score > existing.score) unique.set(key, candidate);
+          return unique;
+        }, new Map());
+
+      const normalizedCandidates = [...candidates.values()]
+        .sort((left, right) => {
+          if (right.score !== left.score) return right.score - left.score;
+          return left.lineTotal - right.lineTotal;
+        })
+        .slice(0, 8);
+
+      if (!normalizedCandidates.some((candidate) => Math.abs(candidate.lineTotal - normalizedLineTotal) < 0.005)) {
+        normalizedCandidates.push({
+          lineTotal: Math.round(normalizedLineTotal * 100) / 100,
+          unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
+          score: 1,
+          leaf: "fallback"
+        });
+      }
+
       return {
+        group,
         id: `pro-forma-line-${group.index + 1}`,
         sortIndex: group.index,
         name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || `Line Item ${group.index + 1}`),
         description: group.description || (!isGenericProFormaName(group.name) ? group.name : ""),
         quantity: String(group.quantity || normalizedQuantity || 1),
+        normalizedQuantity,
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
-        lineTotal: Math.round(normalizedLineTotal * 100) / 100
+        lineTotal: Math.round(normalizedLineTotal * 100) / 100,
+        candidates: normalizedCandidates
       };
     });
 
-  return items;
+  let bestSelection = null;
+
+  if (targetSubtotal > 0 && preparedGroups.length && preparedGroups.length <= 8) {
+    const tolerance = 0.02;
+    const search = (index, runningTotal, runningScore, picks) => {
+      if (index >= preparedGroups.length) {
+        const diff = Math.abs(runningTotal - targetSubtotal);
+        if (
+          !bestSelection ||
+          diff < bestSelection.diff - tolerance ||
+          (Math.abs(diff - bestSelection.diff) <= tolerance && runningScore > bestSelection.score)
+        ) {
+          bestSelection = { diff, score: runningScore, picks: [...picks] };
+        }
+        return;
+      }
+
+      const item = preparedGroups[index];
+      for (const candidate of item.candidates) {
+        search(
+          index + 1,
+          Math.round((runningTotal + candidate.lineTotal) * 100) / 100,
+          runningScore + candidate.score,
+          [...picks, candidate]
+        );
+      }
+    };
+    search(0, 0, 0, []);
+  }
+
+  return preparedGroups.map((item, index) => {
+    const chosen = bestSelection?.picks?.[index];
+    return {
+      id: item.id,
+      sortIndex: item.sortIndex,
+      name: item.name,
+      description: item.description,
+      quantity: item.quantity,
+      unitPrice: chosen?.unitPrice ?? item.unitPrice,
+      lineTotal: chosen?.lineTotal ?? item.lineTotal
+    };
+  });
 }
 
 function pickProFormaVatRate(order = {}) {

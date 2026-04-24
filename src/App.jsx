@@ -3764,21 +3764,30 @@ function formatProFormaDate(value) {
 
 function buildProFormaPreviewHtml(draft, summary) {
   if (!draft) return "";
-  const officeLines = [
+  const companyLines = [
     "Signs Express (Central Lancashire)",
-    "Unit 3, Sherdley Road",
-    "Lostock Hall",
-    "Preston",
-    "PR5 5LP",
-    "01772 797800",
-    "centrallancashire@signsexpress.co.uk"
+    "Unit 3",
+    "Sherdley Road Lostock Hall",
+    "Preston, Lancashire PR5 5LP",
+    "01772797800",
+    "accounts.preston@signsexpress.co.uk",
+    "www.signs-express.co.uk/preston"
   ];
+  const bankLines = [
+    ["Account name", "Signs Preston Limited"],
+    ["Sort code", "01-67-14"],
+    ["Account No.", "71603603"],
+    ["IBAN", "GB98NWBK01671471603603"],
+    ["SWIFT", "NWBKGB2L"]
+  ];
+  const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
   const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     return `
       <tr>
+        <td class="line-number">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</td>
         <td>
           <strong>${escapeHtml(item.name || "-")}</strong>
           ${item.description ? `<div class="invoice-desc">${escapeHtml(item.description)}</div>` : ""}
@@ -3802,7 +3811,7 @@ function buildProFormaPreviewHtml(draft, summary) {
         margin: 0;
         background: #f4f5f7;
         font-family: Arial, Helvetica, sans-serif;
-        color: #111827;
+        color: #000;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
       }
@@ -3811,167 +3820,186 @@ function buildProFormaPreviewHtml(draft, summary) {
         min-height: 297mm;
         margin: 0 auto;
         background: #fff;
-        padding: 12mm 12mm 10mm;
+        padding: 14mm 13mm 10mm;
       }
-      .header {
+      .top-row {
         display: flex;
         justify-content: space-between;
-        gap: 16px;
-        align-items: start;
-        border-bottom: 1px solid #cbd5e1;
-        padding-bottom: 12px;
+        align-items: flex-start;
+        gap: 18px;
+      }
+      .doc-title {
+        font-size: 29px;
+        line-height: 1;
+        letter-spacing: 0.03em;
+        font-weight: 500;
+        color: #0f98a5;
+        margin-top: 4px;
       }
       .brand img {
-        width: 215px;
+        width: 276px;
         max-width: 100%;
         display: block;
       }
-      .brand-copy {
-        margin-top: 10px;
-        color: #475569;
-        font-size: 11px;
-        line-height: 1.45;
-      }
-      .title-block {
-        min-width: 235px;
-        text-align: right;
-      }
-      .title-block h1 {
-        margin: 0 0 8px;
-        font-size: 28px;
-        color: #111827;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-      .meta-table {
-        width: auto;
-        margin: 0 0 0 auto;
-        border-collapse: collapse;
-      }
-      .meta-table td {
-        padding: 5px 0 5px 14px;
-        border: 0;
-        font-size: 12px;
-        vertical-align: top;
-      }
-      .meta-table td:first-child {
-        font-weight: 700;
-        color: #475569;
-      }
-      .two-col {
+      .address-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-top: 16px;
+        gap: 24px;
+        margin-top: 38px;
       }
       .address-block {
-        border: 1px solid #cbd5e1;
-        min-height: 118px;
-        padding: 10px 12px;
+        font-size: 12px;
+        line-height: 1.34;
+        min-height: 132px;
       }
-      .address-block h2 {
-        margin: 0 0 8px;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #475569;
+      .address-block.right {
+        text-align: right;
       }
       .address-block p {
-        margin: 0 0 5px;
-        font-size: 12px;
-        line-height: 1.45;
+        margin: 0;
       }
-      .detail-strip {
+      .meta-split {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 16px;
-        margin-top: 12px;
-      }
-      .detail-panel {
-        border: 1px solid #cbd5e1;
-        padding: 9px 12px;
-      }
-      .detail-panel h3 {
-        margin: 0 0 7px;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #475569;
-      }
-      .detail-panel p {
-        margin: 0;
+        gap: 24px;
+        margin-top: 44px;
         font-size: 12px;
         line-height: 1.45;
-        white-space: pre-wrap;
+      }
+      .meta-split p {
+        margin: 0 0 10px;
+      }
+      .meta-right {
+        text-align: right;
+      }
+      .table-wrap {
+        margin-top: 18px;
       }
       table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 16px;
       }
       thead th {
-        background: #f8fafc;
-        color: #334155;
+        background: #0f98a5;
+        color: #fff;
         font-size: 11px;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-        padding: 9px 10px;
+        font-weight: 700;
+        padding: 11px 12px;
         text-align: left;
-        border-top: 1px solid #cbd5e1;
-        border-bottom: 1px solid #cbd5e1;
+        border-right: 1px solid rgba(255,255,255,0.35);
+      }
+      thead th:last-child {
+        border-right: 0;
+      }
+      thead th.num {
+        text-align: center;
       }
       tbody td {
-        padding: 10px;
-        border-bottom: 1px solid #e2e8f0;
+        padding: 12px 10px 18px;
         font-size: 12px;
         vertical-align: top;
+        border-bottom: 0;
+      }
+      tbody tr {
+        border-bottom: 1px solid #d7e2e5;
+      }
+      .line-number {
+        width: 50px;
+        padding-left: 4px;
+      }
+      .item-name {
+        margin-bottom: 8px;
+      }
+      .invoice-desc {
+        margin-top: 7px;
+        color: #000;
+        white-space: pre-wrap;
+        max-width: 98%;
       }
       .num {
         text-align: right;
         white-space: nowrap;
       }
-      .invoice-desc {
-        margin-top: 5px;
-        color: #64748b;
-        white-space: pre-wrap;
+      .qty {
+        text-align: center;
       }
-      .notes-summary {
+      .bottom-row {
         display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
-        gap: 16px;
-        margin-top: 16px;
+        grid-template-columns: 1.25fr 0.75fr;
+        gap: 28px;
+        margin-top: 22px;
+        align-items: start;
       }
-      .summary-box {
-        border: 1px solid #cbd5e1;
-        padding: 12px;
-        background: #fff;
+      .bank-block {
+        font-size: 12px;
+        line-height: 1.35;
       }
-      .summary-row {
+      .bank-grid {
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        gap: 2px 10px;
+        margin-top: 2px;
+      }
+      .totals-box {
+        border: 3px solid #0f98a5;
+        padding: 10px 14px;
+        font-size: 12px;
+      }
+      .total-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 5px 0;
+      }
+      .total-row.total {
+        font-size: 14px;
+        font-weight: 700;
+        padding-top: 8px;
+        margin-top: 4px;
+      }
+      .total-row strong {
+        font-weight: 700;
+      }
+      .approval {
+        margin-top: 66px;
+        font-size: 12px;
+      }
+      .payment-terms-footer {
+        margin-top: 24px;
+        padding-top: 12px;
+        border-top: 2px solid #0f98a5;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .footer-strip {
+        margin-top: 34px;
+        background: #0f98a5;
+        height: 48px;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+      .footer-meta {
+        margin-top: 10px;
         display: flex;
         justify-content: space-between;
         gap: 12px;
-        padding: 8px 0;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 12px;
+        align-items: center;
+        font-size: 10px;
       }
-      .summary-row:last-child {
-        border-bottom: 0;
+      .footer-company {
+        text-align: center;
+        flex: 1;
       }
-      .summary-row.total {
-        font-size: 15px;
-        font-weight: 800;
-        color: #111827;
+      .muted {
+        color: #4b5563;
       }
-      .terms, .footer-note {
+      .prewrap {
         white-space: pre-wrap;
-      }
-      .footer {
-        margin-top: 18px;
-        padding-top: 12px;
-        border-top: 1px solid #e2e8f0;
-        color: #64748b;
-        font-size: 11px;
-        line-height: 1.45;
       }
       @media print {
         body { background: #fff; }
@@ -3981,83 +4009,81 @@ function buildProFormaPreviewHtml(draft, summary) {
   </head>
   <body>
     <div class="sheet">
-      <div class="header">
+      <div class="top-row">
+        <div class="doc-title">${escapeHtml(displayTitle)}</div>
         <div class="brand">
-          <img src="${window.location.origin}/branding/signs-express-logo.svg" alt="Signs Express logo" />
-          <div class="brand-copy">
-            ${officeLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")}
-          </div>
-        </div>
-        <div class="title-block">
-          <h1>${escapeHtml(draft.headline || "Invoice")}</h1>
-          <table class="meta-table">
-            <tr><td>${escapeHtml(draft.documentLabel || "Reference")}</td><td>${escapeHtml(draft.orderReference || "-")}</td></tr>
-            <tr><td>Date</td><td>${escapeHtml(formatProFormaDate(draft.date) || "-")}</td></tr>
-            <tr><td>Contact</td><td>${escapeHtml(draft.contact || "-")}</td></tr>
-            <tr><td>Phone</td><td>${escapeHtml(draft.number || "-")}</td></tr>
-          </table>
+          <img src="${window.location.origin}/branding/signs-express-logo-teal.svg" alt="Signs Express logo" />
         </div>
       </div>
 
-      <div class="two-col">
+      <div class="address-row">
         <div class="address-block">
-          <h2>Invoice To</h2>
-          <div>
-            <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
-            <p>${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
+          <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
+          <p class="prewrap">${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
+        </div>
+        <div class="address-block right">
+          ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+        </div>
+      </div>
+
+      <div class="meta-split">
+        <div>
+          <p><strong>Date of Invoice:</strong> ${escapeHtml(formatProFormaDate(draft.date) || "-")}</p>
+          <p><strong>Description:</strong> ${escapeHtml(draft.notes || draft.description || "-")}</p>
+          <p><strong>Order Ref:</strong> ${escapeHtml(draft.orderReference || "-")}</p>
+        </div>
+        <div class="meta-right">
+          <p><strong>Payment Terms:</strong> NET 30 End of Month</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:56px;">Items</th>
+              <th>Description</th>
+              <th class="num" style="width:90px;">Qty</th>
+              <th class="num" style="width:130px;">Unit Price</th>
+              <th class="num" style="width:150px;">Line Item Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lineRows || `<tr><td colspan="5">No line items</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="bottom-row">
+        <div>
+          <div class="bank-block">
+            <div>Bank details:</div>
+            <div class="bank-grid">
+              ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
+            </div>
+          </div>
+          <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
+          <div class="payment-terms-footer">
+            <div><strong>Payment Terms:</strong></div>
+            <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
           </div>
         </div>
-        <div class="address-block">
-          <h2>Site Address</h2>
-          <div>
-            <p>${escapeHtml(draft.siteAddress || draft.address || "-")}</p>
-          </div>
+        <div class="totals-box">
+          <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
+          ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
+          <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
+          <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
+          <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
+          <div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>
+          <div class="total-row"><span>Balance Due</span><strong>${escapeHtml(formatProFormaMoney(summary.balanceDue))}</strong></div>
         </div>
       </div>
 
-      <div class="detail-strip">
-        <div class="detail-panel">
-          <h3>Description / Scope</h3>
-          <p>${escapeHtml(draft.notes || draft.description || "-")}</p>
-        </div>
-        <div class="detail-panel">
-          <h3>Payment Terms</h3>
-          <p>${escapeHtml(draft.termsText || "-")}</p>
-        </div>
-      </div>
-
-      <table>
-        <thead>
-          <tr>
-            <th>Description</th>
-            <th class="num">Qty</th>
-            <th class="num">Unit price</th>
-            <th class="num">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lineRows || `<tr><td colspan="4">No line items</td></tr>`}
-        </tbody>
-      </table>
-
-      <div class="notes-summary">
-        <div class="summary-box">
-          <div class="terms"><strong>${escapeHtml(draft.termsHeading || "Payment terms")}</strong>\n\n${escapeHtml(draft.termsText || "-")}</div>
-          ${draft.footerText ? `<div class="footer-note" style="margin-top:14px;">${escapeHtml(draft.footerText)}</div>` : ""}
-        </div>
-        <div class="summary-box">
-          <div class="summary-row"><span>Subtotal</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
-          ${summary.discountAmount > 0 ? `<div class="summary-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
-          <div class="summary-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
-          <div class="summary-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
-          <div class="summary-row total"><span>Total</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
-          <div class="summary-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>
-          <div class="summary-row"><span>Balance Due</span><strong>${escapeHtml(formatProFormaMoney(summary.balanceDue))}</strong></div>
-        </div>
-      </div>
-
-      <div class="footer">
-        All goods remain the property of Signs Express until paid for in full. Please quote the reference above with payment and correspondence.
+      <div class="footer-strip">NHS Approved Supplier  |  Dementia Friends  |  Constructionline  |  CHAS  |  PASMA  |  IPAF  |  FESPA</div>
+      <div class="footer-meta">
+        <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
+        <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
+        <div>Page 1 of 1</div>
       </div>
     </div>
   </body>
