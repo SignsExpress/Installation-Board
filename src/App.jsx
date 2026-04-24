@@ -1729,18 +1729,23 @@ function normalizeRamsLogic(logic = {}) {
       );
       const incomingOptions = Array.isArray(group.options) ? group.options : [];
       const mergedOptions = [
-        ...defaultOptions.map((defaultOption) => {
+        ...defaultOptions.map((defaultOption, optionIndex) => {
           const defaultValue = String(defaultOption.value || "");
-          const incomingMatch = incomingOptions.find((option) => String(option.value || "") === defaultValue);
+          const incomingMatch =
+            (key === "tools" || key === "access")
+              ? incomingOptions[optionIndex] || incomingOptions.find((option) => String(option.value || "") === defaultValue)
+              : incomingOptions.find((option) => String(option.value || "") === defaultValue);
           const nextOption = incomingMatch ? { ...defaultOption, ...incomingMatch } : defaultOption;
           if (requiresRiskBankReset) {
             return { ...nextOption, cardIds: defaultOption.cardIds || [] };
           }
           return nextOption;
         }),
-        ...incomingOptions.filter((option) => {
+        ...incomingOptions.filter((option, optionIndex) => {
           const value = String(option.value || "");
-          return value && !legacyOptionValues.has(value) && !defaultOptions.some((entry) => String(entry.value) === value);
+          if (!value || legacyOptionValues.has(value)) return false;
+          if ((key === "tools" || key === "access") && optionIndex < defaultOptions.length) return false;
+          return !defaultOptions.some((entry) => String(entry.value) === value);
         })
       ];
       return {
