@@ -3751,12 +3751,331 @@ function roundProFormaMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function formatProFormaDate(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(parsed);
+}
+
+function buildProFormaPreviewHtml(draft, summary) {
+  if (!draft) return "";
+  const officeLines = [
+    "Signs Express (Central Lancashire)",
+    "Unit 3, Sherdley Road",
+    "Lostock Hall",
+    "Preston",
+    "PR5 5LP",
+    "01772 797800",
+    "centrallancashire@signsexpress.co.uk"
+  ];
+  const paymentBreakdown = draft.depositType
+    ? [
+        { label: "Deposit due now", value: summary.depositAmount },
+        { label: "Balance remaining", value: summary.remainingBalance }
+      ]
+    : [{ label: "Amount due", value: summary.total }];
+  const lineRows = (draft.lineItems || []).map((item) => {
+    const quantity = Math.max(Number(item.quantity) || 0, 0);
+    const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
+    const lineTotal = roundProFormaMoney(quantity * unitPrice);
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(item.name || "-")}</strong>
+          ${item.description ? `<div class="invoice-desc">${escapeHtml(item.description)}</div>` : ""}
+        </td>
+        <td class="num">${escapeHtml(item.quantity || "1")}</td>
+        <td class="num">${escapeHtml(formatProFormaMoney(unitPrice))}</td>
+        <td class="num">${escapeHtml(formatProFormaMoney(lineTotal))}</td>
+      </tr>
+    `;
+  }).join("");
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(draft.headline || "Invoice")}</title>
+    <style>
+      @page { size: A4 portrait; margin: 10mm; }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: #f4f5f7;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #111827;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .sheet {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0 auto;
+        background: #fff;
+        padding: 12mm 12mm 10mm;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: start;
+        border-bottom: 1px solid #cbd5e1;
+        padding-bottom: 12px;
+      }
+      .brand img {
+        width: 215px;
+        max-width: 100%;
+        display: block;
+      }
+      .brand-copy {
+        margin-top: 10px;
+        color: #475569;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      .title-block {
+        min-width: 235px;
+        text-align: right;
+      }
+      .title-block h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+        color: #111827;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .meta-table {
+        width: auto;
+        margin: 0 0 0 auto;
+        border-collapse: collapse;
+      }
+      .meta-table td {
+        padding: 5px 0 5px 14px;
+        border: 0;
+        font-size: 12px;
+        vertical-align: top;
+      }
+      .meta-table td:first-child {
+        font-weight: 700;
+        color: #475569;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .address-block {
+        border: 1px solid #cbd5e1;
+        min-height: 118px;
+        padding: 10px 12px;
+      }
+      .address-block h2 {
+        margin: 0 0 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #475569;
+      }
+      .address-block p {
+        margin: 0 0 5px;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .detail-strip {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 12px;
+      }
+      .detail-panel {
+        border: 1px solid #cbd5e1;
+        padding: 9px 12px;
+      }
+      .detail-panel h3 {
+        margin: 0 0 7px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #475569;
+      }
+      .detail-panel p {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+      }
+      thead th {
+        background: #f8fafc;
+        color: #334155;
+        font-size: 11px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 9px 10px;
+        text-align: left;
+        border-top: 1px solid #cbd5e1;
+        border-bottom: 1px solid #cbd5e1;
+      }
+      tbody td {
+        padding: 10px;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 12px;
+        vertical-align: top;
+      }
+      .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .invoice-desc {
+        margin-top: 5px;
+        color: #64748b;
+        white-space: pre-wrap;
+      }
+      .notes-summary {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 16px;
+        margin-top: 16px;
+      }
+      .summary-box {
+        border: 1px solid #cbd5e1;
+        padding: 12px;
+        background: #fff;
+      }
+      .summary-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 12px;
+      }
+      .summary-row:last-child {
+        border-bottom: 0;
+      }
+      .summary-row.total {
+        font-size: 15px;
+        font-weight: 800;
+        color: #111827;
+      }
+      .terms, .footer-note {
+        white-space: pre-wrap;
+      }
+      .footer {
+        margin-top: 18px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+        color: #64748b;
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      @media print {
+        body { background: #fff; }
+        .sheet { margin: 0; min-height: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <div class="header">
+        <div class="brand">
+          <img src="${window.location.origin}/branding/signs-express-logo.svg" alt="Signs Express logo" />
+          <div class="brand-copy">
+            ${officeLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")}
+          </div>
+        </div>
+        <div class="title-block">
+          <h1>${escapeHtml(draft.headline || "Invoice")}</h1>
+          <table class="meta-table">
+            <tr><td>${escapeHtml(draft.documentLabel || "Reference")}</td><td>${escapeHtml(draft.orderReference || "-")}</td></tr>
+            <tr><td>Date</td><td>${escapeHtml(formatProFormaDate(draft.date) || "-")}</td></tr>
+            <tr><td>Contact</td><td>${escapeHtml(draft.contact || "-")}</td></tr>
+            <tr><td>Phone</td><td>${escapeHtml(draft.number || "-")}</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="address-block">
+          <h2>Invoice To</h2>
+          <div>
+            <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
+            <p>${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
+          </div>
+        </div>
+        <div class="address-block">
+          <h2>Site Address</h2>
+          <div>
+            <p>${escapeHtml(draft.siteAddress || draft.address || "-")}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="detail-strip">
+        <div class="detail-panel">
+          <h3>Description / Scope</h3>
+          <p>${escapeHtml(draft.notes || draft.description || "-")}</p>
+        </div>
+        <div class="detail-panel">
+          <h3>Payment Terms</h3>
+          <p>${escapeHtml(draft.termsText || "-")}</p>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit price</th>
+            <th class="num">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${lineRows || `<tr><td colspan="4">No line items</td></tr>`}
+        </tbody>
+      </table>
+
+      <div class="notes-summary">
+        <div class="summary-box">
+          <div class="terms"><strong>${escapeHtml(draft.termsHeading || "Payment terms")}</strong>\n\n${escapeHtml(draft.termsText || "-")}</div>
+          ${draft.footerText ? `<div class="footer-note" style="margin-top:14px;">${escapeHtml(draft.footerText)}</div>` : ""}
+        </div>
+        <div class="summary-box">
+          <div class="summary-row"><span>Subtotal</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
+          <div class="summary-row"><span>VAT (${escapeHtml(String(draft.vatRate || 0))}%)</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
+          <div class="summary-row total"><span>Total</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
+          ${paymentBreakdown.map((row) => `<div class="summary-row"><span>${escapeHtml(row.label)}</span><strong>${escapeHtml(formatProFormaMoney(row.value))}</strong></div>`).join("")}
+        </div>
+      </div>
+
+      <div class="footer">
+        All goods remain the property of Signs Express until paid for in full. Please quote the reference above with payment and correspondence.
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
 function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
   const [orderReference, setOrderReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [customDepositMode, setCustomDepositMode] = useState("percent");
   const [customDepositValue, setCustomDepositValue] = useState("");
+  const [printing, setPrinting] = useState(false);
+  const [referencePdfUrl, setReferencePdfUrl] = useState("");
+  const [referencePdfName, setReferencePdfName] = useState("");
   const [draft, setDraft] = useState(null);
 
   const subtotal = useMemo(
@@ -3782,18 +4101,33 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   }, [draft, total]);
 
   const remainingBalance = useMemo(() => Math.max(roundProFormaMoney(total - depositAmount), 0), [total, depositAmount]);
+  const previewHtml = useMemo(() => buildProFormaPreviewHtml(draft, {
+    subtotal,
+    vatAmount,
+    total,
+    depositAmount,
+    remainingBalance
+  }), [draft, subtotal, vatAmount, total, depositAmount, remainingBalance]);
+
+  useEffect(() => {
+    return () => {
+      if (referencePdfUrl) URL.revokeObjectURL(referencePdfUrl);
+    };
+  }, [referencePdfUrl]);
 
   function buildDraftFromPayload(payload = {}) {
     const reference = String(payload.orderReference || "").trim();
     return {
-      headline: payload.headline || "Pro-Forma Invoice",
+      headline: payload.headline || "Pro Forma Invoice",
       date: new Date().toISOString().slice(0, 10),
-      referenceLabel: payload.referenceLabel || (/^est-/i.test(reference) ? "Estimate reference" : "Order reference"),
+      documentLabel: payload.referenceLabel || "Reference",
       orderReference: reference,
       customerName: payload.customerName || "",
       contact: payload.contact || "",
       number: payload.number || "",
       address: payload.address || "",
+      billingAddress: payload.address || "",
+      siteAddress: payload.address || "",
       description: payload.description || "",
       lineItems: Array.isArray(payload.lineItems) && payload.lineItems.length
         ? payload.lineItems.map((item, index) => ({
@@ -3923,6 +4257,41 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     }
   }
 
+  async function openPrintPreview() {
+    if (!draft) return;
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      setError("Please allow pop-ups so the invoice preview can open.");
+      return;
+    }
+    try {
+      setPrinting(true);
+      printWindow.document.write(previewHtml);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        try {
+          printWindow.print();
+        } catch (error) {
+          console.error(error);
+        }
+      }, 300);
+    } finally {
+      setPrinting(false);
+    }
+  }
+
+  function handleReferencePdfChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const nextUrl = URL.createObjectURL(file);
+    setReferencePdfUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return nextUrl;
+    });
+    setReferencePdfName(file.name || "Reference PDF");
+  }
+
   return (
     <div className="app-shell social-post-shell">
       <div className="page social-post-page pro-forma-page">
@@ -3977,6 +4346,15 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 </div>
               </div>
 
+              <div className="pro-forma-deposit-tools">
+                <h4>Reference PDF</h4>
+                <label className="pro-forma-upload-button">
+                  <input type="file" accept="application/pdf" onChange={handleReferencePdfChange} />
+                  <span>{referencePdfName || "Load sample invoice PDF"}</span>
+                </label>
+                <p className="muted-copy">Load the attached invoice here and we can compare your generated version beside it.</p>
+              </div>
+
               {error ? <p className="form-error">{error}</p> : null}
             </form>
 
@@ -3984,9 +4362,14 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
               <div className="pro-forma-editor-head">
                 <div>
                   <h3>{draft?.headline || "Editable Pro-Forma"}</h3>
-                  <p className="muted-copy">Edit anything you need. PDF/export can sit on top of this once the draft flow feels right.</p>
+                  <p className="muted-copy">Edit the document on the left, then use the live invoice preview on the right to sense-check the finished layout.</p>
                 </div>
-                <div className="pro-forma-total-pill">{formatProFormaMoney(total)}</div>
+                <div className="pro-forma-editor-actions">
+                  <div className="pro-forma-total-pill">{formatProFormaMoney(total)}</div>
+                  <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
+                    {printing ? "Opening..." : "Print / Save PDF"}
+                  </button>
+                </div>
               </div>
 
               {draft ? (
@@ -4001,8 +4384,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input type="date" value={draft.date} onChange={(event) => updateDraft("date", event.target.value)} />
                     </label>
                     <label>
-                      Reference label
-                      <input value={draft.referenceLabel} onChange={(event) => updateDraft("referenceLabel", event.target.value)} />
+                      Document label
+                      <input value={draft.documentLabel} onChange={(event) => updateDraft("documentLabel", event.target.value)} />
                     </label>
                     <label>
                       Reference
@@ -4025,8 +4408,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input value={draft.vatRate} onChange={(event) => updateDraft("vatRate", event.target.value)} inputMode="decimal" />
                     </label>
                     <label className="span-2">
-                      Address
-                      <textarea rows={4} value={draft.address} onChange={(event) => updateDraft("address", event.target.value)} />
+                      Billing address
+                      <textarea rows={4} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Site address
+                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
                     </label>
                     <label className="span-2">
                       Notes / scope
@@ -4081,6 +4468,36 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <div><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
                       <div><span>Deposit due</span><strong>{formatProFormaMoney(depositAmount)}</strong></div>
                       <div><span>Remaining balance</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
+                    </div>
+                  </div>
+
+                  <div className="pro-forma-preview-shell">
+                    <div className="pro-forma-lines-head">
+                      <h4>Invoice preview</h4>
+                    </div>
+                    <div className="pro-forma-preview-compare">
+                      <div className="pro-forma-preview-panel">
+                        <div className="pro-forma-preview-label">Generated invoice</div>
+                        <iframe
+                          title="Pro-Forma invoice preview"
+                          className="pro-forma-preview-frame"
+                          srcDoc={previewHtml}
+                        />
+                      </div>
+                      <div className="pro-forma-preview-panel">
+                        <div className="pro-forma-preview-label">Reference PDF</div>
+                        {referencePdfUrl ? (
+                          <iframe
+                            title="Reference invoice PDF"
+                            className="pro-forma-preview-frame"
+                            src={referencePdfUrl}
+                          />
+                        ) : (
+                          <div className="pro-forma-preview-empty">
+                            Load the attached invoice PDF to compare it side by side with the generated template.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

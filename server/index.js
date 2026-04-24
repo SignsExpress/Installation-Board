@@ -5105,14 +5105,15 @@ function buildProFormaPayload(order = {}) {
   const vatRate = pickProFormaVatRate(order);
   const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100;
   const total = Math.round((subtotal + vatAmount) * 100) / 100;
+  const reference = String(order.orderReference || "");
 
   return {
-    orderReference: order.orderReference || "",
+    orderReference: reference,
     customerName: order.customerName || "",
     contact: order.contact || "",
     number: order.number || "",
     address: order.address || "",
-    headline: `Pro-Forma Invoice`,
+    headline: "Pro Forma Invoice",
     description: order.description || "",
     lineItems,
     subtotal,
@@ -5121,7 +5122,7 @@ function buildProFormaPayload(order = {}) {
     total,
     termsHeading: "Payment terms",
     termsText: "Payment due before production / installation unless agreed otherwise.",
-    referenceLabel: /^est-/i.test(String(order.orderReference || "")) ? "Estimate reference" : "Order reference"
+    referenceLabel: "Reference"
   };
 }
 
@@ -5188,8 +5189,16 @@ function buildSocialPostBrief(order, voice) {
 function getSocialLookupReferences(reference = "") {
   const trimmed = String(reference || "").trim();
   const references = [trimmed];
+  if (/^est-/i.test(trimmed)) {
+    references.push(trimmed.replace(/^est-/i, "ORD-"));
+    references.push(trimmed.replace(/^est-/i, "INV-"));
+  }
   if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "ORD-"));
-  if (/^ord-/i.test(trimmed)) references.push(trimmed.replace(/^ord-/i, "INV-"));
+  if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "EST-"));
+  if (/^ord-/i.test(trimmed)) {
+    references.push(trimmed.replace(/^ord-/i, "INV-"));
+    references.push(trimmed.replace(/^ord-/i, "EST-"));
+  }
   return [...new Set(references.filter(Boolean))];
 }
 

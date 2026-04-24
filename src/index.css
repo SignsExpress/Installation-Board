@@ -6237,6 +6237,28 @@ button {
   gap: 10px;
 }
 
+.pro-forma-upload-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pro-forma-upload-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .pro-forma-custom-deposit {
   display: grid;
   grid-template-columns: minmax(0, 120px) minmax(0, 1fr) auto;
@@ -6248,6 +6270,12 @@ button {
   justify-content: space-between;
   align-items: start;
   gap: 16px;
+}
+
+.pro-forma-editor-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
 }
 
 .pro-forma-editor-head h3 {
@@ -6396,6 +6424,52 @@ button {
   font-size: 1rem;
 }
 
+.pro-forma-preview-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.pro-forma-preview-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.pro-forma-preview-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.pro-forma-preview-label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+
+.pro-forma-preview-frame {
+  width: 100%;
+  min-height: 980px;
+  border: 1px solid #d7cbdd;
+  border-radius: 20px;
+  background: #fff;
+}
+
+.pro-forma-preview-empty {
+  min-height: 980px;
+  border: 1px dashed #d7cbdd;
+  border-radius: 20px;
+  background: #fbfbfd;
+  color: #64748b;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.6;
+}
+
 @media (max-width: 1100px) {
   .pro-forma-grid,
   .pro-forma-bottom-grid {
@@ -6404,6 +6478,10 @@ button {
 
   .pro-forma-meta-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pro-forma-preview-compare {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -6425,6 +6503,10 @@ button {
   .pro-forma-editor-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .pro-forma-editor-actions {
+    justify-items: stretch;
   }
 }
 
