@@ -5052,6 +5052,17 @@ function scoreProFormaLineTotalField(leaf) {
   return 0;
 }
 
+function scoreProFormaRawMoneyField(leaf = "") {
+  let score = 0;
+  if (/(pre.?discount|post.?discount|sellingprice|sellprice|unitprice|priceperitem|itemtotal|linetotal|extendedamount|extendedprice|lineamount|lineprice)/i.test(leaf)) score += 90;
+  else if (/(price|amount|total|sell|revenue)/i.test(leaf)) score += 48;
+  if (/(components?|childcomponents?)\./i.test(leaf)) score += 12;
+  if (/assemblydatajson/i.test(leaf)) score -= 8;
+  if (/(machine|labou?r|labor|material|perimeter|area|sheet|time|minutes?|hours?)/i.test(leaf)) score -= 28;
+  if (/(discounttable|markuptable|minimumprice|partcost|sourcedgoods)/i.test(leaf)) score -= 40;
+  return score;
+}
+
 function isGenericProFormaName(value = "") {
   const text = String(value || "").trim();
   if (!text) return true;
@@ -5270,7 +5281,8 @@ function extractProFormaLineItems(order = {}) {
       unitPriceScore: -1,
       lineTotal: 0,
       lineTotalScore: -1,
-      moneyCandidates: []
+      moneyCandidates: [],
+      rawMoneyFields: []
     };
 
     if (/assemblydatajson/i.test(leaf)) {
@@ -5309,14 +5321,12 @@ function extractProFormaLineItems(order = {}) {
       return;
     }
 
-    if (/(^|\.)(components?|childcomponents?)\./i.test(leaf)) {
-      groups.set(match[1], group);
-      return;
-    }
+    const isNestedComponentField = /(^|\.)(components?|childcomponents?)\./i.test(leaf);
 
     if (
       /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
       !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
+      && !isNestedComponentField
     ) {
       const nextScore = /^orderitem\.name$/i.test(leaf) ? 85 : /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : 20;
       if (textValue && nextScore > group.nameScore) {
@@ -5328,6 +5338,7 @@ function extractProFormaLineItems(order = {}) {
     if (
       /(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf) &&
       textValue
+      && !isNestedComponentField
     ) {
       const nextScore =
         /^orderitem\.description$/i.test(leaf) ? 110 :
@@ -5375,6 +5386,14 @@ function extractProFormaLineItems(order = {}) {
           leaf
         });
       }
+
+      const rawScore = scoreProFormaRawMoneyField(leaf) + moneyConfidence;
+      group.rawMoneyFields.push({
+        leaf,
+        raw: moneyMeta.raw,
+        amount: moneyValue,
+        score: rawScore
+      });
     }
 
     groups.set(match[1], group);
@@ -5431,6 +5450,17 @@ function extractProFormaLineItems(order = {}) {
         })
         .slice(0, 8);
 
+      const rawMoneyFields = [...group.rawMoneyFields]
+        .sort((left, right) => {
+          if (right.score !== left.score) return right.score - left.score;
+          return right.amount - left.amount;
+        })
+        .reduce((unique, candidate) => {
+          const key = candidate.leaf + "|" + candidate.amount.toFixed(2);
+          if (!unique.has(key)) unique.set(key, candidate);
+          return unique;
+        }, new Map());
+
       if (!normalizedCandidates.some((candidate) => Math.abs(candidate.lineTotal - normalizedLineTotal) < 0.005)) {
         normalizedCandidates.push({
           lineTotal: Math.round(normalizedLineTotal * 100) / 100,
@@ -5450,7 +5480,8 @@ function extractProFormaLineItems(order = {}) {
         normalizedQuantity,
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
         lineTotal: Math.round(normalizedLineTotal * 100) / 100,
-        candidates: normalizedCandidates
+        candidates: normalizedCandidates,
+        rawMoneyFields: [...rawMoneyFields.values()].slice(0, 18)
       };
     });
 
@@ -5495,7 +5526,8 @@ function extractProFormaLineItems(order = {}) {
       unitPrice: chosen?.unitPrice ?? item.unitPrice,
       lineTotal: chosen?.lineTotal ?? item.lineTotal,
       chosenSource: chosen?.leaf || 'fallback',
-      candidates: item.candidates
+      candidates: item.candidates,
+      rawMoneyFields: item.rawMoneyFields
     };
   });
 }

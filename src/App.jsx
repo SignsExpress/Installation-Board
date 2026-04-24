@@ -4198,7 +4198,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             unitPrice: String(roundProFormaMoney(item.unitPrice || 0)),
             lineTotal: roundProFormaMoney(item.lineTotal || 0),
             chosenSource: item.chosenSource || "fallback",
-            candidates: Array.isArray(item.candidates) ? item.candidates : []
+            candidates: Array.isArray(item.candidates) ? item.candidates : [],
+            rawMoneyFields: Array.isArray(item.rawMoneyFields) ? item.rawMoneyFields : []
           }))
         : [{
             id: "pro-forma-line-1",
@@ -4208,7 +4209,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             unitPrice: "0",
             lineTotal: 0,
             chosenSource: "manual",
-            candidates: []
+            candidates: [],
+            rawMoneyFields: []
           }],
       discountAmount: String(roundProFormaMoney(payload.discountAmount || 0)),
       vatRate: String(payload.vatRate ?? 20),
@@ -4249,7 +4251,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
           unitPrice: "0",
           lineTotal: 0,
           chosenSource: "manual",
-          candidates: []
+          candidates: [],
+          rawMoneyFields: []
         }
       ]
     } : current);
@@ -4265,12 +4268,13 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
           id: "pro-forma-line-1",
           name: "Line Item 1",
           description: "",
-          quantity: "1",
-          unitPrice: "0",
-          lineTotal: 0,
-          chosenSource: "manual",
-          candidates: []
-        }]
+            quantity: "1",
+            unitPrice: "0",
+            lineTotal: 0,
+            chosenSource: "manual",
+            candidates: [],
+            rawMoneyFields: []
+          }]
       };
     });
   }
@@ -4524,14 +4528,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                     </div>
                   </div>
                   <div className="pro-forma-lines-table">
-                    <div className="pro-forma-lines-row pro-forma-lines-header">
-                      <span>Item</span>
-                      <span>Description</span>
-                      <span>Qty</span>
-                      <span>Unit price</span>
-                      <span>Line total</span>
-                      <span />
-                    </div>
                     {draft.lineItems.map((item, index) => {
                       const quantity = Math.max(Number(item.quantity) || 0, 0);
                       const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
@@ -4540,9 +4536,15 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       return (
                         <div key={item.id} className="pro-forma-line-card">
                           <div className="pro-forma-line-top">
-                            <div className="pro-forma-item-cell">
-                              <span className="pro-forma-item-index">{lineNumber}</span>
-                              <input value={item.name} onChange={(event) => updateLineItem(item.id, "name", event.target.value)} />
+                            <div className="pro-forma-line-identity">
+                              <div className="pro-forma-item-cell">
+                                <span className="pro-forma-item-index">{lineNumber}</span>
+                                <input value={item.name} onChange={(event) => updateLineItem(item.id, "name", event.target.value)} />
+                              </div>
+                              <label className="pro-forma-line-description">
+                                <span>Description</span>
+                                <textarea rows={3} value={item.description} onChange={(event) => updateLineItem(item.id, "description", event.target.value)} />
+                              </label>
                             </div>
                             <label>
                               <span>Qty</span>
@@ -4558,23 +4560,38 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                             </div>
                             <button type="button" className="text-button" onClick={() => removeLineItem(item.id)}>Remove</button>
                           </div>
-                          <label className="pro-forma-line-description">
-                            <span>Description</span>
-                            <textarea rows={3} value={item.description} onChange={(event) => updateLineItem(item.id, "description", event.target.value)} />
-                          </label>
                           {showPriceDebug ? (
                             <details className="pro-forma-line-debug" open={index === 0}>
                               <summary>Chosen source: {item.chosenSource || "fallback"}</summary>
-                              <div className="pro-forma-line-debug-grid">
-                                {(Array.isArray(item.candidates) ? item.candidates : []).map((candidate) => (
-                                  <div key={candidate.leaf + String(candidate.unitPrice) + String(candidate.lineTotal)} className="pro-forma-line-debug-card">
-                                    <strong>{candidate.leaf}</strong>
-                                    <span>Unit: {formatProFormaMoney(candidate.unitPrice || 0)}</span>
-                                    <span>Total: {formatProFormaMoney(candidate.lineTotal || 0)}</span>
-                                    <span>Score: {candidate.score}</span>
+                              <div className="pro-forma-line-debug-sections">
+                                <div className="pro-forma-line-debug-group">
+                                  <div className="pro-forma-line-debug-title">Chosen combinations</div>
+                                  <div className="pro-forma-line-debug-grid">
+                                    {(Array.isArray(item.candidates) ? item.candidates : []).map((candidate) => (
+                                      <div key={candidate.leaf + String(candidate.unitPrice) + String(candidate.lineTotal)} className="pro-forma-line-debug-card">
+                                        <strong>{candidate.leaf}</strong>
+                                        <span>Unit: {formatProFormaMoney(candidate.unitPrice || 0)}</span>
+                                        <span>Total: {formatProFormaMoney(candidate.lineTotal || 0)}</span>
+                                        <span>Score: {candidate.score}</span>
+                                      </div>
+                                    ))}
+                                    {!item.candidates?.length ? <div className="pro-forma-line-debug-empty">No candidate combinations exposed for this line.</div> : null}
                                   </div>
-                                ))}
-                                {!item.candidates?.length ? <div className="pro-forma-line-debug-empty">No candidates exposed for this line.</div> : null}
+                                </div>
+                                <div className="pro-forma-line-debug-group">
+                                  <div className="pro-forma-line-debug-title">Raw money fields</div>
+                                  <div className="pro-forma-line-debug-grid">
+                                    {(Array.isArray(item.rawMoneyFields) ? item.rawMoneyFields : []).map((candidate) => (
+                                      <div key={candidate.leaf + String(candidate.amount)} className="pro-forma-line-debug-card">
+                                        <strong>{candidate.leaf}</strong>
+                                        <span>Amount: {formatProFormaMoney(candidate.amount || 0)}</span>
+                                        <span>Raw: {candidate.raw || "-"}</span>
+                                        <span>Score: {candidate.score}</span>
+                                      </div>
+                                    ))}
+                                    {!item.rawMoneyFields?.length ? <div className="pro-forma-line-debug-empty">No raw money fields exposed for this line.</div> : null}
+                                  </div>
+                                </div>
                               </div>
                             </details>
                           ) : null}
