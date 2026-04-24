@@ -5295,7 +5295,8 @@ function extractProFormaLineItems(order = {}) {
       lineTotal: 0,
       lineTotalScore: -1,
       moneyCandidates: [],
-      rawMoneyFields: []
+      rawMoneyFields: [],
+      directSellCandidate: null
     };
 
     if (/assemblydatajson/i.test(leaf)) {
@@ -5319,15 +5320,23 @@ function extractProFormaLineItems(order = {}) {
           group.lineTotalScore = lineTotalScore;
         }
         const candidateScore = Math.max(unitPriceScore, lineTotalScore);
-        if (candidateScore > 0) {
-          group.moneyCandidates.push({
-            rawValue: candidate.amount,
+      if (candidateScore > 0) {
+        group.moneyCandidates.push({
+          rawValue: candidate.amount,
             raw: candidate.meta.raw,
             unitPrice: unitPriceScore > 0 ? candidate.amount : 0,
             lineTotal: lineTotalScore > 0 ? candidate.amount : 0,
             score: candidateScore,
             leaf: candidate.key
           });
+        }
+        if (isPreferredProFormaSellLeaf(candidate.key)) {
+          group.directSellCandidate = {
+            unitPrice: candidate.amount,
+            lineTotal: candidate.amount,
+            score: candidateScore + 500,
+            leaf: candidate.key
+          };
         }
       });
       groups.set(match[1], group);
@@ -5410,6 +5419,14 @@ function extractProFormaLineItems(order = {}) {
           leaf
         });
       }
+      if (isPreferredProFormaSellLeaf(leaf)) {
+        group.directSellCandidate = {
+          unitPrice: moneyValue,
+          lineTotal: moneyValue,
+          score: candidateScore + 500,
+          leaf
+        };
+      }
 
       const rawScore = scoreProFormaRawMoneyField(leaf) + moneyConfidence;
       group.rawMoneyFields.push({
@@ -5474,7 +5491,8 @@ function extractProFormaLineItems(order = {}) {
         })
         .slice(0, 8);
 
-      const preferredSellCandidate = normalizedCandidates.find((candidate) => isPreferredProFormaSellLeaf(candidate.leaf))
+      const preferredSellCandidate = group.directSellCandidate
+        || normalizedCandidates.find((candidate) => isPreferredProFormaSellLeaf(candidate.leaf))
         || normalizedCandidates.find((candidate) => /(?:^|\.)(?:components?|childcomponents?)\.\d+\.pricewithallchildren$/i.test(candidate.leaf))
         || null;
 
