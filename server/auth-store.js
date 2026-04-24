@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
-const { snapshotFile } = require("./backup-store");
+const { snapshotFile, writeTextFileAtomically } = require("./backup-store");
 
 const DEFAULT_USERS_FILE = path.join(__dirname, "..", "data", "users.json");
 const PERMISSION_VALUES = ["admin", "user", "none"];
@@ -46,7 +46,8 @@ function getDefaultPermissions(role) {
       vanEstimator: "none",
       rams: "admin",
       socialPost: "admin",
-      descriptionPull: "admin"
+      descriptionPull: "admin",
+      proForma: "admin"
     };
   }
 
@@ -59,7 +60,8 @@ function getDefaultPermissions(role) {
     vanEstimator: "none",
     rams: "none",
     socialPost: "none",
-    descriptionPull: "none"
+    descriptionPull: "none",
+    proForma: "none"
   };
 }
 
@@ -152,7 +154,8 @@ function normalizePermissions(permissions, role) {
     vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator),
     rams: normalizePermissionValue(permissions?.rams, defaults.rams),
     socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost),
-    descriptionPull: normalizePermissionValue(permissions?.descriptionPull, defaults.descriptionPull)
+    descriptionPull: normalizePermissionValue(permissions?.descriptionPull, defaults.descriptionPull),
+    proForma: normalizePermissionValue(permissions?.proForma, defaults.proForma)
   };
 }
 
@@ -173,7 +176,8 @@ function applyOwnerPermissions(user) {
       vanEstimator: "admin",
       rams: "admin",
       socialPost: "admin",
-      descriptionPull: "admin"
+      descriptionPull: "admin",
+      proForma: "admin"
     }
   };
 }
@@ -244,7 +248,8 @@ function normalizeStore(parsed, options = {}) {
         vanEstimator: "admin",
         rams: "admin",
         socialPost: "admin",
-        descriptionPull: "admin"
+        descriptionPull: "admin",
+        proForma: "admin"
       };
     }
   }
@@ -291,7 +296,7 @@ async function writeUsersStore(store) {
   const normalized = normalizeStore(store);
   const usersFile = getUsersFile();
   await snapshotFile(usersFile, "users");
-  await fsp.writeFile(usersFile, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+  await writeTextFileAtomically(usersFile, `${JSON.stringify(normalized, null, 2)}\n`);
   return normalized;
 }
 
@@ -430,7 +435,8 @@ async function updateUserPermissions(userId, permissions) {
         vanEstimator: "admin",
         rams: "admin",
         socialPost: "admin",
-        descriptionPull: "admin"
+        descriptionPull: "admin",
+        proForma: "admin"
       };
     }
   await writeUsersStore(store);

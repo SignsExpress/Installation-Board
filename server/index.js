@@ -5,7 +5,7 @@ const fsp = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const zlib = require("node:zlib");
-const { snapshotFile } = require("./backup-store");
+const { snapshotFile, writeTextFileAtomically } = require("./backup-store");
 const {
   bootstrapPasswordsFromEnv,
   createUser,
@@ -68,6 +68,27 @@ const HOLIDAY_STAFF = [
   { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" }
 ];
 const HOLIDAY_RESET_VERSION = 1;
+let boardStoreWriteQueue = Promise.resolve();
+let boardStoreCorruptionError = null;
+
+function createEmptyBoardStore() {
+  return {
+    jobs: [],
+    holidays: [],
+    holidayRequests: [],
+    holidayAllowances: [],
+    holidayEvents: [],
+    notifications: [],
+    attendanceEntries: [],
+    mileageClaims: [],
+    ramsLogic: null,
+    vehiclePricingSettings: null,
+    socialPostToneVoices: [],
+    socialPostDeletedToneVoiceIds: [],
+    socialPostSuggestions: [],
+    holidayResetVersion: HOLIDAY_RESET_VERSION
+  };
+}
 
 function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
@@ -297,6 +318,11 @@ function canEditSocialPost(user) {
 function canAccessDescriptionPull(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "descriptionPull", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canAccessProForma(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "proForma", user?.role === "host" ? "admin" : "none") !== "none";
 }
 
 function toPublicRamsProfile(user = {}) {
@@ -609,17 +635,19 @@ function requireDescriptionPullAccess(request, response) {
   return false;
 }
 
+function requireProFormaAccess(request, response) {
+  if (canAccessProForma(request.user)) return true;
+  response.status(403).json({ error: "Pro-Forma access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
-    if (!fs.existsSync(file)) {
-      fs.writeFileSync(
-        file,
-        `${JSON.stringify({ jobs: [], holidays: [], holidayRequests: [], holidayAllowances: [], holidayEvents: [], notifications: [], attendanceEntries: [], mileageClaims: [], vehiclePricingSettings: null, socialPostToneVoices: [], socialPostDeletedToneVoiceIds: [], socialPostSuggestions: [] }, null, 2)}\n`,
-        "utf8"
-      );
-    }
+  if (!fs.existsSync(file)) {
+    fs.writeFileSync(file, `${JSON.stringify(createEmptyBoardStore(), null, 2)}\n`, "utf8");
   }
+}
 
 function readHolidaySeed() {
     if (!fs.existsSync(DEFAULT_HOLIDAY_SEED_FILE)) {
@@ -759,6 +787,7 @@ async function readStore() {
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
       }
+      boardStoreCorruptionError = null;
       return mergeHolidaySeed(migrated);
     }
         const migrated = applyHolidayResetMigration({
@@ -780,33 +809,25 @@ async function readStore() {
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
       await writeStore(migrated);
     }
+    boardStoreCorruptionError = null;
     return mergeHolidaySeed(migrated);
   } catch (error) {
-    console.error("Invalid board store JSON, returning empty store.", error);
-        const migrated = applyHolidayResetMigration({
-          jobs: [],
-          holidays: [],
-          holidayRequests: [],
-          holidayAllowances: [],
-          holidayEvents: [],
-          notifications: [],
-          attendanceEntries: [],
-          mileageClaims: [],
-          ramsLogic: null,
-          vehiclePricingSettings: null,
-          socialPostToneVoices: [],
-          socialPostDeletedToneVoiceIds: [],
-          socialPostSuggestions: []
-        });
-    await writeStore(migrated);
-    return mergeHolidaySeed(migrated);
+    boardStoreCorruptionError = new Error(
+      "Board store JSON is invalid. Refusing to overwrite live data automatically."
+    );
+    console.error("Invalid board store JSON detected. Live data was not auto-reset.", error);
+    try {
+      await snapshotFile(getDataFile(), "jobs-store-invalid");
+    } catch (snapshotError) {
+      console.error("Could not snapshot invalid board store JSON.", snapshotError);
+    }
+    throw boardStoreCorruptionError;
   }
 }
 
 async function writeStore(store) {
   ensureStoreFile();
   const dataFile = getDataFile();
-  await snapshotFile(dataFile, "jobs-store");
   const nextStore = {
     jobs: [...store.jobs].sort((left, right) => {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
@@ -852,8 +873,23 @@ async function writeStore(store) {
       ),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
-  await fsp.writeFile(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`, "utf8");
-  return nextStore;
+  if (boardStoreCorruptionError && fs.existsSync(dataFile)) {
+    try {
+      JSON.parse(await fsp.readFile(dataFile, "utf8"));
+      boardStoreCorruptionError = null;
+    } catch (error) {
+      throw boardStoreCorruptionError;
+    }
+  }
+  boardStoreWriteQueue = boardStoreWriteQueue
+    .catch(() => {})
+    .then(async () => {
+      await snapshotFile(dataFile, "jobs-store");
+      await writeTextFileAtomically(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`);
+      boardStoreCorruptionError = null;
+      return nextStore;
+    });
+  return boardStoreWriteQueue;
 }
 
 async function readInstallersStore() {
@@ -898,7 +934,7 @@ async function writeInstallersStore(installers) {
   );
   const installersFile = getInstallersFile();
   await snapshotFile(installersFile, "installers");
-  await fsp.writeFile(installersFile, `${JSON.stringify(nextInstallers, null, 2)}\n`, "utf8");
+  await writeTextFileAtomically(installersFile, `${JSON.stringify(nextInstallers, null, 2)}\n`);
   return nextInstallers;
 }
 
@@ -922,7 +958,7 @@ async function writeRequestsStore(requests) {
   );
   const requestsFile = getRequestsFile();
   await snapshotFile(requestsFile, "requests");
-  await fsp.writeFile(requestsFile, `${JSON.stringify(nextRequests, null, 2)}\n`, "utf8");
+  await writeTextFileAtomically(requestsFile, `${JSON.stringify(nextRequests, null, 2)}\n`);
   return nextRequests;
 }
 
@@ -4921,6 +4957,174 @@ function formatDescriptionPullText(payload = {}) {
   return [heading, "", ...sections].join("\n\n").trim();
 }
 
+function parseMoneyValue(value) {
+  const numeric = Number(String(value ?? "").replace(/[^\d.-]/g, ""));
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function scoreProFormaUnitPriceField(leaf) {
+  if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
+  if (/^price$/i.test(leaf)) return 50;
+  return 0;
+}
+
+function scoreProFormaLineTotalField(leaf) {
+  if (/linetotal|extended|extendedprice|extendedamount|lineprice|lineamount/i.test(leaf)) return 90;
+  if (/total|amount|sell|revenue|price/i.test(leaf)) return 40;
+  return 0;
+}
+
+function extractProFormaLineItems(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const groups = new Map();
+
+  fields.forEach((field) => {
+    const key = String(field.key || "");
+    const lowerKey = key.toLowerCase();
+    const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+    if (!match) return;
+
+    const index = Number(match[1]);
+    const leaf = match[2];
+    const textValue = normalizeSocialText(field.value);
+    const group = groups.get(match[1]) || {
+      index,
+      name: "",
+      nameScore: -1,
+      quantity: "",
+      quantityScore: -1,
+      description: "",
+      descriptionScore: -1,
+      unitPrice: 0,
+      unitPriceScore: -1,
+      lineTotal: 0,
+      lineTotalScore: -1
+    };
+
+    if (
+      /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
+      !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
+    ) {
+      const nextScore = /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : 20;
+      if (textValue && nextScore > group.nameScore) {
+        group.name = textValue;
+        group.nameScore = nextScore;
+      }
+    }
+
+    if (
+      /(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf) &&
+      textValue
+    ) {
+      const nextScore =
+        /customerdescription/i.test(leaf) ? 90 :
+        /descriptiontext/i.test(leaf) ? 70 :
+        /lineitemdescription|itemdescription|productdescription/i.test(leaf) ? 55 : 25;
+      if (nextScore > group.descriptionScore) {
+        group.description = textValue;
+        group.descriptionScore = nextScore;
+      }
+    }
+
+    if (/(quantity|qty)/i.test(leaf)) {
+      const nextScore = /^quantity$/i.test(leaf) ? 60 : 35;
+      if (textValue && nextScore > group.quantityScore) {
+        group.quantity = textValue;
+        group.quantityScore = nextScore;
+      }
+    }
+
+    const moneyValue = parseMoneyValue(field.value);
+    if (moneyValue > 0) {
+      const unitPriceScore = scoreProFormaUnitPriceField(leaf);
+      if (unitPriceScore > group.unitPriceScore) {
+        group.unitPrice = moneyValue;
+        group.unitPriceScore = unitPriceScore;
+      }
+
+      const lineTotalScore = scoreProFormaLineTotalField(leaf);
+      if (lineTotalScore > group.lineTotalScore) {
+        group.lineTotal = moneyValue;
+        group.lineTotalScore = lineTotalScore;
+      }
+    }
+
+    groups.set(match[1], group);
+  });
+
+  const items = [...groups.values()]
+    .filter((group) => group.name || group.description || group.lineTotal > 0)
+    .sort((left, right) => left.index - right.index)
+    .map((group) => {
+      const quantityValue = Math.max(parseMoneyValue(group.quantity) || 0, 0);
+      const normalizedQuantity = quantityValue > 0 ? quantityValue : 1;
+      const normalizedLineTotal = group.lineTotal > 0
+        ? group.lineTotal
+        : group.unitPrice > 0
+          ? group.unitPrice * normalizedQuantity
+          : 0;
+      const normalizedUnitPrice = group.unitPrice > 0
+        ? group.unitPrice
+        : normalizedLineTotal > 0 && normalizedQuantity > 0
+          ? normalizedLineTotal / normalizedQuantity
+          : 0;
+
+      return {
+        id: `pro-forma-line-${group.index + 1}`,
+        sortIndex: group.index,
+        name: group.name || `Line Item ${group.index + 1}`,
+        description: group.description || group.name || "",
+        quantity: String(group.quantity || normalizedQuantity || 1),
+        unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
+        lineTotal: Math.round(normalizedLineTotal * 100) / 100
+      };
+    });
+
+  return items;
+}
+
+function pickProFormaVatRate(order = {}) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  for (const field of fields) {
+    const key = String(field.key || "").toLowerCase();
+    const value = String(field.value || "");
+    if (/vat|tax/.test(key)) {
+      const percentMatch = value.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (percentMatch) {
+        const parsed = Number(percentMatch[1]);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+  }
+  return 20;
+}
+
+function buildProFormaPayload(order = {}) {
+  const lineItems = extractProFormaLineItems(order);
+  const subtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
+  const vatRate = pickProFormaVatRate(order);
+  const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100;
+  const total = Math.round((subtotal + vatAmount) * 100) / 100;
+
+  return {
+    orderReference: order.orderReference || "",
+    customerName: order.customerName || "",
+    contact: order.contact || "",
+    number: order.number || "",
+    address: order.address || "",
+    headline: `Pro-Forma Invoice`,
+    description: order.description || "",
+    lineItems,
+    subtotal,
+    vatRate,
+    vatAmount,
+    total,
+    termsHeading: "Payment terms",
+    termsText: "Payment due before production / installation unless agreed otherwise.",
+    referenceLabel: /^est-/i.test(String(order.orderReference || "")) ? "Estimate reference" : "Order reference"
+  };
+}
+
 function buildSocialPostBrief(order, voice) {
   const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
@@ -5408,10 +5612,10 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser)) {
-      response.status(403).json({ error: "That account does not have access." });
-      return;
-    }
+      if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser)) {
+        response.status(403).json({ error: "That account does not have access." });
+        return;
+      }
     const { sessionId, expiresAt } = createSession(sessionUser);
     response.setHeader("Set-Cookie", serializeSessionCookie(sessionId, { expiresAt }));
     response.json({ user: { ...sessionUser, canManagePermissions: canManagePermissions(sessionUser) } });
@@ -5526,7 +5730,8 @@ function createServer() {
           vanEstimator: request.body?.vanEstimator,
           rams: request.body?.rams,
           socialPost: request.body?.socialPost,
-          descriptionPull: request.body?.descriptionPull
+          descriptionPull: request.body?.descriptionPull,
+          proForma: request.body?.proForma
         });
       response.json({ user: updatedUser });
     } catch (error) {
@@ -6117,6 +6322,36 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(error.statusCode || 500).json({
         error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not pull descriptions.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.post("/api/pro-forma/pull", async (request, response) => {
+    if (!requireProFormaAccess(request, response)) return;
+    try {
+      const orderReference = String(request.body?.orderReference || "").trim();
+      if (!orderReference) {
+        response.status(400).json({ error: "Enter an EST or ORD reference." });
+        return;
+      }
+
+      const { lookup, order, lookupAttempts } = await fetchSocialPostOrderByReference(orderReference);
+      if (!order) {
+        response.status(404).json({ error: "No CoreBridge order found for that reference." });
+        return;
+      }
+
+      const payload = buildProFormaPayload(order);
+      response.json({
+        ...payload,
+        lookup,
+        lookupAttempts,
+        order
+      });
+    } catch (error) {
+      response.status(error.statusCode || 500).json({
+        error: error.statusCode === 503 ? "Corebridge is not configured yet." : "Could not pull the Pro-Forma details.",
         detail: error.message
       });
     }

@@ -43,6 +43,18 @@ async function snapshotFile(sourceFile, label, keep = 20) {
   await pruneBackups(directory, prefix, keep);
 }
 
+async function writeTextFileAtomically(targetFile, content) {
+  const directory = path.dirname(targetFile);
+  const tempFile = path.join(
+    directory,
+    `.${path.basename(targetFile)}.${process.pid}.${Date.now()}.tmp`
+  );
+  await fsp.mkdir(directory, { recursive: true });
+  await fsp.writeFile(tempFile, content, "utf8");
+  await fsp.rename(tempFile, targetFile);
+}
+
 module.exports = {
-  snapshotFile
+  snapshotFile,
+  writeTextFileAtomically
 };
