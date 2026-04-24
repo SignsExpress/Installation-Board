@@ -5250,7 +5250,13 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   });
 
   const resolvedSubtotal = totals.subtotalScore >= 0 ? totals.subtotal : subtotal;
-  const resolvedDiscount = totals.discountScore >= 0 ? totals.discountAmount : 0;
+  const derivedDiscount = resolvedSubtotal > 0 && totals.preTaxScore >= 0
+    ? Math.max(Math.round((resolvedSubtotal - totals.preTaxTotal) * 100) / 100, 0)
+    : 0;
+  const resolvedDiscount = Math.max(
+    totals.discountScore >= 0 ? totals.discountAmount : 0,
+    derivedDiscount
+  );
   const resolvedPreTax = totals.preTaxScore >= 0 ? totals.preTaxTotal : Math.max(Math.round((resolvedSubtotal - resolvedDiscount) * 100) / 100, 0);
   const resolvedVat = totals.vatScore >= 0 ? totals.vatAmount : Math.round(resolvedPreTax * (vatRate / 100) * 100) / 100;
   const resolvedTotal = totals.totalScore >= 0 ? totals.total : Math.round((resolvedPreTax + resolvedVat) * 100) / 100;

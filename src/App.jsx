@@ -4286,8 +4286,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       depositType: "percent",
       depositValue: String(safePercent),
       termsText: safePercent >= 100
-        ? "Full payment required before production / installation."
-        : `${safePercent}% deposit required with order. Remaining balance due before production / installation.`
+        ? "Full payment required upon order."
+        : `${safePercent}% deposit required upon order - balance due on completion.`
     } : current);
   }
 
@@ -4296,12 +4296,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     if (!draft || value <= 0) return;
     if (customDepositMode === "fixed") {
       const safeAmount = Math.min(roundProFormaMoney(value), total);
-      setDraft({
-        ...draft,
+      setDraft((current) => current ? {
+        ...current,
         depositType: "fixed",
         depositValue: String(safeAmount),
-        termsText: `${formatProFormaMoney(safeAmount)} deposit required with order. Remaining balance due before production / installation.`
-      });
+        termsText: `${formatProFormaMoney(safeAmount)} deposit required upon order - balance due on completion.`
+      } : current);
       return;
     }
     applyDepositPreset(value);
