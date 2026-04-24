@@ -5293,17 +5293,19 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                     return 0;
                   }).map(([key, label]) => {
                     const rect = template.sections[key];
+                    const isSelected = key === selectedSection;
                     return (
                       <button
                         key={key}
                         type="button"
-                        className={`pro-forma-stage-block ${selectedSection === key ? "active" : ""}`}
+                        className={`pro-forma-stage-block ${isSelected ? "active" : "passive"}`}
                         style={{
                           left: `${(rect.x / 210) * 100}%`,
                           top: `${(rect.y / 297) * 100}%`,
                           width: `${(rect.w / 210) * 100}%`,
                           height: `${(rect.h / 297) * 100}%`,
-                          zIndex: key === selectedSection ? 4 : 2
+                          zIndex: isSelected ? 4 : 1,
+                          pointerEvents: isSelected ? "auto" : "none"
                         }}
                         onMouseDown={(event) => startDrag(key, event)}
                         onClick={() => setSelectedSection(key)}
