@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="72" viewBox="0 0 1000 72" role="img" aria-labelledby="title desc">
+  <title id="title">Accreditation strip</title>
+  <desc id="desc">Template accreditation strip for NHS Approved Supplier, Dementia Friends, Constructionline, CHAS, PASMA, IPAF and FESPA UK Association.</desc>
+  <rect width="1000" height="72" fill="#0f98a5"/>
+
+  <g fill="#ffffff" font-family="Arial, Helvetica, sans-serif">
+    <g transform="translate(18 18)">
+      <rect x="0" y="0" width="62" height="26" fill="none" stroke="#ffffff" stroke-width="2"/>
+      <text x="8" y="19" font-size="18" font-weight="700">NHS</text>
+      <text x="74" y="12" font-size="11" font-weight="700">Approved</text>
+      <text x="74" y="26" font-size="11" font-weight="700">Supplier</text>
+    </g>
+
+    <g transform="translate(182 14)">
+      <g transform="translate(0 2)">
+        <circle cx="15" cy="22" r="6"/>
+        <circle cx="27" cy="10" r="6"/>
+        <circle cx="39" cy="22" r="6"/>
+        <circle cx="27" cy="34" r="6"/>
+        <circle cx="27" cy="22" r="5"/>
+      </g>
+      <text x="54" y="18" font-size="16" font-weight="700">Dementia</text>
+      <text x="54" y="36" font-size="16" font-weight="700">Friends</text>
+    </g>
+
+    <g transform="translate(372 12)">
+      <circle cx="20" cy="24" r="16" fill="none" stroke="#ffffff" stroke-width="2"/>
+      <rect x="15" y="10" width="10" height="18" rx="2"/>
+      <line x1="12" y1="33" x2="28" y2="33" stroke="#ffffff" stroke-width="2"/>
+      <text x="46" y="24" font-size="16" font-weight="700">Constructionline</text>
+      <text x="46" y="38" font-size="10">Gold Member</text>
+    </g>
+
+    <g transform="translate(592 13)">
+      <text x="0" y="26" font-size="26" font-weight="700" letter-spacing="0.02em">CHAS</text>
+    </g>
+
+    <g transform="translate(694 13)">
+      <text x="0" y="26" font-size="26" font-weight="700" letter-spacing="0.06em">PASMA</text>
+      <text x="4" y="38" font-size="8">work at height training</text>
+    </g>
+
+    <g transform="translate(830 12)">
+      <rect x="0" y="4" width="54" height="28" fill="none" stroke="#ffffff" stroke-width="2"/>
+      <text x="8" y="24" font-size="22" font-weight="700">IPAF</text>
+    </g>
+
+    <g transform="translate(908 12)">
+      <text x="0" y="18" font-size="20" font-weight="700">FESPA</text>
+      <text x="4" y="34" font-size="10" font-weight="700">UK ASSOCIATION</text>
+    </g>
+  </g>
+</svg>

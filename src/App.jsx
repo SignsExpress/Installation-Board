@@ -3782,6 +3782,7 @@ function buildProFormaPreviewHtml(draft, summary) {
   ];
   const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
   const accreditationImages = (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
+  const fallbackAccreditationStrip = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
   const completionBalance = hasDeposit
     ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
@@ -3831,38 +3832,38 @@ function buildProFormaPreviewHtml(draft, summary) {
         min-height: 297mm;
         margin: 0 auto;
         background: #fff;
-        padding: 14mm 13mm 10mm;
+        padding: 14mm 12.5mm 10mm;
       }
       .top-row {
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        gap: 18px;
+        gap: 16px;
       }
       .doc-title {
-        font-size: 29px;
+        font-size: 28px;
         line-height: 1;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.025em;
         font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
         font-weight: 400;
         color: #0f98a5;
-        margin-top: 4px;
+        margin-top: 6px;
       }
       .brand img {
-        width: 276px;
+        width: 300px;
         max-width: 100%;
         display: block;
       }
       .address-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 26px;
-        margin-top: 34px;
+        gap: 28px;
+        margin-top: 38px;
       }
       .address-block {
-        font-size: 11.6px;
-        line-height: 1.28;
-        min-height: 128px;
+        font-size: 11px;
+        line-height: 1.24;
+        min-height: 118px;
       }
       .address-block.right {
         text-align: right;
@@ -3873,19 +3874,19 @@ function buildProFormaPreviewHtml(draft, summary) {
       .meta-split {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 26px;
-        margin-top: 40px;
-        font-size: 11.8px;
-        line-height: 1.52;
+        gap: 28px;
+        margin-top: 34px;
+        font-size: 11px;
+        line-height: 1.5;
       }
       .meta-split p {
-        margin: 0 0 10px;
+        margin: 0 0 9px;
       }
       .meta-right {
         text-align: right;
       }
       .table-wrap {
-        margin-top: 18px;
+        margin-top: 16px;
       }
       table {
         width: 100%;
@@ -3894,9 +3895,9 @@ function buildProFormaPreviewHtml(draft, summary) {
       thead th {
         background: #0f98a5;
         color: #fff;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
-        padding: 10px 12px;
+        padding: 11px 12px;
         text-align: left;
         border-right: 1px solid rgba(255,255,255,0.35);
       }
@@ -3907,8 +3908,8 @@ function buildProFormaPreviewHtml(draft, summary) {
         text-align: center;
       }
       tbody td {
-        padding: 13px 10px 16px;
-        font-size: 11.8px;
+        padding: 12px 10px 15px;
+        font-size: 11px;
         vertical-align: top;
         border-bottom: 0;
       }
@@ -3921,14 +3922,14 @@ function buildProFormaPreviewHtml(draft, summary) {
         text-align: left;
       }
       .item-name {
-        margin-bottom: 8px;
+        margin-bottom: 7px;
       }
       .invoice-desc {
-        margin-top: 6px;
+        margin-top: 5px;
         color: #000;
         white-space: pre-wrap;
         max-width: 98%;
-        line-height: 1.22;
+        line-height: 1.18;
       }
       .num {
         text-align: right;
@@ -3941,33 +3942,33 @@ function buildProFormaPreviewHtml(draft, summary) {
       .bottom-row {
         display: grid;
         grid-template-columns: 1.25fr 0.75fr;
-        gap: 28px;
-        margin-top: 18px;
+        gap: 30px;
+        margin-top: 16px;
         align-items: start;
       }
       .bank-block {
-        font-size: 11.8px;
-        line-height: 1.34;
+        font-size: 11px;
+        line-height: 1.28;
       }
       .bank-grid {
         display: grid;
-        grid-template-columns: 130px 1fr;
-        gap: 2px 10px;
-        margin-top: 2px;
+        grid-template-columns: 120px 1fr;
+        gap: 1px 10px;
+        margin-top: 4px;
       }
       .totals-box {
         border: 3px solid #0f98a5;
-        padding: 12px 16px;
-        font-size: 11.8px;
+        padding: 14px 16px;
+        font-size: 11px;
       }
       .total-row {
         display: flex;
         justify-content: space-between;
         gap: 14px;
-        padding: 5px 0;
+        padding: 4px 0;
       }
       .total-row.total {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 700;
         padding-top: 8px;
         margin-top: 4px;
@@ -3976,32 +3977,33 @@ function buildProFormaPreviewHtml(draft, summary) {
         font-weight: 700;
       }
       .approval {
-        margin-top: 52px;
-        font-size: 11.8px;
+        margin-top: 54px;
+        font-size: 11px;
       }
       .payment-terms-footer {
-        margin-top: 24px;
-        padding-top: 12px;
+        margin-top: 26px;
+        padding-top: 11px;
         border-top: 2px solid #0f98a5;
-        font-size: 11px;
-        line-height: 1.5;
+        font-size: 10.5px;
+        line-height: 1.45;
       }
       .footer-strip {
-        margin-top: 34px;
+        margin-top: 36px;
         background: #0f98a5;
-        min-height: 48px;
+        min-height: 50px;
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 6px 10px;
+        padding: 6px 8px;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.04em;
       }
       .footer-strip img {
         max-width: 100%;
-        max-height: 36px;
+        max-height: 38px;
+        width: 100%;
         display: block;
         object-fit: contain;
       }
@@ -4014,12 +4016,12 @@ function buildProFormaPreviewHtml(draft, summary) {
         width: 100%;
       }
       .footer-meta {
-        margin-top: 10px;
+        margin-top: 8px;
         display: flex;
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        font-size: 10px;
+        font-size: 9.5px;
       }
       .footer-company {
         text-align: center;
@@ -4109,11 +4111,11 @@ function buildProFormaPreviewHtml(draft, summary) {
         </div>
       </div>
 
-      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}" alt="Accreditation" />`).join("")}</div>` : `NHS Approved Supplier  |  Dementia Friends  |  Constructionline  |  CHAS  |  PASMA  |  IPAF  |  FESPA`}</div>
+      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}" alt="Accreditation" />`).join("")}</div>` : `<img src="${fallbackAccreditationStrip}" alt="Accreditations" />`}</div>
       <div class="footer-meta">
         <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
         <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-        <div>Page 1 of 1</div>
+        <div>Page 1 of 3</div>
       </div>
     </div>
   </body>
