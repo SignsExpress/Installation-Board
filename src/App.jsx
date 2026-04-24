@@ -1695,6 +1695,13 @@ function getRamsOptionIdentity(groupKey, option = {}, optionIndex = 0) {
   return `${groupKey}::option-${optionIndex}`;
 }
 
+function createRamsOptionId(groupKey) {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return `${groupKey}::${crypto.randomUUID()}`;
+  }
+  return `${groupKey}::${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function normalizeRamsLogic(logic = {}) {
   const defaultGroups = RAMS_DEFAULT_LOGIC.optionGroups;
   const incomingGroups = Array.isArray(logic.optionGroups) ? logic.optionGroups : defaultGroups;
@@ -4456,7 +4463,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   }, []);
 
   function updateRamsLogicDraft(updater) {
-    setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
+    setRamsLogicDraft((current) => (typeof updater === "function" ? updater(current) : updater));
     setLogicStatus("");
   }
 
@@ -5278,7 +5285,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
           ...group,
           options: [
             ...group.options,
-            { value: `${group.key}-${Date.now()}`, label: `New option ${nextIndex}`, cardIds: [] }
+            {
+              id: createRamsOptionId(group.key),
+              value: `${group.key}-${Date.now()}`,
+              label: `New option ${nextIndex}`,
+              cardIds: []
+            }
           ]
         };
       });
