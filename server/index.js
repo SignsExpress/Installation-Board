@@ -5147,7 +5147,7 @@ function sanitizeGeneratedSocialPost(post = "") {
     .replace(/\bjazz(?:ed)?\s+up\b/gi, "made stand out")
     .replace(/\btalk about a glow up!?/gi, "it made a proper difference")
     .replace(/#[A-Za-z0-9_]+/g, "")
-    .replace(/[‐‑‒–—―-]/g, " ")
+    .replace(/[\u2010-\u2015]/g, "-")
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n[ \t]+/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
@@ -5286,7 +5286,6 @@ async function generateSocialPostWithAi(brief) {
     technicalMode
       ? "- Technical mode may include useful dimensions, colour/material names or product names when they help explain the benefit. Still avoid VAT/tax/price/admin lines, HTML entities and list-style quoting."
       : "- Do not include raw dimensions, material thicknesses, internal installation caveats, VAT/tax/price/admin lines, HTML entities, or a list of every Corebridge line item.",
-    "- Do not use hyphen or dash characters anywhere in the post.",
     "- Put a blank line between paragraphs so it is easy to read on LinkedIn.",
     "- Keep it LinkedIn-ready and flowing naturally, not like a quote summary.",
     "- Do not include hashtags.",
