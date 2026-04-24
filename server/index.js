@@ -82,11 +82,145 @@ function createEmptyBoardStore() {
     attendanceEntries: [],
     mileageClaims: [],
     ramsLogic: null,
+    proFormaTemplate: null,
     vehiclePricingSettings: null,
     socialPostToneVoices: [],
     socialPostDeletedToneVoiceIds: [],
     socialPostSuggestions: [],
     holidayResetVersion: HOLIDAY_RESET_VERSION
+  };
+}
+
+function getDefaultProFormaTemplate() {
+  return {
+    version: 1,
+    overlayOpacity: 0.34,
+    referencePdfAsset: null,
+    termsPdfAsset: null,
+    accreditationAssets: [],
+    sections: {
+      title: { x: 11.5, y: 10, w: 58, h: 16 },
+      logo: { x: 147, y: 10, w: 48, h: 26 },
+      billing: { x: 12.5, y: 57, w: 78, h: 30 },
+      company: { x: 128, y: 57, w: 66, h: 38 },
+      metaLeft: { x: 12.5, y: 100, w: 84, h: 25 },
+      metaRight: { x: 128, y: 100, w: 66, h: 13 },
+      table: { x: 12.5, y: 124, w: 182, h: 86 },
+      bank: { x: 12.5, y: 218, w: 78, h: 27 },
+      totals: { x: 140, y: 214, w: 55, h: 43 },
+      approval: { x: 12.5, y: 251, w: 108, h: 11 },
+      paymentTerms: { x: 12.5, y: 266, w: 112, h: 13 },
+      accreditations: { x: 12.5, y: 281, w: 182, h: 11 },
+      footerMeta: { x: 12.5, y: 292, w: 182, h: 4.5 }
+    }
+  };
+}
+
+function getProFormaAssetsDir() {
+  return path.join(path.dirname(getDataFile()), "pro-forma-assets");
+}
+
+function ensureProFormaAssetsDir() {
+  fs.mkdirSync(getProFormaAssetsDir(), { recursive: true });
+}
+
+function sanitizeProFormaSectionRect(value = {}, fallback = {}) {
+  const numberOr = (next, safe) => {
+    const numeric = Number(next);
+    return Number.isFinite(numeric) ? numeric : safe;
+  };
+  return {
+    x: Math.max(numberOr(value.x, fallback.x || 0), 0),
+    y: Math.max(numberOr(value.y, fallback.y || 0), 0),
+    w: Math.max(numberOr(value.w, fallback.w || 1), 1),
+    h: Math.max(numberOr(value.h, fallback.h || 1), 1)
+  };
+}
+
+function sanitizeStoredAssetRef(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const storedName = String(value.storedName || "").trim();
+  if (!storedName) return null;
+  return {
+    storedName,
+    originalName: String(value.originalName || "").trim() || storedName,
+    contentType: String(value.contentType || "").trim() || "application/octet-stream"
+  };
+}
+
+function sanitizeProFormaTemplate(template) {
+  const defaults = getDefaultProFormaTemplate();
+  const source = template && typeof template === "object" && !Array.isArray(template) ? template : {};
+  const sections = source.sections && typeof source.sections === "object" && !Array.isArray(source.sections)
+    ? source.sections
+    : {};
+  return {
+    version: Number(source.version || defaults.version),
+    overlayOpacity: Math.min(Math.max(Number(source.overlayOpacity ?? defaults.overlayOpacity), 0), 1),
+    referencePdfAsset: sanitizeStoredAssetRef(source.referencePdfAsset),
+    termsPdfAsset: sanitizeStoredAssetRef(source.termsPdfAsset),
+    accreditationAssets: Array.isArray(source.accreditationAssets)
+      ? source.accreditationAssets.map((asset) => sanitizeStoredAssetRef(asset)).filter(Boolean)
+      : [],
+    sections: Object.fromEntries(
+      Object.entries(defaults.sections).map(([key, rect]) => [
+        key,
+        sanitizeProFormaSectionRect(sections[key], rect)
+      ])
+    )
+  };
+}
+
+function decodeDataUrl(value = "") {
+  const match = String(value || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  try {
+    return {
+      contentType: match[1],
+      buffer: Buffer.from(match[2], "base64")
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function extensionForContentType(contentType = "") {
+  switch (String(contentType).toLowerCase()) {
+    case "application/pdf":
+      return ".pdf";
+    case "image/png":
+      return ".png";
+    case "image/jpeg":
+      return ".jpg";
+    case "image/svg+xml":
+      return ".svg";
+    case "image/webp":
+      return ".webp";
+    default:
+      return "";
+  }
+}
+
+async function writeProFormaAssetUpload(asset, prefix) {
+  if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
+    return null;
+  }
+  if (!asset.dataUrl) {
+    return sanitizeStoredAssetRef(asset);
+  }
+  const decoded = decodeDataUrl(asset.dataUrl);
+  if (!decoded) return null;
+  ensureProFormaAssetsDir();
+  const extension = extensionForContentType(decoded.contentType);
+  const storedName = `${prefix}-${Date.now()}-${crypto.randomUUID()}${extension}`;
+  const filePath = path.join(getProFormaAssetsDir(), storedName);
+  await fsp.writeFile(filePath, decoded.buffer);
+  return {
+    storedName,
+    originalName: String(asset.originalName || asset.fileName || storedName).trim() || storedName,
+    contentType: decoded.contentType
   };
 }
 
@@ -323,6 +457,11 @@ function canAccessDescriptionPull(user) {
 function canAccessProForma(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "proForma", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditProForma(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "proForma", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
 function toPublicRamsProfile(user = {}) {
@@ -641,6 +780,12 @@ function requireProFormaAccess(request, response) {
   return false;
 }
 
+function requireProFormaAdmin(request, response) {
+  if (canEditProForma(request.user)) return true;
+  response.status(403).json({ error: "Pro-Forma admin access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -680,6 +825,7 @@ function mergeHolidaySeed(store) {
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
         ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
+        proFormaTemplate: store.proFormaTemplate && typeof store.proFormaTemplate === "object" ? sanitizeProFormaTemplate(store.proFormaTemplate) : null,
         vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
         socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
         socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : [],
@@ -779,6 +925,7 @@ async function readStore() {
             attendanceEntries: [],
             mileageClaims: [],
             ramsLogic: null,
+            proFormaTemplate: null,
             vehiclePricingSettings: null,
             socialPostToneVoices: [],
             socialPostDeletedToneVoiceIds: [],
@@ -800,6 +947,7 @@ async function readStore() {
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
           ramsLogic: parsed.ramsLogic && typeof parsed.ramsLogic === "object" ? parsed.ramsLogic : null,
+          proFormaTemplate: parsed.proFormaTemplate && typeof parsed.proFormaTemplate === "object" ? sanitizeProFormaTemplate(parsed.proFormaTemplate) : null,
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
@@ -862,6 +1010,7 @@ async function writeStore(store) {
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
       ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
+      proFormaTemplate: store.proFormaTemplate && typeof store.proFormaTemplate === "object" ? sanitizeProFormaTemplate(store.proFormaTemplate) : null,
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
       socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? store.socialPostDeletedToneVoiceIds : [],
       socialPostSuggestions: [...(store.socialPostSuggestions || [])]
@@ -6885,6 +7034,71 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(500).json({ error: "Could not proxy the CoreBridge asset.", detail: error.message });
     }
+  });
+
+  app.get("/api/pro-forma/template-asset/:name", async (request, response) => {
+    if (!requireProFormaAccess(request, response)) return;
+    try {
+      const storedName = path.basename(String(request.params.name || "").trim());
+      if (!storedName) {
+        response.status(400).json({ error: "Asset name is required." });
+        return;
+      }
+      const filePath = path.join(getProFormaAssetsDir(), storedName);
+      if (!filePath.startsWith(getProFormaAssetsDir()) || !fs.existsSync(filePath)) {
+        response.status(404).json({ error: "Template asset not found." });
+        return;
+      }
+      const extension = path.extname(filePath).toLowerCase();
+      const contentType =
+        extension === ".pdf"
+          ? "application/pdf"
+          : extension === ".png"
+            ? "image/png"
+            : extension === ".jpg" || extension === ".jpeg"
+              ? "image/jpeg"
+              : extension === ".svg"
+                ? "image/svg+xml"
+                : extension === ".webp"
+                  ? "image/webp"
+                  : "application/octet-stream";
+      response.setHeader("Content-Type", contentType);
+      response.setHeader("Cache-Control", "private, max-age=3600");
+      fs.createReadStream(filePath).pipe(response);
+    } catch (error) {
+      response.status(500).json({ error: "Could not load the template asset." });
+    }
+  });
+
+  app.get("/api/pro-forma/template", async (request, response) => {
+    if (!requireProFormaAccess(request, response)) return;
+    const store = await readStore();
+    response.json({
+      template: sanitizeProFormaTemplate(store.proFormaTemplate || getDefaultProFormaTemplate())
+    });
+  });
+
+  app.patch("/api/pro-forma/template", async (request, response) => {
+    if (!requireProFormaAdmin(request, response)) return;
+    const incoming = request.body?.template;
+    if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+      response.status(400).json({ error: "Pro-Forma template data is required." });
+      return;
+    }
+    const nextTemplate = sanitizeProFormaTemplate(incoming);
+    nextTemplate.referencePdfAsset = await writeProFormaAssetUpload(incoming.referencePdfAsset, "reference");
+    nextTemplate.termsPdfAsset = await writeProFormaAssetUpload(incoming.termsPdfAsset, "terms");
+    nextTemplate.accreditationAssets = Array.isArray(incoming.accreditationAssets)
+      ? (await Promise.all(incoming.accreditationAssets.map((asset, index) => writeProFormaAssetUpload(asset, `accreditation-${index + 1}`)))).filter(Boolean)
+      : [];
+    const store = await readStore();
+    const nextStore = await writeStore({
+      ...store,
+      proFormaTemplate: nextTemplate
+    });
+    response.json({
+      template: sanitizeProFormaTemplate(nextStore.proFormaTemplate || nextTemplate)
+    });
   });
 
   app.post("/api/pro-forma/pull", async (request, response) => {

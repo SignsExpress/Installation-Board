@@ -2353,6 +2353,11 @@ function canAccessProForma(user) {
   return getPermissionForApp(user, "proForma") !== "none";
 }
 
+function canEditProForma(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "proForma") === "admin";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
@@ -3737,6 +3742,71 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
   );
 }
 
+const DEFAULT_PRO_FORMA_TEMPLATE = {
+  version: 1,
+  overlayOpacity: 0.34,
+  referencePdfAsset: null,
+  termsPdfAsset: null,
+  accreditationAssets: [],
+  sections: {
+    title: { x: 11.5, y: 10, w: 58, h: 16 },
+    logo: { x: 147, y: 10, w: 48, h: 26 },
+    billing: { x: 12.5, y: 57, w: 78, h: 30 },
+    company: { x: 128, y: 57, w: 66, h: 38 },
+    metaLeft: { x: 12.5, y: 100, w: 84, h: 25 },
+    metaRight: { x: 128, y: 100, w: 66, h: 13 },
+    table: { x: 12.5, y: 124, w: 182, h: 86 },
+    bank: { x: 12.5, y: 218, w: 78, h: 27 },
+    totals: { x: 140, y: 214, w: 55, h: 43 },
+    approval: { x: 12.5, y: 251, w: 108, h: 11 },
+    paymentTerms: { x: 12.5, y: 266, w: 112, h: 13 },
+    accreditations: { x: 12.5, y: 281, w: 182, h: 11 },
+    footerMeta: { x: 12.5, y: 292, w: 182, h: 4.5 }
+  }
+};
+
+function sanitizeProFormaTemplate(template) {
+  const source = template && typeof template === "object" ? template : {};
+  const sanitizeRect = (value = {}, fallback = {}) => ({
+    x: Number.isFinite(Number(value?.x)) ? Number(value.x) : fallback.x,
+    y: Number.isFinite(Number(value?.y)) ? Number(value.y) : fallback.y,
+    w: Math.max(Number.isFinite(Number(value?.w)) ? Number(value.w) : fallback.w, 1),
+    h: Math.max(Number.isFinite(Number(value?.h)) ? Number(value.h) : fallback.h, 1)
+  });
+  return {
+    version: Number(source.version || DEFAULT_PRO_FORMA_TEMPLATE.version),
+    overlayOpacity: Math.min(Math.max(Number(source.overlayOpacity ?? DEFAULT_PRO_FORMA_TEMPLATE.overlayOpacity), 0), 1),
+    referencePdfAsset: source.referencePdfAsset || null,
+    termsPdfAsset: source.termsPdfAsset || null,
+    accreditationAssets: Array.isArray(source.accreditationAssets) ? source.accreditationAssets : [],
+    sections: Object.fromEntries(
+      Object.entries(DEFAULT_PRO_FORMA_TEMPLATE.sections).map(([key, rect]) => [
+        key,
+        sanitizeRect(source.sections?.[key], rect)
+      ])
+    )
+  };
+}
+
+function getProFormaTemplateAssetUrl(asset) {
+  if (!asset) return "";
+  if (asset.dataUrl) return asset.dataUrl;
+  if (asset.storedName) {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    return `${origin}/api/pro-forma/template-asset/${encodeURIComponent(asset.storedName)}`;
+  }
+  return "";
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Could not read the selected file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 function formatProFormaMoney(value) {
   const numeric = Number(value) || 0;
   return new Intl.NumberFormat("en-GB", {
@@ -3762,8 +3832,10 @@ function formatProFormaDate(value) {
   }).format(parsed);
 }
 
-function buildProFormaPreviewHtml(draft, summary) {
+function buildProFormaPreviewHtml(draft, summary, templateInput) {
   if (!draft) return "";
+  const template = sanitizeProFormaTemplate(templateInput);
+  const section = template.sections;
   const companyLines = [
     "Signs Express (Central Lancashire)",
     "Unit 3",
@@ -3781,8 +3853,11 @@ function buildProFormaPreviewHtml(draft, summary) {
     ["SWIFT", "NWBKGB2L"]
   ];
   const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
-  const accreditationImages = (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
+  const accreditationImages = template.accreditationAssets?.length
+    ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset) })).filter((asset) => asset.url)
+    : (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
   const fallbackAccreditationStrip = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
+  const termsPdfUrl = getProFormaTemplateAssetUrl(template.termsPdfAsset);
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
   const completionBalance = hasDeposit
     ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
@@ -3804,6 +3879,15 @@ function buildProFormaPreviewHtml(draft, summary) {
       </tr>
     `;
   }).join("");
+
+  const addressTop = Math.max(section.billing.y - 10, 18);
+  const metaTop = Math.max(section.metaLeft.y - (section.billing.y + section.billing.h), 14);
+  const tableTop = Math.max(section.table.y - (section.metaLeft.y + section.metaLeft.h), 12);
+  const bottomTop = Math.max(section.bank.y - (section.table.y + section.table.h), 14);
+  const approvalTop = Math.max(section.approval.y - (section.bank.y + section.bank.h), 18);
+  const paymentTop = Math.max(section.paymentTerms.y - (section.approval.y + section.approval.h), 12);
+  const footerStripTop = Math.max(section.accreditations.y - (section.paymentTerms.y + section.paymentTerms.h), 12);
+  const footerMetaTop = Math.max(section.footerMeta.y - (section.accreditations.y + section.accreditations.h), 5);
 
   return `<!doctype html>
 <html>
@@ -3832,38 +3916,44 @@ function buildProFormaPreviewHtml(draft, summary) {
         min-height: 297mm;
         margin: 0 auto;
         background: #fff;
-        padding: 14mm 12.5mm 10mm;
+        padding: 0;
       }
       .top-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 16px;
+        position: relative;
+        min-height: ${Math.max(section.logo.y + section.logo.h, section.title.y + section.title.h, 34)}mm;
       }
       .doc-title {
+        position: absolute;
+        left: ${section.title.x}mm;
+        top: ${section.title.y}mm;
+        width: ${section.title.w}mm;
+        min-height: ${section.title.h}mm;
         font-size: 28px;
         line-height: 1;
         letter-spacing: 0.025em;
         font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
         font-weight: 400;
         color: #0f98a5;
-        margin-top: 6px;
       }
       .brand img {
-        width: 300px;
-        max-width: 100%;
+        position: absolute;
+        left: ${section.logo.x}mm;
+        top: ${section.logo.y}mm;
+        width: ${section.logo.w}mm;
+        max-width: ${section.logo.w}mm;
         display: block;
       }
       .address-row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 28px;
-        margin-top: 38px;
+        gap: ${Math.max(section.company.x - (section.billing.x + section.billing.w), 12)}mm;
+        margin-top: ${addressTop}mm;
+        padding: 0 ${Math.max(210 - (section.company.x + section.company.w), 12.5)}mm 0 ${section.billing.x}mm;
       }
       .address-block {
         font-size: 11px;
         line-height: 1.24;
-        min-height: 118px;
+        min-height: ${Math.max(section.billing.h, section.company.h)}mm;
       }
       .address-block.right {
         text-align: right;
@@ -3874,8 +3964,9 @@ function buildProFormaPreviewHtml(draft, summary) {
       .meta-split {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 28px;
-        margin-top: 34px;
+        gap: ${Math.max(section.metaRight.x - (section.metaLeft.x + section.metaLeft.w), 12)}mm;
+        margin-top: ${metaTop}mm;
+        padding: 0 ${Math.max(210 - (section.metaRight.x + section.metaRight.w), 12.5)}mm 0 ${section.metaLeft.x}mm;
         font-size: 11px;
         line-height: 1.5;
       }
@@ -3886,7 +3977,9 @@ function buildProFormaPreviewHtml(draft, summary) {
         text-align: right;
       }
       .table-wrap {
-        margin-top: 16px;
+        margin-top: ${tableTop}mm;
+        margin-left: ${section.table.x}mm;
+        width: ${section.table.w}mm;
       }
       table {
         width: 100%;
@@ -3941,9 +4034,11 @@ function buildProFormaPreviewHtml(draft, summary) {
       }
       .bottom-row {
         display: grid;
-        grid-template-columns: 1.25fr 0.75fr;
-        gap: 30px;
-        margin-top: 16px;
+        grid-template-columns: minmax(${section.bank.w}mm, 1fr) ${section.totals.w}mm;
+        gap: ${Math.max(section.totals.x - (section.bank.x + section.bank.w), 12)}mm;
+        margin-top: ${bottomTop}mm;
+        margin-left: ${section.bank.x}mm;
+        width: ${Math.min(section.totals.x + section.totals.w - section.bank.x, 182)}mm;
         align-items: start;
       }
       .bank-block {
@@ -3960,6 +4055,7 @@ function buildProFormaPreviewHtml(draft, summary) {
         border: 3px solid #0f98a5;
         padding: 14px 16px;
         font-size: 11px;
+        min-height: ${section.totals.h}mm;
       }
       .total-row {
         display: flex;
@@ -3977,32 +4073,36 @@ function buildProFormaPreviewHtml(draft, summary) {
         font-weight: 700;
       }
       .approval {
-        margin-top: 54px;
+        margin-top: ${approvalTop}mm;
         font-size: 11px;
+        max-width: ${section.approval.w}mm;
       }
       .payment-terms-footer {
-        margin-top: 26px;
+        margin-top: ${paymentTop}mm;
         padding-top: 11px;
         border-top: 2px solid #0f98a5;
         font-size: 10.5px;
         line-height: 1.45;
+        max-width: ${section.paymentTerms.w}mm;
       }
       .footer-strip {
-        margin-top: 36px;
+        margin-top: ${footerStripTop}mm;
         background: #0f98a5;
-        min-height: 50px;
+        min-height: ${section.accreditations.h}mm;
         color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 6px 8px;
+        padding: 4px 8px;
         font-size: 10px;
         font-weight: 700;
         letter-spacing: 0.04em;
+        margin-left: ${section.accreditations.x}mm;
+        width: ${section.accreditations.w}mm;
       }
       .footer-strip img {
         max-width: 100%;
-        max-height: 38px;
+        max-height: calc(${section.accreditations.h}mm - 4px);
         width: 100%;
         display: block;
         object-fit: contain;
@@ -4016,12 +4116,14 @@ function buildProFormaPreviewHtml(draft, summary) {
         width: 100%;
       }
       .footer-meta {
-        margin-top: 8px;
+        margin-top: ${footerMetaTop}mm;
         display: flex;
         justify-content: space-between;
         gap: 12px;
         align-items: center;
         font-size: 9.5px;
+        margin-left: ${section.footerMeta.x}mm;
+        width: ${section.footerMeta.w}mm;
       }
       .footer-company {
         text-align: center;
@@ -4118,6 +4220,7 @@ function buildProFormaPreviewHtml(draft, summary) {
         <div>Page 1 of 3</div>
       </div>
     </div>
+    ${termsPdfUrl ? `<div class="sheet" style="padding:0;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:297mm;display:block;" /></div>` : ""}
   </body>
 </html>`;
 }
@@ -4133,6 +4236,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   const [referencePdfName, setReferencePdfName] = useState("");
   const [draft, setDraft] = useState(null);
   const [showPriceDebug, setShowPriceDebug] = useState(false);
+  const [template, setTemplate] = useState(DEFAULT_PRO_FORMA_TEMPLATE);
 
   const subtotal = useMemo(
     () => roundProFormaMoney((draft?.lineItems || []).reduce((sum, item) => {
@@ -4178,13 +4282,33 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     depositAmount,
     totalPaid,
     balanceDue: remainingBalance
-  }), [draft, subtotal, discountAmount, preTaxTotal, vatAmount, total, depositAmount, totalPaid, remainingBalance]);
+  }, template), [draft, subtotal, discountAmount, preTaxTotal, vatAmount, total, depositAmount, totalPaid, remainingBalance, template]);
 
   useEffect(() => {
     return () => {
       if (referencePdfUrl) URL.revokeObjectURL(referencePdfUrl);
     };
   }, [referencePdfUrl]);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadTemplate() {
+      try {
+        const response = await fetch("/api/pro-forma/template");
+        const payload = await response.json();
+        if (!response.ok) return;
+        if (!ignore) {
+          setTemplate(sanitizeProFormaTemplate(payload.template));
+        }
+      } catch (loadError) {
+        console.error(loadError);
+      }
+    }
+    loadTemplate();
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   function buildDraftFromPayload(payload = {}) {
     const reference = String(payload.orderReference || "").trim();
@@ -4466,6 +4590,11 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   <p className="muted-copy">Edit the document on the left, then use the live invoice preview on the right to sense-check the finished layout.</p>
                 </div>
                 <div className="pro-forma-editor-actions">
+                  {getPermissionForApp(currentUser, "proForma") === "admin" || currentUser?.canManagePermissions ? (
+                    <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma/template")}>
+                      Template builder
+                    </button>
+                  ) : null}
                   <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
                   <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
                     {printing ? "Opening..." : "Print / Save PDF"}
@@ -4676,6 +4805,332 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
               ) : (
                 <p className="muted-copy">Your editable pro-forma draft will appear here once you pull a CoreBridge reference.</p>
               )}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const [template, setTemplate] = useState(DEFAULT_PRO_FORMA_TEMPLATE);
+  const [selectedSection, setSelectedSection] = useState("title");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const stageRef = useRef(null);
+  const dragStateRef = useRef(null);
+
+  const sectionOptions = [
+    ["title", "Invoice title"],
+    ["logo", "Logo"],
+    ["billing", "Billing address"],
+    ["company", "Company address"],
+    ["metaLeft", "Meta left"],
+    ["metaRight", "Meta right"],
+    ["table", "Items table"],
+    ["bank", "Bank details"],
+    ["totals", "Totals box"],
+    ["approval", "Approval copy"],
+    ["paymentTerms", "Payment terms"],
+    ["accreditations", "Accreditations"],
+    ["footerMeta", "Footer meta"]
+  ];
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadTemplate() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/pro-forma/template");
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || "Could not load the Pro-Forma template.");
+        }
+        if (!ignore) {
+          setTemplate(sanitizeProFormaTemplate(payload.template));
+        }
+      } catch (loadError) {
+        if (!ignore) {
+          setError(loadError.message || "Could not load the Pro-Forma template.");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    }
+    loadTemplate();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleMove(event) {
+      const drag = dragStateRef.current;
+      const stage = stageRef.current;
+      if (!drag || !stage) return;
+      const rect = stage.getBoundingClientRect();
+      const mmPerPxX = 210 / rect.width;
+      const mmPerPxY = 297 / rect.height;
+      const nextX = Math.max(0, Math.min(drag.originX + ((event.clientX - drag.startX) * mmPerPxX), 210 - drag.width));
+      const nextY = Math.max(0, Math.min(drag.originY + ((event.clientY - drag.startY) * mmPerPxY), 297 - drag.height));
+      setTemplate((current) => ({
+        ...current,
+        sections: {
+          ...current.sections,
+          [drag.key]: {
+            ...current.sections[drag.key],
+            x: Number(nextX.toFixed(2)),
+            y: Number(nextY.toFixed(2))
+          }
+        }
+      }));
+    }
+    function handleUp() {
+      dragStateRef.current = null;
+    }
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, []);
+
+  function updateSectionField(field, value) {
+    setTemplate((current) => ({
+      ...current,
+      sections: {
+        ...current.sections,
+        [selectedSection]: {
+          ...current.sections[selectedSection],
+          [field]: Math.max(Number(value) || 0, field === "w" || field === "h" ? 1 : 0)
+        }
+      }
+    }));
+  }
+
+  function startDrag(key, event) {
+    const rect = template.sections[key];
+    dragStateRef.current = {
+      key,
+      startX: event.clientX,
+      startY: event.clientY,
+      originX: rect.x,
+      originY: rect.y,
+      width: rect.w,
+      height: rect.h
+    };
+  }
+
+  async function setSingleAsset(field, file) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setTemplate((current) => ({
+      ...current,
+      [field]: {
+        originalName: file.name,
+        contentType: file.type,
+        dataUrl
+      }
+    }));
+  }
+
+  async function handleReferencePdfUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await setSingleAsset("referencePdfAsset", file);
+  }
+
+  async function handleTermsPdfUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await setSingleAsset("termsPdfAsset", file);
+  }
+
+  async function handleAccreditationUpload(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    const assets = await Promise.all(files.map(async (file) => ({
+      originalName: file.name,
+      contentType: file.type,
+      dataUrl: await readFileAsDataUrl(file)
+    })));
+    setTemplate((current) => ({
+      ...current,
+      accreditationAssets: assets
+    }));
+  }
+
+  async function saveTemplate() {
+    try {
+      setSaving(true);
+      setMessage("");
+      setError("");
+      const response = await fetch("/api/pro-forma/template", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save the Pro-Forma template.");
+      }
+      setTemplate(sanitizeProFormaTemplate(payload.template));
+      setMessage("Template saved.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save the Pro-Forma template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const selectedRect = template.sections[selectedSection];
+  const referenceOverlayUrl = getProFormaTemplateAssetUrl(template.referencePdfAsset);
+  const accreditationPreview = template.accreditationAssets
+    .map((asset) => getProFormaTemplateAssetUrl(asset))
+    .filter(Boolean);
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page pro-forma-page pro-forma-template-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="pro-forma"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+
+        <section className="panel social-post-panel pro-forma-panel">
+          <div className="pro-forma-template-grid">
+            <div className="social-post-card pro-forma-template-card">
+              <div className="pro-forma-template-head">
+                <div>
+                  <h3>Pro-Forma Template Builder</h3>
+                  <p className="muted-copy">Use the A4 stage to line everything up against your current PDF. Upload your reference underneath, drag the blocks around, then save the template.</p>
+                </div>
+                <div className="pro-forma-template-actions">
+                  <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma")}>
+                    Back to Pro-Forma
+                  </button>
+                  <button type="button" className="primary-button" disabled={saving || loading} onClick={saveTemplate}>
+                    {saving ? "Saving..." : "Save template"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="pro-forma-template-controls">
+                <div className="pro-forma-template-upload-group">
+                  <label className="pro-forma-upload-button">
+                    <input type="file" accept="application/pdf" onChange={handleReferencePdfUpload} />
+                    <span>{template.referencePdfAsset?.originalName || "Upload reference PDF underlay"}</span>
+                  </label>
+                  <label className="pro-forma-upload-button">
+                    <input type="file" accept="application/pdf" onChange={handleTermsPdfUpload} />
+                    <span>{template.termsPdfAsset?.originalName || "Upload T&Cs PDF"}</span>
+                  </label>
+                  <label className="pro-forma-upload-button">
+                    <input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg" multiple onChange={handleAccreditationUpload} />
+                    <span>{template.accreditationAssets?.length ? `${template.accreditationAssets.length} accreditation logos loaded` : "Upload accreditation logos"}</span>
+                  </label>
+                  <label>
+                    Underlay opacity
+                    <input
+                      type="range"
+                      min="0"
+                      max="0.8"
+                      step="0.02"
+                      value={template.overlayOpacity}
+                      onChange={(event) => setTemplate((current) => ({ ...current, overlayOpacity: Number(event.target.value) }))}
+                    />
+                  </label>
+                </div>
+
+                <div className="pro-forma-section-list">
+                  {sectionOptions.map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`pro-forma-section-chip ${selectedSection === key ? "active" : ""}`}
+                      onClick={() => setSelectedSection(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pro-forma-section-fields">
+                  <label>
+                    X (mm)
+                    <input value={selectedRect.x} inputMode="decimal" onChange={(event) => updateSectionField("x", event.target.value)} />
+                  </label>
+                  <label>
+                    Y (mm)
+                    <input value={selectedRect.y} inputMode="decimal" onChange={(event) => updateSectionField("y", event.target.value)} />
+                  </label>
+                  <label>
+                    Width (mm)
+                    <input value={selectedRect.w} inputMode="decimal" onChange={(event) => updateSectionField("w", event.target.value)} />
+                  </label>
+                  <label>
+                    Height (mm)
+                    <input value={selectedRect.h} inputMode="decimal" onChange={(event) => updateSectionField("h", event.target.value)} />
+                  </label>
+                </div>
+              </div>
+
+              {message ? <p className="form-success">{message}</p> : null}
+              {error ? <p className="form-error">{error}</p> : null}
+            </div>
+
+            <div className="social-post-card pro-forma-template-stage-card">
+              <div className="pro-forma-template-stage-head">
+                <h3>A4 Template Stage</h3>
+                <p className="muted-copy">Drag the blocks to line them up over the reference PDF. The builder saves in millimetres so it stays tied to A4 output.</p>
+              </div>
+              <div className="pro-forma-stage-shell">
+                <div ref={stageRef} className="pro-forma-stage">
+                  {referenceOverlayUrl ? (
+                    <div className="pro-forma-stage-underlay" style={{ opacity: template.overlayOpacity }}>
+                      <iframe title="Reference underlay" src={referenceOverlayUrl} />
+                    </div>
+                  ) : null}
+
+                  {sectionOptions.map(([key, label]) => {
+                    const rect = template.sections[key];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`pro-forma-stage-block ${selectedSection === key ? "active" : ""}`}
+                        style={{
+                          left: `${(rect.x / 210) * 100}%`,
+                          top: `${(rect.y / 297) * 100}%`,
+                          width: `${(rect.w / 210) * 100}%`,
+                          height: `${(rect.h / 297) * 100}%`
+                        }}
+                        onMouseDown={(event) => startDrag(key, event)}
+                        onClick={() => setSelectedSection(key)}
+                      >
+                        <span>{label}</span>
+                        {key === "accreditations" && accreditationPreview.length ? (
+                          <div className="pro-forma-stage-inline-images">
+                            {accreditationPreview.slice(0, 6).map((src, index) => (
+                              <img key={`${src}-${index}`} src={src} alt="Accreditation" />
+                            ))}
+                          </div>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -11398,6 +11853,7 @@ export default function App() {
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
+  const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
   const isProFormaRoute = pathname.startsWith("/pro-forma");
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
@@ -11491,7 +11947,8 @@ export default function App() {
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
-  const showProForma = Boolean(currentUser && canAccessProForma(currentUser) && isProFormaRoute);
+  const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
+  const showProForma = Boolean(currentUser && canAccessProForma(currentUser) && isProFormaRoute && !isProFormaTemplateRoute);
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
@@ -13689,6 +14146,18 @@ export default function App() {
         notifications={notifications}
         aeroEnabled={aeroEnabled}
         onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showProFormaTemplate) {
+    return (
+      <ProFormaTemplateBuilderPage
+        currentUser={currentUser}
+        onLogout={logout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={toggleUiSkin}
       />
     );
   }

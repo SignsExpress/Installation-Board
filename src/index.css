@@ -6643,9 +6643,145 @@ button {
   line-height: 1.5;
 }
 
+.pro-forma-template-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.pro-forma-template-card,
+.pro-forma-template-stage-card {
+  display: grid;
+  gap: 10px;
+}
+
+.pro-forma-template-head,
+.pro-forma-template-stage-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 10px;
+}
+
+.pro-forma-template-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pro-forma-template-controls,
+.pro-forma-template-upload-group {
+  display: grid;
+  gap: 8px;
+}
+
+.pro-forma-section-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pro-forma-section-chip {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #d7cbdd;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+
+.pro-forma-section-chip.active {
+  border-color: #6d4987;
+  background: #f5eef9;
+  color: #4d2e63;
+  font-weight: 700;
+}
+
+.pro-forma-section-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pro-forma-stage-shell {
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #eef2f7;
+}
+
+.pro-forma-stage {
+  position: relative;
+  width: min(100%, 820px);
+  aspect-ratio: 210 / 297;
+  margin: 0 auto;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.pro-forma-stage-underlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pro-forma-stage-underlay iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.pro-forma-stage-block {
+  position: absolute;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 5px;
+  border: 1px dashed #6d4987;
+  background: rgba(109, 73, 135, 0.08);
+  color: #3b2a4a;
+  text-align: left;
+  cursor: move;
+  overflow: hidden;
+}
+
+.pro-forma-stage-block.active {
+  border-style: solid;
+  border-color: #0f98a5;
+  background: rgba(15, 152, 165, 0.12);
+}
+
+.pro-forma-stage-block span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pro-forma-stage-inline-images {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pro-forma-stage-inline-images img {
+  max-width: 28px;
+  max-height: 14px;
+  object-fit: contain;
+}
+
 @media (max-width: 1100px) {
   .pro-forma-grid,
-  .pro-forma-bottom-grid {
+  .pro-forma-bottom-grid,
+  .pro-forma-template-grid {
     grid-template-columns: 1fr;
   }
 
@@ -6660,7 +6796,8 @@ button {
 
 @media (max-width: 760px) {
   .pro-forma-meta-grid,
-  .pro-forma-custom-deposit {
+  .pro-forma-custom-deposit,
+  .pro-forma-section-fields {
     grid-template-columns: 1fr;
   }
 
@@ -6671,6 +6808,11 @@ button {
   .pro-forma-editor-head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .pro-forma-template-head,
+  .pro-forma-template-stage-head {
+    flex-direction: column;
   }
 
   .pro-forma-editor-actions {
