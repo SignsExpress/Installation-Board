@@ -5286,6 +5286,7 @@ function shouldAcceptProFormaMoneyValue(meta, key = "") {
 }
 
 function scoreProFormaUnitPriceField(leaf) {
+  if (/^orderitem\.components\.0\.priceperitem$/i.test(leaf)) return 220;
   if (/pricewithallchildren/i.test(leaf)) return 130;
   if (/sellingprice/i.test(leaf)) return 110;
   if (/unitprice|priceperitem|sellprice|sellunit/i.test(leaf)) return 80;
@@ -5296,6 +5297,7 @@ function scoreProFormaUnitPriceField(leaf) {
 }
 
 function scoreProFormaLineTotalField(leaf) {
+  if (/^orderitem\.components\.0\.priceperitem$/i.test(leaf)) return 10;
   if (/pricewithallchildren/i.test(leaf)) return 132;
   if (/sellingprice/i.test(leaf)) return 112;
   if (/pricetotal/i.test(leaf)) return 108;
@@ -5308,6 +5310,7 @@ function scoreProFormaLineTotalField(leaf) {
 
 function scoreProFormaRawMoneyField(leaf = "") {
   let score = 0;
+  if (/^orderitem\.components\.0\.priceperitem$/i.test(leaf)) score += 260;
   if (/pricewithallchildren/i.test(leaf)) score += 150;
   else if (/pricetotal/i.test(leaf)) score += 122;
   else if (/(pre.?discount|post.?discount|sellingprice|sellprice|unitprice|priceperitem|itemtotal|linetotal|extendedamount|extendedprice|lineamount|lineprice)/i.test(leaf)) score += 90;
@@ -5321,7 +5324,8 @@ function scoreProFormaRawMoneyField(leaf = "") {
 }
 
 function isPreferredProFormaSellLeaf(leaf = "") {
-  return /^orderitem\.components\.0\.pricewithallchildren$/i.test(String(leaf || "").trim());
+  return /^orderitem\.components\.0\.priceperitem$/i.test(String(leaf || "").trim())
+    || /^components\.0\.priceperitem$/i.test(String(leaf || "").trim());
 }
 
 function isGenericProFormaName(value = "") {
@@ -5550,7 +5554,10 @@ function extractProFormaLineItems(order = {}) {
       lineTotalScore: -1,
       moneyCandidates: [],
       rawMoneyFields: [],
-      directSellCandidate: null
+      directSellCandidate: null,
+      directSellAmount: 0,
+      directSellLeaf: "",
+      directSellScore: -1
     };
 
     if (/assemblydatajson/i.test(leaf)) {
@@ -5584,13 +5591,13 @@ function extractProFormaLineItems(order = {}) {
             leaf: candidate.key
           });
         }
-        if (isPreferredProFormaSellLeaf(candidate.key)) {
-          group.directSellCandidate = {
-            unitPrice: candidate.amount,
-            lineTotal: candidate.amount,
-            score: candidateScore + 500,
-            leaf: candidate.key
-          };
+      if (isPreferredProFormaSellLeaf(candidate.key)) {
+          const preferredScore = candidateScore + 500;
+          if (preferredScore > group.directSellScore) {
+            group.directSellAmount = candidate.amount;
+            group.directSellLeaf = candidate.key;
+            group.directSellScore = preferredScore;
+          }
         }
       });
       groups.set(match[1], group);
@@ -5674,12 +5681,12 @@ function extractProFormaLineItems(order = {}) {
         });
       }
       if (isPreferredProFormaSellLeaf(leaf)) {
-        group.directSellCandidate = {
-          unitPrice: moneyValue,
-          lineTotal: moneyValue,
-          score: candidateScore + 500,
-          leaf
-        };
+        const preferredScore = candidateScore + 500;
+        if (preferredScore > group.directSellScore) {
+          group.directSellAmount = moneyValue;
+          group.directSellLeaf = leaf;
+          group.directSellScore = preferredScore;
+        }
       }
 
       const rawScore = scoreProFormaRawMoneyField(leaf) + moneyConfidence;
@@ -5745,7 +5752,14 @@ function extractProFormaLineItems(order = {}) {
         })
         .slice(0, 8);
 
-      const preferredSellCandidate = group.directSellCandidate
+      const preferredSellCandidate = group.directSellAmount > 0
+        ? {
+            lineTotal: Math.round((group.directSellAmount * normalizedQuantity) * 100) / 100,
+            unitPrice: Math.round(group.directSellAmount * 100) / 100,
+            score: group.directSellScore,
+            leaf: group.directSellLeaf
+          }
+        : group.directSellCandidate
         || normalizedCandidates.find((candidate) => isPreferredProFormaSellLeaf(candidate.leaf))
         || normalizedCandidates.find((candidate) => /(?:^|\.)(?:components?|childcomponents?)\.\d+\.pricewithallchildren$/i.test(candidate.leaf))
         || null;
