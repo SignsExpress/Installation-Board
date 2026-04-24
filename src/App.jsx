@@ -2252,6 +2252,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "proForma"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2344,10 +2348,15 @@ function canAccessDescriptionPull(user) {
   return getPermissionForApp(user, "descriptionPull") !== "none";
 }
 
+function canAccessProForma(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "proForma") !== "none";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canAccessProForma(user) || user.canManagePermissions)
   );
 }
 
@@ -2506,6 +2515,7 @@ function MainNavBar({
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
   const descriptionPullAllowed = canAccessDescriptionPull(currentUser);
+  const proFormaAllowed = canAccessProForma(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -2516,6 +2526,7 @@ function MainNavBar({
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
   const descriptionPullPath = "/description-pull";
+  const proFormaPath = "/pro-forma";
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -2529,6 +2540,7 @@ function MainNavBar({
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
+    { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
@@ -10454,9 +10466,11 @@ export default function App() {
   const [activeClientJob, setActiveClientJob] = useState(null);
   const [clientCompletePrompt, setClientCompletePrompt] = useState(false);
   const [clientPhotoUploading, setClientPhotoUploading] = useState(false);
+  const [clientPendingCompletePhotos, setClientPendingCompletePhotos] = useState([]);
   const [clientExporting, setClientExporting] = useState(false);
   const [adminCompletePrompt, setAdminCompletePrompt] = useState(false);
   const [adminPhotoUploading, setAdminPhotoUploading] = useState(false);
+  const [adminPendingCompletePhotos, setAdminPendingCompletePhotos] = useState([]);
   const [adminExporting, setAdminExporting] = useState(false);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupQuery, setOrderLookupQuery] = useState("");
@@ -10685,6 +10699,7 @@ export default function App() {
   useEffect(() => {
     setClientCompletePrompt(false);
     setClientPhotoUploading(false);
+    setClientPendingCompletePhotos([]);
     setClientExporting(false);
     if (clientPhotoInputRef.current) {
       clientPhotoInputRef.current.value = "";
@@ -10694,6 +10709,7 @@ export default function App() {
   useEffect(() => {
     setAdminCompletePrompt(false);
     setAdminPhotoUploading(false);
+    setAdminPendingCompletePhotos([]);
     setAdminExporting(false);
     if (adminPhotoInputRef.current) {
       adminPhotoInputRef.current.value = "";
@@ -11807,6 +11823,7 @@ export default function App() {
         await completeJob(job.id);
       }
       setClientCompletePrompt(false);
+      setClientPendingCompletePhotos([]);
       setMessage(
         createMessage(
           files.length ? "Job marked complete and photos uploaded." : "Job marked complete.",
@@ -11839,6 +11856,7 @@ export default function App() {
         await completeJob(job.id);
       }
       setAdminCompletePrompt(false);
+      setAdminPendingCompletePhotos([]);
       setMessage(
         createMessage(
           files.length ? "Job marked complete and photos uploaded." : "Job marked complete.",
@@ -13333,7 +13351,13 @@ export default function App() {
                   <button
                     className="success-button"
                     type="button"
-                    onClick={() => setAdminCompletePrompt(true)}
+                    onClick={() => {
+                      setAdminPendingCompletePhotos([]);
+                      if (adminPhotoInputRef.current) {
+                        adminPhotoInputRef.current.value = "";
+                      }
+                      setAdminCompletePrompt(true);
+                    }}
                     disabled={adminPhotoUploading || adminExporting}
                   >
                     Mark as Complete
@@ -13397,23 +13421,53 @@ export default function App() {
                 ) : null}
                 {activeAdminJob && !activeAdminJob.isCompleted && adminCompletePrompt ? (
                   <div className="client-complete-prompt form-complete-prompt">
-                    <span>Would you like to upload job photos?</span>
-                    <div className="client-complete-prompt-actions">
+                    <div className="client-complete-prompt-copy">
+                      <strong>Complete job</strong>
+                      <span className={adminPendingCompletePhotos.length ? "is-ready" : ""}>
+                        {adminPendingCompletePhotos.length
+                          ? `${adminPendingCompletePhotos.length} photo${adminPendingCompletePhotos.length === 1 ? "" : "s"} ready to upload`
+                          : "No photos selected yet"}
+                      </span>
+                    </div>
+                    {adminPendingCompletePhotos.length ? (
+                      <div className="client-complete-photo-list">
+                        {adminPendingCompletePhotos.map((file, index) => (
+                          <span key={`${file.name}-${index}`} className="job-summary-pill is-photos">
+                            {file.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className="client-complete-prompt-actions staged">
                       <button
                         className="ghost-button"
-                        type="button"
-                        onClick={() => markAdminJobComplete(activeAdminJob)}
-                        disabled={adminPhotoUploading}
-                      >
-                        No
-                      </button>
-                      <button
-                        className="success-button"
                         type="button"
                         onClick={() => adminPhotoInputRef.current?.click()}
                         disabled={adminPhotoUploading}
                       >
-                        {adminPhotoUploading ? "Uploading..." : "Yes"}
+                        {adminPendingCompletePhotos.length ? "Change photos" : "Add photos"}
+                      </button>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => {
+                          setAdminCompletePrompt(false);
+                          setAdminPendingCompletePhotos([]);
+                          if (adminPhotoInputRef.current) {
+                            adminPhotoInputRef.current.value = "";
+                          }
+                        }}
+                        disabled={adminPhotoUploading}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        className="success-button"
+                        type="button"
+                        onClick={() => markAdminJobComplete(activeAdminJob, adminPendingCompletePhotos)}
+                        disabled={adminPhotoUploading}
+                      >
+                        {adminPhotoUploading ? "Finishing..." : "Finish"}
                       </button>
                     </div>
                   </div>
@@ -13426,10 +13480,10 @@ export default function App() {
               type="file"
               accept="image/*"
               multiple
-              onChange={async (event) => {
+              onChange={(event) => {
                 const files = Array.from(event.target.files || []);
                 if (!files.length || !activeAdminJob) return;
-                await markAdminJobComplete(activeAdminJob, files);
+                setAdminPendingCompletePhotos(files);
               }}
             />
           </div>
@@ -13639,30 +13693,66 @@ export default function App() {
                       <button
                         className="primary-button"
                         type="button"
-                        onClick={() => setClientCompletePrompt(true)}
+                        onClick={() => {
+                          setClientPendingCompletePhotos([]);
+                          if (clientPhotoInputRef.current) {
+                            clientPhotoInputRef.current.value = "";
+                          }
+                          setClientCompletePrompt(true);
+                        }}
                         disabled={clientPhotoUploading || clientExporting}
                       >
                         Mark as Complete
                       </button>
                     ) : (
                       <div className="client-complete-prompt">
-                        <span>Would you like to upload job photos?</span>
-                        <div className="client-complete-prompt-actions">
+                        <div className="client-complete-prompt-copy">
+                          <strong>Complete job</strong>
+                          <span className={clientPendingCompletePhotos.length ? "is-ready" : ""}>
+                            {clientPendingCompletePhotos.length
+                              ? `${clientPendingCompletePhotos.length} photo${clientPendingCompletePhotos.length === 1 ? "" : "s"} ready to upload`
+                              : "No photos selected yet"}
+                          </span>
+                        </div>
+                        {clientPendingCompletePhotos.length ? (
+                          <div className="client-complete-photo-list">
+                            {clientPendingCompletePhotos.map((file, index) => (
+                              <span key={`${file.name}-${index}`} className="job-summary-pill is-photos">
+                                {file.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div className="client-complete-prompt-actions staged">
                           <button
                             className="ghost-button"
-                            type="button"
-                            onClick={() => markClientJobComplete(activeClientJob)}
-                            disabled={clientPhotoUploading}
-                          >
-                            No
-                          </button>
-                          <button
-                            className="primary-button"
                             type="button"
                             onClick={() => clientPhotoInputRef.current?.click()}
                             disabled={clientPhotoUploading}
                           >
-                            {clientPhotoUploading ? "Uploading..." : "Yes"}
+                            {clientPendingCompletePhotos.length ? "Change photos" : "Add photos"}
+                          </button>
+                          <button
+                            className="ghost-button"
+                            type="button"
+                            onClick={() => {
+                              setClientCompletePrompt(false);
+                              setClientPendingCompletePhotos([]);
+                              if (clientPhotoInputRef.current) {
+                                clientPhotoInputRef.current.value = "";
+                              }
+                            }}
+                            disabled={clientPhotoUploading}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            className="success-button"
+                            type="button"
+                            onClick={() => markClientJobComplete(activeClientJob, clientPendingCompletePhotos)}
+                            disabled={clientPhotoUploading}
+                          >
+                            {clientPhotoUploading ? "Finishing..." : "Finish"}
                           </button>
                         </div>
                       </div>
@@ -13708,7 +13798,7 @@ export default function App() {
               onChange={async (event) => {
                 const files = Array.from(event.target.files || []);
                 if (!files.length) return;
-                await markClientJobComplete(activeClientJob, files);
+                setClientPendingCompletePhotos(files);
               }}
             />
           </div>

@@ -5783,15 +5783,41 @@ button {
   background: #f8fafc;
 }
 
-.client-complete-prompt span {
+.client-complete-prompt-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.client-complete-prompt-copy strong {
+  color: #0f172a;
+  font-size: 0.98rem;
+}
+
+.client-complete-prompt-copy span {
   color: #334155;
   font-weight: 700;
+}
+
+.client-complete-prompt-copy span.is-ready {
+  color: #166534;
+}
+
+.client-complete-photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
 }
 
 .client-complete-prompt-actions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.client-complete-prompt-actions.staged {
+  margin-left: auto;
 }
 
 .job-photo-grid {
