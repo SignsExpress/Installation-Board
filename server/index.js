@@ -37,6 +37,7 @@ const TIME_ZONE = "Europe/London";
 const streamClients = new Set();
 const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
 const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
+const DEFAULT_COREBRIDGE_ESTIMATE_PATH = "/core/api/estimate";
 const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
@@ -3220,13 +3221,14 @@ function getCoreBridgeConfig() {
       process.env.COREBRIDGE_SUBSCRIPTION_KEY || process.env.COREBRIDGE_OCP_KEY || ""
     ).trim(),
     orderPath: String(process.env.COREBRIDGE_ORDER_PATH || process.env.COREBRIDGE_ENDPOINT_PATH || DEFAULT_COREBRIDGE_ORDER_PATH).trim(),
+    estimatePath: String(process.env.COREBRIDGE_ESTIMATE_PATH || DEFAULT_COREBRIDGE_ESTIMATE_PATH).trim(),
     apiVersion: String(process.env.COREBRIDGE_API_VERSION || "v3.0").trim()
   };
 }
 
-function buildCoreBridgeOrderUrl(config, params = {}) {
+function buildCoreBridgeCollectionUrl(config, pathValue, params = {}) {
   const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
-  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const normalizedPath = String(pathValue || config.orderPath).startsWith("/") ? String(pathValue || config.orderPath).slice(1) : String(pathValue || config.orderPath);
   const url = new URL(normalizedPath, normalizedBase);
 
   url.searchParams.set("apiversion", config.apiVersion);
@@ -3240,9 +3242,17 @@ function buildCoreBridgeOrderUrl(config, params = {}) {
   return url.toString();
 }
 
-function buildCoreBridgeOrderDetailUrl(config, orderId) {
+function buildCoreBridgeOrderUrl(config, params = {}) {
+  return buildCoreBridgeCollectionUrl(config, config.orderPath, params);
+}
+
+function buildCoreBridgeEstimateUrl(config, params = {}) {
+  return buildCoreBridgeCollectionUrl(config, config.estimatePath, params);
+}
+
+function buildCoreBridgeDetailUrl(config, pathValue, orderId) {
   const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
-  const normalizedPath = config.orderPath.startsWith("/") ? config.orderPath.slice(1) : config.orderPath;
+  const normalizedPath = String(pathValue || config.orderPath).startsWith("/") ? String(pathValue || config.orderPath).slice(1) : String(pathValue || config.orderPath);
   const detailPath = `${normalizedPath}/${orderId}`;
   const url = new URL(detailPath, normalizedBase);
 
@@ -3254,6 +3264,14 @@ function buildCoreBridgeOrderDetailUrl(config, orderId) {
   url.searchParams.set("itemlevel", "full");
 
   return url.toString();
+}
+
+function buildCoreBridgeOrderDetailUrl(config, orderId) {
+  return buildCoreBridgeDetailUrl(config, config.orderPath, orderId);
+}
+
+function buildCoreBridgeEstimateDetailUrl(config, orderId) {
+  return buildCoreBridgeDetailUrl(config, config.estimatePath, orderId);
 }
 
 function buildCoreBridgeOrderDestinationsUrl(config, orderId) {
@@ -4135,6 +4153,40 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
   return normalized;
 }
 
+async function fetchCoreBridgeEstimateDetail(config, orderId, includeDebug = false) {
+  const response = await fetch(buildCoreBridgeEstimateDetailUrl(config, orderId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Estimate detail lookup failed for ${orderId} (${response.status})`);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  const rawBody = await response.text();
+  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+    throw new Error(`Estimate detail lookup returned HTML for ${orderId}`);
+  }
+
+  const body = JSON.parse(rawBody);
+  const record = extractCoreBridgeDetailRecord(body, orderId);
+  const normalized = normalizeCoreBridgeOrder(record, 0);
+  normalized._detailFetched = true;
+  normalized._detailOrderId = orderId;
+  normalized._detailEntity = "estimate";
+
+  if (includeDebug) {
+    normalized.debugFields = buildCoreBridgeDebugFields(record);
+    normalized.debugRaw = JSON.stringify(record, null, 2);
+  }
+
+  return normalized;
+}
+
 async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   const response = await fetch(buildCoreBridgeOrderDestinationsUrl(config, orderId), {
     headers: {
@@ -4411,9 +4463,38 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   const attempts = [];
   const normalizedSearch = String(searchTerm || "").trim();
   const looksLikeFormattedNumber = /[a-z]{2,5}-?\d+/i.test(normalizedSearch);
+  const looksLikeEstimateReference = /^est-/i.test(normalizedSearch);
   const requestPlans = [
+    ...(looksLikeEstimateReference
+      ? [
+          {
+            label: "estimate-detailed",
+            entity: "estimate",
+            url: buildCoreBridgeEstimateUrl(config, {
+              take: 200,
+              sortBy: "-modifiedDT",
+              companylevel: "full",
+              contactlevel: "full",
+              notelevel: "full",
+              destinationlevel: "full",
+              itemlevel: "full",
+              formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+            })
+          },
+          {
+            label: "estimate-basic",
+            entity: "estimate",
+            url: buildCoreBridgeEstimateUrl(config, {
+              take: 200,
+              sortBy: "-modifiedDT",
+              formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+            })
+          }
+        ]
+      : []),
     {
       label: "detailed",
+      entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
         take: 200,
         sortBy: "-modifiedDT",
@@ -4427,6 +4508,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
     },
     {
       label: "basic",
+      entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
         take: 200,
         sortBy: "-modifiedDT",
@@ -4485,20 +4567,25 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             if (!order.id) return order;
 
             try {
-              const detailedOrder = await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
-              try {
-                const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, order.id);
-                if (destinationAddress) {
-                  detailedOrder.address = destinationAddress;
+              const detailedOrder = plan.entity === "estimate"
+                ? await fetchCoreBridgeEstimateDetail(config, order.id, includeDebug)
+                : await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
+              if (plan.entity !== "estimate") {
+                try {
+                  const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, order.id);
+                  if (destinationAddress) {
+                    detailedOrder.address = destinationAddress;
+                  }
+                } catch (destinationError) {
+                  attempts.push(`DESTINATION ${order.id} ${destinationError.message}`);
                 }
-              } catch (destinationError) {
-                attempts.push(`DESTINATION ${order.id} ${destinationError.message}`);
               }
               return {
                 ...order,
                 ...detailedOrder,
                 _detailFetched: true,
-                _detailOrderId: order.id
+                _detailOrderId: order.id,
+                _detailEntity: plan.entity
               };
             } catch (error) {
               attempts.push(`DETAIL ${order.id} ${error.message}`);
