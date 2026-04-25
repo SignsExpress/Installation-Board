@@ -4009,22 +4009,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   const tableTopAbsolute = section.table.y;
   const localLeft = (value) => value - tableLeft;
   const localTop = (value) => value - tableTopAbsolute;
-  const rowAnchorTop = Math.min(
-    section.tableNumber.y,
-    section.tableTitle.y,
-    section.tableQty.y,
-    section.tableUnitPrice.y,
-    section.tableLineTotal.y,
-    section.tableDescription.y
-  );
-  const rowAnchorBottom = Math.max(
-    section.tableNumber.y + section.tableNumber.h,
-    section.tableTitle.y + section.tableTitle.h,
-    section.tableQty.y + section.tableQty.h,
-    section.tableUnitPrice.y + section.tableUnitPrice.h,
-    section.tableLineTotal.y + section.tableLineTotal.h,
-    section.tableDescription.y + section.tableDescription.h
-  );
   const topSectionBottom = Math.max(
     section.billing.y + section.billing.h,
     section.company.y + section.company.h,
@@ -4035,10 +4019,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.table.y
   );
   const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
-  const rowStartOffset = Math.max(
-    localTop(rowAnchorTop) + 1.5,
-    localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2
-  );
+  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 3.8, 17.8);
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4053,13 +4034,15 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
     const rowHeight = Math.max(7.4 + (descriptionLines * 3.85), 12.9);
     return `
-      <div class="invoice-line-row" style="height:${rowHeight}mm;">
-        <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
-        <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;">${escapeHtml(item.name || "-")}</div>
-        <div class="line-cell line-qty" style="left:${localLeft(section.tableQty.x)}mm; top:${localTop(section.tableQty.y) - localTop(rowAnchorTop)}mm; width:${section.tableQty.w}mm; min-height:${section.tableQty.h}mm;">${escapeHtml(item.quantity || "1")}</div>
-        <div class="line-cell line-unit" style="left:${localLeft(section.tableUnitPrice.x)}mm; top:${localTop(section.tableUnitPrice.y) - localTop(rowAnchorTop)}mm; width:${section.tableUnitPrice.w}mm; min-height:${section.tableUnitPrice.h}mm;">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
-        <div class="line-cell line-total" style="left:${localLeft(section.tableLineTotal.x)}mm; top:${localTop(section.tableLineTotal.y) - localTop(rowAnchorTop)}mm; width:${section.tableLineTotal.w}mm; min-height:${section.tableLineTotal.h}mm;">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
-        ${item.description ? `<div class="line-cell line-description" style="left:${localLeft(section.tableDescription.x)}mm; top:${localTop(section.tableDescription.y) - localTop(rowAnchorTop)}mm; width:${section.tableDescription.w}mm; min-height:${section.tableDescription.h}mm;">${escapeHtml(item.description)}</div>` : ""}
+      <div class="invoice-line-row" style="min-height:${rowHeight}mm;">
+        <div class="invoice-line-main">
+          <div class="line-cell line-number">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
+          <div class="line-cell line-title">${escapeHtml(item.name || "-")}</div>
+          <div class="line-cell line-qty">${escapeHtml(item.quantity || "1")}</div>
+          <div class="line-cell line-unit">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
+          <div class="line-cell line-total">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
+        </div>
+        ${item.description ? `<div class="line-cell line-description">${escapeHtml(item.description)}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -4229,21 +4212,27 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         }
         .table-lines {
           position: relative;
-          margin-top: ${rowStartOffset}mm;
-          min-height: ${Math.max(section.table.h - (rowStartOffset + 1.2), 40)}mm;
+          margin-top: ${tableBodyTop}mm;
+          min-height: ${Math.max(section.table.h - (tableBodyTop + 1.2), 40)}mm;
         }
       .invoice-line-row {
         position: relative;
         width: 100%;
+        margin-bottom: 4.2mm;
         page-break-inside: avoid;
         break-inside: avoid;
       }
+      .invoice-line-main {
+        display: grid;
+        grid-template-columns: 11mm minmax(0, 1fr) 15mm 24mm 34mm;
+        column-gap: 5mm;
+        align-items: start;
+      }
       .line-cell {
-        position: absolute;
         font-size: 10pt;
-          line-height: 1;
-          font-weight: 400;
-        }
+        line-height: 1.02;
+        font-weight: 400;
+      }
       .line-title {
         white-space: nowrap;
       }
@@ -4255,6 +4244,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           white-space: pre-wrap;
           color: #000;
           line-height: 1.04;
+          margin-top: 2.1mm;
+          margin-left: 16mm;
+          width: calc(100% - 16mm - 39mm);
         }
       .line-unit,
       .line-total {
@@ -4414,13 +4406,13 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       <div class="sheet-flow-spacer"></div>
       <div class="table-wrap">
         <div class="table-header-band"></div>
-        <div class="table-header-cell" style="left:${localLeft(section.tableHeaderNumber.x)}mm; top:${localTop(section.tableHeaderNumber.y)}mm; width:${section.tableHeaderNumber.w}mm; min-height:${section.tableHeaderNumber.h}mm;">Items</div>
-        <div class="table-header-cell" style="left:${localLeft(section.tableHeaderTitle.x)}mm; top:${localTop(section.tableHeaderTitle.y)}mm; width:${section.tableHeaderTitle.w}mm; min-height:${section.tableHeaderTitle.h}mm;">Description</div>
-        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderQty.x)}mm; top:${localTop(section.tableHeaderQty.y)}mm; width:${section.tableHeaderQty.w}mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
-        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderUnitPrice.x)}mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:${section.tableHeaderUnitPrice.w}mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
-        <div class="table-header-cell num line-total-header" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
-        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderTitle.x) - 1.5}mm; top:${localTop(section.tableHeaderTitle.y) + (section.tableHeaderTitle.h / 2)}mm;">|</div>
-        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderLineTotal.x) - 4.1}mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
+        <div class="table-header-cell" style="left:1.6mm; top:${localTop(section.tableHeaderNumber.y)}mm; width:11mm; min-height:${section.tableHeaderNumber.h}mm;">Items</div>
+        <div class="table-header-cell" style="left:14mm; top:${localTop(section.tableHeaderTitle.y)}mm; width:79mm; min-height:${section.tableHeaderTitle.h}mm;">Description</div>
+        <div class="table-header-cell num" style="left:103mm; top:${localTop(section.tableHeaderQty.y)}mm; width:15mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
+        <div class="table-header-cell num" style="left:123mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:24mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
+        <div class="table-header-cell num line-total-header" style="left:152mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:28mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
+        <div class="table-header-separator" style="left:11.8mm; top:${localTop(section.tableHeaderTitle.y) + (section.tableHeaderTitle.h / 2)}mm;">|</div>
+        <div class="table-header-separator" style="left:149.2mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
         <div class="table-lines">
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
