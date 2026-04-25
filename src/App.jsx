@@ -4054,6 +4054,102 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     `;
   }).join("");
+  const lineItemsDetailed = (draft.lineItems || []).map((item) => {
+    const quantity = Math.max(Number(item.quantity) || 0, 0);
+    const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
+    const lineTotal = roundProFormaMoney(quantity * unitPrice);
+    const hasDescription = Boolean(String(item.description || "").trim());
+    const descriptionLines = hasDescription ? Math.max(estimateWrappedLines(item.description), 1) : 0;
+    const rowHeight = hasDescription
+      ? Math.max(5.4 + (descriptionLines * 2.9), 8.8)
+      : 5.8;
+    return {
+      rowHeight,
+      html: `
+      <div class="invoice-line-row" style="min-height:${rowHeight}mm;">
+        <div class="invoice-line-main">
+          <div class="line-cell line-number">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
+          <div class="line-cell line-title">${escapeHtml(item.name || "-")}</div>
+          <div class="line-cell line-qty">${escapeHtml(item.quantity || "1")}</div>
+          <div class="line-cell line-unit">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
+          <div class="line-cell line-total">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
+        </div>
+        ${hasDescription ? `<div class="line-cell line-description">${escapeHtml(item.description)}</div>` : ""}
+      </div>
+    `
+    };
+  });
+  const tableHeaderHtml = `
+        <div class="table-header-band">
+          <div class="table-header-cell">Items</div>
+          <div class="table-header-cell description">Description</div>
+          <div class="table-header-cell num qty-header">Qty</div>
+          <div class="table-header-cell num unit-header">Unit Price</div>
+          <div class="table-header-cell num line-total-header">Line Item Total</div>
+        </div>
+  `;
+  const pageHeaderHtml = `
+      <div class="page-header">
+        <div class="doc-title">${escapeHtml(displayTitle)}</div>
+        <div class="brand">
+          <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
+        </div>
+      </div>
+  `;
+  const pageFooterHtml = `
+      <div class="page-footer">
+        ${footerStripHtml}
+        <div class="footer-meta">
+          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
+          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
+          <div>Page 1 of 3</div>
+        </div>
+      </div>
+  `;
+  const firstPageRowBudget = 118;
+  const continuationPageRowBudget = 170;
+  const rowPages = [];
+  let currentPage = [];
+  let currentBudget = firstPageRowBudget;
+  let currentTotal = 0;
+  lineItemsDetailed.forEach((row) => {
+    const rowCost = row.rowHeight + 2.6;
+    if (currentPage.length && currentTotal + rowCost > currentBudget) {
+      rowPages.push(currentPage);
+      currentPage = [];
+      currentBudget = continuationPageRowBudget;
+      currentTotal = 0;
+    }
+    currentPage.push(row);
+    currentTotal += rowCost;
+  });
+  if (currentPage.length || !rowPages.length) {
+    rowPages.push(currentPage);
+  }
+  const firstPageRows = rowPages[0] || [];
+  const continuationRows = rowPages.slice(1);
+  const firstPageTableHtml = `
+      <div class="table-wrap">
+        ${tableHeaderHtml}
+        <div class="table-lines">
+          ${(firstPageRows.length ? firstPageRows : [{ html: `<div class="invoice-line-row"><div class="line-cell">No line items</div></div>` }]).map((row) => row.html).join("")}
+        </div>
+      </div>
+  `;
+  const continuationPagesHtml = continuationRows.map((pageRows) => `
+    <div class="sheet continuation-sheet">
+      ${pageHeaderHtml}
+      <div class="sheet-body continuation-body">
+        <div class="table-wrap continuation-table">
+          ${tableHeaderHtml}
+          <div class="table-lines">
+            ${pageRows.map((row) => row.html).join("")}
+          </div>
+        </div>
+      </div>
+      ${pageFooterHtml}
+    </div>
+  `).join("");
 
   return `<!doctype html>
 <html>
@@ -4089,51 +4185,28 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         overflow: visible;
         position: relative;
       }
-      .print-fixed-header,
-      .print-fixed-footer {
-        display: ${printMode ? "block" : "none"};
-        position: fixed;
-        left: 0;
-        width: 210mm;
-        background: #fff;
-        z-index: 20;
+      .sheet.print-sheet {
+        min-height: 297mm;
+        display: flex;
+        flex-direction: column;
+        page-break-after: always;
+        break-after: page;
       }
-      .print-fixed-header {
-        top: 0;
+      .sheet.print-sheet:last-of-type {
+        page-break-after: auto;
+        break-after: auto;
+      }
+      .sheet-body {
+        flex: 1;
+      }
+      .page-header {
+        position: relative;
         height: ${fixedHeaderHeight}mm;
+        flex: 0 0 ${fixedHeaderHeight}mm;
       }
-      .print-fixed-footer {
-        bottom: 0;
-        height: ${fixedFooterHeight}mm;
-      }
-      .print-fixed-title {
-        position: absolute;
-        left: ${section.title.x}mm;
-        top: ${section.title.y}mm;
-        width: ${section.title.w}mm;
-        font-size: 20pt;
-        line-height: 1;
-        letter-spacing: 0.02em;
-        font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
-        font-weight: 400;
-        color: #008c95;
-        white-space: nowrap;
-      }
-      .print-fixed-logo {
-        position: absolute;
-        left: ${section.logo.x}mm;
-        top: ${section.logo.y}mm;
-        width: ${section.logo.w}mm;
-      }
-      .print-fixed-logo img {
-        width: 100%;
-        display: block;
-      }
-      .print-fixed-footer-inner {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
+      .page-footer {
+        flex: 0 0 ${fixedFooterHeight}mm;
+        margin-top: auto;
       }
       .doc-title {
         position: absolute;
@@ -4219,6 +4292,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         }
       .sheet-flow-spacer {
         height: ${flowStartTop}mm;
+      }
+      .sheet-flow-spacer.print-spacer {
+        height: ${Math.max(flowStartTop - fixedHeaderHeight, 0)}mm;
       }
       .table-wrap {
         position: relative;
@@ -4472,8 +4548,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .terms-sheet {
         page-break-before: always;
         break-before: page;
-        padding-top: ${fixedHeaderHeight + 4}mm;
-        padding-bottom: ${fixedFooterHeight + 4}mm;
+      }
+      .terms-sheet .sheet-body {
+        padding: 4mm 13mm 4mm 13mm;
       }
       .terms-sheet-frame {
         width: 100%;
@@ -4491,37 +4568,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         body { background: #fff; }
         html, body { overflow: visible; }
         .sheet { margin: 0; min-height: auto; }
-        .doc-title,
-        .brand,
-        .footer-strip,
-        .footer-meta {
-          display: none;
-        }
+        .sheet.print-sheet { box-shadow: none; }
       }
     </style>
   </head>
   <body>
-    <div class="print-fixed-header">
-      <div class="print-fixed-title">${escapeHtml(displayTitle)}</div>
-      <div class="print-fixed-logo">
-        <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
-      </div>
-    </div>
-    <div class="print-fixed-footer">
-      <div class="print-fixed-footer-inner">
-        ${footerStripHtml}
-        <div class="footer-meta">
-          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
-          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-          <div>Page 1 of 3</div>
-        </div>
-      </div>
-    </div>
-    <div class="sheet">
-      <div class="doc-title">${escapeHtml(displayTitle)}</div>
-      <div class="brand">
-        <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
-      </div>
+    <div class="sheet print-sheet">
+      ${pageHeaderHtml}
+      <div class="sheet-body">
       <div class="address-block billing">
         <p>${escapeHtml(draft.customerName || "-")}</p>
         <p class="prewrap">${escapeHtml(formatInvoiceAddress(draft.billingAddress || draft.address || "-"))}</p>
@@ -4539,19 +4593,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
       </div>
 
-      <div class="sheet-flow-spacer"></div>
-      <div class="table-wrap">
-        <div class="table-header-band">
-          <div class="table-header-cell">Items</div>
-          <div class="table-header-cell description">Description</div>
-          <div class="table-header-cell num qty-header">Qty</div>
-          <div class="table-header-cell num unit-header">Unit Price</div>
-          <div class="table-header-cell num line-total-header">Line Item Total</div>
-        </div>
-        <div class="table-lines">
-          ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
-        </div>
-      </div>
+      <div class="sheet-flow-spacer print-spacer"></div>
+      ${firstPageTableHtml}
       <div class="invoice-content-flow">
         <div class="bank-totals-row">
           <div class="bank-block">
@@ -4575,15 +4618,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           <div>Payment Terms:</div>
           <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
         </div>
-        ${footerStripHtml}
-        <div class="footer-meta">
-          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
-          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-          <div>Page 1 of 3</div>
-        </div>
       </div>
+      </div>
+      ${pageFooterHtml}
     </div>
-    ${termsPdfUrl ? `<div class="sheet terms-sheet"><object data="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" type="application/pdf" class="terms-sheet-frame"><iframe src="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" class="terms-sheet-frame"></iframe></object></div>` : ""}
+    ${continuationPagesHtml}
+    ${termsPdfUrl ? `<div class="sheet print-sheet terms-sheet">${pageHeaderHtml}<div class="sheet-body"><object data="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" type="application/pdf" class="terms-sheet-frame"><iframe src="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" class="terms-sheet-frame"></iframe></object></div>${pageFooterHtml}</div>` : ""}
           ${autoPrint ? `<script>
       (async function() {
         try {
