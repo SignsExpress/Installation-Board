@@ -3993,6 +3993,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         ? `${draft.depositValue}% deposit, balance due on completion.`
         : `${formatProFormaMoney(Number(draft.depositValue) || 0)} deposit, balance due on completion.`)
     : (draft.termsText || "NET 30 End of Month");
+  const defaultAccreditationStripUrl = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
   const accreditationImages = template.accreditationAssets?.length
     ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset), alt: asset.name || "Accreditation" })).filter((asset) => asset.url)
     : DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS.map((asset) => ({
@@ -4001,6 +4002,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       widthMm: asset.widthMm
     }));
   const termsPdfUrl = builderMode ? "" : getProFormaTemplateAssetUrl(template.termsPdfAsset);
+  const footerStripHtml = template.accreditationAssets?.length
+    ? `<div class="footer-strip footer-strip-custom"><div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div></div>`
+    : `<div class="footer-strip footer-strip-default"><img class="footer-strip-full" src="${defaultAccreditationStripUrl}" alt="Accreditations" /></div>`;
   const fixedHeaderHeight = 26;
   const fixedFooterHeight = 24;
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
@@ -4259,6 +4263,26 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           text-align: center;
           justify-content: center;
         }
+        .table-header-cell.qty-header {
+          position: relative;
+          padding: 0 3.4mm;
+        }
+        .table-header-cell.qty-header::before,
+        .table-header-cell.qty-header::after {
+          content: "|";
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #fff;
+          font-size: 9pt;
+          font-weight: 400;
+        }
+        .table-header-cell.qty-header::before {
+          left: 0;
+        }
+        .table-header-cell.qty-header::after {
+          right: 0;
+        }
         .table-header-cell.line-total-header {
           font-size: 8.4pt;
           justify-content: flex-end;
@@ -4391,23 +4415,35 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           break-inside: avoid;
       }
       .footer-strip {
-          background: #0f98a5;
           min-height: ${section.accreditations.h}mm;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 0 4mm;
         width: ${section.accreditations.w}mm;
         margin-top: 9mm;
         margin-left: ${section.accreditations.x - section.bank.x}mm;
         page-break-inside: avoid;
         break-inside: avoid;
       }
+      .footer-strip-custom {
+        background: #0f98a5;
+        padding: 0 4mm;
+      }
+      .footer-strip-default {
+        padding: 0;
+        background: transparent;
+      }
       .footer-strip img {
         max-width: 100%;
         max-height: calc(${section.accreditations.h}mm - 1.8mm);
         display: block;
         object-fit: contain;
+      }
+      .footer-strip-full {
+        width: 100%;
+        height: ${section.accreditations.h}mm;
+        max-height: none;
+        object-fit: fill;
       }
       .footer-strip-images {
         display: flex;
@@ -4432,6 +4468,18 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .footer-company {
         text-align: center;
         flex: 1;
+      }
+      .terms-sheet {
+        page-break-before: always;
+        break-before: page;
+        padding-top: ${fixedHeaderHeight + 4}mm;
+        padding-bottom: ${fixedFooterHeight + 4}mm;
+      }
+      .terms-sheet-frame {
+        width: 100%;
+        height: ${297 - fixedHeaderHeight - fixedFooterHeight - 8}mm;
+        border: 0;
+        display: block;
       }
       .muted {
         color: #4b5563;
@@ -4461,7 +4509,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     </div>
     <div class="print-fixed-footer">
       <div class="print-fixed-footer-inner">
-        <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
+        ${footerStripHtml}
         <div class="footer-meta">
           <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
           <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
@@ -4496,8 +4544,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <div class="table-header-band">
           <div class="table-header-cell">Items</div>
           <div class="table-header-cell description">Description</div>
-          <div class="table-header-cell num">Qty</div>
-          <div class="table-header-cell num">Unit Price</div>
+          <div class="table-header-cell num qty-header">Qty</div>
+          <div class="table-header-cell num unit-header">Unit Price</div>
           <div class="table-header-cell num line-total-header">Line Item Total</div>
         </div>
         <div class="table-lines">
@@ -4527,7 +4575,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           <div>Payment Terms:</div>
           <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
         </div>
-        <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
+        ${footerStripHtml}
         <div class="footer-meta">
           <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
           <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
@@ -4535,7 +4583,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
     </div>
-    ${termsPdfUrl ? `<div class="sheet terms-sheet" style="padding-top:${fixedHeaderHeight + 4}mm;padding-bottom:${fixedFooterHeight + 4}mm;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:${297 - fixedHeaderHeight - fixedFooterHeight - 8}mm;display:block;" /></div>` : ""}
+    ${termsPdfUrl ? `<div class="sheet terms-sheet"><object data="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" type="application/pdf" class="terms-sheet-frame"><iframe src="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" class="terms-sheet-frame"></iframe></object></div>` : ""}
           ${autoPrint ? `<script>
       (async function() {
         try {
