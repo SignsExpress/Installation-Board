@@ -4019,7 +4019,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.table.y
   );
   const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
-  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 10.4, 24.4);
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4176,32 +4175,37 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         min-height: ${section.table.h}mm;
       }
       .table-header-band {
-        position: absolute;
-        left: ${localLeft(section.tableHeaderBand.x)}mm;
-        top: ${localTop(section.tableHeaderBand.y)}mm;
-        width: ${section.tableHeaderBand.w}mm;
+        width: 100%;
         min-height: ${section.tableHeaderBand.h}mm;
         background: #0f98a5;
+        display: grid;
+        grid-template-columns: 11mm minmax(0, 1fr) 15mm 24mm 34mm;
+        column-gap: 5mm;
+        align-items: center;
+        padding: 0 4mm 0 1.6mm;
       }
         .table-header-cell {
-          position: absolute;
           color: #fff;
           font-size: 9pt;
           font-weight: 400;
           display: flex;
           align-items: center;
-          padding: 0 4px;
-          z-index: 1;
           white-space: nowrap;
+          min-height: ${section.tableHeaderBand.h}mm;
         }
-        .table-header-separator {
+        .table-header-cell.description {
+          position: relative;
+          padding-left: 3.2mm;
+        }
+        .table-header-cell.description::before {
+          content: "|";
           position: absolute;
+          left: 0;
           color: #fff;
           top: 50%;
           transform: translateY(-50%);
           font-size: 9pt;
           font-weight: 400;
-          z-index: 1;
         }
         .table-header-cell.num {
           text-align: center;
@@ -4211,12 +4215,23 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           font-size: 8.4pt;
           justify-content: flex-end;
           text-align: right;
-          padding-right: 1.2mm;
+          position: relative;
+          padding-left: 3.6mm;
+        }
+        .table-header-cell.line-total-header::before {
+          content: "|";
+          position: absolute;
+          left: 0;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #fff;
+          font-size: 9pt;
+          font-weight: 400;
         }
         .table-lines {
           position: relative;
-          margin-top: ${tableBodyTop}mm;
-          min-height: ${Math.max(section.table.h - (tableBodyTop + 1.2), 40)}mm;
+          margin-top: 6.4mm;
+          min-height: ${Math.max(section.table.h - (section.tableHeaderBand.h + 6.4), 40)}mm;
         }
       .invoice-line-row {
         position: relative;
@@ -4408,14 +4423,13 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
 
       <div class="sheet-flow-spacer"></div>
       <div class="table-wrap">
-        <div class="table-header-band"></div>
-        <div class="table-header-cell" style="left:1.6mm; top:${localTop(section.tableHeaderNumber.y)}mm; width:11mm; min-height:${section.tableHeaderNumber.h}mm;">Items</div>
-        <div class="table-header-cell" style="left:14mm; top:${localTop(section.tableHeaderTitle.y)}mm; width:79mm; min-height:${section.tableHeaderTitle.h}mm;">Description</div>
-        <div class="table-header-cell num" style="left:103mm; top:${localTop(section.tableHeaderQty.y)}mm; width:15mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
-        <div class="table-header-cell num" style="left:123mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:24mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
-        <div class="table-header-cell num line-total-header" style="left:152mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:28mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
-        <div class="table-header-separator" style="left:11.8mm; top:${localTop(section.tableHeaderTitle.y) + (section.tableHeaderTitle.h / 2)}mm;">|</div>
-        <div class="table-header-separator" style="left:149.2mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
+        <div class="table-header-band">
+          <div class="table-header-cell">Items</div>
+          <div class="table-header-cell description">Description</div>
+          <div class="table-header-cell num">Qty</div>
+          <div class="table-header-cell num">Unit Price</div>
+          <div class="table-header-cell num line-total-header">Line Item Total</div>
+        </div>
         <div class="table-lines">
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
