@@ -169,6 +169,29 @@ function sanitizeProFormaTemplate(template) {
   const sections = source.sections && typeof source.sections === "object" && !Array.isArray(source.sections)
     ? source.sections
     : {};
+  const sanitizedSections = Object.fromEntries(
+    Object.entries(defaults.sections).map(([key, rect]) => [
+      key,
+      sanitizeProFormaSectionRect(sections[key], rect)
+    ])
+  );
+  const headerBottom = sanitizedSections.tableHeaderBand.y + sanitizedSections.tableHeaderBand.h;
+  const firstRowTop = Math.min(
+    sanitizedSections.tableNumber.y,
+    sanitizedSections.tableTitle.y,
+    sanitizedSections.tableQty.y,
+    sanitizedSections.tableUnitPrice.y,
+    sanitizedSections.tableLineTotal.y
+  );
+  const suspiciousTableRowLayout = firstRowTop < headerBottom + 4;
+  if (suspiciousTableRowLayout) {
+    sanitizedSections.tableNumber = { ...sanitizedSections.tableNumber, ...defaults.sections.tableNumber };
+    sanitizedSections.tableTitle = { ...sanitizedSections.tableTitle, ...defaults.sections.tableTitle };
+    sanitizedSections.tableQty = { ...sanitizedSections.tableQty, ...defaults.sections.tableQty };
+    sanitizedSections.tableUnitPrice = { ...sanitizedSections.tableUnitPrice, ...defaults.sections.tableUnitPrice };
+    sanitizedSections.tableLineTotal = { ...sanitizedSections.tableLineTotal, ...defaults.sections.tableLineTotal };
+    sanitizedSections.tableDescription = { ...sanitizedSections.tableDescription, ...defaults.sections.tableDescription };
+  }
   return {
     version: Number(source.version || defaults.version),
     overlayOpacity: Math.min(Math.max(Number(source.overlayOpacity ?? defaults.overlayOpacity), 0), 1),
@@ -177,12 +200,7 @@ function sanitizeProFormaTemplate(template) {
     accreditationAssets: Array.isArray(source.accreditationAssets)
       ? source.accreditationAssets.map((asset) => sanitizeStoredAssetRef(asset)).filter(Boolean)
       : [],
-    sections: Object.fromEntries(
-      Object.entries(defaults.sections).map(([key, rect]) => [
-        key,
-        sanitizeProFormaSectionRect(sections[key], rect)
-      ])
-    )
+    sections: sanitizedSections
   };
 }
 
