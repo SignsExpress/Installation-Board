@@ -4001,6 +4001,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       widthMm: asset.widthMm
     }));
   const termsPdfUrl = builderMode ? "" : getProFormaTemplateAssetUrl(template.termsPdfAsset);
+  const fixedHeaderHeight = 26;
+  const fixedFooterHeight = 24;
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
   const completionBalance = hasDeposit
     ? Math.max(roundProFormaMoney(summary.total - summary.depositAmount), 0)
@@ -4082,6 +4084,52 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         padding: 0;
         overflow: visible;
         position: relative;
+      }
+      .print-fixed-header,
+      .print-fixed-footer {
+        display: ${printMode ? "block" : "none"};
+        position: fixed;
+        left: 0;
+        width: 210mm;
+        background: #fff;
+        z-index: 20;
+      }
+      .print-fixed-header {
+        top: 0;
+        height: ${fixedHeaderHeight}mm;
+      }
+      .print-fixed-footer {
+        bottom: 0;
+        height: ${fixedFooterHeight}mm;
+      }
+      .print-fixed-title {
+        position: absolute;
+        left: ${section.title.x}mm;
+        top: ${section.title.y}mm;
+        width: ${section.title.w}mm;
+        font-size: 20pt;
+        line-height: 1;
+        letter-spacing: 0.02em;
+        font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
+        font-weight: 400;
+        color: #008c95;
+        white-space: nowrap;
+      }
+      .print-fixed-logo {
+        position: absolute;
+        left: ${section.logo.x}mm;
+        top: ${section.logo.y}mm;
+        width: ${section.logo.w}mm;
+      }
+      .print-fixed-logo img {
+        width: 100%;
+        display: block;
+      }
+      .print-fixed-footer-inner {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
       }
       .doc-title {
         position: absolute;
@@ -4395,10 +4443,32 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         body { background: #fff; }
         html, body { overflow: visible; }
         .sheet { margin: 0; min-height: auto; }
+        .doc-title,
+        .brand,
+        .footer-strip,
+        .footer-meta {
+          display: none;
+        }
       }
     </style>
   </head>
   <body>
+    <div class="print-fixed-header">
+      <div class="print-fixed-title">${escapeHtml(displayTitle)}</div>
+      <div class="print-fixed-logo">
+        <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
+      </div>
+    </div>
+    <div class="print-fixed-footer">
+      <div class="print-fixed-footer-inner">
+        <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
+        <div class="footer-meta">
+          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
+          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
+          <div>Page 1 of 3</div>
+        </div>
+      </div>
+    </div>
     <div class="sheet">
       <div class="doc-title">${escapeHtml(displayTitle)}</div>
       <div class="brand">
@@ -4465,7 +4535,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
     </div>
-    ${termsPdfUrl ? `<div class="sheet" style="padding:0;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:297mm;display:block;" /></div>` : ""}
+    ${termsPdfUrl ? `<div class="sheet terms-sheet" style="padding-top:${fixedHeaderHeight + 4}mm;padding-bottom:${fixedFooterHeight + 4}mm;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:${297 - fixedHeaderHeight - fixedFooterHeight - 8}mm;display:block;" /></div>` : ""}
           ${autoPrint ? `<script>
       (async function() {
         try {
