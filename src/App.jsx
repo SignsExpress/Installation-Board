@@ -4047,7 +4047,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
-    const rowHeight = Math.max(7.9 + (descriptionLines * 4.05), 13.8);
+    const rowHeight = Math.max(7.4 + (descriptionLines * 3.85), 12.9);
     return `
       <div class="invoice-line-row" style="height:${rowHeight}mm;">
         <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
@@ -4225,8 +4225,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         }
         .table-lines {
           position: relative;
-          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h - 0.95, 7.1)}mm;
-          min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
+          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.8, 9.8)}mm;
+          min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2.8), 40)}mm;
         }
       .invoice-line-row {
         position: relative;
@@ -4264,7 +4264,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .invoice-content-flow {
         width: ${section.table.w}mm;
         margin-left: ${section.bank.x}mm;
-        margin-top: 9.5mm;
+        margin-top: 11mm;
       }
       .bank-totals-row {
         display: flex;
