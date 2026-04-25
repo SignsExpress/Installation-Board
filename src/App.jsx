@@ -4019,7 +4019,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.table.y
   );
   const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
-  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 3.8, 17.8);
+  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 7.6, 21.6);
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4032,7 +4032,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
-    const rowHeight = Math.max(7.4 + (descriptionLines * 3.85), 12.9);
+    const rowHeight = Math.max(6.4 + (descriptionLines * 3.25), 10.8);
     return `
       <div class="invoice-line-row" style="min-height:${rowHeight}mm;">
         <div class="invoice-line-main">
@@ -4218,7 +4218,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .invoice-line-row {
         position: relative;
         width: 100%;
-        margin-bottom: 4.2mm;
+        margin-bottom: 1.9mm;
         page-break-inside: avoid;
         break-inside: avoid;
       }
@@ -4244,7 +4244,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           white-space: pre-wrap;
           color: #000;
           line-height: 1.04;
-          margin-top: 2.1mm;
+          margin-top: 1.2mm;
           margin-left: 16mm;
           width: calc(100% - 16mm - 39mm);
         }
