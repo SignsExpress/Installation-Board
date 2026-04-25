@@ -4053,8 +4053,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     `;
   }).join("");
   const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.5 + currentRowOffset, section.table.h);
-  const dynamicBankTop = Math.max(contentBottom + 6, section.bank.y);
-  const dynamicTotalsTop = Math.max(contentBottom + 2, section.totals.y);
+  const dynamicBankTop = Math.max(contentBottom + 8.5, section.bank.y);
+  const dynamicTotalsTop = Math.max(contentBottom + 4.5, section.totals.y);
   const totalRowCount = 4 + (summary.discountAmount > 0 ? 1 : 0) + (hasDeposit ? 2 : 2);
   const dynamicTotalsHeight = Math.max(section.totals.h, 7.8 + (totalRowCount * 6.1));
   const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 9, dynamicTotalsTop + dynamicTotalsHeight + 10, section.approval.y);
@@ -4193,39 +4193,39 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         min-height: ${section.tableHeaderBand.h}mm;
         background: #0f98a5;
       }
-      .table-header-cell {
-        position: absolute;
-        color: #fff;
+        .table-header-cell {
+          position: absolute;
+          color: #fff;
           font-size: 9pt;
-        font-weight: 400;
-        display: flex;
-        align-items: center;
+          font-weight: 400;
+          display: flex;
+          align-items: center;
           padding: 0 4px;
-        z-index: 1;
-        white-space: nowrap;
-      }
-      .table-header-cell::after {
-        content: "|";
-        position: absolute;
-          right: -1.05mm;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #fff;
-        font-weight: 400;
-      }
-      .table-header-cell.num {
-        text-align: center;
-        justify-content: center;
-      }
-        .table-header-cell.line-total-header::after {
-          display: none;
+          z-index: 1;
+          white-space: nowrap;
+        }
+        .table-header-separator {
+          position: absolute;
+          color: #fff;
+          top: 50%;
+          transform: translateY(-50%);
+          font-size: 9pt;
+          font-weight: 400;
+          z-index: 1;
+        }
+        .table-header-cell.num {
+          text-align: center;
+          justify-content: center;
         }
         .table-header-cell.line-total-header {
           font-size: 8.4pt;
+          justify-content: flex-end;
+          text-align: right;
+          padding-right: 0;
         }
         .table-lines {
           position: relative;
-          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.05, 9.1)}mm;
+          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.15, 8.1)}mm;
           min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
         }
       .invoice-line-row {
@@ -4274,25 +4274,25 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         gap: 1px 5mm;
         margin-top: 3px;
       }
-      .totals-box {
-        position: absolute;
-        left: ${section.totals.x}mm;
-        top: ${dynamicTotalsTop}mm;
-        width: ${section.totals.w}mm;
+        .totals-box {
+          position: absolute;
+          left: ${section.totals.x}mm;
+          top: ${dynamicTotalsTop}mm;
+          width: ${section.totals.w - 2.8}mm;
           border: 0.6mm solid #0f98a5;
-          padding: 4.6mm 5.1mm;
+          padding: 3.4mm 4.2mm;
           font-size: 10pt;
           min-height: ${dynamicTotalsHeight}mm;
         }
-      .total-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 14px;
-        padding: 1.4mm 0;
-      }
-      .total-row.total {
-        font-size: 10pt;
-        font-weight: 400;
+        .total-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 11px;
+          padding: 0.85mm 0;
+        }
+        .total-row.total {
+          font-size: 10pt;
+          font-weight: 400;
           padding-top: 1.2mm;
           margin-top: 0;
         }
@@ -4401,6 +4401,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderQty.x)}mm; top:${localTop(section.tableHeaderQty.y)}mm; width:${section.tableHeaderQty.w}mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
         <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderUnitPrice.x)}mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:${section.tableHeaderUnitPrice.w}mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
         <div class="table-header-cell num line-total-header" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
+        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderTitle.x) - 1.5}mm; top:${localTop(section.tableHeaderTitle.y) + (section.tableHeaderTitle.h / 2)}mm;">|</div>
+        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderLineTotal.x) - 2.1}mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
         <div class="table-lines">
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
