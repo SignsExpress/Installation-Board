@@ -4032,17 +4032,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .split(/\r?\n/)
       .reduce((count, line) => count + Math.max(1, Math.ceil(line.trim().length / charsPerLine)), 0);
   };
-  let currentRowOffset = 0;
   const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
     const rowHeight = Math.max(7.9 + (descriptionLines * 4.05), 13.8);
-    const rowOffset = currentRowOffset;
-    currentRowOffset += rowHeight;
     return `
-      <div class="invoice-line-row" style="top:${localTop(rowAnchorTop) + rowOffset}mm; height:${rowHeight}mm;">
+      <div class="invoice-line-row" style="height:${rowHeight}mm;">
         <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
         <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;">${escapeHtml(item.name || "-")}</div>
         <div class="line-cell line-qty" style="left:${localLeft(section.tableQty.x)}mm; top:${localTop(section.tableQty.y) - localTop(rowAnchorTop)}mm; width:${section.tableQty.w}mm; min-height:${section.tableQty.h}mm;">${escapeHtml(item.quantity || "1")}</div>
@@ -4052,15 +4049,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     `;
   }).join("");
-  const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.5 + currentRowOffset, section.table.h);
-  const dynamicBankTop = Math.max(contentBottom + 11.2, section.bank.y);
-  const dynamicTotalsTop = Math.max(contentBottom + 7.4, section.totals.y);
-  const totalRowCount = 4 + (summary.discountAmount > 0 ? 1 : 0) + (hasDeposit ? 2 : 2);
-  const dynamicTotalsHeight = Math.max(section.totals.h, 7.8 + (totalRowCount * 6.1));
-  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 9, dynamicTotalsTop + dynamicTotalsHeight + 10, section.approval.y);
-  const dynamicPaymentTop = Math.max(dynamicApprovalTop + section.approval.h + 8, section.paymentTerms.y);
-  const dynamicAccreditationsTop = Math.max(dynamicPaymentTop + section.paymentTerms.h + 10, section.accreditations.y);
-  const dynamicFooterMetaTop = Math.max(dynamicAccreditationsTop + section.accreditations.h + 6, section.footerMeta.y);
 
   return `<!doctype html>
 <html>
@@ -4178,11 +4166,13 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         .meta-block p {
           margin: 0 0 2.5px;
         }
+      .sheet-flow-spacer {
+        height: ${section.table.y}mm;
+      }
       .table-wrap {
-        position: absolute;
-        left: ${section.table.x}mm;
-        top: ${section.table.y}mm;
+        position: relative;
         width: ${section.table.w}mm;
+        margin-left: ${section.table.x}mm;
         min-height: ${section.table.h}mm;
       }
       .table-header-band {
@@ -4229,9 +4219,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
         }
       .invoice-line-row {
-        position: absolute;
-        left: 0;
+        position: relative;
         width: 100%;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       .line-cell {
         position: absolute;
@@ -4260,10 +4251,20 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         text-align: center;
         white-space: nowrap;
       }
+      .invoice-content-flow {
+        width: ${section.table.w}mm;
+        margin-left: ${section.bank.x}mm;
+        margin-top: 9.5mm;
+      }
+      .bank-totals-row {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10mm;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
       .bank-block {
-        position: absolute;
-        left: ${section.bank.x}mm;
-        top: ${dynamicBankTop}mm;
         width: ${section.bank.w}mm;
         font-size: 10pt;
         line-height: 1.05;
@@ -4275,14 +4276,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         margin-top: 3px;
       }
         .totals-box {
-          position: absolute;
-          left: ${section.totals.x}mm;
-          top: ${dynamicTotalsTop}mm;
           width: ${section.totals.w - 2.8}mm;
           border: 0.6mm solid #0f98a5;
           padding: 3.4mm 4.2mm;
           font-size: 10pt;
-          min-height: ${dynamicTotalsHeight}mm;
+          min-height: ${section.totals.h}mm;
+          margin-left: auto;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
         .total-row {
           display: flex;
@@ -4300,27 +4301,24 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         font-weight: 400;
       }
       .approval {
-        position: absolute;
-        left: ${section.bank.x}mm;
-        top: ${dynamicApprovalTop}mm;
           width: ${section.table.w}mm;
           font-size: 10pt;
           line-height: 1.12;
+          margin-top: 9mm;
+          page-break-inside: avoid;
+          break-inside: avoid;
         }
       .payment-terms-footer {
-        position: absolute;
-          left: ${section.bank.x}mm;
-          top: ${dynamicPaymentTop}mm;
           width: ${section.table.w}mm;
           padding-top: 2.6mm;
           border-top: 1.5px solid #0f98a5;
           font-size: 8pt;
           line-height: 1.25;
+          margin-top: 7mm;
+          page-break-inside: avoid;
+          break-inside: avoid;
       }
       .footer-strip {
-        position: absolute;
-          left: ${section.accreditations.x}mm;
-          top: ${dynamicAccreditationsTop}mm;
           background: #0f98a5;
           min-height: ${section.accreditations.h}mm;
         display: flex;
@@ -4328,6 +4326,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         justify-content: center;
         padding: 0 4mm;
         width: ${section.accreditations.w}mm;
+        margin-top: 9mm;
+        margin-left: ${section.accreditations.x - section.bank.x}mm;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       .footer-strip img {
         max-width: 100%;
@@ -4344,15 +4346,16 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         width: 100%;
       }
       .footer-meta {
-        position: absolute;
-        left: ${section.footerMeta.x}mm;
-        top: ${dynamicFooterMetaTop}mm;
         display: flex;
         justify-content: space-between;
         gap: 12px;
         align-items: center;
         font-size: 6pt;
         width: ${section.footerMeta.w}mm;
+        margin-top: 6mm;
+        margin-left: ${section.footerMeta.x - section.bank.x}mm;
+        page-break-inside: avoid;
+        break-inside: avoid;
       }
       .footer-company {
         text-align: center;
@@ -4394,6 +4397,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
       </div>
 
+      <div class="sheet-flow-spacer"></div>
       <div class="table-wrap">
         <div class="table-header-band"></div>
         <div class="table-header-cell" style="left:${localLeft(section.tableHeaderNumber.x)}mm; top:${localTop(section.tableHeaderNumber.y)}mm; width:${section.tableHeaderNumber.w}mm; min-height:${section.tableHeaderNumber.h}mm;">Items</div>
@@ -4407,33 +4411,35 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
       </div>
-
-      <div class="bank-block">
-        <div>Bank details:</div>
-        <div class="bank-grid">
-          ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
+      <div class="invoice-content-flow">
+        <div class="bank-totals-row">
+          <div class="bank-block">
+            <div>Bank details:</div>
+            <div class="bank-grid">
+              ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
+            </div>
+          </div>
+          <div class="totals-box">
+            <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
+            ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
+            <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
+            <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
+            <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
+            ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
+            <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
+          </div>
         </div>
-      </div>
-      <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
-      <div class="payment-terms-footer">
-        <div>Payment Terms:</div>
-        <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
-      </div>
-        <div class="totals-box">
-          <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
-          ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
-          <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
-          <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
-          <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
-          ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
-          <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
+        <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
+        <div class="payment-terms-footer">
+          <div>Payment Terms:</div>
+          <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
         </div>
-
-      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
-      <div class="footer-meta">
-        <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
-        <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-        <div>Page 1 of 3</div>
+        <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
+        <div class="footer-meta">
+          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
+          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
+          <div>Page 1 of 3</div>
+        </div>
       </div>
     </div>
     ${termsPdfUrl ? `<div class="sheet" style="padding:0;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:297mm;display:block;" /></div>` : ""}

@@ -5390,6 +5390,14 @@ function isGenericProFormaName(value = "") {
   return /^(item\s*\d+|line item\s*\d+|panel with vinyl print to surface\.?|stand-?offs?,? screw covers?,? hanging kits? ?&? holes?|category|graphics|installation|delivery)$/i.test(text);
 }
 
+function isGenericProFormaDescription(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return true;
+  if (/^cm$/i.test(text)) return true;
+  if (text.length <= 3 && /^[A-Z0-9]+$/.test(text)) return true;
+  return false;
+}
+
 function shouldIgnoreProFormaMoneyField(leaf = "") {
   const text = String(leaf || "").trim();
   if (/^orderitem\.priceunitpretax$/i.test(text)) return false;
@@ -5687,6 +5695,7 @@ function extractProFormaLineItems(order = {}) {
     if (
       /(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf) &&
       textValue
+      && !isGenericProFormaDescription(textValue)
       && !isNestedComponentField
     ) {
       const nextScore =
