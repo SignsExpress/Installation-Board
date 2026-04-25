@@ -3749,7 +3749,7 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
   termsPdfAsset: null,
   accreditationAssets: [],
   sections: {
-    title: { x: 12.9, y: 11, w: 16.6, h: 8.5 },
+    title: { x: 12.9, y: 11, w: 58, h: 8.5 },
     logo: { x: 141, y: 10.6, w: 55.9, h: 13.3 },
     billing: { x: 13.2, y: 26.8, w: 36.3, h: 18.4 },
     company: { x: 141.1, y: 26.8, w: 55.5, h: 18.2 },
@@ -3763,7 +3763,7 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
     tableHeaderUnitPrice: { x: 122.3, y: 80.5, w: 27.7, h: 11.3 },
     tableHeaderLineTotal: { x: 173.2, y: 80.5, w: 24.4, h: 11.3 },
     tableNumber: { x: 14.5, y: 93.7, w: 2.2, h: 4.9 },
-    tableTitle: { x: 27.9, y: 93.7, w: 29.5, h: 4.9 },
+    tableTitle: { x: 27.9, y: 93.7, w: 46, h: 4.9 },
     tableQty: { x: 113.2, y: 93.7, w: 2.3, h: 4.9 },
     tableUnitPrice: { x: 127.5, y: 93.7, w: 14.4, h: 4.9 },
     tableLineTotal: { x: 182.1, y: 93.7, w: 14.4, h: 4.9 },
@@ -3772,7 +3772,7 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
     totals: { x: 138.5, y: 141.5, w: 59.4, h: 27.2 },
     approval: { x: 13.3, y: 206.4, w: 101.3, h: 4.9 },
     paymentTerms: { x: 13.3, y: 220.2, w: 104.9, h: 8.3 },
-    accreditations: { x: 46.3, y: 238.8, w: 149.7, h: 8.4 },
+    accreditations: { x: 12.8, y: 238.8, w: 184.4, h: 8.4 },
     footerMeta: { x: 12.8, y: 257.4, w: 184.4, h: 4.2 }
   }
 };
@@ -4055,7 +4055,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.8 + currentRowOffset, section.table.h);
   const dynamicBankTop = Math.max(contentBottom + 6, section.bank.y);
   const dynamicTotalsTop = Math.max(contentBottom + 2, section.totals.y);
-  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 8, section.approval.y);
+  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 8, dynamicTotalsTop + section.totals.h + 8, section.approval.y);
   const dynamicPaymentTop = Math.max(dynamicApprovalTop + section.approval.h + 8, section.paymentTerms.y);
   const dynamicAccreditationsTop = Math.max(dynamicPaymentTop + section.paymentTerms.h + 10, section.accreditations.y);
   const dynamicFooterMetaTop = Math.max(dynamicAccreditationsTop + section.accreditations.h + 6, section.footerMeta.y);
@@ -4106,6 +4106,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
         font-weight: 400;
         color: #008c95;
+        white-space: nowrap;
       }
       .brand {
         position: absolute;
@@ -4214,6 +4215,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         line-height: 1.02;
         font-weight: 400;
       }
+      .line-title {
+        white-space: nowrap;
+      }
       .line-number {
         text-align: left;
         padding-left: 0;
@@ -4250,7 +4254,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         left: ${section.totals.x}mm;
         top: ${dynamicTotalsTop}mm;
         width: ${section.totals.w}mm;
-        border: 1.5px solid #0f98a5;
+        border: 0.8mm solid #0f98a5;
         padding: 4.6mm 5.1mm;
         font-size: 10pt;
         min-height: ${section.totals.h}mm;
@@ -4272,9 +4276,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .approval {
         position: absolute;
-        left: ${section.approval.x}mm;
+        left: ${section.bank.x}mm;
         top: ${dynamicApprovalTop}mm;
-        width: ${section.approval.w}mm;
+        width: ${section.table.w}mm;
         font-size: 10pt;
       }
       .payment-terms-footer {
@@ -4710,23 +4714,46 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     }, template, { printMode: true, autoPrint: true });
     const blob = new Blob([printHtml], { type: "text/html" });
     const printUrl = URL.createObjectURL(blob);
-    const printWindow = window.open(printUrl, "_blank");
-    if (!printWindow) {
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "1px";
+    printFrame.style.height = "1px";
+    printFrame.style.opacity = "0";
+    printFrame.style.pointerEvents = "none";
+    printFrame.src = printUrl;
+    const clearPrintFrame = () => {
+      URL.revokeObjectURL(printUrl);
+      printFrame.remove();
+      setPrinting(false);
+    };
+    printFrame.addEventListener("load", () => {
+      const frameWindow = printFrame.contentWindow;
+      if (!frameWindow) {
+        clearPrintFrame();
+        return;
+      }
+      const finish = () => setTimeout(clearPrintFrame, 1200);
+      frameWindow.addEventListener("afterprint", finish, { once: true });
+      frameWindow.focus();
+      setTimeout(() => {
+        try {
+          frameWindow.print();
+        } catch (error) {
+          console.error(error);
+          clearPrintFrame();
+        }
+      }, 1800);
+    }, { once: true });
+    if (!document.body) {
       URL.revokeObjectURL(printUrl);
       setError("Please allow pop-ups so the invoice preview can open.");
       return;
     }
     try {
       setPrinting(true);
-      const clearPrinting = () => {
-        setPrinting(false);
-        URL.revokeObjectURL(printUrl);
-      };
-      printWindow.addEventListener("afterprint", clearPrinting, { once: true });
-      printWindow.addEventListener("beforeunload", clearPrinting, { once: true });
-      setTimeout(() => {
-        setPrinting(false);
-      }, 2500);
+      document.body.appendChild(printFrame);
     } finally {
       // printing state is cleared after the print window is actually ready
     }

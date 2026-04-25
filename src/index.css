@@ -6203,6 +6203,12 @@ button {
   color: #b91c1c;
 }
 
+.pro-forma-page {
+  min-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .pro-forma-page .social-post-panel {
   padding: 10px;
 }
@@ -6756,6 +6762,7 @@ button {
   border-radius: 14px;
   background: #fff;
   overflow: auto;
+  display: block;
 }
 
 .pro-forma-preview-empty {
