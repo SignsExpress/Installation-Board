@@ -6724,17 +6724,20 @@ button {
 .pro-forma-preview-shell {
   display: grid;
   gap: 8px;
+  min-height: 0;
 }
 
 .pro-forma-preview-compare {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .pro-forma-preview-panel {
   display: grid;
   gap: 6px;
+  min-height: 0;
 }
 
 .pro-forma-preview-label {
@@ -6747,10 +6750,12 @@ button {
 
 .pro-forma-preview-frame {
   width: 100%;
+  height: 78vh;
   min-height: 900px;
   border: 1px solid #d7cbdd;
   border-radius: 14px;
   background: #fff;
+  overflow: auto;
 }
 
 .pro-forma-preview-empty {

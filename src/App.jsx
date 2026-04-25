@@ -3956,6 +3956,8 @@ function buildProFormaCodeCheatSheet(results = [], expectedAmounts = {}) {
 function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   if (!draft) return "";
   const builderMode = options.builderMode === true;
+  const printMode = options.printMode === true;
+  const autoPrint = options.autoPrint === true;
   const template = sanitizeProFormaTemplate(templateInput);
   const section = template.sections;
   const formatInvoiceAddress = (value) => {
@@ -3985,7 +3987,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     ["IBAN", "GB98NWBK01671471603603"],
     ["SWIFT", "NWBKGB2L"]
   ];
-  const displayTitle = "INVOICE";
+  const displayTitle = "PRO FORMA INVOICE";
+  const compactTopTerms = draft.depositType
+    ? (draft.depositType === "percent"
+        ? `${draft.depositValue}% deposit, balance due on completion.`
+        : `${formatProFormaMoney(Number(draft.depositValue) || 0)} deposit, balance due on completion.`)
+    : (draft.termsText || "NET 30 End of Month");
   const accreditationImages = template.accreditationAssets?.length
     ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset), alt: asset.name || "Accreditation" })).filter((asset) => asset.url)
     : DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS.map((asset) => ({
@@ -4018,14 +4025,24 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.tableLineTotal.y + section.tableLineTotal.h,
     section.tableDescription.y + section.tableDescription.h
   );
-  const rowPitch = 20.32;
-  const lineRows = (draft.lineItems || []).map((item, index) => {
+  const estimateWrappedLines = (text, charsPerLine = 46) => {
+    const raw = String(text || "");
+    if (!raw.trim()) return 0;
+    return raw
+      .split(/\r?\n/)
+      .reduce((count, line) => count + Math.max(1, Math.ceil(line.trim().length / charsPerLine)), 0);
+  };
+  let currentRowOffset = 0;
+  const lineRows = (draft.lineItems || []).map((item) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
-    const rowOffset = index * rowPitch;
+    const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
+    const rowHeight = Math.max(11 + (descriptionLines * 4.6), 18);
+    const rowOffset = currentRowOffset;
+    currentRowOffset += rowHeight;
     return `
-      <div class="invoice-line-row" style="top:${localTop(rowAnchorTop) + rowOffset}mm; height:${rowPitch}mm;">
+      <div class="invoice-line-row" style="top:${localTop(rowAnchorTop) + rowOffset}mm; height:${rowHeight}mm;">
         <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
         <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;">${escapeHtml(item.name || "-")}</div>
         <div class="line-cell line-qty" style="left:${localLeft(section.tableQty.x)}mm; top:${localTop(section.tableQty.y) - localTop(rowAnchorTop)}mm; width:${section.tableQty.w}mm; min-height:${section.tableQty.h}mm;">${escapeHtml(item.quantity || "1")}</div>
@@ -4035,6 +4052,13 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     `;
   }).join("");
+  const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.8 + currentRowOffset, section.table.h);
+  const dynamicBankTop = Math.max(contentBottom + 6, section.bank.y);
+  const dynamicTotalsTop = Math.max(contentBottom + 2, section.totals.y);
+  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 8, section.approval.y);
+  const dynamicPaymentTop = Math.max(dynamicApprovalTop + section.approval.h + 8, section.paymentTerms.y);
+  const dynamicAccreditationsTop = Math.max(dynamicPaymentTop + section.paymentTerms.h + 10, section.accreditations.y);
+  const dynamicFooterMetaTop = Math.max(dynamicAccreditationsTop + section.accreditations.h + 6, section.footerMeta.y);
 
   return `<!doctype html>
 <html>
@@ -4054,20 +4078,20 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         margin: 0;
         width: 100%;
         min-height: 100%;
-        background: ${builderMode ? "#ffffff" : "#f4f5f7"};
+        background: ${builderMode || printMode ? "#ffffff" : "#f4f5f7"};
         font-family: Arial, Helvetica, sans-serif;
         color: #000;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
-        overflow: hidden;
+        overflow: auto;
       }
       .sheet {
         width: ${builderMode ? "100%" : "210mm"};
         min-height: ${builderMode ? "100%" : "297mm"};
-        margin: ${builderMode ? "0" : "0 auto"};
+        margin: ${builderMode || printMode ? "0" : "0 auto"};
         background: #fff;
         padding: 0;
-        overflow: hidden;
+        overflow: visible;
         position: relative;
       }
       .doc-title {
@@ -4101,7 +4125,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .address-block {
         position: absolute;
         font-size: 10pt;
-        line-height: 1.08;
+        line-height: 1.02;
         min-height: 1mm;
       }
       .address-block.billing {
@@ -4128,7 +4152,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .meta-block {
         position: absolute;
         font-size: 10pt;
-        line-height: 1.32;
+        line-height: 1.16;
       }
       .meta-block.left {
         left: ${section.metaLeft.x}mm;
@@ -4210,7 +4234,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .bank-block {
         position: absolute;
         left: ${section.bank.x}mm;
-        top: ${section.bank.y}mm;
+        top: ${dynamicBankTop}mm;
         width: ${section.bank.w}mm;
         font-size: 10pt;
         line-height: 1.05;
@@ -4224,7 +4248,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .totals-box {
         position: absolute;
         left: ${section.totals.x}mm;
-        top: ${section.totals.y}mm;
+        top: ${dynamicTotalsTop}mm;
         width: ${section.totals.w}mm;
         border: 1.5px solid #0f98a5;
         padding: 4.6mm 5.1mm;
@@ -4249,14 +4273,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .approval {
         position: absolute;
         left: ${section.approval.x}mm;
-        top: ${section.approval.y}mm;
+        top: ${dynamicApprovalTop}mm;
         width: ${section.approval.w}mm;
         font-size: 10pt;
       }
       .payment-terms-footer {
         position: absolute;
         left: ${section.paymentTerms.x}mm;
-        top: ${section.paymentTerms.y}mm;
+        top: ${dynamicPaymentTop}mm;
         width: ${section.paymentTerms.w}mm;
         padding-top: 2.6mm;
         border-top: 1.5px solid #0f98a5;
@@ -4266,7 +4290,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .footer-strip {
         position: absolute;
         left: ${section.accreditations.x}mm;
-        top: ${section.accreditations.y}mm;
+        top: ${dynamicAccreditationsTop}mm;
         background: #0f98a5;
         min-height: ${section.accreditations.h}mm;
         display: flex;
@@ -4292,7 +4316,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .footer-meta {
         position: absolute;
         left: ${section.footerMeta.x}mm;
-        top: ${section.footerMeta.y}mm;
+        top: ${dynamicFooterMetaTop}mm;
         display: flex;
         justify-content: space-between;
         gap: 12px;
@@ -4312,6 +4336,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       @media print {
         body { background: #fff; }
+        html, body { overflow: visible; }
         .sheet { margin: 0; min-height: auto; }
       }
     </style>
@@ -4336,7 +4361,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <p>Order Ref: ${escapeHtml(draft.orderReference || "-")}</p>
       </div>
       <div class="meta-block right">
-        <p>Payment Terms: ${escapeHtml(draft.termsText || "NET 30 End of Month")}</p>
+        <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
       </div>
 
       <div class="table-wrap">
@@ -4380,6 +4405,29 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     </div>
     ${termsPdfUrl ? `<div class="sheet" style="padding:0;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:297mm;display:block;" /></div>` : ""}
+    ${autoPrint ? `<script>
+      (async function() {
+        try {
+          if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+          }
+          const images = Array.from(document.images || []);
+          await Promise.all(images.map((image) => (
+            image.complete ? Promise.resolve() : new Promise((resolve) => {
+              image.addEventListener('load', resolve, { once: true });
+              image.addEventListener('error', resolve, { once: true });
+            })
+          )));
+          await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+          await new Promise((resolve) => setTimeout(resolve, 1200));
+          window.focus();
+          window.print();
+        } catch (error) {
+          console.error(error);
+        }
+      })();
+    <\/script>` : ""}
   </body>
 </html>`;
 }
@@ -4650,45 +4698,35 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
 
   async function openPrintPreview() {
     if (!draft) return;
-    const printWindow = window.open("", "_blank");
+    const printHtml = buildProFormaPreviewHtml(draft, {
+      subtotal,
+      discountAmount,
+      preTaxTotal,
+      vatAmount,
+      total,
+      depositAmount,
+      totalPaid,
+      balanceDue: remainingBalance
+    }, template, { printMode: true, autoPrint: true });
+    const blob = new Blob([printHtml], { type: "text/html" });
+    const printUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(printUrl, "_blank");
     if (!printWindow) {
+      URL.revokeObjectURL(printUrl);
       setError("Please allow pop-ups so the invoice preview can open.");
       return;
     }
     try {
       setPrinting(true);
-      printWindow.document.write(previewHtml);
-      printWindow.document.close();
-      const waitForPrintReady = async () => {
-        try {
-          const images = Array.from(printWindow.document.images || []);
-          if (printWindow.document.fonts?.ready) {
-            await printWindow.document.fonts.ready;
-          }
-          await Promise.all(images.map((image) => (
-            image.complete
-              ? Promise.resolve()
-              : new Promise((resolve) => {
-                  image.addEventListener("load", resolve, { once: true });
-                  image.addEventListener("error", resolve, { once: true });
-                })
-          )));
-          await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
-          await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
-          await new Promise((resolve) => setTimeout(resolve, 900));
-          printWindow.focus();
-          printWindow.print();
-        } catch (error) {
-          console.error(error);
-        } finally {
-          setPrinting(false);
-        }
+      const clearPrinting = () => {
+        setPrinting(false);
+        URL.revokeObjectURL(printUrl);
       };
-      if (printWindow.document.readyState === "complete") {
-        waitForPrintReady();
-      } else {
-        printWindow.addEventListener("load", waitForPrintReady, { once: true });
-      }
+      printWindow.addEventListener("afterprint", clearPrinting, { once: true });
+      printWindow.addEventListener("beforeunload", clearPrinting, { once: true });
+      setTimeout(() => {
+        setPrinting(false);
+      }, 2500);
     } finally {
       // printing state is cleared after the print window is actually ready
     }
