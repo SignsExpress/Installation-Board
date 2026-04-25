@@ -5366,7 +5366,9 @@ function isGenericProFormaName(value = "") {
 }
 
 function shouldIgnoreProFormaMoneyField(leaf = "") {
-  return /(cost|margin|markup|discounttable|discountamount|discounttotal|discount|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|id$|classtype|account|locator|version|sequence)/i.test(leaf);
+  const text = String(leaf || "").trim();
+  if (/^orderitem\.priceprediscount$/i.test(text)) return false;
+  return /(cost|margin|markup|discounttable|discountamount|discounttotal|discount|markuptable|partcost|setup fee|sourcedgoods|minimumprice|expenseaccount|incomeaccount|id$|classtype|account|locator|version|sequence)/i.test(text);
 }
 
 function extractProFormaAssemblyMoneyCandidates(value, leaf = "") {
