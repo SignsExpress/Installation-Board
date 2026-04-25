@@ -6322,6 +6322,106 @@ button {
   gap: 6px;
 }
 
+.pro-forma-compare-inputs {
+  display: grid;
+  gap: 6px;
+}
+
+.pro-forma-compare-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pro-forma-compare-sheet {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.pro-forma-compare-sheet-head,
+.pro-forma-compare-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.3fr) repeat(3, minmax(0, 1fr));
+}
+
+.pro-forma-compare-sheet-head {
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.pro-forma-compare-sheet-head span {
+  padding: 7px 8px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pro-forma-compare-sheet-body {
+  max-height: 360px;
+  overflow: auto;
+}
+
+.pro-forma-compare-row {
+  border-top: 1px solid #eef2f7;
+}
+
+.pro-forma-compare-row:first-child {
+  border-top: 0;
+}
+
+.pro-forma-compare-code,
+.pro-forma-compare-cell {
+  padding: 8px;
+  min-width: 0;
+}
+
+.pro-forma-compare-code {
+  font-size: 0.64rem;
+  line-height: 1.35;
+  color: #334155;
+  font-family: Consolas, "Courier New", monospace;
+  word-break: break-word;
+}
+
+.pro-forma-compare-cell {
+  display: grid;
+  gap: 4px;
+  border-left: 1px solid #eef2f7;
+}
+
+.pro-forma-compare-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-size: 0.64rem;
+  line-height: 1.25;
+}
+
+.pro-forma-compare-value span {
+  color: #64748b;
+  font-weight: 700;
+}
+
+.pro-forma-compare-value strong {
+  color: #0f172a;
+  font-size: 0.64rem;
+}
+
+.pro-forma-compare-empty {
+  color: #94a3b8;
+  font-size: 0.66rem;
+  padding: 4px 0;
+}
+
 .pro-forma-editor-head {
   display: flex;
   justify-content: space-between;
@@ -6841,6 +6941,16 @@ button {
   .pro-forma-line-total-block,
   .pro-forma-line-card .text-button {
     grid-column: span 1;
+  }
+
+  .pro-forma-compare-sheet-head,
+  .pro-forma-compare-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pro-forma-compare-cell {
+    border-left: 0;
+    border-top: 1px solid #eef2f7;
   }
 }
 

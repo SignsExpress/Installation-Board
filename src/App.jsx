@@ -3855,6 +3855,67 @@ function formatProFormaDate(value) {
   }).format(parsed);
 }
 
+function buildProFormaCodeCheatSheet(results = []) {
+  const references = results
+    .map((result) => String(result.reference || result.payload?.orderReference || "").trim())
+    .filter(Boolean);
+  const rowMap = new Map();
+
+  results.forEach((result) => {
+    const reference = String(result.reference || result.payload?.orderReference || "").trim();
+    if (!reference) return;
+    const lineItems = Array.isArray(result.payload?.lineItems) ? result.payload.lineItems : [];
+    lineItems.forEach((item, index) => {
+      const lineNumber = Number.isFinite(item.sortIndex) ? item.sortIndex + 1 : index + 1;
+      const fields = Array.isArray(item.rawMoneyFields) ? item.rawMoneyFields : [];
+      fields.forEach((field) => {
+        const code = String(field.leaf || "").trim();
+        if (!code) return;
+        if (!rowMap.has(code)) {
+          rowMap.set(code, {
+            code,
+            coverage: 0,
+            cells: {}
+          });
+        }
+        const row = rowMap.get(code);
+        if (!Array.isArray(row.cells[reference])) {
+          row.cells[reference] = [];
+          row.coverage += 1;
+        }
+        row.cells[reference].push({
+          lineNumber,
+          amount: roundProFormaMoney(field.amount || 0),
+          raw: String(field.raw || "")
+        });
+      });
+    });
+  });
+
+  return {
+    references,
+    rows: [...rowMap.values()]
+      .sort((left, right) => {
+        if (right.coverage !== left.coverage) return right.coverage - left.coverage;
+        return left.code.localeCompare(right.code);
+      })
+      .map((row) => ({
+        ...row,
+        cells: Object.fromEntries(
+          references.map((reference) => [
+            reference,
+            Array.isArray(row.cells[reference])
+              ? [...row.cells[reference]].sort((left, right) => {
+                  if (left.lineNumber !== right.lineNumber) return left.lineNumber - right.lineNumber;
+                  return right.amount - left.amount;
+                })
+              : []
+          ])
+        )
+      }))
+  };
+}
+
 function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   if (!draft) return "";
   const builderMode = options.builderMode === true;
@@ -4289,6 +4350,10 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   const [orderReference, setOrderReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [compareReferences, setCompareReferences] = useState(["", "", ""]);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareError, setCompareError] = useState("");
+  const [compareResults, setCompareResults] = useState([]);
   const [customDepositMode, setCustomDepositMode] = useState("percent");
   const [customDepositValue, setCustomDepositValue] = useState("");
   const [printing, setPrinting] = useState(false);
@@ -4343,6 +4408,10 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     totalPaid,
     balanceDue: remainingBalance
   }, template), [draft, subtotal, discountAmount, preTaxTotal, vatAmount, total, depositAmount, totalPaid, remainingBalance, template]);
+  const compareSheet = useMemo(
+    () => buildProFormaCodeCheatSheet(compareResults),
+    [compareResults]
+  );
 
   useEffect(() => {
     return () => {
@@ -4567,6 +4636,48 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     setReferencePdfName(file.name || "Reference PDF");
   }
 
+  function updateCompareReference(index, value) {
+    setCompareReferences((current) => current.map((entry, entryIndex) => (entryIndex === index ? value : entry)));
+  }
+
+  async function buildCodeCheatSheet() {
+    const references = compareReferences
+      .map((value) => String(value || "").trim())
+      .filter(Boolean);
+    if (references.length < 3) {
+      setCompareError("Add three EST or ORD references so we can compare the money codes properly.");
+      return;
+    }
+
+    try {
+      setCompareLoading(true);
+      setCompareError("");
+      const payloads = await Promise.all(
+        references.map(async (reference) => {
+          const response = await fetch("/api/pro-forma/pull", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderReference: reference })
+          });
+          const payload = await response.json();
+          if (!response.ok) {
+            throw new Error(payload.error || `Could not pull ${reference}.`);
+          }
+          return {
+            reference,
+            payload
+          };
+        })
+      );
+      setCompareResults(payloads);
+    } catch (comparePullError) {
+      setCompareResults([]);
+      setCompareError(comparePullError.message || "Could not build the cheat sheet.");
+    } finally {
+      setCompareLoading(false);
+    }
+  }
+
   return (
     <div className="app-shell social-post-shell">
       <div className="page social-post-page pro-forma-page">
@@ -4642,6 +4753,70 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                         {asset.type}: {asset.key}
                       </span>
                     ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="pro-forma-deposit-tools">
+                <h4>Price code cheat sheet</h4>
+                <p className="muted-copy">Pull three refs together and we’ll list every money code side by side, line by line, so we can see which field survives across all three jobs.</p>
+                <div className="pro-forma-compare-inputs">
+                  {compareReferences.map((value, index) => (
+                    <label key={`compare-reference-${index}`}>
+                      Ref {index + 1}
+                      <input
+                        value={value}
+                        onChange={(event) => updateCompareReference(index, event.target.value)}
+                        placeholder={`EST-${3379 + index}`}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className="pro-forma-compare-actions">
+                  <button type="button" className="ghost-button" disabled={compareLoading} onClick={buildCodeCheatSheet}>
+                    {compareLoading ? "Building..." : "Build cheat sheet"}
+                  </button>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={compareLoading && !compareResults.length}
+                    onClick={() => {
+                      setCompareResults([]);
+                      setCompareError("");
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {compareError ? <p className="form-error">{compareError}</p> : null}
+                {compareSheet.rows.length ? (
+                  <div className="pro-forma-compare-sheet">
+                    <div className="pro-forma-compare-sheet-head">
+                      <span>Code</span>
+                      {compareSheet.references.map((reference) => (
+                        <span key={`compare-head-${reference}`}>{reference}</span>
+                      ))}
+                    </div>
+                    <div className="pro-forma-compare-sheet-body">
+                      {compareSheet.rows.map((row) => (
+                        <div key={row.code} className="pro-forma-compare-row">
+                          <div className="pro-forma-compare-code">{row.code}</div>
+                          {compareSheet.references.map((reference) => {
+                            const values = row.cells[reference] || [];
+                            return (
+                              <div key={`${row.code}-${reference}`} className="pro-forma-compare-cell">
+                                {values.length ? values.map((value, index) => (
+                                  <div key={`${row.code}-${reference}-${value.lineNumber}-${index}`} className="pro-forma-compare-value">
+                                    <span>L{value.lineNumber}</span>
+                                    <strong>{formatProFormaMoney(value.amount)}</strong>
+                                  </div>
+                                )) : <span className="pro-forma-compare-empty">—</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
               </div>
