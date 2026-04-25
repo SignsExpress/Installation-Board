@@ -5308,6 +5308,7 @@ function shouldAcceptProFormaMoneyValue(meta, key = "") {
 }
 
 function scoreProFormaUnitPriceField(leaf) {
+  if (/^orderitem\.priceunitpretax$/i.test(leaf)) return 340;
   if (/^orderitem\.pricepretaxtaxable$/i.test(leaf)) return 315;
   if (/^orderitem\.pricepretax$/i.test(leaf)) return 310;
   if (/^orderitem\.pricecomponent$/i.test(leaf)) return 250;
@@ -5326,6 +5327,7 @@ function scoreProFormaUnitPriceField(leaf) {
 }
 
 function scoreProFormaLineTotalField(leaf) {
+  if (/^orderitem\.priceunitpretax$/i.test(leaf)) return 26;
   if (/^orderitem\.priceprediscount$/i.test(leaf)) return 320;
   if (/^orderitem\.pricepretaxtaxable$/i.test(leaf)) return 300;
   if (/^orderitem\.pricepretax$/i.test(leaf)) return 290;
@@ -5346,6 +5348,7 @@ function scoreProFormaLineTotalField(leaf) {
 
 function scoreProFormaRawMoneyField(leaf = "") {
   let score = 0;
+  if (/^orderitem\.priceunitpretax$/i.test(leaf)) score += 350;
   if (/^orderitem\.priceprediscount$/i.test(leaf)) score += 360;
   if (/^orderitem\.pricepretaxtaxable$/i.test(leaf)) score += 340;
   if (/^orderitem\.pricepretax$/i.test(leaf)) score += 332;
@@ -5361,13 +5364,15 @@ function scoreProFormaRawMoneyField(leaf = "") {
   if (/(components?|childcomponents?)\./i.test(leaf)) score += 12;
   if (/assemblydatajson/i.test(leaf)) score -= 8;
   if (/(machine|labou?r|labor|material|perimeter|area|sheet|time|minutes?|hours?)/i.test(leaf)) score -= 28;
-  if (/(pricecomputed|pricepretax|priceunitpretax|taxinfo.*price)/i.test(leaf)) score -= 18;
+  if (/(pricecomputed|taxinfo.*price)/i.test(leaf)) score -= 18;
+  else if (/(pricepretax)/i.test(leaf) && !/^orderitem\.priceunitpretax$/i.test(leaf)) score -= 18;
   if (/(discounttable|markuptable|minimumprice|partcost|sourcedgoods)/i.test(leaf)) score -= 40;
   return score;
 }
 
 function isPreferredProFormaSellLeaf(leaf = "") {
   return /^orderitem\.sellpriceperitem$/i.test(String(leaf || "").trim())
+    || /^orderitem\.priceunitpretax$/i.test(String(leaf || "").trim())
     || /^orderitem\.priceperitem$/i.test(String(leaf || "").trim())
     || /^orderitem\.priceprediscount$/i.test(String(leaf || "").trim())
     || /^orderitem\.pricepretaxtaxable$/i.test(String(leaf || "").trim())
@@ -5387,6 +5392,7 @@ function isGenericProFormaName(value = "") {
 
 function shouldIgnoreProFormaMoneyField(leaf = "") {
   const text = String(leaf || "").trim();
+  if (/^orderitem\.priceunitpretax$/i.test(text)) return false;
   if (/^orderitem\.priceprediscount$/i.test(text)) return false;
   if (/^orderitem\.pricepretaxtaxable$/i.test(text)) return false;
   if (/^orderitem\.pricepretax$/i.test(text)) return false;
@@ -5715,7 +5721,10 @@ function extractProFormaLineItems(order = {}) {
       if (/pricetotal/i.test(leaf)) {
         lineTotalScore += 18;
       }
-      if (/(pricecomputed|pricepretax|priceunitpretax|taxinfo.*price)/i.test(leaf)) {
+      if (/(pricecomputed|taxinfo.*price)/i.test(leaf)) {
+        unitPriceScore -= 16;
+        lineTotalScore -= 16;
+      } else if (/(pricepretax)/i.test(leaf) && !/^orderitem\.priceunitpretax$/i.test(leaf)) {
         unitPriceScore -= 16;
         lineTotalScore -= 16;
       }
@@ -5815,12 +5824,17 @@ function extractProFormaLineItems(order = {}) {
       const directSellLeaf = String(group.directSellLeaf || "").trim();
       const directSellActsAsLineTotal = /^(?:orderitem\.(?:priceprediscount|pricepretax|pricepretaxtaxable|pricecomponent)|orderitem\.(?:sellpriceperitem|priceperitem)|orderitem\.components\.0\.(?:sellpriceperitem|priceperitem)|components\.0\.(?:sellpriceperitem|priceperitem))$/i.test(directSellLeaf);
       const directSellNeedsUnitDerive = /^(?:orderitem\.(?:priceprediscount|pricepretax|pricepretaxtaxable|pricecomponent))$/i.test(directSellLeaf);
+      const directSellActsAsUnitPrice = /^orderitem\.priceunitpretax$/i.test(directSellLeaf);
       const preferredSellCandidate = group.directSellAmount > 0
         ? {
-            lineTotal: directSellActsAsLineTotal
+            lineTotal: directSellActsAsUnitPrice
+              ? Math.round((group.directSellAmount * normalizedQuantity) * 100) / 100
+              : directSellActsAsLineTotal
               ? Math.round(group.directSellAmount * 100) / 100
               : Math.round((group.directSellAmount * normalizedQuantity) * 100) / 100,
-            unitPrice: directSellNeedsUnitDerive
+            unitPrice: directSellActsAsUnitPrice
+              ? Math.round(group.directSellAmount * 100) / 100
+              : directSellNeedsUnitDerive
               ? Math.round((group.directSellAmount / normalizedQuantity) * 100) / 100
               : Math.round(group.directSellAmount * 100) / 100,
             score: group.directSellScore,
