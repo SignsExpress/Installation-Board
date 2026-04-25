@@ -4025,7 +4025,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.tableLineTotal.y + section.tableLineTotal.h,
     section.tableDescription.y + section.tableDescription.h
   );
-  const estimateWrappedLines = (text, charsPerLine = 34) => {
+  const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
     return raw
@@ -4038,7 +4038,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
-    const rowHeight = Math.max(9.8 + (descriptionLines * 4.8), 17.2);
+    const rowHeight = Math.max(7.9 + (descriptionLines * 4.05), 13.8);
     const rowOffset = currentRowOffset;
     currentRowOffset += rowHeight;
     return `
@@ -4225,7 +4225,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         }
         .table-lines {
           position: relative;
-          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h - 0.25, 7.7)}mm;
+          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.05, 9.1)}mm;
           min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
         }
       .invoice-line-row {
