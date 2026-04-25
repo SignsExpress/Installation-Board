@@ -4017,7 +4017,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     return `
       <div class="invoice-line-row" style="top:${localTop(rowAnchorTop) + rowOffset}mm; height:${rowPitch}mm;">
         <div class="line-cell line-number" style="left:${localLeft(section.tableNumber.x)}mm; top:${localTop(section.tableNumber.y) - localTop(rowAnchorTop)}mm; width:${section.tableNumber.w}mm; min-height:${section.tableNumber.h}mm;">${escapeHtml(String(item.sortIndex != null ? item.sortIndex + 1 : ""))}</div>
-        <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;"><strong>${escapeHtml(item.name || "-")}</strong></div>
+        <div class="line-cell line-title" style="left:${localLeft(section.tableTitle.x)}mm; top:${localTop(section.tableTitle.y) - localTop(rowAnchorTop)}mm; width:${section.tableTitle.w}mm; min-height:${section.tableTitle.h}mm;">${escapeHtml(item.name || "-")}</div>
         <div class="line-cell line-qty" style="left:${localLeft(section.tableQty.x)}mm; top:${localTop(section.tableQty.y) - localTop(rowAnchorTop)}mm; width:${section.tableQty.w}mm; min-height:${section.tableQty.h}mm;">${escapeHtml(item.quantity || "1")}</div>
         <div class="line-cell line-unit" style="left:${localLeft(section.tableUnitPrice.x)}mm; top:${localTop(section.tableUnitPrice.y) - localTop(rowAnchorTop)}mm; width:${section.tableUnitPrice.w}mm; min-height:${section.tableUnitPrice.h}mm;">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
         <div class="line-cell line-total" style="left:${localLeft(section.tableLineTotal.x)}mm; top:${localTop(section.tableLineTotal.y) - localTop(rowAnchorTop)}mm; width:${section.tableLineTotal.w}mm; min-height:${section.tableLineTotal.h}mm;">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
@@ -4026,15 +4026,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     `;
   }).join("");
-
-  const addressTop = Math.max(section.billing.y - 10, 18);
-  const metaTop = Math.max(section.metaLeft.y - (section.billing.y + section.billing.h), 14);
-  const tableTop = Math.max(section.table.y - (section.metaLeft.y + section.metaLeft.h), 12);
-  const bottomTop = Math.max(section.bank.y - (section.table.y + section.table.h), 14);
-  const approvalTop = Math.max(section.approval.y - (section.bank.y + section.bank.h), 18);
-  const paymentTop = Math.max(section.paymentTerms.y - (section.approval.y + section.approval.h), 12);
-  const footerStripTop = Math.max(section.accreditations.y - (section.paymentTerms.y + section.paymentTerms.h), 12);
-  const footerMetaTop = Math.max(section.footerMeta.y - (section.accreditations.y + section.accreditations.h), 5);
 
   return `<!doctype html>
 <html>
@@ -4068,10 +4059,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         background: #fff;
         padding: 0;
         overflow: hidden;
-      }
-      .top-row {
         position: relative;
-        min-height: ${Math.max(section.logo.y + section.logo.h, section.title.y + section.title.h, 34)}mm;
       }
       .doc-title {
         position: absolute;
@@ -4086,28 +4074,40 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         font-weight: 400;
         color: #008c95;
       }
-      .brand img {
+      .brand {
         position: absolute;
         left: ${section.logo.x}mm;
         top: ${section.logo.y}mm;
         width: ${section.logo.w}mm;
+        min-height: ${section.logo.h}mm;
+      }
+      .brand img {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
         max-width: ${section.logo.w}mm;
         display: block;
       }
-      .address-row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: ${Math.max(section.company.x - (section.billing.x + section.billing.w), 12)}mm;
-        margin-top: ${addressTop}mm;
-        padding: 0 ${Math.max(210 - (section.company.x + section.company.w), 12.5)}mm 0 ${section.billing.x}mm;
-      }
       .address-block {
+        position: absolute;
         font-size: 10pt;
         line-height: 1.08;
-        min-height: ${Math.max(section.billing.h, section.company.h)}mm;
+        min-height: 1mm;
       }
-      .address-block.right {
+      .address-block.billing {
+        left: ${section.billing.x}mm;
+        top: ${section.billing.y}mm;
+        width: ${section.billing.w}mm;
+      }
+      .address-block.right,
+      .address-block.company {
         text-align: right;
+      }
+      .address-block.company {
+        left: ${section.company.x}mm;
+        top: ${section.company.y}mm;
+        width: ${section.company.w}mm;
       }
       .address-block p {
         margin: 0;
@@ -4118,27 +4118,31 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .address-block.right p:last-child {
         color: #0f98a5;
       }
-      .meta-split {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: ${Math.max(section.metaRight.x - (section.metaLeft.x + section.metaLeft.w), 12)}mm;
-        margin-top: ${metaTop}mm;
-        padding: 0 ${Math.max(210 - (section.metaRight.x + section.metaRight.w), 12.5)}mm 0 ${section.metaLeft.x}mm;
+      .meta-block {
+        position: absolute;
         font-size: 10pt;
         line-height: 1.32;
       }
-      .meta-split p {
-        margin: 0 0 7px;
+      .meta-block.left {
+        left: ${section.metaLeft.x}mm;
+        top: ${section.metaLeft.y}mm;
+        width: ${section.metaLeft.w}mm;
       }
-      .meta-right {
+      .meta-block.right {
+        left: ${section.metaRight.x}mm;
+        top: ${section.metaRight.y}mm;
+        width: ${section.metaRight.w}mm;
         text-align: right;
       }
+      .meta-block p {
+        margin: 0 0 7px;
+      }
       .table-wrap {
-        margin-top: ${tableTop}mm;
-        margin-left: ${section.table.x}mm;
+        position: absolute;
+        left: ${section.table.x}mm;
+        top: ${section.table.y}mm;
         width: ${section.table.w}mm;
         min-height: ${section.table.h}mm;
-        position: relative;
       }
       .table-header-band {
         position: absolute;
@@ -4152,7 +4156,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         position: absolute;
         color: #fff;
         font-size: 10pt;
-        font-weight: 700;
+        font-weight: 400;
         display: flex;
         align-items: center;
         padding: 0 5px;
@@ -4175,14 +4179,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .line-cell {
         position: absolute;
         font-size: 10pt;
-        line-height: 1.15;
+        line-height: 1.08;
+        font-weight: 400;
       }
       .line-number {
         text-align: left;
-        padding-left: 2px;
-      }
-      .line-title strong {
-        font-weight: 700;
+        padding-left: 0;
       }
       .line-description {
         white-space: pre-wrap;
@@ -4205,16 +4207,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         height: 1px;
         background: #d7e2e5;
       }
-      .bottom-row {
-        display: grid;
-        grid-template-columns: minmax(${section.bank.w}mm, 1fr) ${section.totals.w}mm;
-        gap: ${Math.max(section.totals.x - (section.bank.x + section.bank.w), 12)}mm;
-        margin-top: ${bottomTop}mm;
-        margin-left: ${section.bank.x}mm;
-        width: ${Math.min(section.totals.x + section.totals.w - section.bank.x, 182)}mm;
-        align-items: start;
-      }
       .bank-block {
+        position: absolute;
+        left: ${section.bank.x}mm;
+        top: ${section.bank.y}mm;
+        width: ${section.bank.w}mm;
         font-size: 10pt;
         line-height: 1.18;
       }
@@ -4225,6 +4222,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         margin-top: 3px;
       }
       .totals-box {
+        position: absolute;
+        left: ${section.totals.x}mm;
+        top: ${section.totals.y}mm;
+        width: ${section.totals.w}mm;
         border: 1.5px solid #0f98a5;
         padding: 5.5mm 5.8mm;
         font-size: 10pt;
@@ -4237,36 +4238,41 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         padding: 1.4mm 0;
       }
       .total-row.total {
-        font-size: 12pt;
-        font-weight: 700;
+        font-size: 10pt;
+        font-weight: 400;
         padding-top: 2.6mm;
         margin-top: 1.2mm;
       }
       .total-row strong {
-        font-weight: 700;
+        font-weight: 400;
       }
       .approval {
-        margin-top: ${approvalTop}mm;
+        position: absolute;
+        left: ${section.approval.x}mm;
+        top: ${section.approval.y}mm;
+        width: ${section.approval.w}mm;
         font-size: 10pt;
-        max-width: ${section.approval.w}mm;
       }
       .payment-terms-footer {
-        margin-top: ${paymentTop}mm;
-        padding-top: 3.8mm;
+        position: absolute;
+        left: ${section.paymentTerms.x}mm;
+        top: ${section.paymentTerms.y}mm;
+        width: ${section.paymentTerms.w}mm;
+        padding-top: 3.2mm;
         border-top: 1.5px solid #0f98a5;
         font-size: 8pt;
         line-height: 1.35;
-        max-width: ${section.paymentTerms.w}mm;
       }
       .footer-strip {
-        margin-top: ${footerStripTop}mm;
+        position: absolute;
+        left: ${section.accreditations.x}mm;
+        top: ${section.accreditations.y}mm;
         background: #0f98a5;
         min-height: ${section.accreditations.h}mm;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0 4mm;
-        margin-left: ${section.accreditations.x}mm;
         width: ${section.accreditations.w}mm;
       }
       .footer-strip img {
@@ -4284,13 +4290,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         width: 100%;
       }
       .footer-meta {
-        margin-top: ${footerMetaTop}mm;
+        position: absolute;
+        left: ${section.footerMeta.x}mm;
+        top: ${section.footerMeta.y}mm;
         display: flex;
         justify-content: space-between;
         gap: 12px;
         align-items: center;
         font-size: 6pt;
-        margin-left: ${section.footerMeta.x}mm;
         width: ${section.footerMeta.w}mm;
       }
       .footer-company {
@@ -4311,32 +4318,25 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   </head>
   <body>
     <div class="sheet">
-      <div class="top-row">
-        <div class="doc-title">${escapeHtml(displayTitle)}</div>
-        <div class="brand">
-          <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
-        </div>
+      <div class="doc-title">${escapeHtml(displayTitle)}</div>
+      <div class="brand">
+        <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
+      </div>
+      <div class="address-block billing">
+        <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
+        <p class="prewrap">${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
+      </div>
+      <div class="address-block company right">
+        ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
       </div>
 
-      <div class="address-row">
-        <div class="address-block">
-          <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
-          <p class="prewrap">${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
-        </div>
-        <div class="address-block right">
-          ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
-        </div>
+      <div class="meta-block left">
+        <p>Date of Invoice: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</p>
+        <p>Description: ${escapeHtml(draft.notes || draft.description || "-")}</p>
+        <p>Order Ref: ${escapeHtml(draft.orderReference || "-")}</p>
       </div>
-
-      <div class="meta-split">
-        <div>
-          <p><strong>Date of Invoice:</strong> ${escapeHtml(formatProFormaDate(draft.date) || "-")}</p>
-          <p><strong>Description:</strong> ${escapeHtml(draft.notes || draft.description || "-")}</p>
-          <p><strong>Order Ref:</strong> ${escapeHtml(draft.orderReference || "-")}</p>
-        </div>
-        <div class="meta-right">
-          <p><strong>Payment Terms:</strong> NET 30 End of Month</p>
-        </div>
+      <div class="meta-block right">
+        <p>Payment Terms: NET 30 End of Month</p>
       </div>
 
       <div class="table-wrap">
@@ -4351,20 +4351,17 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
 
-      <div class="bottom-row">
-        <div>
-          <div class="bank-block">
-            <div>Bank details:</div>
-            <div class="bank-grid">
-              ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
-            </div>
-          </div>
-          <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
-          <div class="payment-terms-footer">
-            <div><strong>Payment Terms:</strong></div>
-            <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
-          </div>
+      <div class="bank-block">
+        <div>Bank details:</div>
+        <div class="bank-grid">
+          ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
         </div>
+      </div>
+      <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
+      <div class="payment-terms-footer">
+        <div>Payment Terms:</div>
+        <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
+      </div>
         <div class="totals-box">
           <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
           ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
@@ -4374,7 +4371,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
           <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
         </div>
-      </div>
 
       <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
       <div class="footer-meta">
