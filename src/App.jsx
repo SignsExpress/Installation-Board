@@ -3794,7 +3794,6 @@ function cloneDefaultProFormaTemplate() {
 
 function sanitizeProFormaTemplate(template) {
   const source = template && typeof template === "object" ? template : {};
-  const useDefaultsOnly = Number(source.version || 0) !== DEFAULT_PRO_FORMA_TEMPLATE.version;
   const sanitizeRect = (value = {}, fallback = {}) => ({
     x: Number.isFinite(Number(value?.x)) ? Number(value.x) : fallback.x,
     y: Number.isFinite(Number(value?.y)) ? Number(value.y) : fallback.y,
@@ -3802,15 +3801,15 @@ function sanitizeProFormaTemplate(template) {
     h: Math.max(Number.isFinite(Number(value?.h)) ? Number(value.h) : fallback.h, 1)
   });
   return {
-    version: DEFAULT_PRO_FORMA_TEMPLATE.version,
+    version: Number.isFinite(Number(source.version)) ? Number(source.version) : DEFAULT_PRO_FORMA_TEMPLATE.version,
     overlayOpacity: Math.min(Math.max(Number(source.overlayOpacity ?? DEFAULT_PRO_FORMA_TEMPLATE.overlayOpacity), 0), 1),
-    referencePdfAsset: useDefaultsOnly ? null : (source.referencePdfAsset || null),
-    termsPdfAsset: useDefaultsOnly ? null : (source.termsPdfAsset || null),
-    accreditationAssets: useDefaultsOnly ? [] : (Array.isArray(source.accreditationAssets) ? source.accreditationAssets : []),
+    referencePdfAsset: source.referencePdfAsset || null,
+    termsPdfAsset: source.termsPdfAsset || null,
+    accreditationAssets: Array.isArray(source.accreditationAssets) ? source.accreditationAssets : [],
     sections: Object.fromEntries(
       Object.entries(DEFAULT_PRO_FORMA_TEMPLATE.sections).map(([key, rect]) => [
         key,
-        useDefaultsOnly ? rect : sanitizeRect(source.sections?.[key], rect)
+        sanitizeRect(source.sections?.[key], rect)
       ])
     )
   };
@@ -3993,7 +3992,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         ? `${draft.depositValue}% deposit, balance due on completion.`
         : `${formatProFormaMoney(Number(draft.depositValue) || 0)} deposit, balance due on completion.`)
     : (draft.termsText || "NET 30 End of Month");
-  const defaultAccreditationStripUrl = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
   const accreditationImages = template.accreditationAssets?.length
     ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset), alt: asset.name || "Accreditation" })).filter((asset) => asset.url)
     : DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS.map((asset) => ({
@@ -4002,9 +4000,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       widthMm: asset.widthMm
     }));
   const termsPdfUrl = builderMode ? "" : getProFormaTemplateAssetUrl(template.termsPdfAsset);
-  const footerStripHtml = template.accreditationAssets?.length
-    ? `<div class="footer-strip footer-strip-custom"><div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div></div>`
-    : `<div class="footer-strip footer-strip-default"><img class="footer-strip-full" src="${defaultAccreditationStripUrl}" alt="Accreditations" /></div>`;
+  const footerStripHtml = `<div class="footer-strip"><div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div></div>`;
   const fixedHeaderHeight = 26;
   const fixedFooterHeight = 24;
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
@@ -4187,17 +4183,17 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .sheet.print-sheet {
         min-height: 297mm;
-        display: flex;
-        flex-direction: column;
+        display: block;
         page-break-after: always;
         break-after: page;
+        padding-bottom: ${fixedFooterHeight}mm;
       }
       .sheet.print-sheet:last-of-type {
         page-break-after: auto;
         break-after: auto;
       }
       .sheet-body {
-        flex: 1;
+        min-height: calc(297mm - ${fixedHeaderHeight}mm - ${fixedFooterHeight}mm);
       }
       .page-header {
         position: relative;
@@ -4205,8 +4201,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         flex: 0 0 ${fixedHeaderHeight}mm;
       }
       .page-footer {
-        flex: 0 0 ${fixedFooterHeight}mm;
-        margin-top: auto;
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: ${fixedFooterHeight}mm;
       }
       .doc-title {
         position: absolute;
@@ -4491,35 +4490,23 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           break-inside: avoid;
       }
       .footer-strip {
+        background: #0f98a5;
           min-height: ${section.accreditations.h}mm;
         display: flex;
         align-items: center;
         justify-content: center;
         width: ${section.accreditations.w}mm;
-        margin-top: 9mm;
-        margin-left: ${section.accreditations.x - section.bank.x}mm;
+        margin-top: 0;
+        margin-left: ${section.accreditations.x}mm;
+        padding: 0 4mm;
         page-break-inside: avoid;
         break-inside: avoid;
-      }
-      .footer-strip-custom {
-        background: #0f98a5;
-        padding: 0 4mm;
-      }
-      .footer-strip-default {
-        padding: 0;
-        background: transparent;
       }
       .footer-strip img {
         max-width: 100%;
         max-height: calc(${section.accreditations.h}mm - 1.8mm);
         display: block;
         object-fit: contain;
-      }
-      .footer-strip-full {
-        width: 100%;
-        height: ${section.accreditations.h}mm;
-        max-height: none;
-        object-fit: fill;
       }
       .footer-strip-images {
         display: flex;
@@ -4536,8 +4523,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         align-items: center;
         font-size: 6pt;
         width: ${section.footerMeta.w}mm;
-        margin-top: 6mm;
-        margin-left: ${section.footerMeta.x - section.bank.x}mm;
+        margin-top: 3mm;
+        margin-left: ${section.footerMeta.x}mm;
         page-break-inside: avoid;
         break-inside: avoid;
       }
