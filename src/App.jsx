@@ -3743,7 +3743,7 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
 }
 
 const DEFAULT_PRO_FORMA_TEMPLATE = {
-  version: 2,
+  version: 3,
   overlayOpacity: 0.34,
   referencePdfAsset: null,
   termsPdfAsset: null,
@@ -3751,29 +3751,29 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
   sections: {
     title: { x: 12.9, y: 11, w: 16.6, h: 8.5 },
     logo: { x: 141, y: 10.6, w: 55.9, h: 13.3 },
-    billing: { x: 13.2, y: 33.9, w: 36.3, h: 24.4 },
-    company: { x: 141.1, y: 33.9, w: 55.5, h: 22.1 },
-    metaLeft: { x: 13.5, y: 71.4, w: 57.1, h: 17.4 },
-    metaRight: { x: 136.4, y: 71.4, w: 60.2, h: 4.9 },
-    table: { x: 12, y: 97.3, w: 185.6, h: 70 },
-    tableHeaderBand: { x: 12, y: 97.3, w: 185.6, h: 11.3 },
-    tableHeaderNumber: { x: 12, y: 97.3, w: 14.5, h: 11.3 },
-    tableHeaderTitle: { x: 26.5, y: 97.3, w: 73, h: 11.3 },
-    tableHeaderQty: { x: 109.8, y: 97.3, w: 12.5, h: 11.3 },
-    tableHeaderUnitPrice: { x: 122.3, y: 97.3, w: 27.7, h: 11.3 },
-    tableHeaderLineTotal: { x: 173.2, y: 97.3, w: 24.4, h: 11.3 },
-    tableNumber: { x: 14.5, y: 110.7, w: 2.2, h: 4.9 },
-    tableTitle: { x: 27.9, y: 110.7, w: 29.5, h: 4.9 },
-    tableQty: { x: 113.2, y: 110.7, w: 2.3, h: 4.9 },
-    tableUnitPrice: { x: 127.5, y: 110.7, w: 14.4, h: 4.9 },
-    tableLineTotal: { x: 182.1, y: 110.7, w: 14.4, h: 4.9 },
-    tableDescription: { x: 27.9, y: 117.8, w: 88.5, h: 15.1 },
-    bank: { x: 14, y: 166.2, w: 58, h: 23.1 },
-    totals: { x: 138.5, y: 160.7, w: 59.4, h: 31.6 },
-    approval: { x: 13.3, y: 234.7, w: 101.3, h: 4.9 },
-    paymentTerms: { x: 13.3, y: 251.7, w: 104.9, h: 8.3 },
-    accreditations: { x: 46.3, y: 264.2, w: 149.7, h: 8.4 },
-    footerMeta: { x: 12.8, y: 281.8, w: 184.4, h: 4.2 }
+    billing: { x: 13.2, y: 26.8, w: 36.3, h: 18.4 },
+    company: { x: 141.1, y: 26.8, w: 55.5, h: 18.2 },
+    metaLeft: { x: 13.5, y: 59.8, w: 57.1, h: 13.2 },
+    metaRight: { x: 136.4, y: 59.8, w: 60.2, h: 4.9 },
+    table: { x: 12, y: 80.5, w: 185.6, h: 68 },
+    tableHeaderBand: { x: 12, y: 80.5, w: 185.6, h: 11.3 },
+    tableHeaderNumber: { x: 12, y: 80.5, w: 14.5, h: 11.3 },
+    tableHeaderTitle: { x: 26.5, y: 80.5, w: 73, h: 11.3 },
+    tableHeaderQty: { x: 109.8, y: 80.5, w: 12.5, h: 11.3 },
+    tableHeaderUnitPrice: { x: 122.3, y: 80.5, w: 27.7, h: 11.3 },
+    tableHeaderLineTotal: { x: 173.2, y: 80.5, w: 24.4, h: 11.3 },
+    tableNumber: { x: 14.5, y: 93.7, w: 2.2, h: 4.9 },
+    tableTitle: { x: 27.9, y: 93.7, w: 29.5, h: 4.9 },
+    tableQty: { x: 113.2, y: 93.7, w: 2.3, h: 4.9 },
+    tableUnitPrice: { x: 127.5, y: 93.7, w: 14.4, h: 4.9 },
+    tableLineTotal: { x: 182.1, y: 93.7, w: 14.4, h: 4.9 },
+    tableDescription: { x: 27.9, y: 100.1, w: 118, h: 13.2 },
+    bank: { x: 14, y: 144.5, w: 58, h: 20.2 },
+    totals: { x: 138.5, y: 141.5, w: 59.4, h: 27.2 },
+    approval: { x: 13.3, y: 206.4, w: 101.3, h: 4.9 },
+    paymentTerms: { x: 13.3, y: 220.2, w: 104.9, h: 8.3 },
+    accreditations: { x: 46.3, y: 238.8, w: 149.7, h: 8.4 },
+    footerMeta: { x: 12.8, y: 257.4, w: 184.4, h: 4.2 }
   }
 };
 
@@ -3794,6 +3794,7 @@ function cloneDefaultProFormaTemplate() {
 
 function sanitizeProFormaTemplate(template) {
   const source = template && typeof template === "object" ? template : {};
+  const useDefaultsOnly = Number(source.version || 0) !== DEFAULT_PRO_FORMA_TEMPLATE.version;
   const sanitizeRect = (value = {}, fallback = {}) => ({
     x: Number.isFinite(Number(value?.x)) ? Number(value.x) : fallback.x,
     y: Number.isFinite(Number(value?.y)) ? Number(value.y) : fallback.y,
@@ -3801,15 +3802,15 @@ function sanitizeProFormaTemplate(template) {
     h: Math.max(Number.isFinite(Number(value?.h)) ? Number(value.h) : fallback.h, 1)
   });
   return {
-    version: Number(source.version || DEFAULT_PRO_FORMA_TEMPLATE.version),
+    version: DEFAULT_PRO_FORMA_TEMPLATE.version,
     overlayOpacity: Math.min(Math.max(Number(source.overlayOpacity ?? DEFAULT_PRO_FORMA_TEMPLATE.overlayOpacity), 0), 1),
-    referencePdfAsset: source.referencePdfAsset || null,
-    termsPdfAsset: source.termsPdfAsset || null,
-    accreditationAssets: Array.isArray(source.accreditationAssets) ? source.accreditationAssets : [],
+    referencePdfAsset: useDefaultsOnly ? null : (source.referencePdfAsset || null),
+    termsPdfAsset: useDefaultsOnly ? null : (source.termsPdfAsset || null),
+    accreditationAssets: useDefaultsOnly ? [] : (Array.isArray(source.accreditationAssets) ? source.accreditationAssets : []),
     sections: Object.fromEntries(
       Object.entries(DEFAULT_PRO_FORMA_TEMPLATE.sections).map(([key, rect]) => [
         key,
-        sanitizeRect(source.sections?.[key], rect)
+        useDefaultsOnly ? rect : sanitizeRect(source.sections?.[key], rect)
       ])
     )
   };
@@ -4139,9 +4140,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         top: ${section.metaRight.y}mm;
         width: ${section.metaRight.w}mm;
         text-align: right;
+        line-height: 1.15;
       }
       .meta-block p {
-        margin: 0 0 7px;
+        margin: 0 0 4px;
       }
       .table-wrap {
         position: absolute;
@@ -4174,8 +4176,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .table-lines {
         position: relative;
-        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.4, 13)}mm;
-        min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2), 40)}mm;
+        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.8, 11)}mm;
+        min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
       }
       .invoice-line-row {
         position: absolute;
@@ -4185,7 +4187,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .line-cell {
         position: absolute;
         font-size: 10pt;
-        line-height: 1.08;
+        line-height: 1.02;
         font-weight: 400;
       }
       .line-number {
@@ -4211,7 +4213,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         top: ${section.bank.y}mm;
         width: ${section.bank.w}mm;
         font-size: 10pt;
-        line-height: 1.18;
+        line-height: 1.05;
       }
       .bank-grid {
         display: grid;
@@ -4225,7 +4227,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         top: ${section.totals.y}mm;
         width: ${section.totals.w}mm;
         border: 1.5px solid #0f98a5;
-        padding: 5.5mm 5.8mm;
+        padding: 4.6mm 5.1mm;
         font-size: 10pt;
         min-height: ${section.totals.h}mm;
       }
@@ -4256,10 +4258,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         left: ${section.paymentTerms.x}mm;
         top: ${section.paymentTerms.y}mm;
         width: ${section.paymentTerms.w}mm;
-        padding-top: 3.2mm;
+        padding-top: 2.6mm;
         border-top: 1.5px solid #0f98a5;
         font-size: 8pt;
-        line-height: 1.35;
+        line-height: 1.25;
       }
       .footer-strip {
         position: absolute;
@@ -4334,7 +4336,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <p>Order Ref: ${escapeHtml(draft.orderReference || "-")}</p>
       </div>
       <div class="meta-block right">
-        <p>Payment Terms: NET 30 End of Month</p>
+        <p>Payment Terms: ${escapeHtml(draft.termsText || "NET 30 End of Month")}</p>
       </div>
 
       <div class="table-wrap">
@@ -4673,6 +4675,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
           )));
           await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
           await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
+          await new Promise((resolve) => setTimeout(resolve, 900));
           printWindow.focus();
           printWindow.print();
         } catch (error) {
