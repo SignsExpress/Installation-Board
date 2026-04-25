@@ -3743,37 +3743,37 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
 }
 
 const DEFAULT_PRO_FORMA_TEMPLATE = {
-  version: 3,
+  version: 4,
   overlayOpacity: 0.34,
   referencePdfAsset: null,
   termsPdfAsset: null,
   accreditationAssets: [],
   sections: {
-    title: { x: 12.9, y: 11, w: 58, h: 8.5 },
+    title: { x: 12.9, y: 11, w: 72, h: 8.5 },
     logo: { x: 141, y: 10.6, w: 55.9, h: 13.3 },
-    billing: { x: 13.2, y: 26.8, w: 36.3, h: 18.4 },
-    company: { x: 141.1, y: 26.8, w: 55.5, h: 18.2 },
-    metaLeft: { x: 13.5, y: 59.8, w: 57.1, h: 13.2 },
-    metaRight: { x: 136.4, y: 59.8, w: 60.2, h: 4.9 },
-    table: { x: 12, y: 80.5, w: 185.6, h: 68 },
-    tableHeaderBand: { x: 12, y: 80.5, w: 185.6, h: 11.3 },
-    tableHeaderNumber: { x: 12, y: 80.5, w: 14.5, h: 11.3 },
-    tableHeaderTitle: { x: 26.5, y: 80.5, w: 73, h: 11.3 },
-    tableHeaderQty: { x: 109.8, y: 80.5, w: 12.5, h: 11.3 },
-    tableHeaderUnitPrice: { x: 122.3, y: 80.5, w: 27.7, h: 11.3 },
-    tableHeaderLineTotal: { x: 173.2, y: 80.5, w: 24.4, h: 11.3 },
-    tableNumber: { x: 14.5, y: 93.7, w: 2.2, h: 4.9 },
-    tableTitle: { x: 27.9, y: 93.7, w: 46, h: 4.9 },
-    tableQty: { x: 113.2, y: 93.7, w: 2.3, h: 4.9 },
-    tableUnitPrice: { x: 127.5, y: 93.7, w: 14.4, h: 4.9 },
-    tableLineTotal: { x: 182.1, y: 93.7, w: 14.4, h: 4.9 },
-    tableDescription: { x: 27.9, y: 100.1, w: 118, h: 13.2 },
-    bank: { x: 14, y: 144.5, w: 58, h: 20.2 },
-    totals: { x: 138.5, y: 141.5, w: 59.4, h: 27.2 },
-    approval: { x: 13.3, y: 206.4, w: 101.3, h: 4.9 },
-    paymentTerms: { x: 13.3, y: 220.2, w: 104.9, h: 8.3 },
-    accreditations: { x: 12.8, y: 238.8, w: 184.4, h: 8.4 },
-    footerMeta: { x: 12.8, y: 257.4, w: 184.4, h: 4.2 }
+    billing: { x: 13.2, y: 20.8, w: 36.3, h: 15.8 },
+    company: { x: 136.4, y: 20.8, w: 60.2, h: 16.8 },
+    metaLeft: { x: 13.5, y: 45.8, w: 57.1, h: 13.2 },
+    metaRight: { x: 136.4, y: 45.8, w: 60.2, h: 7.2 },
+    table: { x: 12, y: 66.2, w: 185.6, h: 68 },
+    tableHeaderBand: { x: 12, y: 66.2, w: 185.6, h: 10.2 },
+    tableHeaderNumber: { x: 12, y: 66.2, w: 14.5, h: 10.2 },
+    tableHeaderTitle: { x: 26.5, y: 66.2, w: 82.2, h: 10.2 },
+    tableHeaderQty: { x: 110.4, y: 66.2, w: 11.8, h: 10.2 },
+    tableHeaderUnitPrice: { x: 123.3, y: 66.2, w: 24.8, h: 10.2 },
+    tableHeaderLineTotal: { x: 156.6, y: 66.2, w: 41, h: 10.2 },
+    tableNumber: { x: 14.5, y: 78.1, w: 2.2, h: 4.9 },
+    tableTitle: { x: 25.6, y: 78.1, w: 52, h: 4.9 },
+    tableQty: { x: 113.2, y: 78.1, w: 2.3, h: 4.9 },
+    tableUnitPrice: { x: 127.5, y: 78.1, w: 14.4, h: 4.9 },
+    tableLineTotal: { x: 182.1, y: 78.1, w: 14.4, h: 4.9 },
+    tableDescription: { x: 25.6, y: 84.2, w: 132.5, h: 13.2 },
+    bank: { x: 14, y: 132.8, w: 58, h: 20.2 },
+    totals: { x: 138.5, y: 130.5, w: 59.4, h: 27.2 },
+    approval: { x: 13.3, y: 179.8, w: 184.3, h: 4.9 },
+    paymentTerms: { x: 13.3, y: 193.3, w: 184.3, h: 8.3 },
+    accreditations: { x: 12.8, y: 212.6, w: 184.4, h: 8.4 },
+    footerMeta: { x: 12.8, y: 224.8, w: 184.4, h: 4.2 }
   }
 };
 
@@ -4025,7 +4025,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.tableLineTotal.y + section.tableLineTotal.h,
     section.tableDescription.y + section.tableDescription.h
   );
-  const estimateWrappedLines = (text, charsPerLine = 46) => {
+  const estimateWrappedLines = (text, charsPerLine = 34) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
     return raw
@@ -4038,7 +4038,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
     const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
-    const rowHeight = Math.max(11 + (descriptionLines * 4.6), 18);
+    const rowHeight = Math.max(9.8 + (descriptionLines * 4.8), 17.2);
     const rowOffset = currentRowOffset;
     currentRowOffset += rowHeight;
     return `
@@ -4052,10 +4052,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     `;
   }).join("");
-  const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.8 + currentRowOffset, section.table.h);
+  const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.5 + currentRowOffset, section.table.h);
   const dynamicBankTop = Math.max(contentBottom + 6, section.bank.y);
   const dynamicTotalsTop = Math.max(contentBottom + 2, section.totals.y);
-  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 8, dynamicTotalsTop + section.totals.h + 8, section.approval.y);
+  const totalRowCount = 4 + (summary.discountAmount > 0 ? 1 : 0) + (hasDeposit ? 2 : 2);
+  const dynamicTotalsHeight = Math.max(section.totals.h, 7.8 + (totalRowCount * 6.1));
+  const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 9, dynamicTotalsTop + dynamicTotalsHeight + 10, section.approval.y);
   const dynamicPaymentTop = Math.max(dynamicApprovalTop + section.approval.h + 8, section.paymentTerms.y);
   const dynamicAccreditationsTop = Math.max(dynamicPaymentTop + section.paymentTerms.h + 10, section.accreditations.y);
   const dynamicFooterMetaTop = Math.max(dynamicAccreditationsTop + section.accreditations.h + 6, section.footerMeta.y);
@@ -4138,11 +4140,17 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .address-block.company {
         text-align: right;
       }
-      .address-block.company {
-        left: ${section.company.x}mm;
-        top: ${section.company.y}mm;
-        width: ${section.company.w}mm;
-      }
+        .address-block.company {
+          left: ${section.company.x}mm;
+          top: ${section.company.y}mm;
+          width: ${section.company.w}mm;
+          font-size: 9.7pt;
+        }
+        .address-block.company p {
+          white-space: nowrap;
+          display: block;
+          width: 100%;
+        }
       .address-block p {
         margin: 0;
         font-weight: 400;
@@ -4167,9 +4175,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         text-align: right;
         line-height: 1.15;
       }
-      .meta-block p {
-        margin: 0 0 4px;
-      }
+        .meta-block p {
+          margin: 0 0 2.5px;
+        }
       .table-wrap {
         position: absolute;
         left: ${section.table.x}mm;
@@ -4188,22 +4196,38 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .table-header-cell {
         position: absolute;
         color: #fff;
-        font-size: 10pt;
+          font-size: 9pt;
         font-weight: 400;
         display: flex;
         align-items: center;
-        padding: 0 5px;
+          padding: 0 4px;
         z-index: 1;
+        white-space: nowrap;
+      }
+      .table-header-cell::after {
+        content: "|";
+        position: absolute;
+          right: -1.05mm;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #fff;
+        font-weight: 400;
       }
       .table-header-cell.num {
         text-align: center;
         justify-content: center;
       }
-      .table-lines {
-        position: relative;
-        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.8, 11)}mm;
-        min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
-      }
+        .table-header-cell.line-total-header::after {
+          display: none;
+        }
+        .table-header-cell.line-total-header {
+          font-size: 8.4pt;
+        }
+        .table-lines {
+          position: relative;
+          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h - 0.25, 7.7)}mm;
+          min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
+        }
       .invoice-line-row {
         position: absolute;
         left: 0;
@@ -4212,9 +4236,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .line-cell {
         position: absolute;
         font-size: 10pt;
-        line-height: 1.02;
-        font-weight: 400;
-      }
+          line-height: 1;
+          font-weight: 400;
+        }
       .line-title {
         white-space: nowrap;
       }
@@ -4222,10 +4246,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         text-align: left;
         padding-left: 0;
       }
-      .line-description {
-        white-space: pre-wrap;
-        color: #000;
-      }
+        .line-description {
+          white-space: pre-wrap;
+          color: #000;
+          line-height: 1.04;
+        }
       .line-unit,
       .line-total {
         text-align: right;
@@ -4254,11 +4279,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         left: ${section.totals.x}mm;
         top: ${dynamicTotalsTop}mm;
         width: ${section.totals.w}mm;
-        border: 0.8mm solid #0f98a5;
-        padding: 4.6mm 5.1mm;
-        font-size: 10pt;
-        min-height: ${section.totals.h}mm;
-      }
+          border: 0.6mm solid #0f98a5;
+          padding: 4.6mm 5.1mm;
+          font-size: 10pt;
+          min-height: ${dynamicTotalsHeight}mm;
+        }
       .total-row {
         display: flex;
         justify-content: space-between;
@@ -4268,9 +4293,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .total-row.total {
         font-size: 10pt;
         font-weight: 400;
-        padding-top: 2.6mm;
-        margin-top: 1.2mm;
-      }
+          padding-top: 1.2mm;
+          margin-top: 0;
+        }
       .total-row strong {
         font-weight: 400;
       }
@@ -4278,25 +4303,26 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         position: absolute;
         left: ${section.bank.x}mm;
         top: ${dynamicApprovalTop}mm;
-        width: ${section.table.w}mm;
-        font-size: 10pt;
-      }
+          width: ${section.table.w}mm;
+          font-size: 10pt;
+          line-height: 1.12;
+        }
       .payment-terms-footer {
         position: absolute;
-        left: ${section.paymentTerms.x}mm;
-        top: ${dynamicPaymentTop}mm;
-        width: ${section.paymentTerms.w}mm;
-        padding-top: 2.6mm;
-        border-top: 1.5px solid #0f98a5;
-        font-size: 8pt;
-        line-height: 1.25;
+          left: ${section.bank.x}mm;
+          top: ${dynamicPaymentTop}mm;
+          width: ${section.table.w}mm;
+          padding-top: 2.6mm;
+          border-top: 1.5px solid #0f98a5;
+          font-size: 8pt;
+          line-height: 1.25;
       }
       .footer-strip {
         position: absolute;
-        left: ${section.accreditations.x}mm;
-        top: ${dynamicAccreditationsTop}mm;
-        background: #0f98a5;
-        min-height: ${section.accreditations.h}mm;
+          left: ${section.accreditations.x}mm;
+          top: ${dynamicAccreditationsTop}mm;
+          background: #0f98a5;
+          min-height: ${section.accreditations.h}mm;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -4374,7 +4400,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <div class="table-header-cell" style="left:${localLeft(section.tableHeaderTitle.x)}mm; top:${localTop(section.tableHeaderTitle.y)}mm; width:${section.tableHeaderTitle.w}mm; min-height:${section.tableHeaderTitle.h}mm;">Description</div>
         <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderQty.x)}mm; top:${localTop(section.tableHeaderQty.y)}mm; width:${section.tableHeaderQty.w}mm; min-height:${section.tableHeaderQty.h}mm;">Qty</div>
         <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderUnitPrice.x)}mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:${section.tableHeaderUnitPrice.w}mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
-        <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
+        <div class="table-header-cell num line-total-header" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
         <div class="table-lines">
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
@@ -4409,7 +4435,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       </div>
     </div>
     ${termsPdfUrl ? `<div class="sheet" style="padding:0;"><embed src="${escapeHtml(termsPdfUrl)}" type="application/pdf" style="width:100%;height:297mm;display:block;" /></div>` : ""}
-    ${autoPrint ? `<script>
+          ${autoPrint ? `<script>
       (async function() {
         try {
           if (document.fonts && document.fonts.ready) {
@@ -4424,9 +4450,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           )));
           await new Promise((resolve) => requestAnimationFrame(() => resolve()));
           await new Promise((resolve) => requestAnimationFrame(() => resolve()));
-          await new Promise((resolve) => setTimeout(resolve, 1200));
+          await new Promise((resolve) => setTimeout(resolve, 1600));
           window.focus();
           window.print();
+          window.addEventListener('afterprint', () => {
+            setTimeout(() => window.close(), 150);
+          }, { once: true });
         } catch (error) {
           console.error(error);
         }
@@ -4714,48 +4743,24 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     }, template, { printMode: true, autoPrint: true });
     const blob = new Blob([printHtml], { type: "text/html" });
     const printUrl = URL.createObjectURL(blob);
-    const printFrame = document.createElement("iframe");
-    printFrame.style.position = "fixed";
-    printFrame.style.right = "0";
-    printFrame.style.bottom = "0";
-    printFrame.style.width = "1px";
-    printFrame.style.height = "1px";
-    printFrame.style.opacity = "0";
-    printFrame.style.pointerEvents = "none";
-    printFrame.src = printUrl;
-    const clearPrintFrame = () => {
-      URL.revokeObjectURL(printUrl);
-      printFrame.remove();
-      setPrinting(false);
-    };
-    printFrame.addEventListener("load", () => {
-      const frameWindow = printFrame.contentWindow;
-      if (!frameWindow) {
-        clearPrintFrame();
-        return;
-      }
-      const finish = () => setTimeout(clearPrintFrame, 1200);
-      frameWindow.addEventListener("afterprint", finish, { once: true });
-      frameWindow.focus();
-      setTimeout(() => {
-        try {
-          frameWindow.print();
-        } catch (error) {
-          console.error(error);
-          clearPrintFrame();
-        }
-      }, 1800);
-    }, { once: true });
-    if (!document.body) {
-      URL.revokeObjectURL(printUrl);
-      setError("Please allow pop-ups so the invoice preview can open.");
-      return;
-    }
     try {
       setPrinting(true);
-      document.body.appendChild(printFrame);
-    } finally {
-      // printing state is cleared after the print window is actually ready
+      const printWindow = window.open(printUrl, "_blank");
+      if (!printWindow) {
+        URL.revokeObjectURL(printUrl);
+        setPrinting(false);
+        setError("Please allow pop-ups so the invoice preview can open.");
+        return;
+      }
+      window.setTimeout(() => {
+        URL.revokeObjectURL(printUrl);
+        setPrinting(false);
+      }, 45000);
+    } catch (error) {
+      console.error(error);
+      URL.revokeObjectURL(printUrl);
+      setPrinting(false);
+      setError("Could not open the invoice preview.");
     }
   }
 
