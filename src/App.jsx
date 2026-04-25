@@ -3749,33 +3749,44 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
   termsPdfAsset: null,
   accreditationAssets: [],
   sections: {
-    title: { x: 11.5, y: 10, w: 58, h: 16 },
-    logo: { x: 147, y: 10, w: 48, h: 26 },
-    billing: { x: 12.5, y: 57, w: 78, h: 30 },
-    company: { x: 128, y: 57, w: 66, h: 38 },
-    metaLeft: { x: 12.5, y: 100, w: 84, h: 25 },
-    metaRight: { x: 128, y: 100, w: 66, h: 13 },
-    table: { x: 12.5, y: 124, w: 182, h: 86 },
-    tableHeaderBand: { x: 12.5, y: 124, w: 182, h: 14 },
-    tableHeaderNumber: { x: 12.5, y: 124, w: 14, h: 14 },
-    tableHeaderTitle: { x: 26.5, y: 124, w: 74, h: 14 },
-    tableHeaderQty: { x: 111, y: 124, w: 14, h: 14 },
-    tableHeaderUnitPrice: { x: 127, y: 124, w: 25, h: 14 },
-    tableHeaderLineTotal: { x: 156, y: 124, w: 38.5, h: 14 },
-    tableNumber: { x: 14.5, y: 145, w: 8, h: 8 },
-    tableTitle: { x: 28, y: 143.5, w: 72, h: 8 },
-    tableQty: { x: 112.5, y: 143.5, w: 12, h: 8 },
-    tableUnitPrice: { x: 133, y: 143.5, w: 20, h: 8 },
-    tableLineTotal: { x: 173.5, y: 143.5, w: 18, h: 8 },
-    tableDescription: { x: 28, y: 154.5, w: 146, h: 16 },
-    bank: { x: 12.5, y: 218, w: 78, h: 27 },
-    totals: { x: 140, y: 214, w: 55, h: 43 },
-    approval: { x: 12.5, y: 251, w: 108, h: 11 },
-    paymentTerms: { x: 12.5, y: 266, w: 112, h: 13 },
-    accreditations: { x: 12.5, y: 281, w: 182, h: 11 },
-    footerMeta: { x: 12.5, y: 292, w: 182, h: 4.5 }
+    title: { x: 12.9, y: 11, w: 16.6, h: 8.5 },
+    logo: { x: 141, y: 10.6, w: 55.9, h: 13.3 },
+    billing: { x: 13.2, y: 33.9, w: 36.3, h: 24.4 },
+    company: { x: 141.1, y: 33.9, w: 55.5, h: 22.1 },
+    metaLeft: { x: 13.5, y: 71.4, w: 57.1, h: 17.4 },
+    metaRight: { x: 136.4, y: 71.4, w: 60.2, h: 4.9 },
+    table: { x: 12, y: 97.3, w: 185.6, h: 70 },
+    tableHeaderBand: { x: 12, y: 97.3, w: 185.6, h: 11.3 },
+    tableHeaderNumber: { x: 12, y: 97.3, w: 14.5, h: 11.3 },
+    tableHeaderTitle: { x: 26.5, y: 97.3, w: 73, h: 11.3 },
+    tableHeaderQty: { x: 109.8, y: 97.3, w: 12.5, h: 11.3 },
+    tableHeaderUnitPrice: { x: 122.3, y: 97.3, w: 27.7, h: 11.3 },
+    tableHeaderLineTotal: { x: 173.2, y: 97.3, w: 24.4, h: 11.3 },
+    tableNumber: { x: 14.5, y: 110.7, w: 2.2, h: 4.9 },
+    tableTitle: { x: 27.9, y: 110.7, w: 29.5, h: 4.9 },
+    tableQty: { x: 113.2, y: 110.7, w: 2.3, h: 4.9 },
+    tableUnitPrice: { x: 127.5, y: 110.7, w: 14.4, h: 4.9 },
+    tableLineTotal: { x: 182.1, y: 110.7, w: 14.4, h: 4.9 },
+    tableDescription: { x: 27.9, y: 117.8, w: 88.5, h: 15.1 },
+    bank: { x: 14, y: 166.2, w: 58, h: 23.1 },
+    totals: { x: 138.5, y: 160.7, w: 59.4, h: 31.6 },
+    approval: { x: 13.3, y: 234.7, w: 101.3, h: 4.9 },
+    paymentTerms: { x: 13.3, y: 251.7, w: 104.9, h: 8.3 },
+    accreditations: { x: 46.3, y: 264.2, w: 149.7, h: 8.4 },
+    footerMeta: { x: 12.8, y: 281.8, w: 184.4, h: 4.2 }
   }
 };
+
+const DEFAULT_PRO_FORMA_LOGO = "/branding/pdf-reference/invoice-logo.png";
+const DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS = [
+  { url: "/branding/pdf-reference/accreditation-nhs.png", widthMm: 23.9, alt: "NHS Approved Supplier" },
+  { url: "/branding/pdf-reference/accreditation-dementia-friends.png", widthMm: 21.3, alt: "Dementia Friends" },
+  { url: "/branding/pdf-reference/accreditation-constructionline.png", widthMm: 18.3, alt: "Constructionline" },
+  { url: "/branding/pdf-reference/accreditation-chas.png", widthMm: 16.0, alt: "CHAS" },
+  { url: "/branding/pdf-reference/accreditation-pasma.png", widthMm: 24.6, alt: "PASMA" },
+  { url: "/branding/pdf-reference/accreditation-ipaf.png", widthMm: 14.2, alt: "IPAF" },
+  { url: "/branding/pdf-reference/accreditation-fespa.png", widthMm: 18.9, alt: "FESPA UK Association" }
+];
 
 function cloneDefaultProFormaTemplate() {
   return sanitizeProFormaTemplate(DEFAULT_PRO_FORMA_TEMPLATE);
@@ -3962,11 +3973,16 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     ["IBAN", "GB98NWBK01671471603603"],
     ["SWIFT", "NWBKGB2L"]
   ];
-  const displayTitle = /pro\s*forma/i.test(String(draft.headline || "")) ? "PRO FORMA INVOICE" : (draft.headline || "INVOICE").toUpperCase();
+  const displayTitle = /pro\s*forma/i.test(String(draft.headline || ""))
+    ? "PRO FORMA INVOICE"
+    : (draft.headline || "INVOICE").toUpperCase();
   const accreditationImages = template.accreditationAssets?.length
-    ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset) })).filter((asset) => asset.url)
-    : (draft.brandingAssets || []).filter((asset) => asset?.type === "image");
-  const fallbackAccreditationStrip = `${window.location.origin}/branding/pro-forma-accreditations-strip.svg`;
+    ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset), alt: asset.name || "Accreditation" })).filter((asset) => asset.url)
+    : DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS.map((asset) => ({
+      url: `${window.location.origin}${asset.url}`,
+      alt: asset.alt,
+      widthMm: asset.widthMm
+    }));
   const termsPdfUrl = builderMode ? "" : getProFormaTemplateAssetUrl(template.termsPdfAsset);
   const hasDeposit = Number(summary.depositAmount || 0) > 0;
   const completionBalance = hasDeposit
@@ -3992,7 +4008,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.tableLineTotal.y + section.tableLineTotal.h,
     section.tableDescription.y + section.tableDescription.h
   );
-  const rowPitch = Math.max(Number((rowAnchorBottom - rowAnchorTop + 4).toFixed(2)), 18);
+  const rowPitch = 20.32;
   const lineRows = (draft.lineItems || []).map((item, index) => {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
@@ -4032,7 +4048,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         font-weight: 400;
         font-style: normal;
       }
-      @page { size: A4 portrait; margin: 10mm; }
+      @page { size: A4 portrait; margin: 0; }
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
@@ -4063,12 +4079,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         top: ${section.title.y}mm;
         width: ${section.title.w}mm;
         min-height: ${section.title.h}mm;
-        font-size: 28px;
+        font-size: 20pt;
         line-height: 1;
-        letter-spacing: 0.025em;
+        letter-spacing: 0.02em;
         font-family: "Bebas Neue", Arial, Helvetica, sans-serif;
         font-weight: 400;
-        color: #0f98a5;
+        color: #008c95;
       }
       .brand img {
         position: absolute;
@@ -4086,8 +4102,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         padding: 0 ${Math.max(210 - (section.company.x + section.company.w), 12.5)}mm 0 ${section.billing.x}mm;
       }
       .address-block {
-        font-size: 11px;
-        line-height: 1.24;
+        font-size: 10pt;
+        line-height: 1.08;
         min-height: ${Math.max(section.billing.h, section.company.h)}mm;
       }
       .address-block.right {
@@ -4096,17 +4112,23 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .address-block p {
         margin: 0;
       }
+      .address-block p:last-child {
+        color: inherit;
+      }
+      .address-block.right p:last-child {
+        color: #0f98a5;
+      }
       .meta-split {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: ${Math.max(section.metaRight.x - (section.metaLeft.x + section.metaLeft.w), 12)}mm;
         margin-top: ${metaTop}mm;
         padding: 0 ${Math.max(210 - (section.metaRight.x + section.metaRight.w), 12.5)}mm 0 ${section.metaLeft.x}mm;
-        font-size: 11px;
-        line-height: 1.5;
+        font-size: 10pt;
+        line-height: 1.32;
       }
       .meta-split p {
-        margin: 0 0 9px;
+        margin: 0 0 7px;
       }
       .meta-right {
         text-align: right;
@@ -4129,11 +4151,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .table-header-cell {
         position: absolute;
         color: #fff;
-        font-size: 10px;
+        font-size: 10pt;
         font-weight: 700;
         display: flex;
         align-items: center;
-        padding: 0 8px;
+        padding: 0 5px;
         z-index: 1;
       }
       .table-header-cell.num {
@@ -4142,7 +4164,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .table-lines {
         position: relative;
-        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2, 16)}mm;
+        margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.4, 13)}mm;
         min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2), 40)}mm;
       }
       .invoice-line-row {
@@ -4152,8 +4174,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .line-cell {
         position: absolute;
-        font-size: 11px;
-        line-height: 1.18;
+        font-size: 10pt;
+        line-height: 1.15;
       }
       .line-number {
         text-align: left;
@@ -4179,7 +4201,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         position: absolute;
         left: 0;
         right: 0;
-        bottom: 0;
+        bottom: 1mm;
         height: 1px;
         background: #d7e2e5;
       }
@@ -4193,68 +4215,63 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         align-items: start;
       }
       .bank-block {
-        font-size: 11px;
-        line-height: 1.28;
+        font-size: 10pt;
+        line-height: 1.18;
       }
       .bank-grid {
         display: grid;
-        grid-template-columns: 120px 1fr;
-        gap: 1px 10px;
-        margin-top: 4px;
+        grid-template-columns: 34mm 1fr;
+        gap: 1px 5mm;
+        margin-top: 3px;
       }
       .totals-box {
-        border: 3px solid #0f98a5;
-        padding: 14px 16px;
-        font-size: 11px;
+        border: 1.5px solid #0f98a5;
+        padding: 5.5mm 5.8mm;
+        font-size: 10pt;
         min-height: ${section.totals.h}mm;
       }
       .total-row {
         display: flex;
         justify-content: space-between;
         gap: 14px;
-        padding: 4px 0;
+        padding: 1.4mm 0;
       }
       .total-row.total {
-        font-size: 13px;
+        font-size: 12pt;
         font-weight: 700;
-        padding-top: 8px;
-        margin-top: 4px;
+        padding-top: 2.6mm;
+        margin-top: 1.2mm;
       }
       .total-row strong {
         font-weight: 700;
       }
       .approval {
         margin-top: ${approvalTop}mm;
-        font-size: 11px;
+        font-size: 10pt;
         max-width: ${section.approval.w}mm;
       }
       .payment-terms-footer {
         margin-top: ${paymentTop}mm;
-        padding-top: 11px;
-        border-top: 2px solid #0f98a5;
-        font-size: 10.5px;
-        line-height: 1.45;
+        padding-top: 3.8mm;
+        border-top: 1.5px solid #0f98a5;
+        font-size: 8pt;
+        line-height: 1.35;
         max-width: ${section.paymentTerms.w}mm;
       }
       .footer-strip {
         margin-top: ${footerStripTop}mm;
         background: #0f98a5;
         min-height: ${section.accreditations.h}mm;
-        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 4px 8px;
-        font-size: 10px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
+        padding: 0 4mm;
         margin-left: ${section.accreditations.x}mm;
         width: ${section.accreditations.w}mm;
       }
       .footer-strip img {
         max-width: 100%;
-        max-height: calc(${section.accreditations.h}mm - 4px);
-        width: 100%;
+        max-height: calc(${section.accreditations.h}mm - 1.8mm);
         display: block;
         object-fit: contain;
       }
@@ -4262,8 +4279,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 14px;
-        flex-wrap: wrap;
+        gap: 2.8mm;
+        flex-wrap: nowrap;
         width: 100%;
       }
       .footer-meta {
@@ -4272,7 +4289,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        font-size: 9.5px;
+        font-size: 6pt;
         margin-left: ${section.footerMeta.x}mm;
         width: ${section.footerMeta.w}mm;
       }
@@ -4297,7 +4314,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       <div class="top-row">
         <div class="doc-title">${escapeHtml(displayTitle)}</div>
         <div class="brand">
-          <img src="${window.location.origin}/branding/signs-express-logo-teal.svg" alt="Signs Express logo" />
+          <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
         </div>
       </div>
 
@@ -4359,7 +4376,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
 
-      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}" alt="Accreditation" />`).join("")}</div>` : `<img src="${fallbackAccreditationStrip}" alt="Accreditations" />`}</div>
+      <div class="footer-strip">${accreditationImages.length ? `<div class="footer-strip-images">${accreditationImages.map((asset) => `<img src="${asset.url.startsWith("data:") || asset.url.startsWith("http") ? asset.url.includes("/api/pro-forma/asset?") || asset.url.startsWith("data:") || asset.url.startsWith(window.location.origin) ? asset.url : `${window.location.origin}/api/pro-forma/asset?url=${encodeURIComponent(asset.url)}` : `${window.location.origin}${asset.url}`}" alt="${escapeHtml(asset.alt || "Accreditation")}" ${asset.widthMm ? `style="width:${asset.widthMm}mm"` : ""} />`).join("")}</div>` : ""}</div>
       <div class="footer-meta">
         <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
         <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
