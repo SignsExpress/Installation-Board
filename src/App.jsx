@@ -4019,7 +4019,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.table.y
   );
   const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
-  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 7.6, 21.6);
+  const tableBodyTop = Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 10.4, 24.4);
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4031,8 +4031,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     const quantity = Math.max(Number(item.quantity) || 0, 0);
     const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
     const lineTotal = roundProFormaMoney(quantity * unitPrice);
-    const descriptionLines = Math.max(estimateWrappedLines(item.description), 1);
-    const rowHeight = Math.max(6.4 + (descriptionLines * 3.25), 10.8);
+    const hasDescription = Boolean(String(item.description || "").trim());
+    const descriptionLines = hasDescription ? Math.max(estimateWrappedLines(item.description), 1) : 0;
+    const rowHeight = hasDescription
+      ? Math.max(5.4 + (descriptionLines * 2.9), 8.8)
+      : 5.8;
     return `
       <div class="invoice-line-row" style="min-height:${rowHeight}mm;">
         <div class="invoice-line-main">
@@ -4042,7 +4045,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           <div class="line-cell line-unit">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
           <div class="line-cell line-total">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
         </div>
-        ${item.description ? `<div class="line-cell line-description">${escapeHtml(item.description)}</div>` : ""}
+        ${hasDescription ? `<div class="line-cell line-description">${escapeHtml(item.description)}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -4218,7 +4221,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .invoice-line-row {
         position: relative;
         width: 100%;
-        margin-bottom: 1.9mm;
+        margin-bottom: 0.7mm;
         page-break-inside: avoid;
         break-inside: avoid;
       }
@@ -4244,7 +4247,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           white-space: pre-wrap;
           color: #000;
           line-height: 1.04;
-          margin-top: 1.2mm;
+          margin-top: 0.6mm;
           margin-left: 16mm;
           width: calc(100% - 16mm - 39mm);
         }
