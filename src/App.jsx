@@ -4025,6 +4025,16 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.tableLineTotal.y + section.tableLineTotal.h,
     section.tableDescription.y + section.tableDescription.h
   );
+  const topSectionBottom = Math.max(
+    section.billing.y + section.billing.h,
+    section.company.y + section.company.h,
+    section.metaLeft.y + section.metaLeft.h,
+    section.metaRight.y + section.metaRight.h,
+    section.logo.y + section.logo.h,
+    section.title.y + section.title.h,
+    section.table.y
+  );
+  const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4167,7 +4177,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           margin: 0 0 2.5px;
         }
       .sheet-flow-spacer {
-        height: ${section.table.y}mm;
+        height: ${flowStartTop}mm;
       }
       .table-wrap {
         position: relative;

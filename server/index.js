@@ -5879,7 +5879,7 @@ function extractProFormaLineItems(order = {}) {
         id: 'pro-forma-line-' + (group.index + 1),
         sortIndex: group.index,
         name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || ('Line Item ' + (group.index + 1))),
-        description: group.description || (!isGenericProFormaName(group.name) ? group.name : ''),
+        description: group.description || '',
         quantity: String(group.quantity || normalizedQuantity || 1),
         normalizedQuantity,
         unitPrice: Math.round(normalizedUnitPrice * 100) / 100,
