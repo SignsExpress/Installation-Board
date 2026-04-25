@@ -4035,6 +4035,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     section.table.y
   );
   const flowStartTop = Math.max(topSectionBottom + 4, section.table.y);
+  const rowStartOffset = Math.max(
+    localTop(rowAnchorTop) + 1.5,
+    localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2
+  );
   const estimateWrappedLines = (text, charsPerLine = 42) => {
     const raw = String(text || "");
     if (!raw.trim()) return 0;
@@ -4225,8 +4229,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         }
         .table-lines {
           position: relative;
-          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1.8, 9.8)}mm;
-          min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 2.8), 40)}mm;
+          margin-top: ${rowStartOffset}mm;
+          min-height: ${Math.max(section.table.h - (rowStartOffset + 1.2), 40)}mm;
         }
       .invoice-line-row {
         position: relative;
