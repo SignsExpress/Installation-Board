@@ -3759,9 +3759,9 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
     tableHeaderBand: { x: 12, y: 96.6, w: 185.6, h: 10.8 },
     tableHeaderNumber: { x: 12, y: 96.6, w: 14.5, h: 10.8 },
     tableHeaderTitle: { x: 26.5, y: 96.6, w: 82.2, h: 10.8 },
-    tableHeaderQty: { x: 110.4, y: 96.6, w: 11.8, h: 10.8 },
-    tableHeaderUnitPrice: { x: 123.3, y: 96.6, w: 24.8, h: 10.8 },
-    tableHeaderLineTotal: { x: 156.6, y: 96.6, w: 41, h: 10.8 },
+    tableHeaderQty: { x: 109.9, y: 96.6, w: 12.8, h: 10.8 },
+    tableHeaderUnitPrice: { x: 122.7, y: 96.6, w: 24.4, h: 10.8 },
+    tableHeaderLineTotal: { x: 168.2, y: 96.6, w: 29.4, h: 10.8 },
     tableNumber: { x: 14.5, y: 110.7, w: 2.2, h: 4.9 },
     tableTitle: { x: 25.6, y: 110.7, w: 52, h: 4.9 },
     tableQty: { x: 113.2, y: 110.7, w: 2.3, h: 4.9 },
@@ -4053,8 +4053,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     `;
   }).join("");
   const contentBottom = section.table.y + Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.5 + currentRowOffset, section.table.h);
-  const dynamicBankTop = Math.max(contentBottom + 8.5, section.bank.y);
-  const dynamicTotalsTop = Math.max(contentBottom + 4.5, section.totals.y);
+  const dynamicBankTop = Math.max(contentBottom + 11.2, section.bank.y);
+  const dynamicTotalsTop = Math.max(contentBottom + 7.4, section.totals.y);
   const totalRowCount = 4 + (summary.discountAmount > 0 ? 1 : 0) + (hasDeposit ? 2 : 2);
   const dynamicTotalsHeight = Math.max(section.totals.h, 7.8 + (totalRowCount * 6.1));
   const dynamicApprovalTop = Math.max(dynamicBankTop + section.bank.h + 9, dynamicTotalsTop + dynamicTotalsHeight + 10, section.approval.y);
@@ -4221,11 +4221,11 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           font-size: 8.4pt;
           justify-content: flex-end;
           text-align: right;
-          padding-right: 0;
+          padding-right: 1.2mm;
         }
         .table-lines {
           position: relative;
-          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 0.15, 8.1)}mm;
+          margin-top: ${Math.max(localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h - 0.95, 7.1)}mm;
           min-height: ${Math.max(section.table.h - (localTop(section.tableHeaderBand.y) + section.tableHeaderBand.h + 1), 40)}mm;
         }
       .invoice-line-row {
@@ -4402,7 +4402,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <div class="table-header-cell num" style="left:${localLeft(section.tableHeaderUnitPrice.x)}mm; top:${localTop(section.tableHeaderUnitPrice.y)}mm; width:${section.tableHeaderUnitPrice.w}mm; min-height:${section.tableHeaderUnitPrice.h}mm;">Unit Price</div>
         <div class="table-header-cell num line-total-header" style="left:${localLeft(section.tableHeaderLineTotal.x)}mm; top:${localTop(section.tableHeaderLineTotal.y)}mm; width:${section.tableHeaderLineTotal.w}mm; min-height:${section.tableHeaderLineTotal.h}mm;">Line Item Total</div>
         <div class="table-header-separator" style="left:${localLeft(section.tableHeaderTitle.x) - 1.5}mm; top:${localTop(section.tableHeaderTitle.y) + (section.tableHeaderTitle.h / 2)}mm;">|</div>
-        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderLineTotal.x) - 2.1}mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
+        <div class="table-header-separator" style="left:${localLeft(section.tableHeaderLineTotal.x) - 4.1}mm; top:${localTop(section.tableHeaderLineTotal.y) + (section.tableHeaderLineTotal.h / 2)}mm;">|</div>
         <div class="table-lines">
           ${lineRows || `<div class="invoice-line-row" style="top:0;"><div class="line-cell" style="left:0; top:0;">No line items</div></div>`}
         </div>
