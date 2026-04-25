@@ -3957,6 +3957,17 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   const builderMode = options.builderMode === true;
   const template = sanitizeProFormaTemplate(templateInput);
   const section = template.sections;
+  const formatInvoiceAddress = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return "-";
+    if (raw.includes("\n")) return raw;
+    const parts = raw.split(",").map((part) => part.trim()).filter(Boolean);
+    if (parts.length >= 4) {
+      return [parts[0], parts.slice(1, -1).join(", "), parts.at(-1)].join("\n");
+    }
+    if (parts.length === 3) return [parts[0], parts[1], parts[2]].join("\n");
+    return raw;
+  };
   const companyLines = [
     "Signs Express (Central Lancashire)",
     "Unit 3",
@@ -3973,9 +3984,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     ["IBAN", "GB98NWBK01671471603603"],
     ["SWIFT", "NWBKGB2L"]
   ];
-  const displayTitle = /pro\s*forma/i.test(String(draft.headline || ""))
-    ? "PRO FORMA INVOICE"
-    : (draft.headline || "INVOICE").toUpperCase();
+  const displayTitle = "INVOICE";
   const accreditationImages = template.accreditationAssets?.length
     ? template.accreditationAssets.map((asset) => ({ url: getProFormaTemplateAssetUrl(asset), alt: asset.name || "Accreditation" })).filter((asset) => asset.url)
     : DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS.map((asset) => ({
@@ -4022,7 +4031,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <div class="line-cell line-unit" style="left:${localLeft(section.tableUnitPrice.x)}mm; top:${localTop(section.tableUnitPrice.y) - localTop(rowAnchorTop)}mm; width:${section.tableUnitPrice.w}mm; min-height:${section.tableUnitPrice.h}mm;">${escapeHtml(formatProFormaMoney(unitPrice))}</div>
         <div class="line-cell line-total" style="left:${localLeft(section.tableLineTotal.x)}mm; top:${localTop(section.tableLineTotal.y) - localTop(rowAnchorTop)}mm; width:${section.tableLineTotal.w}mm; min-height:${section.tableLineTotal.h}mm;">${escapeHtml(formatProFormaMoney(lineTotal))}</div>
         ${item.description ? `<div class="line-cell line-description" style="left:${localLeft(section.tableDescription.x)}mm; top:${localTop(section.tableDescription.y) - localTop(rowAnchorTop)}mm; width:${section.tableDescription.w}mm; min-height:${section.tableDescription.h}mm;">${escapeHtml(item.description)}</div>` : ""}
-        <div class="line-divider"></div>
       </div>
     `;
   }).join("");
@@ -4111,9 +4119,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .address-block p {
         margin: 0;
-      }
-      .address-block p:last-child {
-        color: inherit;
+        font-weight: 400;
       }
       .address-block.right p:last-child {
         color: #0f98a5;
@@ -4198,14 +4204,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .line-qty {
         text-align: center;
         white-space: nowrap;
-      }
-      .line-divider {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 1mm;
-        height: 1px;
-        background: #d7e2e5;
       }
       .bank-block {
         position: absolute;
@@ -4323,8 +4321,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         <img src="${window.location.origin}${DEFAULT_PRO_FORMA_LOGO}" alt="Signs Express logo" />
       </div>
       <div class="address-block billing">
-        <p><strong>${escapeHtml(draft.customerName || "-")}</strong></p>
-        <p class="prewrap">${escapeHtml(draft.billingAddress || draft.address || "-")}</p>
+        <p>${escapeHtml(draft.customerName || "-")}</p>
+        <p class="prewrap">${escapeHtml(formatInvoiceAddress(draft.billingAddress || draft.address || "-"))}</p>
       </div>
       <div class="address-block company right">
         ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
@@ -4659,16 +4657,37 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       setPrinting(true);
       printWindow.document.write(previewHtml);
       printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
+      const waitForPrintReady = async () => {
         try {
+          const images = Array.from(printWindow.document.images || []);
+          if (printWindow.document.fonts?.ready) {
+            await printWindow.document.fonts.ready;
+          }
+          await Promise.all(images.map((image) => (
+            image.complete
+              ? Promise.resolve()
+              : new Promise((resolve) => {
+                  image.addEventListener("load", resolve, { once: true });
+                  image.addEventListener("error", resolve, { once: true });
+                })
+          )));
+          await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
+          await new Promise((resolve) => printWindow.requestAnimationFrame(() => resolve()));
+          printWindow.focus();
           printWindow.print();
         } catch (error) {
           console.error(error);
+        } finally {
+          setPrinting(false);
         }
-      }, 300);
+      };
+      if (printWindow.document.readyState === "complete") {
+        waitForPrintReady();
+      } else {
+        printWindow.addEventListener("load", waitForPrintReady, { once: true });
+      }
     } finally {
-      setPrinting(false);
+      // printing state is cleared after the print window is actually ready
     }
   }
 
