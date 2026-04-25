@@ -3844,6 +3844,15 @@ function roundProFormaMoney(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+function parseProFormaCheatSheetMoney(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw || /^(true|false|null|undefined|n\/a)$/i.test(raw)) return null;
+  const normalized = raw.replace(/,/g, "").replace(/[£\s]/g, "");
+  if (!/^-?\d+(?:\.\d+)?$/.test(normalized)) return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? roundProFormaMoney(amount) : null;
+}
+
 function formatProFormaDate(value) {
   if (!value) return "";
   const parsed = new Date(value);
@@ -3855,39 +3864,53 @@ function formatProFormaDate(value) {
   }).format(parsed);
 }
 
-function buildProFormaCodeCheatSheet(results = []) {
+function buildProFormaCodeCheatSheet(results = [], expectedAmounts = {}) {
   const references = results
     .map((result) => String(result.reference || result.payload?.orderReference || "").trim())
     .filter(Boolean);
   const rowMap = new Map();
+  const expectedMap = Object.fromEntries(
+    Object.entries(expectedAmounts || {}).map(([reference, value]) => [String(reference || "").trim(), roundProFormaMoney(value)])
+  );
 
   results.forEach((result) => {
     const reference = String(result.reference || result.payload?.orderReference || "").trim();
     if (!reference) return;
-    const lineItems = Array.isArray(result.payload?.lineItems) ? result.payload.lineItems : [];
-    lineItems.forEach((item, index) => {
-      const lineNumber = Number.isFinite(item.sortIndex) ? item.sortIndex + 1 : index + 1;
-      const fields = Array.isArray(item.rawMoneyFields) ? item.rawMoneyFields : [];
-      fields.forEach((field) => {
-        const code = String(field.leaf || "").trim();
-        if (!code) return;
-        if (!rowMap.has(code)) {
-          rowMap.set(code, {
-            code,
-            coverage: 0,
-            cells: {}
-          });
-        }
-        const row = rowMap.get(code);
-        if (!Array.isArray(row.cells[reference])) {
-          row.cells[reference] = [];
-          row.coverage += 1;
-        }
-        row.cells[reference].push({
-          lineNumber,
-          amount: roundProFormaMoney(field.amount || 0),
-          raw: String(field.raw || "")
+    const debugFields = Array.isArray(result.payload?.order?.debugFields) ? result.payload.order.debugFields : [];
+    debugFields.forEach((field) => {
+      const key = String(field.key || "");
+      const lowerKey = key.toLowerCase();
+      const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+      if (!match) return;
+      const amount = parseProFormaCheatSheetMoney(field.value);
+      if (amount === null) return;
+      const code = String(match[2] || "").trim();
+      const lineNumber = Number(match[1]) + 1;
+      if (!code) return;
+      if (!rowMap.has(code)) {
+        rowMap.set(code, {
+          code,
+          coverage: 0,
+          exactMatches: 0,
+          cells: {}
         });
+      }
+      const row = rowMap.get(code);
+      if (!Array.isArray(row.cells[reference])) {
+        row.cells[reference] = [];
+        row.coverage += 1;
+      }
+      const exactMatch = lineNumber === 1
+        && Number.isFinite(expectedMap[reference])
+        && Math.abs(amount - expectedMap[reference]) < 0.01;
+      if (exactMatch) {
+        row.exactMatches += 1;
+      }
+      row.cells[reference].push({
+        lineNumber,
+        amount,
+        raw: String(field.value || ""),
+        exactMatch
       });
     });
   });
@@ -3896,6 +3919,7 @@ function buildProFormaCodeCheatSheet(results = []) {
     references,
     rows: [...rowMap.values()]
       .sort((left, right) => {
+        if (right.exactMatches !== left.exactMatches) return right.exactMatches - left.exactMatches;
         if (right.coverage !== left.coverage) return right.coverage - left.coverage;
         return left.code.localeCompare(right.code);
       })
@@ -3906,6 +3930,7 @@ function buildProFormaCodeCheatSheet(results = []) {
             reference,
             Array.isArray(row.cells[reference])
               ? [...row.cells[reference]].sort((left, right) => {
+                  if (right.exactMatch !== left.exactMatch) return Number(right.exactMatch) - Number(left.exactMatch);
                   if (left.lineNumber !== right.lineNumber) return left.lineNumber - right.lineNumber;
                   return right.amount - left.amount;
                 })
@@ -4351,6 +4376,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [compareReferences, setCompareReferences] = useState(["", "", ""]);
+  const [compareExpectedAmounts, setCompareExpectedAmounts] = useState(["", "", ""]);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState("");
   const [compareResults, setCompareResults] = useState([]);
@@ -4409,8 +4435,16 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     balanceDue: remainingBalance
   }, template), [draft, subtotal, discountAmount, preTaxTotal, vatAmount, total, depositAmount, totalPaid, remainingBalance, template]);
   const compareSheet = useMemo(
-    () => buildProFormaCodeCheatSheet(compareResults),
-    [compareResults]
+    () => buildProFormaCodeCheatSheet(
+      compareResults,
+      Object.fromEntries(
+        compareReferences.map((reference, index) => [
+          String(reference || "").trim(),
+          Number(compareExpectedAmounts[index] || 0)
+        ]).filter(([reference, value]) => reference && Number.isFinite(value) && value > 0)
+      )
+    ),
+    [compareResults, compareReferences, compareExpectedAmounts]
   );
 
   useEffect(() => {
@@ -4640,6 +4674,10 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     setCompareReferences((current) => current.map((entry, entryIndex) => (entryIndex === index ? value : entry)));
   }
 
+  function updateCompareExpectedAmount(index, value) {
+    setCompareExpectedAmounts((current) => current.map((entry, entryIndex) => (entryIndex === index ? value : entry)));
+  }
+
   async function buildCodeCheatSheet() {
     const references = compareReferences
       .map((value) => String(value || "").trim())
@@ -4764,11 +4802,19 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   {compareReferences.map((value, index) => (
                     <label key={`compare-reference-${index}`}>
                       Ref {index + 1}
-                      <input
-                        value={value}
-                        onChange={(event) => updateCompareReference(index, event.target.value)}
-                        placeholder={`EST-${3379 + index}`}
-                      />
+                      <div className="pro-forma-compare-input-row">
+                        <input
+                          value={value}
+                          onChange={(event) => updateCompareReference(index, event.target.value)}
+                          placeholder={`EST-${3379 + index}`}
+                        />
+                        <input
+                          value={compareExpectedAmounts[index]}
+                          onChange={(event) => updateCompareExpectedAmount(index, event.target.value)}
+                          inputMode="decimal"
+                          placeholder="Line 1 £"
+                        />
+                      </div>
                     </label>
                   ))}
                 </div>
@@ -4800,13 +4846,19 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                     <div className="pro-forma-compare-sheet-body">
                       {compareSheet.rows.map((row) => (
                         <div key={row.code} className="pro-forma-compare-row">
-                          <div className="pro-forma-compare-code">{row.code}</div>
+                          <div className="pro-forma-compare-code">
+                            <strong>{row.code}</strong>
+                            {row.exactMatches ? <span>{row.exactMatches} exact line 1 match{row.exactMatches === 1 ? "" : "es"}</span> : null}
+                          </div>
                           {compareSheet.references.map((reference) => {
                             const values = row.cells[reference] || [];
                             return (
                               <div key={`${row.code}-${reference}`} className="pro-forma-compare-cell">
                                 {values.length ? values.map((value, index) => (
-                                  <div key={`${row.code}-${reference}-${value.lineNumber}-${index}`} className="pro-forma-compare-value">
+                                  <div
+                                    key={`${row.code}-${reference}-${value.lineNumber}-${index}`}
+                                    className={`pro-forma-compare-value${value.exactMatch ? " is-match" : ""}`}
+                                  >
                                     <span>L{value.lineNumber}</span>
                                     <strong>{formatProFormaMoney(value.amount)}</strong>
                                   </div>

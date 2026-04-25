@@ -6327,6 +6327,12 @@ button {
   gap: 6px;
 }
 
+.pro-forma-compare-input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 6px;
+}
+
 .pro-forma-compare-actions {
   display: flex;
   gap: 8px;
@@ -6386,6 +6392,19 @@ button {
   color: #334155;
   font-family: Consolas, "Courier New", monospace;
   word-break: break-word;
+  display: grid;
+  gap: 4px;
+}
+
+.pro-forma-compare-code strong {
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.pro-forma-compare-code span {
+  font-size: 0.58rem;
+  color: #64748b;
+  font-family: "Aptos", "Segoe UI", sans-serif;
 }
 
 .pro-forma-compare-cell {
@@ -6404,6 +6423,11 @@ button {
   background: #f8fafc;
   font-size: 0.64rem;
   line-height: 1.25;
+}
+
+.pro-forma-compare-value.is-match {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
 }
 
 .pro-forma-compare-value span {
@@ -6945,6 +6969,10 @@ button {
 
   .pro-forma-compare-sheet-head,
   .pro-forma-compare-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pro-forma-compare-input-row {
     grid-template-columns: 1fr;
   }
 
