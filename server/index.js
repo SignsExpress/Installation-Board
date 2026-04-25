@@ -4464,6 +4464,19 @@ function filterCoreBridgeOrders(orders, searchTerm = "", options = {}) {
   );
 }
 
+function getCoreBridgeReferenceVariants(reference = "") {
+  const trimmed = String(reference || "").trim();
+  if (!trimmed) return [];
+  const variants = new Set([trimmed]);
+  if (/^ests-/i.test(trimmed)) variants.add(trimmed.replace(/^ests-/i, "EST-"));
+  if (/^est-/i.test(trimmed)) variants.add(trimmed.replace(/^est-/i, "ESTS-"));
+  if (/^ords-/i.test(trimmed)) variants.add(trimmed.replace(/^ords-/i, "ORD-"));
+  if (/^ord-/i.test(trimmed)) variants.add(trimmed.replace(/^ord-/i, "ORDS-"));
+  if (/^invs-/i.test(trimmed)) variants.add(trimmed.replace(/^invs-/i, "INV-"));
+  if (/^inv-/i.test(trimmed)) variants.add(trimmed.replace(/^inv-/i, "INVS-"));
+  return [...variants];
+}
+
 async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, options = {}) {
   const config = getCoreBridgeConfig();
   if (!config.token || !config.subscriptionKey) {
@@ -4475,12 +4488,13 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   const attempts = [];
   const normalizedSearch = String(searchTerm || "").trim();
   const looksLikeFormattedNumber = /[a-z]{2,5}-?\d+/i.test(normalizedSearch);
-  const looksLikeEstimateReference = /^est-/i.test(normalizedSearch);
-  const requestPlans = [
+  const formattedSearchVariants = looksLikeFormattedNumber ? getCoreBridgeReferenceVariants(normalizedSearch) : [normalizedSearch];
+  const looksLikeEstimateReference = formattedSearchVariants.some((value) => /^ests?-/i.test(value));
+  const requestPlans = formattedSearchVariants.flatMap((formattedNumber) => [
     ...(looksLikeEstimateReference
       ? [
           {
-            label: "estimate-detailed",
+            label: `estimate-detailed:${formattedNumber}`,
             entity: "estimate",
             url: buildCoreBridgeEstimateUrl(config, {
               take: 200,
@@ -4490,22 +4504,22 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
               notelevel: "full",
               destinationlevel: "full",
               itemlevel: "full",
-              formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+              formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           },
           {
-            label: "estimate-basic",
+            label: `estimate-basic:${formattedNumber}`,
             entity: "estimate",
             url: buildCoreBridgeEstimateUrl(config, {
               take: 200,
               sortBy: "-modifiedDT",
-              formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+              formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           }
         ]
       : []),
     {
-      label: "detailed",
+      label: `detailed:${formattedNumber}`,
       entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
         take: 200,
@@ -4515,19 +4529,19 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
         notelevel: "full",
         destinationlevel: "full",
         itemlevel: "full",
-        formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+        formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
       })
     },
     {
-      label: "basic",
+      label: `basic:${formattedNumber}`,
       entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
         take: 200,
         sortBy: "-modifiedDT",
-        formattednumber: looksLikeFormattedNumber ? normalizedSearch : ""
+        formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
       })
     }
-  ];
+  ]);
 
   for (const plan of requestPlans) {
     try {
@@ -4572,6 +4586,14 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
         normalizedSearch,
         options
       ).filter((order) => order.orderReference || order.customerName);
+
+      if (looksLikeFormattedNumber && formattedSearchVariants.length) {
+        const variantSet = new Set(formattedSearchVariants.map((value) => value.toLowerCase()));
+        const exactMatches = orders.filter((order) => variantSet.has(String(order.orderReference || "").trim().toLowerCase()));
+        if (exactMatches.length) {
+          orders = exactMatches;
+        }
+      }
 
       if (looksLikeFormattedNumber && orders.length) {
           orders = await Promise.all(
@@ -5974,16 +5996,22 @@ function buildSocialPostBrief(order, voice) {
 
 function getSocialLookupReferences(reference = "") {
   const trimmed = String(reference || "").trim();
-  const references = [trimmed];
-  if (/^est-/i.test(trimmed)) {
-    references.push(trimmed.replace(/^est-/i, "ORD-"));
-    references.push(trimmed.replace(/^est-/i, "INV-"));
+  const references = [...getCoreBridgeReferenceVariants(trimmed)];
+  const addReferenceFamily = (value, nextPrefix) => {
+    getCoreBridgeReferenceVariants(value.replace(/^(ests?|ords?|invs?)-/i, `${nextPrefix}-`))
+      .forEach((candidate) => references.push(candidate));
+  };
+  if (/^ests?-/i.test(trimmed)) {
+    addReferenceFamily(trimmed, "ORD");
+    addReferenceFamily(trimmed, "INV");
   }
-  if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "ORD-"));
-  if (/^inv-/i.test(trimmed)) references.push(trimmed.replace(/^inv-/i, "EST-"));
-  if (/^ord-/i.test(trimmed)) {
-    references.push(trimmed.replace(/^ord-/i, "INV-"));
-    references.push(trimmed.replace(/^ord-/i, "EST-"));
+  if (/^invs?-/i.test(trimmed)) {
+    addReferenceFamily(trimmed, "ORD");
+    addReferenceFamily(trimmed, "EST");
+  }
+  if (/^ords?-/i.test(trimmed)) {
+    addReferenceFamily(trimmed, "INV");
+    addReferenceFamily(trimmed, "EST");
   }
   return [...new Set(references.filter(Boolean))];
 }
