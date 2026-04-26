@@ -5317,12 +5317,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
                     <label className="span-2">
-                      Site address
-                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
-                    </label>
-                    <label className="span-2">
                       Notes / scope
                       <textarea rows={1} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Site address
+                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
                     </label>
                     <label className="span-2">
                       Billing address

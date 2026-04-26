@@ -3892,6 +3892,52 @@ function getCoreBridgeBillingAddress(record) {
   ]);
 }
 
+function looksLikeEmail(value = "") {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+}
+
+function pickBestCoreBridgeEmail(flatRecord) {
+  const contactRoleLocatorEmail = pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (!/(contactroles|ordercontactroles)\.\d+/.test(normalizedKey)) return false;
+    if (!looksLikeEmail(value)) return false;
+    if (!normalizedKey.endsWith(".locator")) return normalizedKey.includes("email");
+
+    const baseKey = normalizedKey.slice(0, -".locator".length);
+    const subType =
+      flatRecord[`${baseKey}.locatorsubtypenavigation.name`] ||
+      flatRecord[`${baseKey}.locatortypenavigation.name`] ||
+      flatRecord[`${baseKey}.locatorsubtype`] ||
+      flatRecord[`${baseKey}.locatortype`] ||
+      "";
+
+    return /email|e-mail|mail/i.test(String(subType));
+  });
+
+  if (contactRoleLocatorEmail) return contactRoleLocatorEmail;
+
+  const directEmail = pickFirst(flatRecord, [
+    "email",
+    "contactemail",
+    "company.email",
+    "contactroles.0.email",
+    "ordercontactroles.0.email",
+    "contactroles.0.ordercontactrolelocators.0.locator",
+    "ordercontactroles.0.ordercontactrolelocators.0.locator",
+    "primaryemail",
+    "customeremail",
+    "contactpersonemail"
+  ]);
+
+  if (looksLikeEmail(directEmail)) return String(directEmail).trim();
+
+  return pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    if (!looksLikeEmail(value)) return false;
+    return normalizedKey.includes("email") || normalizedKey.includes("mail");
+  });
+}
+
 function normalizeCoreBridgeOrder(record, index) {
   const flat = flattenRecord(record);
   const preferredRole = pickPreferredCoreBridgeContactRole(record);
@@ -3956,6 +4002,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
+    email: pickBestCoreBridgeEmail(flat),
     number: orderDestinationPhone || preferredRolePhone || directRolePhone,
     address: billingAddress || orderDestinationAddress || destinationRoleAddress,
     billingAddress: billingAddress || "",
