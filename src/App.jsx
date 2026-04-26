@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -3847,6 +3843,11 @@ async function ensureTemplateAssetDataUrl(asset) {
 
 async function renderPdfAssetToPageImages(assetUrl) {
   if (!assetUrl) return [];
+  const [{ default: pdfWorkerUrl }, pdfjsLib] = await Promise.all([
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+    import("pdfjs-dist/build/pdf.mjs")
+  ]);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   const response = await fetch(assetUrl);
   if (!response.ok) {
     throw new Error("Could not load the T&Cs PDF.");
