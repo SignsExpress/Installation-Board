@@ -4124,8 +4124,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const firstPageRowBudget = 112;
-  const continuationPageRowBudget = 148;
+  const firstPageRowBudget = 108;
+  const continuationPageRowBudget = 154;
+  const contentTailBudget = 59;
   const rowPages = [];
   let currentPage = [];
   let currentBudget = firstPageRowBudget;
@@ -4144,9 +4145,36 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   if (currentPage.length || !rowPages.length) {
     rowPages.push(currentPage);
   }
-  const firstPageRows = rowPages[0] || [];
-  const continuationRows = rowPages.slice(1);
-  const totalPageCount = 1 + continuationRows.length + termsPageImages.length;
+  const contentPages = rowPages.map((pageRows, index) => ({
+    rows: pageRows,
+    showTopMeta: index === 0,
+    includeTail: false
+  }));
+  const lastRowPage = rowPages[rowPages.length - 1] || [];
+  const lastRowPageCost = lastRowPage.reduce((sum, row) => sum + row.rowHeight + 2.6, 0);
+  const lastRowBudget = rowPages.length > 1 ? continuationPageRowBudget : firstPageRowBudget;
+  const remainingBudget = Math.max(lastRowBudget - lastRowPageCost, 0);
+  if (contentPages.length) {
+    if (remainingBudget >= contentTailBudget) {
+      contentPages[contentPages.length - 1].includeTail = true;
+    } else {
+      contentPages.push({
+        rows: [],
+        showTopMeta: false,
+        includeTail: true
+      });
+    }
+  }
+  const resolvedTermsPages = termsPageImages.length
+    ? termsPageImages.map((imageUrl) => ({ type: "image", imageUrl }))
+    : [{
+        type: "placeholder",
+        title: "STANDARD TERMS AND CONDITIONS",
+        body: hasTermsAsset
+          ? "Terms and conditions file detected but preview pages could not be rendered here yet."
+          : "Terms and conditions placeholder. Upload the approved terms image or PDF in Template Builder."
+      }];
+  const totalPageCount = contentPages.length + resolvedTermsPages.length;
   const buildPageFooterHtml = (pageNumber) => `
       <div class="page-footer">
         ${footerStripHtml}
@@ -4157,37 +4185,75 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const firstPageTableHtml = `
-      <div class="table-wrap">
-        ${tableHeaderHtml}
-        <div class="table-lines">
-          ${(firstPageRows.length ? firstPageRows : [{ html: `<div class="invoice-line-row"><div class="line-cell">No line items</div></div>` }]).map((row) => row.html).join("")}
+  const invoiceTailHtml = `
+      <div class="invoice-content-flow">
+        <div class="bank-totals-row">
+          <div class="bank-block">
+            <div>Bank details:</div>
+            <div class="bank-grid">
+              ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
+            </div>
+          </div>
+          <div class="totals-box">
+            <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
+            ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
+            <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
+            <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
+            <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
+            ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
+            <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
+          </div>
+        </div>
+        <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
+        <div class="payment-terms-footer">
+          <div>Payment Terms:</div>
+          <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
         </div>
       </div>
   `;
-  const continuationPagesHtml = continuationRows.map((pageRows, index) => `
-    <div class="sheet print-sheet continuation-sheet">
+  const contentPagesHtml = contentPages.map((page, index) => `
+    <div class="sheet print-sheet ${page.showTopMeta ? "invoice-sheet-first" : "invoice-sheet-continuation"}">
       ${pageHeaderHtml}
-      <div class="sheet-body continuation-body">
-        <div class="table-wrap continuation-table">
+      <div class="sheet-body invoice-sheet-body">
+        ${page.showTopMeta ? `
+      <div class="address-block billing">
+        <p>${escapeHtml(draft.customerName || "-")}</p>
+        <p class="prewrap">${escapeHtml(formatInvoiceAddress(draft.billingAddress || draft.address || "-"))}</p>
+      </div>
+      <div class="address-block company right">
+        ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
+      </div>
+      <div class="meta-block left">
+        <p>Date of Invoice: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</p>
+        <p>Description: ${escapeHtml(draft.notes || draft.description || "-")}</p>
+        <p>Order Ref: ${escapeHtml(draft.orderReference || "-")}</p>
+      </div>
+      <div class="meta-block right">
+        <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
+      </div>
+      <div class="sheet-flow-spacer print-spacer"></div>` : `<div class="continuation-spacer"></div>`}
+        <div class="table-wrap${page.showTopMeta ? "" : " continuation-table"}">
           ${tableHeaderHtml}
           <div class="table-lines">
-            ${pageRows.map((row) => row.html).join("")}
+            ${(page.rows.length ? page.rows : (page.includeTail ? [] : [{ html: `<div class="invoice-line-row"><div class="line-cell">No line items</div></div>` }])).map((row) => row.html).join("")}
           </div>
         </div>
+        ${page.includeTail ? invoiceTailHtml : `<div class="table-tail-spacer"></div>`}
       </div>
-      ${buildPageFooterHtml(index + 2)}
+      ${buildPageFooterHtml(index + 1)}
     </div>
   `).join("");
-  const termsPagesHtml = termsPageImages.map((imageUrl, index) => `
+  const termsPagesHtml = resolvedTermsPages.map((page, index) => `
     <div class="sheet print-sheet terms-sheet">
       ${pageHeaderHtml}
       <div class="sheet-body">
-        <div class="terms-sheet-image-wrap">
-          <img src="${imageUrl}" alt="Terms and conditions page ${index + 1}" class="terms-sheet-image" />
+        <div class="terms-sheet-image-wrap${page.type === "placeholder" ? " placeholder" : ""}">
+          ${page.type === "image"
+            ? `<img src="${page.imageUrl}" alt="Terms and conditions page ${index + 1}" class="terms-sheet-image" />`
+            : `<div class="terms-placeholder"><div class="terms-placeholder-frame"><div class="terms-placeholder-title">${escapeHtml(page.title)}</div><div class="terms-placeholder-body">${escapeHtml(page.body)}</div></div></div>`}
         </div>
       </div>
-      ${buildPageFooterHtml(1 + continuationRows.length + index + 1)}
+      ${buildPageFooterHtml(contentPages.length + index + 1)}
     </div>
   `).join("");
 
@@ -4240,6 +4306,12 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .sheet-body {
         min-height: 0;
       }
+      .invoice-sheet-body {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
       .page-header {
         position: relative;
         height: ${fixedHeaderHeight}mm;
@@ -4248,6 +4320,9 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         position: relative;
         height: ${fixedFooterHeight}mm;
         align-self: end;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
       }
       .doc-title {
         position: absolute;
@@ -4420,7 +4495,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         .table-lines {
           position: relative;
           margin-top: 6.4mm;
-          min-height: ${Math.max(section.table.h - (section.tableHeaderBand.h + 6.4), 40)}mm;
+          min-height: 0;
         }
       .invoice-line-row {
         position: relative;
@@ -4467,7 +4542,15 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .invoice-content-flow {
         width: ${section.table.w}mm;
         margin-left: ${section.bank.x}mm;
-        margin-top: 11mm;
+        margin-top: 8mm;
+        flex: 0 0 auto;
+      }
+      .table-tail-spacer {
+        flex: 1;
+      }
+      .continuation-spacer {
+        height: 4mm;
+        flex: 0 0 auto;
       }
       .bank-totals-row {
         display: flex;
@@ -4592,6 +4675,36 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         justify-content: center;
         overflow: hidden;
       }
+      .terms-sheet-image-wrap.placeholder {
+        align-items: stretch;
+      }
+      .terms-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+      }
+      .terms-placeholder-frame {
+        width: 100%;
+        height: 100%;
+        border: 0.4mm solid #cbd5e1;
+        background: #f8fafc;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        padding: 12mm;
+      }
+      .terms-placeholder-title {
+        font-size: 14pt;
+        font-weight: 700;
+        margin-bottom: 5mm;
+      }
+      .terms-placeholder-body {
+        font-size: 10pt;
+        line-height: 1.35;
+        max-width: 120mm;
+      }
       .terms-sheet-frame {
         border: 0;
         display: block;
@@ -4616,56 +4729,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     </style>
   </head>
   <body>
-    <div class="sheet print-sheet">
-      ${pageHeaderHtml}
-      <div class="sheet-body">
-      <div class="address-block billing">
-        <p>${escapeHtml(draft.customerName || "-")}</p>
-        <p class="prewrap">${escapeHtml(formatInvoiceAddress(draft.billingAddress || draft.address || "-"))}</p>
-      </div>
-      <div class="address-block company right">
-        ${companyLines.map((line) => `<p>${escapeHtml(line)}</p>`).join("")}
-      </div>
-
-      <div class="meta-block left">
-        <p>Date of Invoice: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</p>
-        <p>Description: ${escapeHtml(draft.notes || draft.description || "-")}</p>
-        <p>Order Ref: ${escapeHtml(draft.orderReference || "-")}</p>
-      </div>
-      <div class="meta-block right">
-        <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
-      </div>
-
-      <div class="sheet-flow-spacer print-spacer"></div>
-      ${firstPageTableHtml}
-      <div class="invoice-content-flow">
-        <div class="bank-totals-row">
-          <div class="bank-block">
-            <div>Bank details:</div>
-            <div class="bank-grid">
-              ${bankLines.map(([label, value]) => `<div>${escapeHtml(label)}:</div><div>${escapeHtml(value)}</div>`).join("")}
-            </div>
-          </div>
-          <div class="totals-box">
-            <div class="total-row"><span>Sub Total</span><strong>${escapeHtml(formatProFormaMoney(summary.subtotal))}</strong></div>
-            ${summary.discountAmount > 0 ? `<div class="total-row"><span>Order Discount</span><strong>-${escapeHtml(formatProFormaMoney(summary.discountAmount))}</strong></div>` : ""}
-            <div class="total-row"><span>Pre-Tax Total</span><strong>${escapeHtml(formatProFormaMoney(summary.preTaxTotal))}</strong></div>
-            <div class="total-row"><span>VAT</span><strong>${escapeHtml(formatProFormaMoney(summary.vatAmount))}</strong></div>
-            <div class="total-row total"><span>TOTAL</span><strong>${escapeHtml(formatProFormaMoney(summary.total))}</strong></div>
-            ${hasDeposit ? `<div class="total-row"><span>Deposit required${draft.depositType === "percent" ? `, ${escapeHtml(String(draft.depositValue || "0"))}%` : ""}</span><strong>${escapeHtml(formatProFormaMoney(summary.depositAmount))}</strong></div>` : `<div class="total-row"><span>Total Paid</span><strong>${escapeHtml(formatProFormaMoney(summary.totalPaid))}</strong></div>`}
-            <div class="total-row"><span>${hasDeposit ? "Balance due on completion" : "Balance Due"}</span><strong>${escapeHtml(formatProFormaMoney(completionBalance))}</strong></div>
-          </div>
-        </div>
-        <div class="approval">I hope this meets with your approval. Please do not hesitate to contact me should you have any further queries.</div>
-        <div class="payment-terms-footer">
-          <div>Payment Terms:</div>
-          <div>${escapeHtml(draft.termsText || "To be paid within 30 days from the 1st day of the following month of the invoice date.")}</div>
-        </div>
-      </div>
-      </div>
-      ${buildPageFooterHtml(1)}
-    </div>
-    ${continuationPagesHtml}
+    ${contentPagesHtml}
     ${termsPagesHtml}
           ${autoPrint ? `<script>
       (async function() {
@@ -4980,7 +5044,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
         depositAmount,
         totalPaid,
         balanceDue: remainingBalance
-      }, template, { printMode: true, autoPrint: true, termsPageImages });
+      }, template, { printMode: true, autoPrint: true, termsPageImages, hasTermsAsset: Boolean(termsAssetUrl) });
       const blob = new Blob([printHtml], { type: "text/html" });
       printUrl = URL.createObjectURL(blob);
       const printWindow = window.open(printUrl, "_blank");
