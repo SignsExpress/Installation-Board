@@ -3745,6 +3745,49 @@ function buildPhoneFromRole(role) {
   return "";
 }
 
+function buildEmailFromRole(role) {
+  if (!role) return "";
+
+  const directRoleEmail = String(
+    role?.Email ||
+      role?.email ||
+      role?.ContactEmail ||
+      role?.contactEmail ||
+      role?.CustomerEmail ||
+      role?.customerEmail ||
+      ""
+  ).trim();
+  if (looksLikeEmail(directRoleEmail)) return directRoleEmail;
+
+  const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
+  for (const locator of locators) {
+    const locatorValue = String(locator?.Locator || "").trim();
+    if (looksLikeEmail(locatorValue)) return locatorValue;
+
+    const metadata = locator?.MetaData || locator?.MetaDataObject || locator?.metadata || {};
+    const metadataEmail = String(
+      metadata?.Email ||
+        metadata?.email ||
+        metadata?.EmailAddress ||
+        metadata?.emailAddress ||
+        metadata?.emailaddress ||
+        metadata?.BusinessEmail ||
+        metadata?.businessEmail ||
+        metadata?.businessemail ||
+        metadata?.PrimaryEmail ||
+        metadata?.primaryEmail ||
+        metadata?.primaryemail ||
+        metadata?.CustomerEmail ||
+        metadata?.customerEmail ||
+        metadata?.customeremail ||
+        ""
+    ).trim();
+    if (looksLikeEmail(metadataEmail)) return metadataEmail;
+  }
+
+  return "";
+}
+
 function buildDestinationAddressFromRole(role) {
   const locators = Array.isArray(role?.OrderContactRoleLocators) ? role.OrderContactRoleLocators : [];
   const addressLocator = locators.find((locator) => Number(locator?.LocatorType) === 1) || null;
@@ -3919,14 +3962,21 @@ function pickBestCoreBridgeEmail(flatRecord) {
   const directEmail = pickFirst(flatRecord, [
     "email",
     "contactemail",
+    "contact.email",
+    "customer.email",
     "company.email",
+    "companyemail",
     "contactroles.0.email",
     "ordercontactroles.0.email",
+    "contactroles.0.contactemail",
+    "ordercontactroles.0.contactemail",
     "contactroles.0.ordercontactrolelocators.0.locator",
     "ordercontactroles.0.ordercontactrolelocators.0.locator",
     "primaryemail",
     "customeremail",
-    "contactpersonemail"
+    "contactpersonemail",
+    "billingemail",
+    "invoiceemail"
   ]);
 
   if (looksLikeEmail(directEmail)) return String(directEmail).trim();
@@ -3956,6 +4006,7 @@ function normalizeCoreBridgeOrder(record, index) {
     pickDestinationAddressFromFlat(flat);
   const billingAddress = getCoreBridgeBillingAddress(record);
   const preferredRolePhone = buildPhoneFromRole(preferredRole);
+  const preferredRoleEmail = buildEmailFromRole(preferredRole);
   const directRolePhone = pickFirstPhone(flat, [
     "contactroles.0.ordercontactrolelocators.1.locator",
     "ordercontactroles.0.ordercontactrolelocators.1.locator",
@@ -4002,7 +4053,16 @@ function normalizeCoreBridgeOrder(record, index) {
       "contactperson",
       "customercontact"
     ]),
-    email: pickBestCoreBridgeEmail(flat),
+    email:
+      preferredRoleEmail ||
+      pickBestCoreBridgeEmail(flat) ||
+      String(
+        record?.Email ||
+          record?.ContactEmail ||
+          record?.CustomerEmail ||
+          record?.Company?.Email ||
+          ""
+      ).trim(),
     number: orderDestinationPhone || preferredRolePhone || directRolePhone,
     address: billingAddress || orderDestinationAddress || destinationRoleAddress,
     billingAddress: billingAddress || "",
