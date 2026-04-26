@@ -5036,8 +5036,14 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     let printUrl = "";
     try {
       setPrinting(true);
-      const termsAssetUrl = getProFormaTemplateAssetUrl(template?.termsPdfAsset);
-      const termsPageImages = termsAssetUrl ? await renderPdfAssetToPageImages(termsAssetUrl) : [];
+      const termsAsset = template?.termsPdfAsset || null;
+      const termsAssetUrl = getProFormaTemplateAssetUrl(termsAsset);
+      const isTermsImageAsset = Boolean(termsAsset?.contentType && String(termsAsset.contentType).toLowerCase().startsWith("image/"));
+      const termsPageImages = !termsAssetUrl
+        ? []
+        : isTermsImageAsset
+          ? [termsAssetUrl]
+          : await renderPdfAssetToPageImages(termsAssetUrl);
       if (termsAssetUrl && !termsPageImages.length) {
         console.warn("T&Cs PDF was present but rendered zero pages.", termsAssetUrl);
       }
@@ -5674,7 +5680,7 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
     await setSingleAsset("referencePdfAsset", file);
   }
 
-  async function handleTermsPdfUpload(event) {
+  async function handleTermsAssetUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     await setSingleAsset("termsPdfAsset", file);
@@ -5898,9 +5904,9 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
                     <span>{template.referencePdfAsset?.originalName || "Upload reference PDF underlay"}</span>
                   </label>
                   <label className="pro-forma-upload-button">
-                    <input type="file" accept="application/pdf" onChange={handleTermsPdfUpload} />
-                    <span>{template.termsPdfAsset?.originalName || "Upload T&Cs PDF"}</span>
-                  </label>
+                      <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" onChange={handleTermsAssetUpload} />
+                      <span>{template.termsPdfAsset?.originalName || "Upload T&Cs PDF / image"}</span>
+                    </label>
                   <label className="pro-forma-upload-button">
                     <input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg" multiple onChange={handleAccreditationUpload} />
                     <span>{template.accreditationAssets?.length ? `${template.accreditationAssets.length} accreditation logos loaded` : "Upload accreditation logos"}</span>
