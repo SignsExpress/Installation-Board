@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as pdfjsLib from "pdfjs-dist/build/pdf.mjs";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -3841,6 +3845,32 @@ async function ensureTemplateAssetDataUrl(asset) {
   return asset;
 }
 
+async function renderPdfAssetToPageImages(assetUrl) {
+  if (!assetUrl) return [];
+  const response = await fetch(assetUrl);
+  if (!response.ok) {
+    throw new Error("Could not load the T&Cs PDF.");
+  }
+  const buffer = await response.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const pdf = await loadingTask.promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    const viewport = page.getViewport({ scale: 1.75 });
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({
+      canvasContext: context,
+      viewport
+    }).promise;
+    pages.push(canvas.toDataURL("image/png"));
+  }
+  return pages;
+}
+
 function formatProFormaMoney(value) {
   const numeric = Number(value) || 0;
   return new Intl.NumberFormat("en-GB", {
@@ -3957,6 +3987,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   const builderMode = options.builderMode === true;
   const printMode = options.printMode === true;
   const autoPrint = options.autoPrint === true;
+  const termsPageImages = Array.isArray(options.termsPageImages) ? options.termsPageImages.filter(Boolean) : [];
   const template = sanitizeProFormaTemplate(templateInput);
   const section = template.sections;
   const formatInvoiceAddress = (value) => {
@@ -4092,18 +4123,19 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const pageFooterHtml = `
+  const totalPageCount = 1 + continuationRows.length + termsPageImages.length;
+  const buildPageFooterHtml = (pageNumber) => `
       <div class="page-footer">
         ${footerStripHtml}
         <div class="footer-meta">
           <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
           <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-          <div>Page 1 of 3</div>
+          <div>Page ${pageNumber} of ${Math.max(totalPageCount, 1)}</div>
         </div>
       </div>
   `;
-  const firstPageRowBudget = 118;
-  const continuationPageRowBudget = 170;
+  const firstPageRowBudget = 88;
+  const continuationPageRowBudget = 132;
   const rowPages = [];
   let currentPage = [];
   let currentBudget = firstPageRowBudget;
@@ -4132,8 +4164,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const continuationPagesHtml = continuationRows.map((pageRows) => `
-    <div class="sheet continuation-sheet">
+  const continuationPagesHtml = continuationRows.map((pageRows, index) => `
+    <div class="sheet print-sheet continuation-sheet">
       ${pageHeaderHtml}
       <div class="sheet-body continuation-body">
         <div class="table-wrap continuation-table">
@@ -4143,7 +4175,18 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
           </div>
         </div>
       </div>
-      ${pageFooterHtml}
+      ${buildPageFooterHtml(index + 2)}
+    </div>
+  `).join("");
+  const termsPagesHtml = termsPageImages.map((imageUrl, index) => `
+    <div class="sheet print-sheet terms-sheet">
+      ${pageHeaderHtml}
+      <div class="sheet-body">
+        <div class="terms-sheet-image-wrap">
+          <img src="${imageUrl}" alt="Terms and conditions page ${index + 1}" class="terms-sheet-image" />
+        </div>
+      </div>
+      ${buildPageFooterHtml(1 + continuationRows.length + index + 1)}
     </div>
   `).join("");
 
@@ -4539,11 +4582,25 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       .terms-sheet .sheet-body {
         padding: 4mm 13mm 4mm 13mm;
       }
-      .terms-sheet-frame {
+      .terms-sheet-frame,
+      .terms-sheet-image-wrap {
         width: 100%;
         height: ${297 - fixedHeaderHeight - fixedFooterHeight - 8}mm;
+      }
+      .terms-sheet-image-wrap {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        overflow: hidden;
+      }
+      .terms-sheet-frame {
         border: 0;
         display: block;
+      }
+      .terms-sheet-image {
+        display: block;
+        width: 100%;
+        height: auto;
       }
       .muted {
         color: #4b5563;
@@ -4607,10 +4664,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
       </div>
-      ${pageFooterHtml}
+      ${buildPageFooterHtml(1)}
     </div>
     ${continuationPagesHtml}
-    ${termsPdfUrl ? `<div class="sheet print-sheet terms-sheet">${pageHeaderHtml}<div class="sheet-body"><object data="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" type="application/pdf" class="terms-sheet-frame"><iframe src="${escapeHtml(termsPdfUrl)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH" class="terms-sheet-frame"></iframe></object></div>${pageFooterHtml}</div>` : ""}
+    ${termsPagesHtml}
           ${autoPrint ? `<script>
       (async function() {
         try {
@@ -4907,20 +4964,23 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
 
   async function openPrintPreview() {
     if (!draft) return;
-    const printHtml = buildProFormaPreviewHtml(draft, {
-      subtotal,
-      discountAmount,
-      preTaxTotal,
-      vatAmount,
-      total,
-      depositAmount,
-      totalPaid,
-      balanceDue: remainingBalance
-    }, template, { printMode: true, autoPrint: true });
-    const blob = new Blob([printHtml], { type: "text/html" });
-    const printUrl = URL.createObjectURL(blob);
+    let printUrl = "";
     try {
       setPrinting(true);
+      const termsAssetUrl = getProFormaTemplateAssetUrl(template?.termsPdfAsset);
+      const termsPageImages = termsAssetUrl ? await renderPdfAssetToPageImages(termsAssetUrl) : [];
+      const printHtml = buildProFormaPreviewHtml(draft, {
+        subtotal,
+        discountAmount,
+        preTaxTotal,
+        vatAmount,
+        total,
+        depositAmount,
+        totalPaid,
+        balanceDue: remainingBalance
+      }, template, { printMode: true, autoPrint: true, termsPageImages });
+      const blob = new Blob([printHtml], { type: "text/html" });
+      printUrl = URL.createObjectURL(blob);
       const printWindow = window.open(printUrl, "_blank");
       if (!printWindow) {
         URL.revokeObjectURL(printUrl);
@@ -4934,7 +4994,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       }, 45000);
     } catch (error) {
       console.error(error);
-      URL.revokeObjectURL(printUrl);
+      if (printUrl) {
+        URL.revokeObjectURL(printUrl);
+      }
       setPrinting(false);
       setError("Could not open the invoice preview.");
     }
