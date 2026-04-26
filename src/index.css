@@ -6291,6 +6291,17 @@ button {
   gap: 6px;
 }
 
+.pro-forma-deposit-buttons .ghost-button.active {
+  background: #15803d;
+  border-color: #15803d;
+  color: #fff;
+}
+
+.pro-forma-deposit-buttons .ghost-button.active:hover {
+  background: #166534;
+  border-color: #166534;
+}
+
 .pro-forma-upload-button {
   position: relative;
   display: inline-flex;

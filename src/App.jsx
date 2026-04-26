@@ -3826,6 +3826,14 @@ function getProFormaTemplateAssetUrl(asset) {
   return "";
 }
 
+function isProFormaImageAsset(asset) {
+  if (!asset) return false;
+  const contentType = String(asset.contentType || "").toLowerCase();
+  if (contentType.startsWith("image/")) return true;
+  const name = String(asset.originalName || asset.storedName || "").toLowerCase();
+  return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"].some((extension) => name.endsWith(extension));
+}
+
 async function ensureTemplateAssetDataUrl(asset) {
   if (!asset) return null;
   if (asset.dataUrl || asset.storedName) {
@@ -4873,7 +4881,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     const reference = String(payload.orderReference || "").trim();
     return {
       headerText: payload.headerText || "PRO FORMA INVOICE",
-      headline: payload.headline || `Pro Forma Invoice${reference ? ` - ${reference}` : ""}`,
+      headline: `Pro Forma Invoice${reference ? ` - ${reference}` : ""}`,
       date: new Date().toISOString().slice(0, 10),
       documentLabel: payload.referenceLabel || "Reference",
       orderReference: reference,
@@ -5039,7 +5047,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       setPrinting(true);
       const termsAsset = template?.termsPdfAsset || null;
       const termsAssetUrl = getProFormaTemplateAssetUrl(termsAsset);
-      const isTermsImageAsset = Boolean(termsAsset?.contentType && String(termsAsset.contentType).toLowerCase().startsWith("image/"));
+      const isTermsImageAsset = isProFormaImageAsset(termsAsset);
       const termsPageImages = !termsAssetUrl
         ? []
         : isTermsImageAsset
@@ -5172,9 +5180,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
               <div className="pro-forma-deposit-tools">
                 <h4>Deposit</h4>
                 <div className="pro-forma-deposit-buttons">
-                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(25)}>25% deposit</button>
-                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(50)}>50% deposit</button>
-                  <button type="button" className="ghost-button" disabled={!draft} onClick={() => applyDepositPreset(100)}>Full payment</button>
+                  <button type="button" className={`ghost-button${draft?.depositType === "percent" && String(draft.depositValue) === "25" ? " active" : ""}`} disabled={!draft} onClick={() => applyDepositPreset(25)}>25% deposit</button>
+                  <button type="button" className={`ghost-button${draft?.depositType === "percent" && String(draft.depositValue) === "50" ? " active" : ""}`} disabled={!draft} onClick={() => applyDepositPreset(50)}>50% deposit</button>
+                  <button type="button" className={`ghost-button${draft?.depositType === "percent" && String(draft.depositValue) === "100" ? " active" : ""}`} disabled={!draft} onClick={() => applyDepositPreset(100)}>Full payment</button>
                 </div>
                 <div className="pro-forma-custom-deposit">
                   <select value={customDepositMode} onChange={(event) => setCustomDepositMode(event.target.value)} disabled={!draft}>
@@ -5253,10 +5261,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       Total paid
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
-                    <label>
-                      Billing address
-                      <textarea rows={1} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
-                    </label>
                     <label className="span-2">
                       Site address
                       <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
@@ -5264,6 +5268,10 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                     <label className="span-2">
                       Notes / scope
                       <textarea rows={4} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Billing address
+                      <textarea rows={4} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
                     </label>
                   </div>
 
