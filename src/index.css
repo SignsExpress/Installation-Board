@@ -6460,9 +6460,10 @@ button {
 }
 
 .pro-forma-editor-actions {
-  display: grid;
+  display: flex;
   gap: 6px;
-  justify-items: end;
+  justify-content: flex-end;
+  align-items: center;
 }
 
 .pro-forma-total-pill {
@@ -6473,7 +6474,7 @@ button {
   min-height: 0;
   padding: 7px 10px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #5f3c74, #2d1c53);
+  background: linear-gradient(135deg, #15803d, #166534);
   color: #fff;
   white-space: nowrap;
 }
@@ -6537,6 +6538,11 @@ button {
 .pro-forma-lines-row textarea,
 .pro-forma-terms-card textarea {
   resize: vertical;
+}
+
+.pro-forma-meta-grid textarea {
+  min-height: 26px;
+  resize: none;
 }
 
 .pro-forma-meta-grid .span-2 {

@@ -4019,7 +4019,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     ["IBAN", "GB98NWBK01671471603603"],
     ["SWIFT", "NWBKGB2L"]
   ];
-  const displayTitle = "PRO FORMA INVOICE";
+  const displayTitle = String(draft.headerText || "PRO FORMA INVOICE").trim() || "PRO FORMA INVOICE";
   const compactTopTerms = draft.depositType
     ? (draft.depositType === "percent"
         ? `${draft.depositValue}% deposit, balance due on completion.`
@@ -4872,7 +4872,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   function buildDraftFromPayload(payload = {}) {
     const reference = String(payload.orderReference || "").trim();
     return {
-      headline: payload.headline || "Pro Forma Invoice",
+      headerText: payload.headerText || "PRO FORMA INVOICE",
+      headline: payload.headline || `Pro Forma Invoice${reference ? ` - ${reference}` : ""}`,
       date: new Date().toISOString().slice(0, 10),
       documentLabel: payload.referenceLabel || "Reference",
       orderReference: reference,
@@ -5168,12 +5169,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 </div>
               </label>
 
-              {canEditProForma(currentUser) ? (
-                <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma/template")}>
-                  Open template builder
-                </button>
-              ) : null}
-
               <div className="pro-forma-deposit-tools">
                 <h4>Deposit</h4>
                 <div className="pro-forma-deposit-buttons">
@@ -5197,102 +5192,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 </div>
               </div>
 
-              <div className="pro-forma-deposit-tools">
-                <h4>Reference PDF</h4>
-                <label className="pro-forma-upload-button">
-                  <input type="file" accept="application/pdf" onChange={handleReferencePdfChange} />
-                  <span>{referencePdfName || "Load sample invoice PDF"}</span>
-                </label>
-                <p className="muted-copy">Load the attached invoice here and we can compare your generated version beside it.</p>
-                {draft?.brandingAssets?.length ? (
-                  <div className="pro-forma-asset-list">
-                    <strong>CoreBridge assets found:</strong>
-                    {draft.brandingAssets.map((asset) => (
-                      <span key={`${asset.key}-${asset.url}`} className="social-post-chip">
-                        {asset.type}: {asset.key}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
 
-              <div className="pro-forma-deposit-tools">
-                <h4>Price code cheat sheet</h4>
-                <p className="muted-copy">Pull three refs together and we’ll list every money code side by side, line by line, so we can see which field survives across all three jobs.</p>
-                <div className="pro-forma-compare-inputs">
-                  {compareReferences.map((value, index) => (
-                    <label key={`compare-reference-${index}`}>
-                      Ref {index + 1}
-                      <div className="pro-forma-compare-input-row">
-                        <input
-                          value={value}
-                          onChange={(event) => updateCompareReference(index, event.target.value)}
-                          placeholder={`EST-${3379 + index}`}
-                        />
-                        <input
-                          value={compareExpectedAmounts[index]}
-                          onChange={(event) => updateCompareExpectedAmount(index, event.target.value)}
-                          inputMode="decimal"
-                          placeholder="Line 1 £"
-                        />
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                <div className="pro-forma-compare-actions">
-                  <button type="button" className="ghost-button" disabled={compareLoading} onClick={buildCodeCheatSheet}>
-                    {compareLoading ? "Building..." : "Build cheat sheet"}
-                  </button>
-                  <button
-                    type="button"
-                    className="text-button"
-                    disabled={compareLoading && !compareResults.length}
-                    onClick={() => {
-                      setCompareResults([]);
-                      setCompareError("");
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-                {compareError ? <p className="form-error">{compareError}</p> : null}
-                {compareSheet.rows.length ? (
-                  <div className="pro-forma-compare-sheet">
-                    <div className="pro-forma-compare-sheet-head">
-                      <span>Code</span>
-                      {compareSheet.references.map((reference) => (
-                        <span key={`compare-head-${reference}`}>{reference}</span>
-                      ))}
-                    </div>
-                    <div className="pro-forma-compare-sheet-body">
-                      {compareSheet.rows.map((row) => (
-                        <div key={row.code} className="pro-forma-compare-row">
-                          <div className="pro-forma-compare-code">
-                            <strong>{row.code}</strong>
-                            {row.exactMatches ? <span>{row.exactMatches} exact line 1 match{row.exactMatches === 1 ? "" : "es"}</span> : null}
-                          </div>
-                          {compareSheet.references.map((reference) => {
-                            const values = row.cells[reference] || [];
-                            return (
-                              <div key={`${row.code}-${reference}`} className="pro-forma-compare-cell">
-                                {values.length ? values.map((value, index) => (
-                                  <div
-                                    key={`${row.code}-${reference}-${value.lineNumber}-${index}`}
-                                    className={`pro-forma-compare-value${value.exactMatch ? " is-match" : ""}`}
-                                  >
-                                    <span>L{value.lineNumber}</span>
-                                    <strong>{formatProFormaMoney(value.amount)}</strong>
-                                  </div>
-                                )) : <span className="pro-forma-compare-empty">—</span>}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
 
               {error ? <p className="form-error">{error}</p> : null}
             </form>
@@ -5300,15 +5200,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             <div className="social-post-card pro-forma-editor-card">
               <div className="pro-forma-editor-head">
                 <div>
-                  <h3>{draft?.headline || "Editable Pro-Forma"}</h3>
-                  <p className="muted-copy">Edit the document on the left, then use the live invoice preview on the right to sense-check the finished layout.</p>
+                  <h3>DOCUMENT NAME</h3>
                 </div>
                 <div className="pro-forma-editor-actions">
-                  {getPermissionForApp(currentUser, "proForma") === "admin" || currentUser?.canManagePermissions ? (
-                    <button type="button" className="ghost-button" onClick={() => window.location.assign("/pro-forma/template")}>
-                      Template builder
-                    </button>
-                  ) : null}
                   <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
                   <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
                     {printing ? "Opening..." : "Print / Save PDF"}
@@ -5320,16 +5214,16 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 <div className="pro-forma-editor">
                   <div className="pro-forma-meta-grid">
                     <label>
-                      Title
+                      Header
+                      <input value={draft.headerText || ""} onChange={(event) => updateDraft("headerText", event.target.value)} />
+                    </label>
+                    <label>
+                      Document name
                       <input value={draft.headline} onChange={(event) => updateDraft("headline", event.target.value)} />
                     </label>
                     <label>
                       Date
                       <input type="date" value={draft.date} onChange={(event) => updateDraft("date", event.target.value)} />
-                    </label>
-                    <label>
-                      Document label
-                      <input value={draft.documentLabel} onChange={(event) => updateDraft("documentLabel", event.target.value)} />
                     </label>
                     <label>
                       Reference
@@ -5359,9 +5253,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       Total paid
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
-                    <label className="span-2">
+                    <label>
                       Billing address
-                      <textarea rows={4} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
+                      <textarea rows={1} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
                     </label>
                     <label className="span-2">
                       Site address
@@ -5376,9 +5270,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   <div className="pro-forma-lines-head">
                     <h4>Line items</h4>
                     <div className="pro-forma-lines-tools">
-                      <button type="button" className="ghost-button" onClick={() => setShowPriceDebug((current) => !current)}>
-                        {showPriceDebug ? "Hide debug" : "Show debug"}
-                      </button>
                       <button type="button" className="ghost-button" onClick={addLineItem}>Add line</button>
                     </div>
                   </div>
@@ -5415,41 +5306,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                             </div>
                             <button type="button" className="text-button" onClick={() => removeLineItem(item.id)}>Remove</button>
                           </div>
-                          {showPriceDebug ? (
-                            <details className="pro-forma-line-debug" open={index === 0}>
-                              <summary>Chosen source: {item.chosenSource || "fallback"}</summary>
-                              <div className="pro-forma-line-debug-sections">
-                                <div className="pro-forma-line-debug-group">
-                                  <div className="pro-forma-line-debug-title">Chosen combinations</div>
-                                  <div className="pro-forma-line-debug-grid">
-                                    {(Array.isArray(item.candidates) ? item.candidates : []).map((candidate) => (
-                                      <div key={candidate.leaf + String(candidate.unitPrice) + String(candidate.lineTotal)} className="pro-forma-line-debug-card">
-                                        <strong>{candidate.leaf}</strong>
-                                        <span>Unit: {formatProFormaMoney(candidate.unitPrice || 0)}</span>
-                                        <span>Total: {formatProFormaMoney(candidate.lineTotal || 0)}</span>
-                                        <span>Score: {candidate.score}</span>
-                                      </div>
-                                    ))}
-                                    {!item.candidates?.length ? <div className="pro-forma-line-debug-empty">No candidate combinations exposed for this line.</div> : null}
-                                  </div>
-                                </div>
-                                <div className="pro-forma-line-debug-group">
-                                  <div className="pro-forma-line-debug-title">Raw money fields</div>
-                                  <div className="pro-forma-line-debug-grid">
-                                    {(Array.isArray(item.rawMoneyFields) ? item.rawMoneyFields : []).map((candidate) => (
-                                      <div key={candidate.leaf + String(candidate.amount)} className="pro-forma-line-debug-card">
-                                        <strong>{candidate.leaf}</strong>
-                                        <span>Amount: {formatProFormaMoney(candidate.amount || 0)}</span>
-                                        <span>Raw: {candidate.raw || "-"}</span>
-                                        <span>Score: {candidate.score}</span>
-                                      </div>
-                                    ))}
-                                    {!item.rawMoneyFields?.length ? <div className="pro-forma-line-debug-empty">No raw money fields exposed for this line.</div> : null}
-                                  </div>
-                                </div>
-                              </div>
-                            </details>
-                          ) : null}
                         </div>
                       );
                     })}
@@ -5483,36 +5339,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                           <div><span>Balance due</span><strong>{formatProFormaMoney(remainingBalance)}</strong></div>
                         </>
                       )}
-                    </div>
-                  </div>
-
-                  <div className="pro-forma-preview-shell">
-                    <div className="pro-forma-lines-head">
-                      <h4>Invoice preview</h4>
-                    </div>
-                    <div className="pro-forma-preview-compare">
-                      <div className="pro-forma-preview-panel">
-                        <div className="pro-forma-preview-label">Generated invoice</div>
-                        <iframe
-                          title="Pro-Forma invoice preview"
-                          className="pro-forma-preview-frame"
-                          srcDoc={previewHtml}
-                        />
-                      </div>
-                      <div className="pro-forma-preview-panel">
-                        <div className="pro-forma-preview-label">Reference PDF</div>
-                        {referencePdfUrl ? (
-                          <iframe
-                            title="Reference invoice PDF"
-                            className="pro-forma-preview-frame"
-                            src={referencePdfUrl}
-                          />
-                        ) : (
-                          <div className="pro-forma-preview-empty">
-                            Load the attached invoice PDF to compare it side by side with the generated template.
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -16138,3 +15964,4 @@ export default function App() {
     </div>
   );
 }
+
