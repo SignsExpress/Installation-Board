@@ -2361,7 +2361,7 @@ function canEditProForma(user) {
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canAccessProForma(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
   );
 }
 
