@@ -5985,6 +5985,7 @@ function buildProFormaPayload(order = {}) {
     orderReference: reference,
     customerName: order.customerName || "",
     contact: order.contact || "",
+    contactEmail: order.email || order.contactEmail || "",
     number: order.number || "",
     address: order.address || order.billingAddress || "",
     billingAddress: order.billingAddress || order.address || "",

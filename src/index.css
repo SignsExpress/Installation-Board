@@ -6339,6 +6339,20 @@ button {
   gap: 6px;
 }
 
+.pro-forma-deposit-notice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #15803d;
+  color: #fff;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .pro-forma-compare-inputs {
   display: grid;
   gap: 6px;
@@ -6475,6 +6489,29 @@ button {
   gap: 6px;
   justify-content: flex-end;
   align-items: center;
+}
+
+.pro-forma-email-button {
+  min-height: 46px;
+  border-radius: 16px;
+  padding: 0 18px;
+  border: 1px solid #38bdf8;
+  background: #38bdf8;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+
+.pro-forma-email-button:hover {
+  background: #0ea5e9;
+  border-color: #0ea5e9;
+}
+
+.pro-forma-email-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .pro-forma-total-pill {

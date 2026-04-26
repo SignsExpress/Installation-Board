@@ -4793,6 +4793,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
   const [draft, setDraft] = useState(null);
   const [showPriceDebug, setShowPriceDebug] = useState(false);
   const [template, setTemplate] = useState(DEFAULT_PRO_FORMA_TEMPLATE);
+  const [customDepositNotice, setCustomDepositNotice] = useState("");
 
   const subtotal = useMemo(
     () => roundProFormaMoney((draft?.lineItems || []).reduce((sum, item) => {
@@ -4858,15 +4859,22 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     };
   }, [referencePdfUrl]);
 
+  async function fetchLatestProFormaTemplate() {
+    const response = await fetch("/api/pro-forma/template");
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Could not load the Pro-Forma template.");
+    }
+    return sanitizeProFormaTemplate(payload.template);
+  }
+
   useEffect(() => {
     let ignore = false;
     async function loadTemplate() {
       try {
-        const response = await fetch("/api/pro-forma/template");
-        const payload = await response.json();
-        if (!response.ok) return;
+        const nextTemplate = await fetchLatestProFormaTemplate();
         if (!ignore) {
-          setTemplate(sanitizeProFormaTemplate(payload.template));
+          setTemplate(nextTemplate);
         }
       } catch (loadError) {
         console.error(loadError);
@@ -4888,6 +4896,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       orderReference: reference,
       customerName: payload.customerName || "",
       contact: payload.contact || "",
+      contactEmail: payload.contactEmail || payload.email || "",
       number: payload.number || "",
       address: payload.address || "",
       billingAddress: payload.billingAddress || payload.address || "",
@@ -4926,7 +4935,8 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       totalPaid: String(roundProFormaMoney(payload.totalPaid || 0)),
       brandingAssets: Array.isArray(payload.brandingAssets) ? payload.brandingAssets : [],
       depositType: "",
-      depositValue: ""
+      depositValue: "",
+      depositSource: ""
     };
   }
 
@@ -4990,10 +5000,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       ...current,
       depositType: "percent",
       depositValue: String(safePercent),
+      depositSource: "preset",
       termsText: safePercent >= 100
         ? "Full payment required upon order."
         : `${safePercent}% deposit required upon order - balance due on completion.`
     } : current);
+    setCustomDepositNotice("");
   }
 
   function applyCustomDeposit() {
@@ -5005,11 +5017,22 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
         ...current,
         depositType: "fixed",
         depositValue: String(safeAmount),
+        depositSource: "custom-fixed",
         termsText: `${formatProFormaMoney(safeAmount)} deposit required upon order - balance due on completion.`
       } : current);
+      setCustomDepositNotice("Custom deposit £ applied");
       return;
     }
-    applyDepositPreset(value);
+    setDraft((current) => current ? {
+      ...current,
+      depositType: "percent",
+      depositValue: String(value),
+      depositSource: "custom-percent",
+      termsText: value >= 100
+        ? "Full payment required upon order."
+        : `${value}% deposit required upon order - balance due on completion.`
+    } : current);
+    setCustomDepositNotice("Custom deposit % applied");
   }
 
   async function pullProForma(event) {
@@ -5033,6 +5056,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       if (!response.ok) {
         throw new Error(payload.error || "Could not pull the Pro-Forma details.");
       }
+      setCustomDepositNotice("");
       setDraft(buildDraftFromPayload(payload));
     } catch (pullError) {
       setError(pullError.message || "Could not pull the Pro-Forma details.");
@@ -5046,9 +5070,14 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     let printUrl = "";
     try {
       setPrinting(true);
-      const termsAsset = template?.termsPdfAsset || null;
+      const latestTemplate = await fetchLatestProFormaTemplate().catch((loadError) => {
+        console.error(loadError);
+        return template;
+      });
+      setTemplate(latestTemplate);
+      const termsAsset = latestTemplate?.termsPdfAsset || null;
       const termsAssetUrl = getProFormaTemplateAssetUrl(termsAsset);
-      const isTermsImageAsset = isProFormaImageAsset(termsAsset);
+      const isTermsImageAsset = isProFormaImageAsset(termsAsset) || /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|[?#])/i.test(termsAssetUrl);
       const termsPageImages = !termsAssetUrl
         ? []
         : isTermsImageAsset
@@ -5066,7 +5095,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
         depositAmount,
         totalPaid,
         balanceDue: remainingBalance
-      }, template, { printMode: true, autoPrint: true, termsPageImages, hasTermsAsset: Boolean(termsAssetUrl) });
+      }, latestTemplate, { printMode: true, autoPrint: true, termsPageImages, hasTermsAsset: Boolean(termsAssetUrl) });
       const blob = new Blob([printHtml], { type: "text/html" });
       printUrl = URL.createObjectURL(blob);
       const printWindow = window.open(printUrl, "_blank");
@@ -5088,6 +5117,27 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       setPrinting(false);
       setError("Could not open the invoice preview.");
     }
+  }
+
+  function openEmailPdfDraft() {
+    if (!draft) return;
+    const recipient = String(draft.contactEmail || "").trim();
+    if (!recipient) {
+      setError("No contact email address was pulled through for this Pro-Forma.");
+      return;
+    }
+    const subject = draft.headline || `Pro Forma Invoice${draft.orderReference ? ` - ${draft.orderReference}` : ""}`;
+    const greetingName = String(draft.contact || draft.customerName || "").trim();
+    const bodyLines = [
+      greetingName ? `Hi ${greetingName},` : "Hi,",
+      "",
+      `Please find attached the pro forma invoice${draft.orderReference ? ` for ${draft.orderReference}` : ""}.`,
+      "",
+      "Kind regards,",
+      "Signs Express"
+    ];
+    const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?cc=${encodeURIComponent("accounts.preston@signs-express.co.uk")}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines.join("\n"))}`;
+    window.location.href = mailtoUrl;
   }
 
   function handleReferencePdfChange(event) {
@@ -5199,6 +5249,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                   />
                   <button type="button" className="primary-button" disabled={!draft} onClick={applyCustomDeposit}>Apply</button>
                 </div>
+                {customDepositNotice ? <div className="pro-forma-deposit-notice">{customDepositNotice}</div> : null}
               </div>
 
 
@@ -5213,6 +5264,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                 </div>
                 <div className="pro-forma-editor-actions">
                   <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
+                  <button type="button" className="pro-forma-email-button" disabled={!draft} onClick={openEmailPdfDraft}>
+                    Email PDF
+                  </button>
                   <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
                     {printing ? "Opening..." : "Print / Save PDF"}
                   </button>
@@ -5263,12 +5317,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
                     <label className="span-2">
-                      Notes / scope
-                      <textarea rows={1} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
-                    </label>
-                    <label className="span-2">
                       Site address
                       <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Notes / scope
+                      <textarea rows={1} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
                     </label>
                     <label className="span-2">
                       Billing address
