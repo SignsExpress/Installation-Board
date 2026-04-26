@@ -3778,6 +3778,7 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
 };
 
 const DEFAULT_PRO_FORMA_LOGO = "/branding/pdf-reference/invoice-logo.png";
+const DEFAULT_PRO_FORMA_TERMS_PDF = "/branding/pdf-reference/terms-and-conditions.pdf";
 const DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS = [
   { url: "/branding/pdf-reference/accreditation-nhs.png", widthMm: 23.9, alt: "NHS Approved Supplier" },
   { url: "/branding/pdf-reference/accreditation-dementia-friends.png", widthMm: 21.3, alt: "Dementia Friends" },
@@ -5077,14 +5078,19 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       setTemplate(latestTemplate);
       const termsAsset = latestTemplate?.termsPdfAsset || null;
       const termsAssetUrl = getProFormaTemplateAssetUrl(termsAsset);
-      const isTermsImageAsset = isProFormaImageAsset(termsAsset) || /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|[?#])/i.test(termsAssetUrl);
-      const termsPageImages = !termsAssetUrl
+      const defaultTermsUrl = `${window.location.origin}${DEFAULT_PRO_FORMA_TERMS_PDF}`;
+      const resolvedTermsUrl = termsAssetUrl || defaultTermsUrl;
+      const isTermsImageAsset = isProFormaImageAsset(termsAsset) || /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|[?#])/i.test(resolvedTermsUrl);
+      let termsPageImages = !resolvedTermsUrl
         ? []
         : isTermsImageAsset
-          ? [termsAssetUrl]
-          : await renderPdfAssetToPageImages(termsAssetUrl);
-      if (termsAssetUrl && !termsPageImages.length) {
-        console.warn("T&Cs PDF was present but rendered zero pages.", termsAssetUrl);
+          ? [resolvedTermsUrl]
+          : await renderPdfAssetToPageImages(resolvedTermsUrl);
+      if (!termsPageImages.length && resolvedTermsUrl !== defaultTermsUrl) {
+        termsPageImages = await renderPdfAssetToPageImages(defaultTermsUrl);
+      }
+      if (resolvedTermsUrl && !termsPageImages.length) {
+        console.warn("T&Cs file was present but rendered zero pages.", resolvedTermsUrl);
       }
       const printHtml = buildProFormaPreviewHtml(draft, {
         subtotal,
@@ -5095,7 +5101,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
         depositAmount,
         totalPaid,
         balanceDue: remainingBalance
-      }, latestTemplate, { printMode: true, autoPrint: true, termsPageImages, hasTermsAsset: Boolean(termsAssetUrl) });
+      }, latestTemplate, { printMode: true, autoPrint: true, termsPageImages, hasTermsAsset: Boolean(resolvedTermsUrl) });
       const blob = new Blob([printHtml], { type: "text/html" });
       printUrl = URL.createObjectURL(blob);
       const printWindow = window.open(printUrl, "_blank");
