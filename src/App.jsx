@@ -3989,6 +3989,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   const printMode = options.printMode === true;
   const autoPrint = options.autoPrint === true;
   const termsPageImages = Array.isArray(options.termsPageImages) ? options.termsPageImages.filter(Boolean) : [];
+  const hasTermsAsset = options.hasTermsAsset === true;
   const template = sanitizeProFormaTemplate(templateInput);
   const section = template.sections;
   const formatInvoiceAddress = (value) => {
