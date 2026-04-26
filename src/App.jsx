@@ -3461,6 +3461,7 @@ function HostLandingPage({
   onToggleAero
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
+  const proFormaPath = getProFormaPathForUser(currentUser);
 
   function goTo(path) {
     window.location.assign(path);
@@ -3556,6 +3557,8 @@ function ClientLandingPage({
   aeroEnabled,
   onToggleAero
 }) {
+  const proFormaPath = getProFormaPathForUser(currentUser);
+
   function goTo(path) {
     window.location.assign(path);
   }
