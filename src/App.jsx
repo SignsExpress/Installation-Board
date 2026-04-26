@@ -4125,15 +4125,15 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const firstPageRowBudget = 108;
-  const continuationPageRowBudget = 154;
-  const contentTailBudget = 59;
+  const firstPageRowBudget = 132;
+  const continuationPageRowBudget = 162;
+  const contentTailBudget = 52;
   const rowPages = [];
   let currentPage = [];
   let currentBudget = firstPageRowBudget;
   let currentTotal = 0;
   lineItemsDetailed.forEach((row) => {
-    const rowCost = row.rowHeight + 2.6;
+    const rowCost = row.rowHeight + 1.4;
     if (currentPage.length && currentTotal + rowCost > currentBudget) {
       rowPages.push(currentPage);
       currentPage = [];
@@ -4232,13 +4232,14 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       <div class="meta-block right">
         <p>Payment Terms: ${escapeHtml(compactTopTerms)}</p>
       </div>
-      <div class="sheet-flow-spacer print-spacer"></div>` : `<div class="continuation-spacer"></div>`}
+      <div class="sheet-flow-spacer print-spacer"></div>` : `${page.rows.length ? `<div class="continuation-spacer"></div>` : `<div class="tail-only-spacer"></div>`}`}
+        ${page.rows.length || !page.includeTail ? `
         <div class="table-wrap${page.showTopMeta ? "" : " continuation-table"}">
           ${tableHeaderHtml}
           <div class="table-lines">
-            ${(page.rows.length ? page.rows : (page.includeTail ? [] : [{ html: `<div class="invoice-line-row"><div class="line-cell">No line items</div></div>` }])).map((row) => row.html).join("")}
+            ${(page.rows.length ? page.rows : [{ html: `<div class="invoice-line-row"><div class="line-cell">No line items</div></div>` }]).map((row) => row.html).join("")}
           </div>
-        </div>
+        </div>` : ""}
         ${page.includeTail ? invoiceTailHtml : `<div class="table-tail-spacer"></div>`}
       </div>
       ${buildPageFooterHtml(index + 1)}
@@ -4551,6 +4552,10 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .continuation-spacer {
         height: 4mm;
+        flex: 0 0 auto;
+      }
+      .tail-only-spacer {
+        height: 10mm;
         flex: 0 0 auto;
       }
       .bank-totals-row {
