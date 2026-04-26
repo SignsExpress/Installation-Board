@@ -4124,8 +4124,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const firstPageRowBudget = 88;
-  const continuationPageRowBudget = 132;
+  const firstPageRowBudget = 70;
+  const continuationPageRowBudget = 108;
   const rowPages = [];
   let currentPage = [];
   let currentBudget = firstPageRowBudget;
@@ -4227,29 +4227,27 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
       }
       .sheet.print-sheet {
         min-height: 297mm;
-        display: block;
+        display: grid;
+        grid-template-rows: ${fixedHeaderHeight}mm 1fr ${fixedFooterHeight}mm;
         page-break-after: always;
         break-after: page;
-        padding-bottom: ${fixedFooterHeight}mm;
+        padding-bottom: 0;
       }
       .sheet.print-sheet:last-of-type {
         page-break-after: auto;
         break-after: auto;
       }
       .sheet-body {
-        min-height: calc(297mm - ${fixedHeaderHeight}mm - ${fixedFooterHeight}mm);
+        min-height: 0;
       }
       .page-header {
         position: relative;
         height: ${fixedHeaderHeight}mm;
-        flex: 0 0 ${fixedHeaderHeight}mm;
       }
       .page-footer {
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
+        position: relative;
         height: ${fixedFooterHeight}mm;
+        align-self: end;
       }
       .doc-title {
         position: absolute;
@@ -4970,6 +4968,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
       setPrinting(true);
       const termsAssetUrl = getProFormaTemplateAssetUrl(template?.termsPdfAsset);
       const termsPageImages = termsAssetUrl ? await renderPdfAssetToPageImages(termsAssetUrl) : [];
+      if (termsAssetUrl && !termsPageImages.length) {
+        console.warn("T&Cs PDF was present but rendered zero pages.", termsAssetUrl);
+      }
       const printHtml = buildProFormaPreviewHtml(draft, {
         subtotal,
         discountAmount,
