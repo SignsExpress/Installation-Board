@@ -154,11 +154,11 @@ function sanitizeStoredAssetRef(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
-  const storedName = String(value.storedName || "").trim();
+  const storedName = String(value.storedName || value.storageName || value.name || "").trim();
   if (!storedName) return null;
   return {
     storedName,
-    originalName: String(value.originalName || "").trim() || storedName,
+    originalName: String(value.originalName || value.fileName || "").trim() || storedName,
     contentType: String(value.contentType || "").trim() || "application/octet-stream"
   };
 }

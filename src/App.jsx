@@ -3819,9 +3819,10 @@ function getProFormaTemplateAssetUrl(asset) {
   if (!asset) return "";
   if (asset.previewUrl) return asset.previewUrl;
   if (asset.dataUrl) return asset.dataUrl;
-  if (asset.storedName) {
+  const storedName = String(asset.storedName || asset.storageName || asset.name || "").trim();
+  if (storedName) {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return `${origin}/api/pro-forma/template-asset/${encodeURIComponent(asset.storedName)}`;
+    return `${origin}/api/pro-forma/template-asset/${encodeURIComponent(storedName)}`;
   }
   return "";
 }
@@ -5262,12 +5263,12 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
                     <label className="span-2">
-                      Site address
-                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
+                      Notes / scope
+                      <textarea rows={1} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
                     </label>
                     <label className="span-2">
-                      Notes / scope
-                      <textarea rows={4} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
+                      Site address
+                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
                     </label>
                     <label className="span-2">
                       Billing address

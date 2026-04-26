@@ -6556,6 +6556,11 @@ button {
   resize: none;
 }
 
+.pro-forma-meta-grid .pro-forma-vat-field input,
+.pro-forma-meta-grid textarea[rows="1"] {
+  min-height: 26px;
+}
+
 .pro-forma-meta-grid .span-2 {
   grid-column: span 2;
 }
