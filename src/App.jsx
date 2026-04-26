@@ -13056,7 +13056,7 @@ export default function App() {
       return;
     }
 
-    if (hostShellMode && isClientRoute && !isClientBoardRoute && !isClientRamsRoute) {
+    if (hostShellMode && isClientRoute && !isClientBoardRoute && !isClientRamsRoute && !isClientProFormaRoute) {
       window.location.replace(nextHomePath);
       return;
     }
