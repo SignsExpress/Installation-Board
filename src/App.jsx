@@ -4124,8 +4124,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const firstPageRowBudget = 70;
-  const continuationPageRowBudget = 108;
+  const firstPageRowBudget = 112;
+  const continuationPageRowBudget = 148;
   const rowPages = [];
   let currentPage = [];
   let currentBudget = firstPageRowBudget;
@@ -5680,7 +5680,12 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
   async function revertTemplateToDefault() {
     const confirmed = window.confirm("Revert the Pro-Forma template back to the default layout?");
     if (!confirmed) return;
-    const nextTemplate = cloneDefaultProFormaTemplate();
+    const nextTemplate = {
+      ...cloneDefaultProFormaTemplate(),
+      referencePdfAsset: template.referencePdfAsset || null,
+      termsPdfAsset: template.termsPdfAsset || null,
+      accreditationAssets: Array.isArray(template.accreditationAssets) ? template.accreditationAssets : []
+    };
     setTemplate(nextTemplate);
     setSelectedSection("title");
     setMessage("");
