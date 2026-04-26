@@ -2373,6 +2373,10 @@ function getBoardPathForUser(user) {
   return canEditBoard(user) ? "/board" : "/client/board";
 }
 
+function getProFormaPathForUser(user) {
+  return canEditProForma(user) ? "/pro-forma" : "/client/pro-forma";
+}
+
 function canToggleAeroSkin(user) {
   return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
@@ -2531,7 +2535,7 @@ function MainNavBar({
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
   const descriptionPullPath = "/description-pull";
-  const proFormaPath = "/pro-forma";
+  const proFormaPath = getProFormaPathForUser(currentUser);
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
@@ -3494,9 +3498,9 @@ function HostLandingPage({
             {canAccessDescriptionPull(currentUser) ? (
               <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
             ) : null}
-            {canAccessProForma(currentUser) ? (
-              <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo("/pro-forma")} />
-            ) : null}
+              {canAccessProForma(currentUser) ? (
+               <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
+              ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -3588,9 +3592,9 @@ function ClientLandingPage({
             {canAccessDescriptionPull(currentUser) ? (
               <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
             ) : null}
-            {canAccessProForma(currentUser) ? (
-              <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo("/pro-forma")} />
-            ) : null}
+              {canAccessProForma(currentUser) ? (
+               <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
+              ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -5125,27 +5129,6 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     }
   }
 
-  function openEmailPdfDraft() {
-    if (!draft) return;
-    const recipient = String(draft.contactEmail || "").trim();
-    if (!recipient) {
-      setError("No contact email address was pulled through for this Pro-Forma.");
-      return;
-    }
-    const subject = draft.headline || `Pro Forma Invoice${draft.orderReference ? ` - ${draft.orderReference}` : ""}`;
-    const greetingName = String(draft.contact || draft.customerName || "").trim();
-    const bodyLines = [
-      greetingName ? `Hi ${greetingName},` : "Hi,",
-      "",
-      `Please find attached the pro forma invoice${draft.orderReference ? ` for ${draft.orderReference}` : ""}.`,
-      "",
-      "Kind regards,",
-      "Signs Express"
-    ];
-    const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?cc=${encodeURIComponent("accounts.preston@signs-express.co.uk")}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyLines.join("\n"))}`;
-    window.location.href = mailtoUrl;
-  }
-
   function handleReferencePdfChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -5264,20 +5247,17 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             </form>
 
             <div className="social-post-card pro-forma-editor-card">
-              <div className="pro-forma-editor-head">
-                <div>
-                  <h3>DOCUMENT NAME</h3>
-                </div>
-                <div className="pro-forma-editor-actions">
-                  <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
-                  <button type="button" className="pro-forma-email-button" disabled={!draft} onClick={openEmailPdfDraft}>
-                    Email PDF
-                  </button>
+                <div className="pro-forma-editor-head">
+                  <div>
+                    <h3>DOCUMENT NAME</h3>
+                  </div>
+                  <div className="pro-forma-editor-actions">
+                    <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
                   <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
-                    {printing ? "Opening..." : "Print / Save PDF"}
-                  </button>
+                      {printing ? "Opening..." : "Print / Save PDF"}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
               {draft ? (
                 <div className="pro-forma-editor">
@@ -12616,7 +12596,8 @@ export default function App() {
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
-  const isProFormaRoute = pathname.startsWith("/pro-forma");
+  const isClientProFormaRoute = pathname.startsWith("/client/pro-forma");
+  const isProFormaRoute = pathname.startsWith("/pro-forma") && !isProFormaTemplateRoute;
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
@@ -12699,6 +12680,7 @@ export default function App() {
   const boardEditable = canEditBoard(currentUser);
   const installerEditable = canEditInstaller(currentUser);
   const attendanceEditable = canEditAttendance(currentUser);
+  const proFormaEditable = canEditProForma(currentUser);
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
   const aeroEnabled = getUiSkin(currentUser) === "aero";
@@ -12710,7 +12692,11 @@ export default function App() {
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
-  const showProForma = Boolean(currentUser && canAccessProForma(currentUser) && isProFormaRoute && !isProFormaTemplateRoute);
+  const showProForma = Boolean(
+    currentUser &&
+      canAccessProForma(currentUser) &&
+      ((proFormaEditable && isProFormaRoute) || (!proFormaEditable && isClientProFormaRoute))
+  );
   const showRamsLogic = Boolean(currentUser && canAccessRams(currentUser) && isRamsLogicRoute);
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
@@ -12720,8 +12706,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -13042,7 +13028,7 @@ export default function App() {
       return;
     }
 
-    if (isProFormaRoute && !canAccessProForma(currentUser)) {
+    if ((isProFormaRoute || isClientProFormaRoute) && !canAccessProForma(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -13072,15 +13058,20 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
+      return;
+    }
+
+    if ((isProFormaRoute || isClientProFormaRoute) && getProFormaPathForUser(currentUser) !== window.location.pathname) {
+      window.location.replace(getProFormaPathForUser(currentUser));
       return;
     }
 
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
