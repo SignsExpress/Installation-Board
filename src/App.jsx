@@ -4124,17 +4124,6 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
         </div>
       </div>
   `;
-  const totalPageCount = 1 + continuationRows.length + termsPageImages.length;
-  const buildPageFooterHtml = (pageNumber) => `
-      <div class="page-footer">
-        ${footerStripHtml}
-        <div class="footer-meta">
-          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
-          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
-          <div>Page ${pageNumber} of ${Math.max(totalPageCount, 1)}</div>
-        </div>
-      </div>
-  `;
   const firstPageRowBudget = 88;
   const continuationPageRowBudget = 132;
   const rowPages = [];
@@ -4157,6 +4146,17 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
   }
   const firstPageRows = rowPages[0] || [];
   const continuationRows = rowPages.slice(1);
+  const totalPageCount = 1 + continuationRows.length + termsPageImages.length;
+  const buildPageFooterHtml = (pageNumber) => `
+      <div class="page-footer">
+        ${footerStripHtml}
+        <div class="footer-meta">
+          <div>Generated on: ${escapeHtml(formatProFormaDate(draft.date) || "-")}</div>
+          <div class="footer-company muted">Signs Express Central Lancashire, Sherdley Road, Lostock Hall, Preston, Lancashire PR5 5LP. Registered in England No. 09550746   Vat No. GB 213 17 67 33</div>
+          <div>Page ${pageNumber} of ${Math.max(totalPageCount, 1)}</div>
+        </div>
+      </div>
+  `;
   const firstPageTableHtml = `
       <div class="table-wrap">
         ${tableHeaderHtml}
