@@ -5106,8 +5106,24 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
       take: 200,
       sortBy: "name",
       name: query
+    }),
+    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+      take: 200,
+      sortBy: "name",
+      keyword: query
     })
   ];
+
+  const filterMaterials = (materials) => {
+    if (!query) return materials;
+    const queryLower = query.toLowerCase();
+    const queryTokens = queryLower.split(/[^a-z0-9]+/i).filter(Boolean);
+    return materials.filter((material) => {
+      const haystack = `${material.name} ${material.supplier}`.toLowerCase();
+      if (haystack.includes(queryLower)) return true;
+      return queryTokens.every((token) => haystack.includes(token));
+    });
+  };
 
   for (const requestUrl of requestPlans) {
     try {
@@ -5133,20 +5149,47 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
       let materials = extractCoreBridgeRecords(body)
         .map((record, index) => normalizeCoreBridgeMaterial(record, index))
         .filter((material) => material.name);
-      if (query) {
-        const queryLower = query.toLowerCase();
-        materials = materials.filter((material) =>
-          material.name.toLowerCase().includes(queryLower) ||
-          material.supplier.toLowerCase().includes(queryLower)
-        );
+      materials = filterMaterials(materials);
+      if (materials.length) {
+        return {
+          materials: materials.slice(0, 100),
+          sourceUrl: requestUrl
+        };
       }
-      return {
-        materials: materials.slice(0, 100),
-        sourceUrl: requestUrl
-      };
+      attempts.push(`EMPTY ${requestUrl}`);
     } catch (error) {
       attempts.push(`ERR ${requestUrl} ${error.message}`);
     }
+  }
+
+  try {
+    const fallbackUrl = buildCoreBridgeCollectionUrl(config, config.materialPath, {
+      take: 500,
+      sortBy: "name"
+    });
+    const response = await fetch(fallbackUrl, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+        Accept: "application/json"
+      }
+    });
+    if (response.ok) {
+      const rawBody = await response.text();
+      const body = JSON.parse(rawBody);
+      const materials = filterMaterials(
+        extractCoreBridgeRecords(body)
+          .map((record, index) => normalizeCoreBridgeMaterial(record, index))
+          .filter((material) => material.name)
+      );
+      return {
+        materials: materials.slice(0, 100),
+        sourceUrl: fallbackUrl
+      };
+    }
+    attempts.push(`${response.status} ${fallbackUrl}`);
+  } catch (error) {
+    attempts.push(`ERR fallback ${error.message}`);
   }
 
   const error = new Error(`CoreBridge material lookup failed. Tried: ${attempts.join(" | ") || "no endpoints"}`);
