@@ -72,6 +72,8 @@ const HOLIDAY_STAFF = [
 const HOLIDAY_RESET_VERSION = 1;
 let boardStoreWriteQueue = Promise.resolve();
 let boardStoreCorruptionError = null;
+let socialPostQueueProcessing = false;
+let socialPostQueueInterval = null;
 const MATERIAL_REQUEST_CATEGORIES = [
   {
     id: "consumables",
@@ -142,6 +144,7 @@ function createEmptyBoardStore() {
     socialPostToneVoices: [],
     socialPostDeletedToneVoiceIds: [],
     socialPostSuggestions: [],
+    socialPostQueue: [],
     holidayResetVersion: HOLIDAY_RESET_VERSION
   };
 }
@@ -939,6 +942,7 @@ function mergeHolidaySeed(store) {
         socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? [...store.socialPostToneVoices] : [],
         socialPostDeletedToneVoiceIds: Array.isArray(store.socialPostDeletedToneVoiceIds) ? [...store.socialPostDeletedToneVoiceIds] : [],
         socialPostSuggestions: Array.isArray(store.socialPostSuggestions) ? [...store.socialPostSuggestions] : [],
+        socialPostQueue: Array.isArray(store.socialPostQueue) ? [...store.socialPostQueue] : [],
         holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
       };
 
@@ -1040,7 +1044,8 @@ async function readStore() {
             vehiclePricingSettings: null,
             socialPostToneVoices: [],
             socialPostDeletedToneVoiceIds: [],
-            socialPostSuggestions: []
+            socialPostSuggestions: [],
+            socialPostQueue: []
           });
       if (Number(migrated.holidayResetVersion || 0) !== 0) {
         await writeStore(migrated);
@@ -1068,6 +1073,7 @@ async function readStore() {
           socialPostToneVoices: Array.isArray(parsed.socialPostToneVoices) ? parsed.socialPostToneVoices : [],
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
           socialPostSuggestions: Array.isArray(parsed.socialPostSuggestions) ? parsed.socialPostSuggestions : [],
+          socialPostQueue: Array.isArray(parsed.socialPostQueue) ? parsed.socialPostQueue : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
@@ -1136,6 +1142,9 @@ async function writeStore(store) {
       socialPostSuggestions: [...(store.socialPostSuggestions || [])]
         .map((entry) => sanitizeSocialPostSuggestion(entry))
         .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || ""))),
+      socialPostQueue: [...(store.socialPostQueue || [])]
+        .map((entry) => sanitizeSocialPostQueueEntry(entry))
+        .sort((left, right) => String(left.scheduledFor || "").localeCompare(String(right.scheduledFor || ""))),
       vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
@@ -5187,6 +5196,24 @@ function sanitizeSocialPostSuggestion(entry = {}) {
   };
 }
 
+function sanitizeSocialPostQueueEntry(entry = {}) {
+  const scheduledDate = new Date(entry.scheduledFor || entry.createdAt || new Date().toISOString());
+  const createdDate = new Date(entry.createdAt || new Date().toISOString());
+  return {
+    id: String(entry.id || makeId()),
+    userId: String(entry.userId || "").trim(),
+    jobId: String(entry.jobId || "").trim(),
+    orderReference: String(entry.orderReference || "").replace(/\s+/g, " ").trim().slice(0, 80),
+    actorName: String(entry.actorName || "").replace(/\s+/g, " ").trim().slice(0, 160),
+    toneVoiceId: String(entry.toneVoiceId || "").trim(),
+    toneVoiceName: String(entry.toneVoiceName || "").replace(/\s+/g, " ").trim().slice(0, 120),
+    scheduledFor: Number.isNaN(scheduledDate.getTime()) ? new Date().toISOString() : scheduledDate.toISOString(),
+    createdAt: Number.isNaN(createdDate.getTime()) ? new Date().toISOString() : createdDate.toISOString(),
+    attemptCount: Math.max(0, Number(entry.attemptCount) || 0),
+    lastError: String(entry.lastError || "").trim().slice(0, 1000)
+  };
+}
+
 function decodeXmlEntities(value = "") {
   return String(value)
     .replace(/&nbsp;/gi, " ")
@@ -6595,69 +6622,189 @@ async function fetchSocialPostOrderByReference(orderReference = "") {
   };
 }
 
-async function createAutoSocialSuggestionsForCompletedJob({ store, users, job, actorName = "" }) {
-  if (!job?.id || !String(job.orderReference || "").trim()) return;
+async function queueAutoSocialSuggestionsForCompletedJob({ store, users, job, actorName = "" }) {
+  if (!job?.id || !String(job.orderReference || "").trim()) return 0;
   const voices = getSocialPostVoices(store);
-  if (!voices.length) return;
+  if (!voices.length) return 0;
 
   const recipients = (Array.isArray(users) ? users : []).filter((user) => canAccessSocialPost(user));
-  if (!recipients.length) return;
+  if (!recipients.length) return 0;
 
-  const { lookup, order, lookupAttempts } = await fetchSocialPostOrderByReference(job.orderReference);
-  if (!order || !lookup) return;
+  store.socialPostQueue = Array.isArray(store.socialPostQueue) ? store.socialPostQueue.map(sanitizeSocialPostQueueEntry) : [];
+  const existingQueue = store.socialPostQueue.filter((entry) => entry.jobId !== String(job.id || ""));
+  const now = Date.now();
+  const lastScheduledAt = existingQueue.reduce((latest, entry) => {
+    const scheduled = new Date(entry.scheduledFor).getTime();
+    return Number.isFinite(scheduled) ? Math.max(latest, scheduled) : latest;
+  }, now);
+  const queueStart = Math.max(now, lastScheduledAt);
+  const staggerWindowMs = 15 * 60 * 1000;
+  const delayMs = recipients.length > 1 ? Math.max(30000, Math.floor(staggerWindowMs / recipients.length)) : 0;
+  const nextEntries = [];
 
-  const publicJob = toPublicJob(job);
+  recipients.forEach((user, index) => {
+    const voice = pickSocialPostVoiceForUser(user, voices) || voices[0];
+    if (!voice) return;
+    nextEntries.push(
+      sanitizeSocialPostQueueEntry({
+        userId: user.id,
+        jobId: job.id,
+        orderReference: job.orderReference,
+        actorName,
+        toneVoiceId: voice.id,
+        toneVoiceName: voice.name,
+        scheduledFor: new Date(queueStart + delayMs * index).toISOString(),
+        createdAt: new Date().toISOString(),
+        attemptCount: 0,
+        lastError: ""
+      })
+    );
+  });
+
+  store.socialPostQueue = [...existingQueue, ...nextEntries];
+  return nextEntries.length;
+}
+
+async function processQueuedSocialPostEntry(store, entry) {
+  const usersStore = await readUsersStore();
+  const user = (Array.isArray(usersStore.users) ? usersStore.users : []).find(
+    (candidate) => String(candidate?.id || "") === String(entry.userId || "")
+  );
+  if (!user || !canAccessSocialPost(user)) {
+    return { status: "skipped" };
+  }
+
+  const voices = getSocialPostVoices(store);
+  const voice = voices.find((candidate) => String(candidate.id || "") === String(entry.toneVoiceId || "")) ||
+    pickSocialPostVoiceForUser(user, voices) ||
+    voices[0];
+  if (!voice) {
+    return { status: "skipped" };
+  }
+
+  const { lookup, order, lookupAttempts } = await fetchSocialPostOrderByReference(entry.orderReference);
+  if (!order || !lookup) {
+    throw new Error(`Could not fetch CoreBridge order for ${entry.orderReference}.`);
+  }
+
+  const liveJob = (Array.isArray(store.jobs) ? store.jobs : []).find(
+    (job) => String(job?.id || "") === String(entry.jobId || "")
+  );
+  const publicJob = liveJob ? toPublicJob(liveJob) : toPublicJob({
+    id: entry.jobId,
+    orderReference: entry.orderReference,
+    customerName: order.customerName || ""
+  });
   const photoCount = Array.isArray(publicJob.photos) ? publicJob.photos.length : 0;
   const photoSummary = photoCount === 1 ? "1 photo attached" : `${photoCount} photos attached`;
   store.socialPostSuggestions = Array.isArray(store.socialPostSuggestions) ? store.socialPostSuggestions : [];
   store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
 
-  for (const user of recipients) {
-    const voice = pickSocialPostVoiceForUser(user, voices) || voices[0];
-    if (!voice) continue;
+  const brief = buildSocialPostBrief(order, voice);
+  brief.lookupAttempts = lookupAttempts;
+  brief.debug.lookupAttempts = lookupAttempts;
+  brief.debug.selectedVoice = {
+    id: voice.id,
+    name: voice.name,
+    fileName: voice.fileName,
+    contentLength: voice.content.length,
+    supportingTextLength: voice.supportingText.length,
+    exampleCount: voice.examples.length,
+    isFallback: false,
+    autoGeneratedForUser: String(user.displayName || "").trim()
+  };
 
-    const brief = buildSocialPostBrief(order, voice);
-    brief.lookupAttempts = lookupAttempts;
-    brief.debug.lookupAttempts = lookupAttempts;
-    brief.debug.selectedVoice = {
-      id: voice.id,
-      name: voice.name,
-      fileName: voice.fileName,
-      contentLength: voice.content.length,
-      supportingTextLength: voice.supportingText.length,
-      exampleCount: voice.examples.length,
-      isFallback: false,
-      autoGeneratedForUser: String(user.displayName || "").trim()
-    };
+  const generated = await generateSocialPostWithAi(brief);
+  const suggestion = sanitizeSocialPostSuggestion({
+    userId: user.id,
+    jobId: publicJob.id,
+    orderReference: publicJob.orderReference,
+    customerName: publicJob.customerName,
+    toneVoiceId: voice.id,
+    toneVoiceName: voice.name,
+    post: generated.post,
+    source: generated.source,
+    warning: generated.warning || ""
+  });
 
-    const generated = await generateSocialPostWithAi(brief);
-    const suggestion = sanitizeSocialPostSuggestion({
+  store.socialPostSuggestions = [
+    suggestion,
+    ...store.socialPostSuggestions.filter(
+      (candidate) => !(String(candidate.userId || "") === String(user.id || "") && String(candidate.jobId || "") === String(publicJob.id || ""))
+    )
+  ].slice(0, 500);
+
+  store.notifications.unshift(
+    createNotification({
       userId: user.id,
-      jobId: publicJob.id,
-      orderReference: publicJob.orderReference,
-      customerName: publicJob.customerName,
-      toneVoiceId: voice.id,
-      toneVoiceName: voice.name,
-      post: generated.post,
-      source: generated.source,
-      warning: generated.warning || ""
+      type: "social-post",
+      title: "Suggested social post ready",
+      link: `/social-post?suggestion=${encodeURIComponent(suggestion.id)}`,
+      message: `${getJobNotificationSummary(publicJob)} was completed by ${entry.actorName || "a user"}. ${photoSummary}. A suggested post in ${voice.name}'s tone is ready.`
+    })
+  );
+
+  return { status: "processed" };
+}
+
+async function processSocialPostQueue() {
+  if (socialPostQueueProcessing) return;
+  socialPostQueueProcessing = true;
+  try {
+    const store = await readStore();
+    const queue = Array.isArray(store.socialPostQueue) ? store.socialPostQueue.map(sanitizeSocialPostQueueEntry) : [];
+    if (!queue.length) return;
+
+    const now = Date.now();
+    const nextEntry = queue.find((entry) => {
+      const scheduled = new Date(entry.scheduledFor).getTime();
+      return Number.isFinite(scheduled) && scheduled <= now;
     });
+    if (!nextEntry) return;
 
-    store.socialPostSuggestions = [
-      suggestion,
-      ...store.socialPostSuggestions.filter((entry) => String(entry.id || "") !== suggestion.id)
-    ].slice(0, 500);
+    store.socialPostQueue = queue.filter((entry) => String(entry.id || "") !== String(nextEntry.id || ""));
 
-    store.notifications.unshift(
-      createNotification({
-        userId: user.id,
-        type: "social-post",
-        title: "Suggested social post ready",
-        link: `/social-post?suggestion=${encodeURIComponent(suggestion.id)}`,
-        message: `${getJobNotificationSummary(publicJob)} was completed by ${actorName || "a user"}. ${photoSummary}. A suggested post in ${voice.name}'s tone is ready.`
-      })
-    );
+    try {
+      await processQueuedSocialPostEntry(store, nextEntry);
+    } catch (error) {
+      const attemptCount = Math.max(0, Number(nextEntry.attemptCount) || 0) + 1;
+      if (attemptCount < 3) {
+        store.socialPostQueue.push(
+          sanitizeSocialPostQueueEntry({
+            ...nextEntry,
+            attemptCount,
+            lastError: error.message || "Unknown social post generation error.",
+            scheduledFor: new Date(Date.now() + attemptCount * 5 * 60 * 1000).toISOString()
+          })
+        );
+      } else {
+        console.error("Could not generate queued social post suggestion.", error);
+      }
+    }
+
+    await writeStore(store);
+  } catch (error) {
+    console.error("Could not process social post queue.", error);
+  } finally {
+    socialPostQueueProcessing = false;
   }
+}
+
+function ensureSocialPostQueueWorker() {
+  if (socialPostQueueInterval) return;
+  socialPostQueueInterval = setInterval(() => {
+    processSocialPostQueue().catch((error) => {
+      console.error("Could not process queued social posts.", error);
+    });
+  }, 30000);
+  if (typeof socialPostQueueInterval.unref === "function") {
+    socialPostQueueInterval.unref();
+  }
+  setTimeout(() => {
+    processSocialPostQueue().catch((error) => {
+      console.error("Could not process queued social posts.", error);
+    });
+  }, 2000);
 }
 
 function cleanSocialPostSpec(value = "") {
@@ -8082,14 +8229,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
       message: `${jobSummary} was marked complete by ${request.user?.displayName || "a user"}. ${photoSummary}`
     }));
     try {
-      await createAutoSocialSuggestionsForCompletedJob({
+      await queueAutoSocialSuggestionsForCompletedJob({
         store,
         users: usersStore.users || [],
         job: nextJob,
         actorName: request.user?.displayName || "a user"
       });
     } catch (socialError) {
-      console.error("Could not auto-create social post suggestions.", socialError);
+      console.error("Could not queue social post suggestions.", socialError);
     }
     const savedStore = await writeStore(store);
     const payload = {
@@ -9351,6 +9498,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
 async function startServer() {
   const app = createServer();
+  ensureSocialPostQueueWorker();
   return new Promise((resolve) => {
     const server = app.listen(PORT, HOST, () => {
       console.log(`Installation board server running on http://${HOST}:${PORT}`);
