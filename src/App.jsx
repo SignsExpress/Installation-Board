@@ -3775,6 +3775,9 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   const [corebridgeQuery, setCorebridgeQuery] = useState("");
   const [corebridgeResults, setCorebridgeResults] = useState([]);
   const [corebridgeLoading, setCorebridgeLoading] = useState(false);
+  const [corebridgeDebugPath, setCorebridgeDebugPath] = useState("/core/api/material");
+  const [corebridgeDebugResults, setCorebridgeDebugResults] = useState(null);
+  const [corebridgeDebugLoading, setCorebridgeDebugLoading] = useState(false);
 
   const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : MATERIAL_REQUEST_CATEGORIES;
   const catalog = payload.catalog && typeof payload.catalog === "object" ? payload.catalog : {};
@@ -4019,6 +4022,39 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     }
   }
 
+  async function debugCoreBridgeMaterialPathLookup() {
+    if (!corebridgeDebugPath.trim()) {
+      setMessage(createMessage("Enter a CoreBridge path to test first.", "error"));
+      return;
+    }
+    try {
+      setCorebridgeDebugLoading(true);
+      const params = new URLSearchParams({
+        path: corebridgeDebugPath.trim(),
+        query: corebridgeQuery
+      });
+      const response = await fetch(`/api/material-requests/corebridge/debug?${params.toString()}`);
+      const nextPayload = await response.json();
+      if (!response.ok) {
+        throw new Error(nextPayload.error || "Could not debug CoreBridge materials.");
+      }
+      setCorebridgeDebugResults(nextPayload);
+      setMessage(
+        createMessage(
+          Array.isArray(nextPayload.normalizedRecords) && nextPayload.normalizedRecords.length
+            ? "Debug route returned material-shaped records."
+            : "Debug route checked successfully. Review the statuses below.",
+          "success"
+        )
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not debug CoreBridge materials.", "error"));
+    } finally {
+      setCorebridgeDebugLoading(false);
+    }
+  }
+
   function importCoreBridgeMaterial(material) {
     if (!selectedCategory) return;
     const nextSection = {
@@ -4162,6 +4198,57 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                               ))}
                             </div>
                           ) : null}
+                          <details className="materials-corebridge-debug">
+                            <summary>CoreBridge debug</summary>
+                            <div className="materials-corebridge-debug-body">
+                              <div className="materials-corebridge-bar">
+                                <input
+                                  type="text"
+                                  value={corebridgeDebugPath}
+                                  placeholder="/core/api/..."
+                                  onChange={(event) => setCorebridgeDebugPath(event.target.value)}
+                                />
+                                <button
+                                  className="ghost-button"
+                                  type="button"
+                                  onClick={debugCoreBridgeMaterialPathLookup}
+                                  disabled={corebridgeDebugLoading}
+                                >
+                                  {corebridgeDebugLoading ? "Checking..." : "Try path"}
+                                </button>
+                              </div>
+                              <p className="muted-copy">
+                                Try the exact CoreBridge relative path for Materials or Components here and we’ll show the response status and any material-like records we can detect.
+                              </p>
+                              {corebridgeDebugResults?.normalizedRecords?.length ? (
+                                <div className="materials-corebridge-results">
+                                  {corebridgeDebugResults.normalizedRecords.map((material) => (
+                                    <div key={`debug-${material.id || material.name}`} className="materials-corebridge-result">
+                                      <div>
+                                        <strong>{material.name}</strong>
+                                        <small>{material.supplier || "No supplier"} · {material.width ? `${material.width}mm` : "No width"} · {material.length ? `${material.length}mm` : "No length"}</small>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {Array.isArray(corebridgeDebugResults?.attempts) && corebridgeDebugResults.attempts.length ? (
+                                <div className="materials-debug-attempts">
+                                  {corebridgeDebugResults.attempts.map((attempt) => (
+                                    <article key={attempt.url} className="materials-debug-attempt">
+                                      <div className="materials-debug-attempt-head">
+                                        <strong>{attempt.status || "ERR"}</strong>
+                                        <span>{attempt.recordCount || 0} records</span>
+                                      </div>
+                                      <code>{attempt.url}</code>
+                                      {attempt.parseError ? <small>{attempt.parseError}</small> : null}
+                                      {attempt.bodyPreview ? <pre>{attempt.bodyPreview}</pre> : null}
+                                    </article>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </details>
                         </div>
 
                         <div className="materials-section-list">

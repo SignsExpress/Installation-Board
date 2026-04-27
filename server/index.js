@@ -5247,6 +5247,83 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
   throw error;
 }
 
+async function debugCoreBridgeMaterialPath(pathValue, searchTerm = "") {
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    const error = new Error("CoreBridge is not configured yet.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const normalizedPath = String(pathValue || "").trim();
+  const query = String(searchTerm || "").trim();
+  if (!normalizedPath) {
+    return { attempts: [], normalizedRecords: [] };
+  }
+
+  const requestPlans = [
+    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", search: query }),
+    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", q: query }),
+    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", name: query }),
+    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", keyword: query }),
+    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name" })
+  ].filter((value, index, items) => items.indexOf(value) === index);
+
+  const attempts = [];
+  let normalizedRecords = [];
+
+  for (const requestUrl of requestPlans) {
+    try {
+      const response = await fetch(requestUrl, {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+          Accept: "application/json"
+        }
+      });
+      const rawBody = await response.text();
+      let body = null;
+      let parseError = "";
+      if (rawBody) {
+        try {
+          body = JSON.parse(rawBody);
+        } catch (error) {
+          parseError = error.message || "Could not parse JSON.";
+        }
+      }
+      const records = body ? extractCoreBridgeRecords(body) : [];
+      if (!normalizedRecords.length && records.length) {
+        normalizedRecords = records
+          .map((record, index) => normalizeCoreBridgeMaterial(record, index))
+          .filter((material) => material.name)
+          .slice(0, 10);
+      }
+      attempts.push({
+        url: requestUrl,
+        status: response.status,
+        ok: response.ok,
+        parseError,
+        recordCount: records.length,
+        bodyPreview: rawBody.slice(0, 600)
+      });
+    } catch (error) {
+      attempts.push({
+        url: requestUrl,
+        status: 0,
+        ok: false,
+        parseError: error.message || "Request failed.",
+        recordCount: 0,
+        bodyPreview: ""
+      });
+    }
+  }
+
+  return {
+    attempts,
+    normalizedRecords
+  };
+}
+
 function sanitizeSocialToneVoice(voice = {}) {
   const examples = Array.isArray(voice.examples)
     ? voice.examples
@@ -8833,6 +8910,16 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.json(payload);
     } catch (error) {
       response.status(error.statusCode || 500).json({ error: error.message || "Could not load CoreBridge materials." });
+    }
+  });
+
+  app.get("/api/material-requests/corebridge/debug", async (request, response) => {
+    if (!requireMaterialsAdmin(request, response)) return;
+    try {
+      const payload = await debugCoreBridgeMaterialPath(request.query?.path || "", request.query?.query || "");
+      response.json(payload);
+    } catch (error) {
+      response.status(error.statusCode || 500).json({ error: error.message || "Could not debug CoreBridge materials." });
     }
   });
 
