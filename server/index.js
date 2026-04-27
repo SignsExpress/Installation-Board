@@ -3535,6 +3535,22 @@ function buildCoreBridgeEstimateUrl(config, params = {}) {
   return buildCoreBridgeCollectionUrl(config, config.estimatePath, params);
 }
 
+function getCoreBridgeMaterialPathVariants(config) {
+  return [
+    config.materialPath,
+    "/core/api/materials",
+    "/core/api/material/simplelist",
+    "/core/api/materialsimplelist",
+    "/core/api/component",
+    "/core/api/component/simplelist",
+    "/core/api/components",
+    "/core/api/components/simplelist"
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .filter((value, index, items) => items.indexOf(value) === index);
+}
+
 function buildCoreBridgeDetailUrl(config, pathValue, orderId) {
   const normalizedBase = config.baseUrl.endsWith("/") ? config.baseUrl : `${config.baseUrl}/`;
   const normalizedPath = String(pathValue || config.orderPath).startsWith("/") ? String(pathValue || config.orderPath).slice(1) : String(pathValue || config.orderPath);
@@ -5091,28 +5107,41 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
 
   const attempts = [];
   const query = String(searchTerm || "").trim();
-  const requestPlans = [
-    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+  const materialPaths = getCoreBridgeMaterialPathVariants(config);
+  const requestPlans = materialPaths.flatMap((pathValue) => [
+    buildCoreBridgeCollectionUrl(config, pathValue, {
       take: 200,
       sortBy: "name",
       search: query
     }),
-    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+    buildCoreBridgeCollectionUrl(config, pathValue, {
       take: 200,
       sortBy: "name",
       q: query
     }),
-    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+    buildCoreBridgeCollectionUrl(config, pathValue, {
       take: 200,
       sortBy: "name",
       name: query
     }),
-    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+    buildCoreBridgeCollectionUrl(config, pathValue, {
       take: 200,
       sortBy: "name",
       keyword: query
+    }),
+    buildCoreBridgeCollectionUrl(config, pathValue, {
+      take: 200,
+      sortBy: "name",
+      type: "material",
+      search: query
+    }),
+    buildCoreBridgeCollectionUrl(config, pathValue, {
+      take: 200,
+      sortBy: "name",
+      componentType: "material",
+      search: query
     })
-  ];
+  ]).filter((value, index, items) => items.indexOf(value) === index);
 
   const filterMaterials = (materials) => {
     if (!query) return materials;
@@ -5163,31 +5192,52 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
   }
 
   try {
-    const fallbackUrl = buildCoreBridgeCollectionUrl(config, config.materialPath, {
-      take: 500,
-      sortBy: "name"
-    });
-    const response = await fetch(fallbackUrl, {
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        "Ocp-Apim-Subscription-Key": config.subscriptionKey,
-        Accept: "application/json"
+    for (const pathValue of materialPaths) {
+      const fallbackCandidates = [
+        buildCoreBridgeCollectionUrl(config, pathValue, {
+          take: 500,
+          sortBy: "name"
+        }),
+        buildCoreBridgeCollectionUrl(config, pathValue, {
+          take: 500,
+          sortBy: "name",
+          type: "material"
+        }),
+        buildCoreBridgeCollectionUrl(config, pathValue, {
+          take: 500,
+          sortBy: "name",
+          componentType: "material"
+        })
+      ].filter((value, index, items) => items.indexOf(value) === index);
+
+      for (const fallbackUrl of fallbackCandidates) {
+        const response = await fetch(fallbackUrl, {
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+            Accept: "application/json"
+          }
+        });
+        if (!response.ok) {
+          attempts.push(`${response.status} ${fallbackUrl}`);
+          continue;
+        }
+        const rawBody = await response.text();
+        const body = JSON.parse(rawBody);
+        const materials = filterMaterials(
+          extractCoreBridgeRecords(body)
+            .map((record, index) => normalizeCoreBridgeMaterial(record, index))
+            .filter((material) => material.name)
+        );
+        if (materials.length) {
+          return {
+            materials: materials.slice(0, 100),
+            sourceUrl: fallbackUrl
+          };
+        }
+        attempts.push(`EMPTY ${fallbackUrl}`);
       }
-    });
-    if (response.ok) {
-      const rawBody = await response.text();
-      const body = JSON.parse(rawBody);
-      const materials = filterMaterials(
-        extractCoreBridgeRecords(body)
-          .map((record, index) => normalizeCoreBridgeMaterial(record, index))
-          .filter((material) => material.name)
-      );
-      return {
-        materials: materials.slice(0, 100),
-        sourceUrl: fallbackUrl
-      };
     }
-    attempts.push(`${response.status} ${fallbackUrl}`);
   } catch (error) {
     attempts.push(`ERR fallback ${error.message}`);
   }
