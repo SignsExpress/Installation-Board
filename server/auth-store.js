@@ -43,6 +43,7 @@ function getDefaultPermissions(role) {
       holidays: "admin",
       attendance: "admin",
       mileage: "admin",
+      materials: "admin",
       vanEstimator: "none",
       rams: "admin",
       socialPost: "admin",
@@ -57,6 +58,7 @@ function getDefaultPermissions(role) {
     holidays: "user",
     attendance: "user",
     mileage: "user",
+    materials: "none",
     vanEstimator: "none",
     rams: "none",
     socialPost: "none",
@@ -151,6 +153,7 @@ function normalizePermissions(permissions, role) {
     holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
     attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
     mileage: normalizePermissionValue(permissions?.mileage, defaults.mileage),
+    materials: normalizePermissionValue(permissions?.materials, defaults.materials),
     vanEstimator: normalizePermissionValue(permissions?.vanEstimator, defaults.vanEstimator),
     rams: normalizePermissionValue(permissions?.rams, defaults.rams),
     socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost),
@@ -173,6 +176,7 @@ function applyOwnerPermissions(user) {
       holidays: "admin",
       attendance: "admin",
       mileage: "admin",
+      materials: "admin",
       vanEstimator: "admin",
       rams: "admin",
       socialPost: "admin",
@@ -189,6 +193,7 @@ function deriveRoleFromPermissions(permissions) {
     permissions?.holidays === "user" &&
     permissions?.attendance === "user" &&
     permissions?.mileage === "user" &&
+    permissions?.materials === "none" &&
     permissions?.vanEstimator === "none" &&
     permissions?.rams === "none" &&
     permissions?.socialPost === "none"
@@ -245,6 +250,7 @@ function normalizeStore(parsed, options = {}) {
         holidays: "admin",
         attendance: "admin",
         mileage: "admin",
+        materials: "admin",
         vanEstimator: "admin",
         rams: "admin",
         socialPost: "admin",
@@ -432,6 +438,7 @@ async function updateUserPermissions(userId, permissions) {
         holidays: "admin",
         attendance: "admin",
         mileage: "admin",
+        materials: "admin",
         vanEstimator: "admin",
         rams: "admin",
         socialPost: "admin",

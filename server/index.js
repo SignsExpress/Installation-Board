@@ -38,6 +38,7 @@ const streamClients = new Set();
 const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
 const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
 const DEFAULT_COREBRIDGE_ESTIMATE_PATH = "/core/api/estimate";
+const DEFAULT_COREBRIDGE_MATERIAL_PATH = "/core/api/material";
 const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
@@ -71,6 +72,57 @@ const HOLIDAY_STAFF = [
 const HOLIDAY_RESET_VERSION = 1;
 let boardStoreWriteQueue = Promise.resolve();
 let boardStoreCorruptionError = null;
+const MATERIAL_REQUEST_CATEGORIES = [
+  {
+    id: "consumables",
+    label: "Consumables",
+    description: "Rags, blades, cleaners and everyday shop items.",
+    imagePath: "/materials/consumables.jpg"
+  },
+  {
+    id: "epson-surecolor",
+    label: "Epson Surecolor SC-R5000",
+    description: "Resin print materials and matched production choices.",
+    imagePath: "/materials/epson-surecolor-sc-r5000.jpg"
+  },
+  {
+    id: "hp-latex",
+    label: "HP Latex 365",
+    description: "Latex roll media and print-ready stock.",
+    imagePath: "/materials/hp-latex-365.jpg"
+  },
+  {
+    id: "fixings",
+    label: "Fixings",
+    description: "Stand-offs, screws, tapes and mounting hardware.",
+    imagePath: "/materials/fixings.jpg"
+  },
+  {
+    id: "flatbed-uv",
+    label: "Mimaki JFX200-2513 EX Flatbed UV",
+    description: "Flatbed-ready boards, inks and specialist stock.",
+    imagePath: "/materials/mimaki-jfx200-2513-ex-flatbed-uv.jpg"
+  },
+  {
+    id: "pos",
+    label: "POS",
+    description: "Display pockets, holders and point-of-sale parts.",
+    imagePath: "/materials/pos.jpg"
+  },
+  {
+    id: "sheet-media",
+    label: "Sheet Media",
+    description: "Foamex, ACM, acrylic and sheet stock.",
+    imagePath: "/materials/sheet-media.jpg"
+  },
+  {
+    id: "roll-media",
+    label: "Roll Media",
+    description: "Printable rolls, laminates and speciality films.",
+    imagePath: "/materials/roll-media.jpg"
+  }
+];
+const MATERIAL_REQUEST_CATEGORY_IDS = new Set(MATERIAL_REQUEST_CATEGORIES.map((category) => category.id));
 
 function createEmptyBoardStore() {
   return {
@@ -82,6 +134,8 @@ function createEmptyBoardStore() {
     notifications: [],
     attendanceEntries: [],
     mileageClaims: [],
+    materialRequestCatalog: {},
+    materialRequests: [],
     ramsLogic: null,
     proFormaTemplate: null,
     vehiclePricingSettings: null,
@@ -450,6 +504,16 @@ function canEditMileage(user) {
   return getUserPermission(user, "mileage", user?.role === "host" ? "admin" : "user") === "admin";
 }
 
+function canAccessMaterials(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "materials", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditMaterials(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "materials", user?.role === "host" ? "admin" : "none") === "admin";
+}
+
 function canAccessVanEstimator(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "vanEstimator", "none") !== "none";
@@ -787,6 +851,18 @@ function requireMileageAdmin(request, response) {
   return false;
 }
 
+function requireMaterialsAccess(request, response) {
+  if (canAccessMaterials(request.user)) return true;
+  response.status(403).json({ error: "Material Request access required." });
+  return false;
+}
+
+function requireMaterialsAdmin(request, response) {
+  if (canEditMaterials(request.user)) return true;
+  response.status(403).json({ error: "Material Request admin access required." });
+  return false;
+}
+
 function requireVanEstimatorAccess(request, response) {
   if (canAccessVanEstimator(request.user)) return true;
   response.status(403).json({ error: "Vehicle pricing access required." });
@@ -855,6 +931,8 @@ function mergeHolidaySeed(store) {
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
+        materialRequestCatalog: sanitizeMaterialRequestCatalog(store.materialRequestCatalog),
+        materialRequests: Array.isArray(store.materialRequests) ? [...store.materialRequests] : [],
         ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
         proFormaTemplate: store.proFormaTemplate && typeof store.proFormaTemplate === "object" ? sanitizeProFormaTemplate(store.proFormaTemplate) : null,
         vehiclePricingSettings: store.vehiclePricingSettings && typeof store.vehiclePricingSettings === "object" ? store.vehiclePricingSettings : null,
@@ -955,6 +1033,8 @@ async function readStore() {
             notifications: [],
             attendanceEntries: [],
             mileageClaims: [],
+            materialRequestCatalog: {},
+            materialRequests: [],
             ramsLogic: null,
             proFormaTemplate: null,
             vehiclePricingSettings: null,
@@ -977,6 +1057,11 @@ async function readStore() {
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
+          materialRequestCatalog:
+            parsed.materialRequestCatalog && typeof parsed.materialRequestCatalog === "object" && !Array.isArray(parsed.materialRequestCatalog)
+              ? parsed.materialRequestCatalog
+              : {},
+          materialRequests: Array.isArray(parsed.materialRequests) ? parsed.materialRequests : [],
           ramsLogic: parsed.ramsLogic && typeof parsed.ramsLogic === "object" ? parsed.ramsLogic : null,
           proFormaTemplate: parsed.proFormaTemplate && typeof parsed.proFormaTemplate === "object" ? sanitizeProFormaTemplate(parsed.proFormaTemplate) : null,
           vehiclePricingSettings: parsed.vehiclePricingSettings && typeof parsed.vehiclePricingSettings === "object" ? parsed.vehiclePricingSettings : null,
@@ -1040,6 +1125,10 @@ async function writeStore(store) {
           if (left.monthId !== right.monthId) return String(right.monthId || "").localeCompare(String(left.monthId || ""));
           return String(left.userName || "").localeCompare(String(right.userName || ""));
         }),
+      materialRequestCatalog: sanitizeMaterialRequestCatalog(store.materialRequestCatalog),
+      materialRequests: [...(store.materialRequests || [])]
+        .map((entry) => sanitizeMaterialRequest(entry))
+        .sort((left, right) => String(right.createdAt || "").localeCompare(String(left.createdAt || ""))),
       ramsLogic: store.ramsLogic && typeof store.ramsLogic === "object" ? store.ramsLogic : null,
       proFormaTemplate: store.proFormaTemplate && typeof store.proFormaTemplate === "object" ? sanitizeProFormaTemplate(store.proFormaTemplate) : null,
       socialPostToneVoices: Array.isArray(store.socialPostToneVoices) ? store.socialPostToneVoices : [],
@@ -2466,6 +2555,162 @@ function sanitizeMileageClaim(payload) {
   };
 }
 
+function createEmptyMaterialRequestCategoryState() {
+  return { sections: [] };
+}
+
+function sanitizeMaterialRequestNumber(value, precision = 2) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const factor = 10 ** precision;
+  return Math.max(0, Math.round(numeric * factor) / factor);
+}
+
+function sanitizeMaterialRequestText(value, maxLength = 240) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, maxLength);
+}
+
+function sanitizeMaterialRequestMultiline(value, maxLength = 2000) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeMaterialRequestPreset(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    label: sanitizeMaterialRequestText(payload?.label, 120),
+    width: sanitizeMaterialRequestNumber(payload?.width),
+    height: sanitizeMaterialRequestNumber(payload?.height),
+    length: sanitizeMaterialRequestNumber(payload?.length),
+    quantity: sanitizeMaterialRequestNumber(payload?.quantity, 0),
+    unit: sanitizeMaterialRequestText(payload?.unit, 40)
+  };
+}
+
+function sanitizeMaterialRequestMaterial(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    name: sanitizeMaterialRequestText(payload?.name, 180),
+    supplier: sanitizeMaterialRequestText(payload?.supplier, 120),
+    width: sanitizeMaterialRequestNumber(payload?.width),
+    length: sanitizeMaterialRequestNumber(payload?.length),
+    costPerSquareMetre: sanitizeMaterialRequestNumber(payload?.costPerSquareMetre),
+    totalLength: sanitizeMaterialRequestNumber(payload?.totalLength),
+    unit: sanitizeMaterialRequestText(payload?.unit, 40),
+    notes: sanitizeMaterialRequestMultiline(payload?.notes, 400)
+  };
+}
+
+function sanitizeMaterialRequestSection(payload) {
+  const title = sanitizeMaterialRequestText(payload?.title, 120);
+  return {
+    id: String(payload?.id || makeId()),
+    title,
+    description: sanitizeMaterialRequestText(payload?.description, 180),
+    allowBespoke: payload?.allowBespoke !== false,
+    sizePresets: Array.isArray(payload?.sizePresets)
+      ? payload.sizePresets.map((preset) => sanitizeMaterialRequestPreset(preset)).filter((preset) => preset.label)
+      : [],
+    materials: Array.isArray(payload?.materials)
+      ? payload.materials.map((material) => sanitizeMaterialRequestMaterial(material)).filter((material) => material.name)
+      : []
+  };
+}
+
+function sanitizeMaterialRequestCatalog(payload) {
+  const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  return Object.fromEntries(
+    MATERIAL_REQUEST_CATEGORIES.map((category) => {
+      const categoryState =
+        source[category.id] && typeof source[category.id] === "object" && !Array.isArray(source[category.id])
+          ? source[category.id]
+          : createEmptyMaterialRequestCategoryState();
+      return [
+        category.id,
+        {
+          sections: Array.isArray(categoryState.sections)
+            ? categoryState.sections.map((section) => sanitizeMaterialRequestSection(section)).filter((section) => section.title)
+            : []
+        }
+      ];
+    })
+  );
+}
+
+function sanitizeMaterialRequestLine(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    categoryId: MATERIAL_REQUEST_CATEGORY_IDS.has(String(payload?.categoryId || "").trim())
+      ? String(payload.categoryId).trim()
+      : "",
+    categoryLabel: sanitizeMaterialRequestText(payload?.categoryLabel, 120),
+    sectionId: String(payload?.sectionId || "").trim(),
+    sectionTitle: sanitizeMaterialRequestText(payload?.sectionTitle, 120),
+    materialId: String(payload?.materialId || "").trim(),
+    materialName: sanitizeMaterialRequestText(payload?.materialName, 180),
+    supplier: sanitizeMaterialRequestText(payload?.supplier, 120),
+    quantity: Math.max(1, sanitizeMaterialRequestNumber(payload?.quantity || 1, 0)),
+    requestMode: ["preset", "bespoke", "standard"].includes(String(payload?.requestMode || "").trim().toLowerCase())
+      ? String(payload.requestMode).trim().toLowerCase()
+      : "standard",
+    presetId: String(payload?.presetId || "").trim(),
+    presetLabel: sanitizeMaterialRequestText(payload?.presetLabel, 120),
+    bespokeWidth: sanitizeMaterialRequestNumber(payload?.bespokeWidth),
+    bespokeHeight: sanitizeMaterialRequestNumber(payload?.bespokeHeight),
+    bespokeLength: sanitizeMaterialRequestNumber(payload?.bespokeLength),
+    sizeSummary: sanitizeMaterialRequestText(payload?.sizeSummary, 180),
+    width: sanitizeMaterialRequestNumber(payload?.width),
+    length: sanitizeMaterialRequestNumber(payload?.length),
+    costPerSquareMetre: sanitizeMaterialRequestNumber(payload?.costPerSquareMetre),
+    totalLength: sanitizeMaterialRequestNumber(payload?.totalLength),
+    unit: sanitizeMaterialRequestText(payload?.unit, 40),
+    lineTotal: sanitizeMaterialRequestNumber(payload?.lineTotal)
+  };
+}
+
+function sanitizeMaterialRequest(payload) {
+  const lines = Array.isArray(payload?.lines)
+    ? payload.lines.map((line) => sanitizeMaterialRequestLine(line)).filter((line) => line.materialName || line.sectionTitle)
+    : [];
+  return {
+    id: String(payload?.id || makeId()),
+    userId: String(payload?.userId || "").trim(),
+    userName: sanitizeMaterialRequestText(payload?.userName, 120),
+    notes: sanitizeMaterialRequestMultiline(payload?.notes, 1200),
+    hostNotes: sanitizeMaterialRequestMultiline(payload?.hostNotes, 1200),
+    status: ["submitted", "reviewed", "ordered"].includes(String(payload?.status || "").trim().toLowerCase())
+      ? String(payload.status).trim().toLowerCase()
+      : "submitted",
+    lines,
+    createdAt: String(payload?.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function getMaterialRequestCategories() {
+  return MATERIAL_REQUEST_CATEGORIES.map((category) => ({ ...category }));
+}
+
+function buildMaterialRequestPayload(store, currentUser) {
+  const catalog = sanitizeMaterialRequestCatalog(store.materialRequestCatalog);
+  const requests = (Array.isArray(store.materialRequests) ? store.materialRequests : []).map((entry) =>
+    sanitizeMaterialRequest(entry)
+  );
+  return {
+    categories: getMaterialRequestCategories(),
+    catalog,
+    adminMode: canEditMaterials(currentUser),
+    requests: canEditMaterials(currentUser)
+      ? requests
+      : requests.filter((request) => String(request.userId || "") === String(currentUser?.id || ""))
+  };
+}
+
 function buildMileageHistory(claims) {
   const monthGroups = new Map();
 
@@ -3252,6 +3497,7 @@ function getCoreBridgeConfig() {
     ).trim(),
     orderPath: String(process.env.COREBRIDGE_ORDER_PATH || process.env.COREBRIDGE_ENDPOINT_PATH || DEFAULT_COREBRIDGE_ORDER_PATH).trim(),
     estimatePath: String(process.env.COREBRIDGE_ESTIMATE_PATH || DEFAULT_COREBRIDGE_ESTIMATE_PATH).trim(),
+    materialPath: String(process.env.COREBRIDGE_MATERIAL_PATH || DEFAULT_COREBRIDGE_MATERIAL_PATH).trim(),
     apiVersion: String(process.env.COREBRIDGE_API_VERSION || "v3.0").trim()
   };
 }
@@ -4771,6 +5017,130 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   }
 
   const error = new Error(`CoreBridge lookup failed. Tried: ${attempts.join(" | ") || "no endpoints"}`);
+  error.statusCode = 502;
+  throw error;
+}
+
+function normalizeCoreBridgeMaterial(record, index = 0) {
+  const flat = flattenRecord(record);
+  const name = pickFirst(flat, [
+    "name",
+    "materialname",
+    "description",
+    "formattedname"
+  ]);
+  const supplier = pickFirst(flat, [
+    "supplier",
+    "suppliername",
+    "vendor",
+    "vendorname",
+    "manufacturer"
+  ]);
+  const width = Number(
+    pickFirst(flat, [
+      "width",
+      "metadata.width",
+      "dimensions.width"
+    ])
+  );
+  const length = Number(
+    pickFirst(flat, [
+      "length",
+      "metadata.length",
+      "dimensions.length",
+      "rolllength"
+    ])
+  );
+  const costPerSquareMetre = Number(
+    pickFirst(flat, [
+      "costpersquaremetre",
+      "costperm2",
+      "sqmcost",
+      "sqmprice"
+    ])
+  );
+  return {
+    id: String(record?.ID || record?.Id || record?.id || `material-${index + 1}`),
+    name: sanitizeMaterialRequestText(name, 180),
+    supplier: sanitizeMaterialRequestText(supplier, 120),
+    width: Number.isFinite(width) ? width : 0,
+    length: Number.isFinite(length) ? length : 0,
+    costPerSquareMetre: Number.isFinite(costPerSquareMetre) ? costPerSquareMetre : 0,
+    totalLength: Number.isFinite(length) ? length : 0,
+    unit: "mm",
+    raw: record
+  };
+}
+
+async function fetchCoreBridgeMaterials(searchTerm = "") {
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    const error = new Error("CoreBridge is not configured yet.");
+    error.statusCode = 503;
+    throw error;
+  }
+
+  const attempts = [];
+  const query = String(searchTerm || "").trim();
+  const requestPlans = [
+    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+      take: 200,
+      sortBy: "name",
+      search: query
+    }),
+    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+      take: 200,
+      sortBy: "name",
+      q: query
+    }),
+    buildCoreBridgeCollectionUrl(config, config.materialPath, {
+      take: 200,
+      sortBy: "name",
+      name: query
+    })
+  ];
+
+  for (const requestUrl of requestPlans) {
+    try {
+      const response = await fetch(requestUrl, {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+          Accept: "application/json"
+        }
+      });
+      if (!response.ok) {
+        attempts.push(`${response.status} ${requestUrl}`);
+        continue;
+      }
+      const rawBody = await response.text();
+      let body;
+      try {
+        body = JSON.parse(rawBody);
+      } catch (error) {
+        attempts.push(`NONJSON ${requestUrl}`);
+        continue;
+      }
+      let materials = extractCoreBridgeRecords(body)
+        .map((record, index) => normalizeCoreBridgeMaterial(record, index))
+        .filter((material) => material.name);
+      if (query) {
+        const queryLower = query.toLowerCase();
+        materials = materials.filter((material) =>
+          material.name.toLowerCase().includes(queryLower) ||
+          material.supplier.toLowerCase().includes(queryLower)
+        );
+      }
+      return {
+        materials: materials.slice(0, 100),
+        sourceUrl: requestUrl
+      };
+    } catch (error) {
+      attempts.push(`ERR ${requestUrl} ${error.message}`);
+    }
+  }
+
+  const error = new Error(`CoreBridge material lookup failed. Tried: ${attempts.join(" | ") || "no endpoints"}`);
   error.statusCode = 502;
   throw error;
 }
@@ -6616,7 +6986,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-      if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessMaterials(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser)) {
         response.status(403).json({ error: "That account does not have access." });
         return;
       }
@@ -6730,8 +7100,9 @@ function createServer() {
           installer: request.body?.installer,
           holidays: request.body?.holidays,
           attendance: request.body?.attendance,
-          mileage: request.body?.mileage,
-          vanEstimator: request.body?.vanEstimator,
+        mileage: request.body?.mileage,
+        materials: request.body?.materials,
+        vanEstimator: request.body?.vanEstimator,
           rams: request.body?.rams,
           socialPost: request.body?.socialPost,
           descriptionPull: request.body?.descriptionPull,
@@ -8135,6 +8506,94 @@ app.get("/api/corebridge/orders", async (request, response) => {
     response.json(
       savedStore.notifications.filter((entry) => String(entry.userId || "") === userId)
     );
+  });
+
+  app.get("/api/material-requests", async (request, response) => {
+    if (!requireMaterialsAccess(request, response)) return;
+    const store = await readStore();
+    response.json(buildMaterialRequestPayload(store, request.user));
+  });
+
+  app.post("/api/material-requests", async (request, response) => {
+    if (!requireMaterialsAccess(request, response)) return;
+    const lines = Array.isArray(request.body?.lines)
+      ? request.body.lines.map((line) => sanitizeMaterialRequestLine(line)).filter((line) => line.materialName || line.sectionTitle)
+      : [];
+    if (!lines.length) {
+      response.status(400).json({ error: "Add at least one material to the basket." });
+      return;
+    }
+
+    const store = await readStore();
+    const nextRequest = sanitizeMaterialRequest({
+      userId: request.user?.id || "",
+      userName: request.user?.displayName || "Unknown user",
+      notes: request.body?.notes || "",
+      status: "submitted",
+      lines
+    });
+    store.materialRequests = [nextRequest, ...(store.materialRequests || [])];
+
+    try {
+      const usersStore = await readUsersStore();
+      const recipients = (usersStore.users || []).filter((user) => canEditMaterials(user));
+      recipients.forEach((user) => {
+        store.notifications.unshift(
+          createNotification({
+            userId: user.id,
+            type: "materials",
+            title: "Material request received",
+            message: `${nextRequest.userName} sent ${lines.length} material ${lines.length === 1 ? "item" : "items"} for review.`,
+            link: "/materials"
+          })
+        );
+      });
+    } catch (error) {
+      console.error("Could not create material request notifications.", error);
+    }
+
+    const savedStore = await writeStore(store);
+    response.json({
+      request: nextRequest,
+      ...buildMaterialRequestPayload(savedStore, request.user)
+    });
+  });
+
+  app.patch("/api/material-requests/catalog", async (request, response) => {
+    if (!requireMaterialsAdmin(request, response)) return;
+    const store = await readStore();
+    store.materialRequestCatalog = sanitizeMaterialRequestCatalog(request.body?.catalog);
+    const savedStore = await writeStore(store);
+    response.json(buildMaterialRequestPayload(savedStore, request.user));
+  });
+
+  app.patch("/api/material-requests/:id", async (request, response) => {
+    if (!requireMaterialsAdmin(request, response)) return;
+    const store = await readStore();
+    const index = (store.materialRequests || []).findIndex((entry) => String(entry.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Material request not found." });
+      return;
+    }
+    const existing = sanitizeMaterialRequest(store.materialRequests[index]);
+    store.materialRequests[index] = sanitizeMaterialRequest({
+      ...existing,
+      status: request.body?.status || existing.status,
+      hostNotes: request.body?.hostNotes ?? existing.hostNotes,
+      createdAt: existing.createdAt
+    });
+    const savedStore = await writeStore(store);
+    response.json(buildMaterialRequestPayload(savedStore, request.user));
+  });
+
+  app.get("/api/material-requests/corebridge/materials", async (request, response) => {
+    if (!requireMaterialsAdmin(request, response)) return;
+    try {
+      const payload = await fetchCoreBridgeMaterials(request.query?.query || "");
+      response.json(payload);
+    } catch (error) {
+      response.status(error.statusCode || 500).json({ error: error.message || "Could not load CoreBridge materials." });
+    }
   });
 
   app.get("/api/mileage/admin", async (request, response) => {

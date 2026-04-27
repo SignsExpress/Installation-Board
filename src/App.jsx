@@ -27,6 +27,57 @@ const PERMISSION_OPTIONS = [
   { value: "none", label: "No Access" }
 ];
 
+const MATERIAL_REQUEST_CATEGORIES = [
+  {
+    id: "consumables",
+    label: "Consumables",
+    description: "Blades, cleaners, cloths and everyday shop essentials.",
+    imagePath: "/materials/consumables.jpg"
+  },
+  {
+    id: "epson-surecolor",
+    label: "Epson Surecolor SC-R5000",
+    description: "Resin print stock and matched production choices.",
+    imagePath: "/materials/epson-surecolor-sc-r5000.jpg"
+  },
+  {
+    id: "hp-latex",
+    label: "HP Latex 365",
+    description: "Latex print media and roll-based stock.",
+    imagePath: "/materials/hp-latex-365.jpg"
+  },
+  {
+    id: "fixings",
+    label: "Fixings",
+    description: "Stand-offs, tapes, screws and mounting parts.",
+    imagePath: "/materials/fixings.jpg"
+  },
+  {
+    id: "flatbed-uv",
+    label: "Mimaki JFX200-2513 EX Flatbed UV",
+    description: "Flatbed-ready materials and specialist board options.",
+    imagePath: "/materials/mimaki-jfx200-2513-ex-flatbed-uv.jpg"
+  },
+  {
+    id: "pos",
+    label: "POS",
+    description: "Pockets, holders and point-of-sale display parts.",
+    imagePath: "/materials/pos.jpg"
+  },
+  {
+    id: "sheet-media",
+    label: "Sheet Media",
+    description: "Foamex, ACM, acrylic and other sheet stock.",
+    imagePath: "/materials/sheet-media.jpg"
+  },
+  {
+    id: "roll-media",
+    label: "Roll Media",
+    description: "Printable rolls, laminates and film choices.",
+    imagePath: "/materials/roll-media.jpg"
+  }
+];
+
 const HOLIDAY_STAFF = [
   { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black", birthDate: "" },
   { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black", birthDate: "" },
@@ -2252,6 +2303,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "materials"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : key === "proForma"
         ? user?.role === "host"
           ? "admin"
@@ -2313,6 +2368,16 @@ function canEditMileage(user) {
   return getPermissionForApp(user, "mileage") === "admin";
 }
 
+function canAccessMaterials(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "materials") !== "none";
+}
+
+function canEditMaterials(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "materials") === "admin";
+}
+
 function canAccessVanEstimator(user) {
   if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "vanEstimator") !== "none";
@@ -2361,7 +2426,7 @@ function canEditProForma(user) {
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
   );
 }
 
@@ -2375,6 +2440,10 @@ function getBoardPathForUser(user) {
 
 function getProFormaPathForUser(user) {
   return canEditProForma(user) ? "/pro-forma" : "/client/pro-forma";
+}
+
+function getMaterialsPath() {
+  return "/materials";
 }
 
 function canToggleAeroSkin(user) {
@@ -2423,6 +2492,50 @@ function MileageIcon() {
       <path d="M6.5 5a3.5 3.5 0 0 0-3.5 3.5c0 2.5 3.5 6.5 3.5 6.5S10 11 10 8.5A3.5 3.5 0 0 0 6.5 5Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM17.5 3A3.5 3.5 0 0 0 14 6.5c0 2.5 3.5 6.5 3.5 6.5S21 9 21 6.5A3.5 3.5 0 0 0 17.5 3Zm0 4.7a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4ZM7 18h11a1 1 0 1 1 0 2H7a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2Zm10-2a4 4 0 0 1-4-4h2a2 2 0 0 0 2 2h1v2Z" />
     </svg>
   );
+}
+
+function MaterialsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4h7M8.5 12h7M8.5 15h4.5" />
+    </svg>
+  );
+}
+
+function createEmptyMaterialsSection() {
+  return {
+    id: `section-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    title: "",
+    description: "",
+    allowBespoke: true,
+    sizePresets: [],
+    materials: []
+  };
+}
+
+function createEmptyMaterialsMaterial() {
+  return {
+    id: `material-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: "",
+    supplier: "",
+    width: "",
+    length: "",
+    costPerSquareMetre: "",
+    totalLength: "",
+    panelWidth: "",
+    panelHeight: "",
+    unit: "sqm"
+  };
+}
+
+function createEmptyMaterialsPreset() {
+  return {
+    id: `preset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    label: "",
+    width: "",
+    height: "",
+    length: ""
+  };
 }
 
 function VanEstimatorIcon() {
@@ -2486,6 +2599,9 @@ function getNotificationCategory(notification) {
   if (link.includes("/mileage") || title.includes("mileage") || message.includes("miles")) {
     return { label: "Mileage", icon: MileageIcon, className: "notification-type-update" };
   }
+  if (link.includes("/materials") || title.includes("material request") || message.includes("material ")) {
+    return { label: "Materials", icon: NotificationIcon, className: "notification-type-update" };
+  }
   if (link.includes("/board") || title.includes("job") || message.includes("job")) {
     return { label: "Board", icon: BoardIcon, className: "notification-type-board" };
   }
@@ -2520,6 +2636,7 @@ function MainNavBar({
   const attendanceAllowed = canAccessAttendance(currentUser);
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
+  const materialsAllowed = canAccessMaterials(currentUser);
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
@@ -2531,6 +2648,7 @@ function MainNavBar({
   const attendancePath = "/attendance";
   const holidaysPath = "/holidays";
   const mileagePath = "/mileage";
+  const materialsPath = getMaterialsPath();
   const vanEstimatorPath = "/van-estimator";
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
@@ -2545,6 +2663,7 @@ function MainNavBar({
     { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
     { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
+    { key: "materials", label: "Materials", path: materialsPath, allowed: materialsAllowed },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
@@ -2780,6 +2899,7 @@ function PermissionsPanel({
             const installerPermission = getPermissionForApp(user, "installer");
             const attendancePermission = getPermissionForApp(user, "attendance");
             const mileagePermission = getPermissionForApp(user, "mileage");
+            const materialsPermission = getPermissionForApp(user, "materials");
             const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
             const ramsPermission = getPermissionForApp(user, "rams");
             const socialPostPermission = getPermissionForApp(user, "socialPost");
@@ -2970,6 +3090,24 @@ function PermissionsPanel({
                             className={`permission-chip ${mileagePermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:mileage`}
                             onClick={() => onChangePermission(user.id, "mileage", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Materials</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-materials-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${materialsPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:materials`}
+                            onClick={() => onChangePermission(user.id, "materials", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3400,6 +3538,9 @@ function HostLaunchIcon({ type }) {
     mileage: (
       <svg {...iconProps}><path {...commonProps} d="M5 17.5 7.5 7h9L19 17.5" /><path {...commonProps} d="M7 14h10" /><path {...commonProps} d="M8 18h.1M16 18h.1" /><path {...commonProps} d="M10 7l1-3h2l1 3" /></svg>
     ),
+    materials: (
+      <svg {...iconProps}><path {...commonProps} d="M5 7.5h14M5 12h14M5 16.5h9" /><path {...commonProps} d="M6 4.5h12a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" /></svg>
+    ),
     rams: (
       <svg {...iconProps}><path {...commonProps} d="M7 3.5h7l3 3V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path {...commonProps} d="M14 3.5V7h3" /><path {...commonProps} d="M9 11h6M9 14h6M9 17h3" /></svg>
     ),
@@ -3489,6 +3630,9 @@ function HostLandingPage({
             ) : null}
             {canAccessMileage(currentUser) ? (
               <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
+            ) : null}
+            {canAccessMaterials(currentUser) ? (
+              <HostLaunchCard icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} />
             ) : null}
             {canAccessRams(currentUser) ? (
               <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
@@ -3586,6 +3730,9 @@ function ClientLandingPage({
             {canAccessMileage(currentUser) ? (
               <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
             ) : null}
+            {canAccessMaterials(currentUser) ? (
+              <HostLaunchCard icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} />
+            ) : null}
             {canAccessRams(currentUser) ? (
               <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
             ) : null}
@@ -3610,6 +3757,796 @@ function ClientLandingPage({
           </div>
         </section>
 
+      </div>
+    </div>
+  );
+}
+
+function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const adminMode = canEditMaterials(currentUser);
+  const [payload, setPayload] = useState({ categories: MATERIAL_REQUEST_CATEGORIES, catalog: {}, requests: [] });
+  const [selectedCategoryId, setSelectedCategoryId] = useState(MATERIAL_REQUEST_CATEGORIES[0]?.id || "");
+  const [basket, setBasket] = useState([]);
+  const [requestNotes, setRequestNotes] = useState("");
+  const [drafts, setDrafts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+  const [corebridgeQuery, setCorebridgeQuery] = useState("");
+  const [corebridgeResults, setCorebridgeResults] = useState([]);
+  const [corebridgeLoading, setCorebridgeLoading] = useState(false);
+
+  const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : MATERIAL_REQUEST_CATEGORIES;
+  const catalog = payload.catalog && typeof payload.catalog === "object" ? payload.catalog : {};
+  const requests = Array.isArray(payload.requests) ? payload.requests : [];
+  const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || categories[0] || null;
+  const selectedCategoryState =
+    selectedCategory && catalog[selectedCategory.id] && typeof catalog[selectedCategory.id] === "object"
+      ? catalog[selectedCategory.id]
+      : { sections: [] };
+
+  useEffect(() => {
+    let active = true;
+    async function loadData() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/material-requests");
+        const nextPayload = await response.json();
+        if (!response.ok) {
+          throw new Error(nextPayload.error || "Could not load materials.");
+        }
+        if (!active) return;
+        setPayload(nextPayload);
+        const nextCategories =
+          Array.isArray(nextPayload.categories) && nextPayload.categories.length ? nextPayload.categories : MATERIAL_REQUEST_CATEGORIES;
+        setSelectedCategoryId((current) => current || nextCategories[0]?.id || "");
+      } catch (error) {
+        console.error(error);
+        if (active) setMessage(createMessage(error.message || "Could not load materials.", "error"));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadData();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function categoryLabelFromId(categoryId) {
+    return categories.find((category) => category.id === categoryId)?.label || "Category";
+  }
+
+  function updateCategory(categoryId, updater) {
+    setPayload((current) => {
+      const currentCatalog = current.catalog && typeof current.catalog === "object" ? current.catalog : {};
+      const existingCategory = currentCatalog[categoryId] && typeof currentCatalog[categoryId] === "object"
+        ? currentCatalog[categoryId]
+        : { sections: [] };
+      const nextCategory = typeof updater === "function" ? updater(existingCategory) : updater;
+      return {
+        ...current,
+        catalog: {
+          ...currentCatalog,
+          [categoryId]: nextCategory
+        }
+      };
+    });
+  }
+
+  function updateSection(categoryId, sectionId, updater) {
+    updateCategory(categoryId, (currentCategory) => ({
+      ...currentCategory,
+      sections: (Array.isArray(currentCategory.sections) ? currentCategory.sections : []).map((section) =>
+        section.id === sectionId ? (typeof updater === "function" ? updater(section) : updater) : section
+      )
+    }));
+  }
+
+  function addSection() {
+    if (!selectedCategory) return;
+    updateCategory(selectedCategory.id, (currentCategory) => ({
+      ...currentCategory,
+      sections: [...(Array.isArray(currentCategory.sections) ? currentCategory.sections : []), createEmptyMaterialsSection()]
+    }));
+  }
+
+  function removeSection(sectionId) {
+    if (!selectedCategory) return;
+    updateCategory(selectedCategory.id, (currentCategory) => ({
+      ...currentCategory,
+      sections: (Array.isArray(currentCategory.sections) ? currentCategory.sections : []).filter((section) => section.id !== sectionId)
+    }));
+  }
+
+  function addMaterialToSection(sectionId) {
+    if (!selectedCategory) return;
+    updateSection(selectedCategory.id, sectionId, (section) => ({
+      ...section,
+      materials: [...(Array.isArray(section.materials) ? section.materials : []), createEmptyMaterialsMaterial()]
+    }));
+  }
+
+  function addPresetToSection(sectionId) {
+    if (!selectedCategory) return;
+    updateSection(selectedCategory.id, sectionId, (section) => ({
+      ...section,
+      sizePresets: [...(Array.isArray(section.sizePresets) ? section.sizePresets : []), createEmptyMaterialsPreset()]
+    }));
+  }
+
+  function getSectionDraft(section) {
+    const existing = drafts[section.id];
+    if (existing) return existing;
+    return {
+      materialId: section.materials?.[0]?.id || "",
+      quantity: "1",
+      requestMode: section.sizePresets?.length ? "preset" : "standard",
+      presetId: section.sizePresets?.[0]?.id || "",
+      bespokeWidth: "",
+      bespokeHeight: "",
+      bespokeLength: ""
+    };
+  }
+
+  function updateSectionDraft(sectionId, patch) {
+    setDrafts((current) => {
+      const existing = current[sectionId] || {};
+      return {
+        ...current,
+        [sectionId]: {
+          ...existing,
+          ...(typeof patch === "function" ? patch(existing) : patch)
+        }
+      };
+    });
+  }
+
+  function addSectionLineToBasket(section) {
+    const draft = getSectionDraft(section);
+    const material = (section.materials || []).find((entry) => entry.id === draft.materialId) || section.materials?.[0];
+    if (!material) {
+      setMessage(createMessage("Choose a material first.", "error"));
+      return;
+    }
+    const quantity = Math.max(1, Number(draft.quantity) || 1);
+    const preset = (section.sizePresets || []).find((entry) => entry.id === draft.presetId) || null;
+    const requestMode = draft.requestMode === "bespoke" ? "bespoke" : draft.requestMode === "preset" ? "preset" : "standard";
+    const bespokeWidth = Number(draft.bespokeWidth) || 0;
+    const bespokeHeight = Number(draft.bespokeHeight) || 0;
+    const bespokeLength = Number(draft.bespokeLength) || 0;
+    const sizeSummary =
+      requestMode === "preset" && preset
+        ? preset.label
+        : requestMode === "bespoke"
+          ? [bespokeWidth ? `${bespokeWidth}mm W` : "", bespokeHeight ? `${bespokeHeight}mm H` : "", bespokeLength ? `${bespokeLength}mm L` : ""].filter(Boolean).join(" x ") || "Bespoke"
+          : "Standard size";
+
+    setBasket((current) => [
+      ...current,
+      {
+        id: `basket-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        categoryId: selectedCategory.id,
+        categoryLabel: categoryLabelFromId(selectedCategory.id),
+        sectionId: section.id,
+        sectionTitle: section.title || "Untitled section",
+        materialId: material.id,
+        materialName: material.name || "Unnamed material",
+        supplier: material.supplier || "",
+        quantity,
+        requestMode,
+        presetId: preset?.id || "",
+        presetLabel: preset?.label || "",
+        bespokeWidth,
+        bespokeHeight,
+        bespokeLength,
+        sizeSummary,
+        width: Number(material.width) || 0,
+        length: Number(material.length) || 0,
+        costPerSquareMetre: Number(material.costPerSquareMetre) || 0,
+        totalLength: Number(material.totalLength) || 0,
+        unit: material.unit || "sqm",
+        lineTotal: 0
+      }
+    ]);
+    setMessage(createMessage("Added to material request.", "success"));
+  }
+
+  async function saveCatalog() {
+    try {
+      setSaving(true);
+      const response = await fetch("/api/material-requests/catalog", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ catalog })
+      });
+      const nextPayload = await response.json();
+      if (!response.ok) {
+        throw new Error(nextPayload.error || "Could not save the material catalog.");
+      }
+      setPayload(nextPayload);
+      setMessage(createMessage("Material catalog saved.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not save the material catalog.", "error"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitRequest() {
+    if (!basket.length) {
+      setMessage(createMessage("Add at least one item to the basket first.", "error"));
+      return;
+    }
+    try {
+      setSaving(true);
+      const response = await fetch("/api/material-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lines: basket, notes: requestNotes })
+      });
+      const nextPayload = await response.json();
+      if (!response.ok) {
+        throw new Error(nextPayload.error || "Could not send the material request.");
+      }
+      setPayload(nextPayload);
+      setBasket([]);
+      setRequestNotes("");
+      setMessage(createMessage("Material request sent.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not send the material request.", "error"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function searchCoreBridgeMaterials() {
+    try {
+      setCorebridgeLoading(true);
+      const response = await fetch(`/api/material-requests/corebridge/materials?query=${encodeURIComponent(corebridgeQuery)}`);
+      const nextPayload = await response.json();
+      if (!response.ok) {
+        throw new Error(nextPayload.error || "Could not load CoreBridge materials.");
+      }
+      setCorebridgeResults(Array.isArray(nextPayload.materials) ? nextPayload.materials : []);
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not load CoreBridge materials.", "error"));
+    } finally {
+      setCorebridgeLoading(false);
+    }
+  }
+
+  function importCoreBridgeMaterial(material) {
+    if (!selectedCategory) return;
+    const nextSection = {
+      ...createEmptyMaterialsSection(),
+      title: material.name || "Imported material",
+      materials: [
+        {
+          ...createEmptyMaterialsMaterial(),
+          name: material.name || "",
+          supplier: material.supplier || "",
+          width: material.width || "",
+          length: material.length || "",
+          costPerSquareMetre: material.costPerSquareMetre || "",
+          totalLength: material.totalLength || "",
+          panelWidth: material.width || "",
+          panelHeight: material.length || ""
+        }
+      ]
+    };
+    updateCategory(selectedCategory.id, (currentCategory) => ({
+      ...currentCategory,
+      sections: [...(Array.isArray(currentCategory.sections) ? currentCategory.sections : []), nextSection]
+    }));
+    setMessage(createMessage(`Imported ${material.name}.`, "success"));
+  }
+
+  async function updateRequest(requestId, patch) {
+    try {
+      setSaving(true);
+      const response = await fetch(`/api/material-requests/${encodeURIComponent(requestId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch)
+      });
+      const nextPayload = await response.json();
+      if (!response.ok) {
+        throw new Error(nextPayload.error || "Could not update the request.");
+      }
+      setPayload(nextPayload);
+      setMessage(createMessage("Material request updated.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not update the request.", "error"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="app-shell">
+      <div className="page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="materials"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+
+        <section className="panel materials-page-panel">
+          <div className="materials-page-head">
+            <div>
+              <p className="eyebrow">MATERIALS</p>
+              <h2>{adminMode ? "Material request setup" : "Material request"}</h2>
+              <p>{adminMode ? "Build the material choices your production team can request." : "Build a basket across categories and send it through to the hosts."}</p>
+            </div>
+            {adminMode ? (
+              <button className="primary-button" type="button" onClick={saveCatalog} disabled={saving}>
+                {saving ? "Saving..." : "Save catalog"}
+              </button>
+            ) : null}
+          </div>
+
+          {message ? <div className={`flash ${message.tone}`}>{message.text}</div> : null}
+
+          <div className="materials-layout">
+            <aside className="materials-categories">
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  className={`materials-category-card ${selectedCategoryId === category.id ? "active" : ""}`}
+                  onClick={() => setSelectedCategoryId(category.id)}
+                >
+                  <img src={category.imagePath} alt="" />
+                  <span className="materials-category-copy">
+                    <strong>{category.label}</strong>
+                    <small>{category.description}</small>
+                  </span>
+                </button>
+              ))}
+            </aside>
+
+            <div className="materials-main">
+              {loading ? (
+                <div className="board-loading">Loading materials...</div>
+              ) : selectedCategory ? (
+                <div className="materials-main-grid">
+                  <section className="materials-editor panel">
+                    <div className="materials-editor-head">
+                      <div>
+                        <h3>{selectedCategory.label}</h3>
+                        <p>{selectedCategory.description}</p>
+                      </div>
+                      {adminMode ? (
+                        <button className="ghost-button" type="button" onClick={addSection}>
+                          Add header
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {adminMode ? (
+                      <>
+                        <div className="materials-corebridge panel">
+                          <div className="materials-corebridge-bar">
+                            <input
+                              type="text"
+                              value={corebridgeQuery}
+                              placeholder="Search CoreBridge materials"
+                              onChange={(event) => setCorebridgeQuery(event.target.value)}
+                            />
+                            <button className="ghost-button" type="button" onClick={searchCoreBridgeMaterials} disabled={corebridgeLoading}>
+                              {corebridgeLoading ? "Searching..." : "Search"}
+                            </button>
+                          </div>
+                          {corebridgeResults.length ? (
+                            <div className="materials-corebridge-results">
+                              {corebridgeResults.map((material) => (
+                                <div key={material.id || material.name} className="materials-corebridge-result">
+                                  <div>
+                                    <strong>{material.name}</strong>
+                                    <small>
+                                      {material.width ? `${material.width}mm` : "No width"} · {material.length ? `${material.length}mm` : "No length"} · £{Number(material.costPerSquareMetre || 0).toFixed(2)}/m²
+                                    </small>
+                                  </div>
+                                  <button className="ghost-button" type="button" onClick={() => importCoreBridgeMaterial(material)}>
+                                    Import
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="materials-section-list">
+                          {(selectedCategoryState.sections || []).map((section) => (
+                            <article key={section.id} className="materials-section-card">
+                              <div className="materials-section-head">
+                                <input
+                                  type="text"
+                                  value={section.title || ""}
+                                  placeholder="Header title"
+                                  onChange={(event) =>
+                                    updateSection(selectedCategory.id, section.id, (current) => ({ ...current, title: event.target.value }))
+                                  }
+                                />
+                                <button className="text-button danger-text-button" type="button" onClick={() => removeSection(section.id)}>
+                                  Remove
+                                </button>
+                              </div>
+                              <textarea
+                                value={section.description || ""}
+                                placeholder="Optional guidance for the client"
+                                onChange={(event) =>
+                                  updateSection(selectedCategory.id, section.id, (current) => ({ ...current, description: event.target.value }))
+                                }
+                              />
+                              <label className="materials-checkbox">
+                                <input
+                                  type="checkbox"
+                                  checked={section.allowBespoke !== false}
+                                  onChange={(event) =>
+                                    updateSection(selectedCategory.id, section.id, (current) => ({ ...current, allowBespoke: event.target.checked }))
+                                  }
+                                />
+                                Allow bespoke sizing
+                              </label>
+
+                              <div className="materials-subgrid">
+                                <div>
+                                  <div className="materials-subhead">
+                                    <strong>Preset sizes</strong>
+                                    <button className="ghost-button" type="button" onClick={() => addPresetToSection(section.id)}>Add preset</button>
+                                  </div>
+                                  {(section.sizePresets || []).map((preset) => (
+                                    <div key={preset.id} className="materials-inline-fields">
+                                      <input
+                                        type="text"
+                                        value={preset.label || ""}
+                                        placeholder="Preset label"
+                                        onChange={(event) =>
+                                          updateSection(selectedCategory.id, section.id, (current) => ({
+                                            ...current,
+                                            sizePresets: (current.sizePresets || []).map((entry) =>
+                                              entry.id === preset.id ? { ...entry, label: event.target.value } : entry
+                                            )
+                                          }))
+                                        }
+                                      />
+                                      <input
+                                        type="number"
+                                        value={preset.width || ""}
+                                        placeholder="Width mm"
+                                        onChange={(event) =>
+                                          updateSection(selectedCategory.id, section.id, (current) => ({
+                                            ...current,
+                                            sizePresets: (current.sizePresets || []).map((entry) =>
+                                              entry.id === preset.id ? { ...entry, width: event.target.value } : entry
+                                            )
+                                          }))
+                                        }
+                                      />
+                                      <input
+                                        type="number"
+                                        value={preset.height || ""}
+                                        placeholder="Height mm"
+                                        onChange={(event) =>
+                                          updateSection(selectedCategory.id, section.id, (current) => ({
+                                            ...current,
+                                            sizePresets: (current.sizePresets || []).map((entry) =>
+                                              entry.id === preset.id ? { ...entry, height: event.target.value } : entry
+                                            )
+                                          }))
+                                        }
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div>
+                                  <div className="materials-subhead">
+                                    <strong>Materials</strong>
+                                    <button className="ghost-button" type="button" onClick={() => addMaterialToSection(section.id)}>Add material</button>
+                                  </div>
+                                  {(section.materials || []).map((material) => (
+                                    <div key={material.id} className="materials-material-card">
+                                      <div className="materials-inline-fields">
+                                        <input
+                                          type="text"
+                                          value={material.name || ""}
+                                          placeholder="Material name"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, name: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                        <input
+                                          type="text"
+                                          value={material.supplier || ""}
+                                          placeholder="Supplier"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, supplier: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                      </div>
+                                      <div className="materials-inline-fields">
+                                        <input
+                                          type="number"
+                                          value={material.width || ""}
+                                          placeholder="Width mm"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, width: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                        <input
+                                          type="number"
+                                          value={material.length || ""}
+                                          placeholder="Length mm"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, length: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          value={material.costPerSquareMetre || ""}
+                                          placeholder="£/m²"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, costPerSquareMetre: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                        <input
+                                          type="number"
+                                          value={material.totalLength || ""}
+                                          placeholder="Total roll length / panel size"
+                                          onChange={(event) =>
+                                            updateSection(selectedCategory.id, section.id, (current) => ({
+                                              ...current,
+                                              materials: (current.materials || []).map((entry) =>
+                                                entry.id === material.id ? { ...entry, totalLength: event.target.value } : entry
+                                              )
+                                            }))
+                                          }
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="materials-section-list">
+                        {(selectedCategoryState.sections || []).map((section) => {
+                          const draft = getSectionDraft(section);
+                          return (
+                            <article key={section.id} className="materials-section-card materials-client-card">
+                              <div className="materials-section-head static">
+                                <div>
+                                  <strong>{section.title || "Untitled header"}</strong>
+                                  {section.description ? <p>{section.description}</p> : null}
+                                </div>
+                              </div>
+                              <div className="materials-inline-fields">
+                                <select
+                                  value={draft.materialId || ""}
+                                  onChange={(event) => updateSectionDraft(section.id, { materialId: event.target.value })}
+                                >
+                                  <option value="">Choose material</option>
+                                  {(section.materials || []).map((material) => (
+                                    <option key={material.id} value={material.id}>
+                                      {material.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={draft.quantity || "1"}
+                                  onChange={(event) => updateSectionDraft(section.id, { quantity: event.target.value })}
+                                  placeholder="Qty"
+                                />
+                                <select
+                                  value={draft.requestMode || "standard"}
+                                  onChange={(event) => updateSectionDraft(section.id, { requestMode: event.target.value })}
+                                >
+                                  <option value="standard">Standard size</option>
+                                  {(section.sizePresets || []).length ? <option value="preset">Preset size</option> : null}
+                                  {section.allowBespoke !== false ? <option value="bespoke">Bespoke size</option> : null}
+                                </select>
+                              </div>
+                              {draft.requestMode === "preset" && (section.sizePresets || []).length ? (
+                                <select
+                                  value={draft.presetId || ""}
+                                  onChange={(event) => updateSectionDraft(section.id, { presetId: event.target.value })}
+                                >
+                                  {(section.sizePresets || []).map((preset) => (
+                                    <option key={preset.id} value={preset.id}>
+                                      {preset.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : null}
+                              {draft.requestMode === "bespoke" ? (
+                                <div className="materials-inline-fields">
+                                  <input
+                                    type="number"
+                                    placeholder="Width mm"
+                                    value={draft.bespokeWidth || ""}
+                                    onChange={(event) => updateSectionDraft(section.id, { bespokeWidth: event.target.value })}
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="Height mm"
+                                    value={draft.bespokeHeight || ""}
+                                    onChange={(event) => updateSectionDraft(section.id, { bespokeHeight: event.target.value })}
+                                  />
+                                  <input
+                                    type="number"
+                                    placeholder="Length mm"
+                                    value={draft.bespokeLength || ""}
+                                    onChange={(event) => updateSectionDraft(section.id, { bespokeLength: event.target.value })}
+                                  />
+                                </div>
+                              ) : null}
+                              <div className="materials-client-actions">
+                                <small>
+                                  Supplier: {(section.materials || []).find((entry) => entry.id === draft.materialId)?.supplier || "-"}
+                                </small>
+                                <button className="ghost-button" type="button" onClick={() => addSectionLineToBasket(section)}>
+                                  Add to request
+                                </button>
+                              </div>
+                            </article>
+                          );
+                        })}
+                        {!selectedCategoryState.sections?.length ? <p className="muted-copy">No material choices have been set up for this category yet.</p> : null}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="materials-basket panel">
+                    <div className="materials-editor-head">
+                      <div>
+                        <h3>{adminMode ? "Incoming requests" : "Request basket"}</h3>
+                        <p>{adminMode ? "Review what the team has asked for and track the status." : "This basket stays with you while you move between categories."}</p>
+                      </div>
+                    </div>
+
+                    {adminMode ? (
+                      <div className="materials-request-history">
+                        {requests.map((requestItem) => (
+                          <article key={requestItem.id} className="materials-request-card">
+                            <div className="materials-request-head">
+                              <strong>{requestItem.userName}</strong>
+                              <span className={`materials-request-status status-${requestItem.status}`}>{requestItem.status}</span>
+                            </div>
+                            <ul className="materials-request-lines">
+                              {(requestItem.lines || []).map((line) => (
+                                <li key={line.id}>
+                                  <strong>{line.materialName || line.sectionTitle}</strong>
+                                  <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
+                                  {line.supplier ? <small>{line.supplier}</small> : null}
+                                </li>
+                              ))}
+                            </ul>
+                            {requestItem.notes ? <p className="materials-request-notes">{requestItem.notes}</p> : null}
+                            <div className="materials-inline-fields">
+                              <select
+                                value={requestItem.status || "submitted"}
+                                onChange={(event) => updateRequest(requestItem.id, { status: event.target.value, hostNotes: requestItem.hostNotes || "" })}
+                              >
+                                <option value="submitted">Submitted</option>
+                                <option value="reviewed">Reviewed</option>
+                                <option value="ordered">Ordered</option>
+                              </select>
+                              <textarea
+                                defaultValue={requestItem.hostNotes || ""}
+                                placeholder="Host notes"
+                                onBlur={(event) => updateRequest(requestItem.id, { status: requestItem.status || "submitted", hostNotes: event.target.value })}
+                              />
+                            </div>
+                          </article>
+                        ))}
+                        {!requests.length ? <p className="muted-copy">No material requests have been sent yet.</p> : null}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="materials-request-lines">
+                          {basket.map((line) => (
+                            <div key={line.id} className="materials-basket-line">
+                              <div>
+                                <strong>{line.materialName}</strong>
+                                <small>{line.categoryLabel} · {line.sectionTitle}</small>
+                                <small>{line.quantity} × {line.sizeSummary}</small>
+                              </div>
+                              <button
+                                className="text-button danger-text-button"
+                                type="button"
+                                onClick={() => setBasket((current) => current.filter((entry) => entry.id !== line.id))}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                          {!basket.length ? <p className="muted-copy">No materials in your basket yet.</p> : null}
+                        </div>
+                        <label>
+                          Notes
+                          <textarea
+                            value={requestNotes}
+                            placeholder="Add notes for purchasing or delivery here."
+                            onChange={(event) => setRequestNotes(event.target.value)}
+                          />
+                        </label>
+                        <button className="primary-button" type="button" onClick={submitRequest} disabled={saving || !basket.length}>
+                          {saving ? "Sending..." : "Send request for materials"}
+                        </button>
+
+                        <div className="materials-request-history">
+                          <h4>Your previous requests</h4>
+                          {requests.map((requestItem) => (
+                            <article key={requestItem.id} className="materials-request-card">
+                              <div className="materials-request-head">
+                                <strong>{new Date(requestItem.createdAt).toLocaleDateString("en-GB")}</strong>
+                                <span className={`materials-request-status status-${requestItem.status}`}>{requestItem.status}</span>
+                              </div>
+                              <ul className="materials-request-lines">
+                                {(requestItem.lines || []).map((line) => (
+                                  <li key={line.id}>
+                                    <strong>{line.materialName || line.sectionTitle}</strong>
+                                    <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              {requestItem.notes ? <p className="materials-request-notes">{requestItem.notes}</p> : null}
+                              {requestItem.hostNotes ? <p className="materials-request-host-notes">Host notes: {requestItem.hostNotes}</p> : null}
+                            </article>
+                          ))}
+                          {!requests.length ? <p className="muted-copy">You haven’t sent any material requests yet.</p> : null}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                </div>
+              ) : (
+                <div className="board-loading">No categories available.</div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -12595,6 +13532,7 @@ export default function App() {
   const isAttendanceRoute = pathname.startsWith("/attendance");
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
+  const isMaterialsRoute = pathname.startsWith("/materials");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
@@ -12691,6 +13629,7 @@ export default function App() {
   const showAttendance = Boolean(currentUser && canAccessAttendance(currentUser) && isAttendanceRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
+  const showMaterials = Boolean(currentUser && canAccessMaterials(currentUser) && isMaterialsRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
@@ -12704,13 +13643,14 @@ export default function App() {
   const showRams = Boolean(currentUser && canAccessRams(currentUser) && isRamsRoute && !isRamsLogicRoute);
   const showClientRams = Boolean(currentUser && canAccessBoard(currentUser) && isClientRamsRoute);
   const showNotifications = Boolean(currentUser && isNotificationsRoute);
+  const showMaterialsDenied = Boolean(currentUser && isMaterialsRoute && !canAccessMaterials(currentUser));
   const showBoard = Boolean(
     currentUser &&
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -13283,6 +14223,7 @@ export default function App() {
       holidays: getPermissionForApp(targetUser, "holidays"),
       attendance: getPermissionForApp(targetUser, "attendance"),
       mileage: getPermissionForApp(targetUser, "mileage"),
+      materials: getPermissionForApp(targetUser, "materials"),
       vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
       rams: getPermissionForApp(targetUser, "rams"),
       socialPost: getPermissionForApp(targetUser, "socialPost"),
@@ -14824,6 +15765,35 @@ export default function App() {
     );
   }
 
+  if (showMaterialsDenied) {
+    return hostShellMode ? (
+      <HostLandingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        users={loginUsers}
+        savingKey={permissionSavingKey}
+        onChangePermission={handlePermissionChange}
+        onUpdateAttendanceProfile={handleUpdateAttendanceProfile}
+        onUpdateUserProfile={handleUpdateUserProfile}
+        onCreateUser={handleCreateUser}
+        onResetPassword={handleResetUserPassword}
+        onDeleteUser={handleDeleteUser}
+        onDownloadBackup={handleDownloadBackup}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    ) : (
+      <ClientLandingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
   if (showClientRams) {
     return (
       <ClientRamsPage />
@@ -14852,6 +15822,18 @@ export default function App() {
         onLogout={handleLogout}
         notifications={notifications}
         onRefreshNotifications={refreshNotifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showMaterials) {
+    return (
+      <MaterialsPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
         aeroEnabled={aeroEnabled}
         onToggleAero={handleToggleAero}
       />
