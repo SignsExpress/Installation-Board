@@ -5512,7 +5512,7 @@ function isPreferredProFormaSellLeaf(leaf = "") {
 function isGenericProFormaName(value = "") {
   const text = String(value || "").trim();
   if (!text) return true;
-  return /^(item\s*\d+|line item\s*\d+|panel with vinyl print to surface\.?|stand-?offs?,? screw covers?,? hanging kits? ?&? holes?|category|graphics|installation|delivery)$/i.test(text);
+  return /^(item\s*\d+|line item\s*\d+|panel with vinyl print to surface\.?|stand-?offs?,? screw covers?,? hanging kits? ?&? holes?|category|graphics)$/i.test(text);
 }
 
 function isGenericProFormaDescription(value = "") {
