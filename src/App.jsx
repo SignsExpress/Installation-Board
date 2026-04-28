@@ -1581,6 +1581,29 @@ function formatJobDate(value) {
   }).format(parsed);
 }
 
+function formatTvSectionDate(value) {
+  const parsed = parseIsoDate(value);
+  if (!parsed) return String(value || "");
+  return new Intl.DateTimeFormat("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/London"
+  }).format(parsed);
+}
+
+function formatLastUpdatedTime(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Europe/London"
+  }).format(parsed);
+}
+
 function formatHolidayRequestDateRange(startDate, endDate) {
   const start = formatJobDate(startDate);
   const end = formatJobDate(endDate || startDate);
@@ -3757,6 +3780,146 @@ function ClientLandingPage({
           </div>
         </section>
 
+      </div>
+    </div>
+  );
+}
+
+function TvInstallsPage({ jobs = [], loading = false, lastUpdated = "" }) {
+  const scrollRef = useRef(null);
+  const todayIso = getLocalTodayIso();
+
+  const sections = useMemo(() => {
+    const today = parseIsoDate(todayIso);
+    if (!today) return [];
+
+    const groupedJobs = new Map();
+    for (const job of Array.isArray(jobs) ? jobs : []) {
+      const iso = String(job?.date || "").trim();
+      if (!parseIsoDate(iso)) continue;
+      if (!groupedJobs.has(iso)) groupedJobs.set(iso, []);
+      groupedJobs.get(iso).push(job);
+    }
+
+    const tomorrowIso = toIsoDate(addDays(today, 1));
+    const nextDates = [...groupedJobs.keys()]
+      .filter((iso) => iso > tomorrowIso)
+      .sort((left, right) => left.localeCompare(right))
+      .slice(0, 4);
+
+    return [todayIso, tomorrowIso, ...nextDates].map((iso, index) => {
+      const sectionJobs = (groupedJobs.get(iso) || []).slice().sort((left, right) => {
+        const leftCompleted = left?.isCompleted ? 1 : 0;
+        const rightCompleted = right?.isCompleted ? 1 : 0;
+        if (leftCompleted !== rightCompleted) return leftCompleted - rightCompleted;
+        return String(left?.customerName || "").localeCompare(String(right?.customerName || ""));
+      });
+
+      return {
+        iso,
+        title:
+          index === 0
+            ? "Today's installs"
+            : index === 1
+              ? "Tomorrow's installs"
+              : formatTvSectionDate(iso),
+        subtitle:
+          index < 2
+            ? formatTvSectionDate(iso)
+            : `${sectionJobs.length} install${sectionJobs.length === 1 ? "" : "s"}`,
+        jobs: sectionJobs
+      };
+    });
+  }, [jobs, todayIso]);
+
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return undefined;
+    if (node.scrollHeight <= node.clientHeight + 8) {
+      node.scrollTop = 0;
+      return undefined;
+    }
+
+    let direction = 1;
+    let pausedUntil = Date.now() + 1200;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      if (now < pausedUntil) return;
+
+      const maxScroll = Math.max(0, node.scrollHeight - node.clientHeight);
+      if (maxScroll <= 0) return;
+
+      const next = node.scrollTop + direction * 0.65;
+      if (next >= maxScroll) {
+        node.scrollTop = maxScroll;
+        direction = -1;
+        pausedUntil = now + 2200;
+        return;
+      }
+
+      if (next <= 0) {
+        node.scrollTop = 0;
+        direction = 1;
+        pausedUntil = now + 2200;
+        return;
+      }
+
+      node.scrollTop = next;
+    }, 24);
+
+    return () => window.clearInterval(timer);
+  }, [sections]);
+
+  return (
+    <div className="tv-installs-shell">
+      <div className="tv-installs-stage">
+        <div className="tv-installs-scroll" ref={scrollRef}>
+          <div className={`tv-installs-grid ${sections.length <= 2 ? "is-compact" : ""}`}>
+            {sections.map((section) => (
+              <section key={section.iso} className="tv-installs-section">
+                <header className="tv-installs-section-head">
+                  <h2>{section.title}</h2>
+                  <p>{section.subtitle}</p>
+                </header>
+
+                {section.jobs.length ? (
+                  <div className="tv-installs-cards">
+                    {section.jobs.map((job) => {
+                      const installers = Array.isArray(job.installers) ? job.installers.filter(Boolean).join(", ") : "";
+                      return (
+                        <article
+                          key={job.id}
+                          className={`tv-install-card ${job.isCompleted ? "is-complete" : ""} ${job.isSnagging ? "is-snagging" : ""}`}
+                        >
+                          <div className="tv-install-card-top">
+                            <span className="tv-install-ref">{job.orderReference || "No ref"}</span>
+                            <div className="tv-install-flags">
+                              {job.isCompleted ? <span className="tv-install-flag is-complete">Complete</span> : null}
+                              {job.isSnagging ? <span className="tv-install-flag is-snagging">Snagging</span> : null}
+                              {job.isPlaceholder ? <span className="tv-install-flag is-placeholder">Placeholder</span> : null}
+                            </div>
+                          </div>
+                          <h3>{job.customerName || "Untitled install"}</h3>
+                          {job.description ? <p className="tv-install-description">{job.description}</p> : null}
+                          <div className="tv-install-meta">
+                            {job.address ? <span>{job.address}</span> : null}
+                            {installers ? <span>Installers: {installers}</span> : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="tv-installs-empty">No installs booked.</div>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="tv-installs-updated">
+        {loading ? "Refreshing..." : `Last updated ${formatLastUpdatedTime(lastUpdated) || "--:--"}`}
       </div>
     </div>
   );
@@ -13623,6 +13786,7 @@ export default function App() {
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
+  const isTvInstallsRoute = pathname.startsWith("/tv/installs");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
   const isClientProFormaRoute = pathname.startsWith("/client/pro-forma");
   const isProFormaRoute = pathname.startsWith("/pro-forma") && !isProFormaTemplateRoute;
@@ -13657,6 +13821,7 @@ export default function App() {
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [tvLastUpdated, setTvLastUpdated] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [draggingJobId, setDraggingJobId] = useState("");
@@ -13720,6 +13885,7 @@ export default function App() {
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
+  const showTvInstalls = Boolean(currentUser && canAccessBoard(currentUser) && isTvInstallsRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
   const showProForma = Boolean(
     currentUser &&
@@ -13736,8 +13902,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -13886,6 +14052,37 @@ export default function App() {
       active = false;
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    if (!currentUser || !showTvInstalls) return undefined;
+    let active = true;
+
+    async function loadTvInstalls() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/jobs");
+        if (!response.ok) {
+          throw new Error("Could not load TV installs.");
+        }
+        const payload = await response.json();
+        if (!active) return;
+        setJobs(Array.isArray(payload) ? payload : []);
+        setTvLastUpdated(new Date().toISOString());
+      } catch (error) {
+        console.error(error);
+        if (active) setMessage(createMessage("Could not load the TV installs board.", "error"));
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadTvInstalls();
+    const refreshTimer = window.setInterval(loadTvInstalls, 5 * 60 * 1000);
+    return () => {
+      active = false;
+      window.clearInterval(refreshTimer);
+    };
+  }, [currentUser, showTvInstalls]);
 
   useEffect(() => {
     if (!showBoard || !boardNotificationJobId || !Array.isArray(jobs) || !jobs.length) return;
@@ -14058,6 +14255,11 @@ export default function App() {
       return;
     }
 
+    if (isTvInstallsRoute && !canAccessBoard(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if ((isProFormaRoute || isClientProFormaRoute) && !canAccessProForma(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -14088,7 +14290,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -14101,7 +14303,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -14129,6 +14331,33 @@ export default function App() {
       stream.close();
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    if (!currentUser || !showTvInstalls) return undefined;
+    const stream = new EventSource("/api/events");
+
+    async function handleUpdate() {
+      try {
+        const response = await fetch("/api/jobs");
+        if (!response.ok) return;
+        const payload = await response.json();
+        setJobs(Array.isArray(payload) ? payload : []);
+        setTvLastUpdated(new Date().toISOString());
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    stream.addEventListener("board-updated", handleUpdate);
+    stream.onerror = () => {
+      stream.close();
+    };
+
+    return () => {
+      stream.removeEventListener("board-updated", handleUpdate);
+      stream.close();
+    };
+  }, [currentUser, showTvInstalls]);
 
   useEffect(() => {
     if (!currentUser || !showAttendance) return undefined;
@@ -15848,6 +16077,16 @@ export default function App() {
         notifications={notifications}
         aeroEnabled={aeroEnabled}
         onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showTvInstalls) {
+    return (
+      <TvInstallsPage
+        jobs={jobs}
+        loading={loading}
+        lastUpdated={tvLastUpdated}
       />
     );
   }
