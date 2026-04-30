@@ -2604,12 +2604,20 @@ function sanitizeMaterialRequestPreset(payload) {
 function sanitizeMaterialRequestMaterial(payload) {
   return {
     id: String(payload?.id || makeId()),
-    name: sanitizeMaterialRequestText(payload?.name, 180),
+    corebridgeId: String(payload?.corebridgeId || payload?.id || "").trim(),
+    corebridgeName: sanitizeMaterialRequestText(payload?.corebridgeName || payload?.name, 180),
+    corebridgeWidth: sanitizeMaterialRequestNumber(payload?.corebridgeWidth ?? payload?.width),
+    corebridgeHeight: sanitizeMaterialRequestNumber(payload?.corebridgeHeight ?? payload?.height ?? payload?.length),
+    corebridgeLength: sanitizeMaterialRequestNumber(payload?.corebridgeLength ?? payload?.length),
+    corebridgeCostPerSquareMetre: sanitizeMaterialRequestNumber(
+      payload?.corebridgeCostPerSquareMetre ?? payload?.costPerSquareMetre ?? payload?.cost
+    ),
+    lastCoreBridgeRefreshDate: sanitizeMaterialRequestText(payload?.lastCoreBridgeRefreshDate, 32),
+    sizeLabel: sanitizeMaterialRequestText(payload?.sizeLabel || payload?.label, 120),
     supplier: sanitizeMaterialRequestText(payload?.supplier, 120),
-    width: sanitizeMaterialRequestNumber(payload?.width),
-    length: sanitizeMaterialRequestNumber(payload?.length),
-    costPerSquareMetre: sanitizeMaterialRequestNumber(payload?.costPerSquareMetre),
-    totalLength: sanitizeMaterialRequestNumber(payload?.totalLength),
+    email: sanitizeMaterialRequestText(payload?.email, 180),
+    stockWidth: sanitizeMaterialRequestNumber(payload?.stockWidth ?? payload?.panelWidth ?? payload?.width),
+    stockHeight: sanitizeMaterialRequestNumber(payload?.stockHeight ?? payload?.panelHeight ?? payload?.height ?? payload?.length),
     unit: sanitizeMaterialRequestText(payload?.unit, 40),
     notes: sanitizeMaterialRequestMultiline(payload?.notes, 400)
   };
@@ -2621,15 +2629,17 @@ function sanitizeMaterialRequestSection(payload) {
     id: String(payload?.id || makeId()),
     title,
     description: sanitizeMaterialRequestText(payload?.description, 180),
-    allowBespoke: payload?.allowBespoke !== false,
-    sizePresets: Array.isArray(payload?.sizePresets)
-      ? payload.sizePresets.map((preset) => sanitizeMaterialRequestPreset(preset)).filter((preset) => preset.label)
-      : [],
-    materials: Array.isArray(payload?.materials)
-      ? payload.materials.map((material) => sanitizeMaterialRequestMaterial(material)).filter((material) => material.name)
-      : []
-  };
-}
+      allowBespoke: payload?.allowBespoke !== false,
+      sizePresets: Array.isArray(payload?.sizePresets)
+        ? payload.sizePresets.map((preset) => sanitizeMaterialRequestPreset(preset)).filter((preset) => preset.label)
+        : [],
+      materials: Array.isArray(payload?.materials)
+        ? payload.materials
+            .map((material) => sanitizeMaterialRequestMaterial(material))
+            .filter((material) => material.corebridgeName || material.sizeLabel)
+        : []
+    };
+  }
 
 function sanitizeMaterialRequestCatalog(payload) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
@@ -2657,29 +2667,33 @@ function sanitizeMaterialRequestLine(payload) {
     categoryId: MATERIAL_REQUEST_CATEGORY_IDS.has(String(payload?.categoryId || "").trim())
       ? String(payload.categoryId).trim()
       : "",
-    categoryLabel: sanitizeMaterialRequestText(payload?.categoryLabel, 120),
-    sectionId: String(payload?.sectionId || "").trim(),
-    sectionTitle: sanitizeMaterialRequestText(payload?.sectionTitle, 120),
-    materialId: String(payload?.materialId || "").trim(),
-    materialName: sanitizeMaterialRequestText(payload?.materialName, 180),
-    supplier: sanitizeMaterialRequestText(payload?.supplier, 120),
-    quantity: Math.max(1, sanitizeMaterialRequestNumber(payload?.quantity || 1, 0)),
-    requestMode: ["preset", "bespoke", "standard"].includes(String(payload?.requestMode || "").trim().toLowerCase())
-      ? String(payload.requestMode).trim().toLowerCase()
-      : "standard",
-    presetId: String(payload?.presetId || "").trim(),
+      categoryLabel: sanitizeMaterialRequestText(payload?.categoryLabel, 120),
+      sectionId: String(payload?.sectionId || "").trim(),
+      sectionTitle: sanitizeMaterialRequestText(payload?.sectionTitle, 120),
+      materialId: String(payload?.materialId || "").trim(),
+      materialName: sanitizeMaterialRequestText(payload?.materialName || payload?.partName, 180),
+      partName: sanitizeMaterialRequestText(payload?.partName || payload?.materialName, 180),
+      sizeLabel: sanitizeMaterialRequestText(payload?.sizeLabel || payload?.presetLabel, 120),
+      supplier: sanitizeMaterialRequestText(payload?.supplier, 120),
+      email: sanitizeMaterialRequestText(payload?.email, 180),
+      quantity: Math.max(1, sanitizeMaterialRequestNumber(payload?.quantity || 1, 0)),
+      requestMode: ["preset", "bespoke", "standard"].includes(String(payload?.requestMode || "").trim().toLowerCase())
+        ? String(payload.requestMode).trim().toLowerCase()
+        : "standard",
+      presetId: String(payload?.presetId || "").trim(),
     presetLabel: sanitizeMaterialRequestText(payload?.presetLabel, 120),
-    bespokeWidth: sanitizeMaterialRequestNumber(payload?.bespokeWidth),
-    bespokeHeight: sanitizeMaterialRequestNumber(payload?.bespokeHeight),
-    bespokeLength: sanitizeMaterialRequestNumber(payload?.bespokeLength),
-    sizeSummary: sanitizeMaterialRequestText(payload?.sizeSummary, 180),
-    width: sanitizeMaterialRequestNumber(payload?.width),
-    length: sanitizeMaterialRequestNumber(payload?.length),
-    costPerSquareMetre: sanitizeMaterialRequestNumber(payload?.costPerSquareMetre),
-    totalLength: sanitizeMaterialRequestNumber(payload?.totalLength),
-    unit: sanitizeMaterialRequestText(payload?.unit, 40),
-    lineTotal: sanitizeMaterialRequestNumber(payload?.lineTotal)
-  };
+      bespokeWidth: sanitizeMaterialRequestNumber(payload?.bespokeWidth),
+      bespokeHeight: sanitizeMaterialRequestNumber(payload?.bespokeHeight),
+      bespokeLength: sanitizeMaterialRequestNumber(payload?.bespokeLength),
+      sizeSummary: sanitizeMaterialRequestText(payload?.sizeSummary, 180),
+      width: sanitizeMaterialRequestNumber(payload?.width ?? payload?.stockWidth),
+      height: sanitizeMaterialRequestNumber(payload?.height ?? payload?.stockHeight),
+      length: sanitizeMaterialRequestNumber(payload?.length ?? payload?.corebridgeLength),
+      costPerSquareMetre: sanitizeMaterialRequestNumber(payload?.costPerSquareMetre ?? payload?.corebridgeCostPerSquareMetre),
+      corebridgeCostPerSquareMetre: sanitizeMaterialRequestNumber(payload?.corebridgeCostPerSquareMetre ?? payload?.costPerSquareMetre),
+      unit: sanitizeMaterialRequestText(payload?.unit, 40),
+      lineTotal: sanitizeMaterialRequestNumber(payload?.lineTotal)
+    };
 }
 
 function sanitizeMaterialRequest(payload) {
@@ -2718,6 +2732,83 @@ function buildMaterialRequestPayload(store, currentUser) {
       ? requests
       : requests.filter((request) => String(request.userId || "") === String(currentUser?.id || ""))
   };
+}
+
+function getMaterialRefreshDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeMaterialNameForMatch(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function selectCoreBridgeMaterialMatch(savedMaterial, materials) {
+  const expectedId = String(savedMaterial?.corebridgeId || "").trim();
+  const expectedName = normalizeMaterialNameForMatch(savedMaterial?.corebridgeName);
+  if (!Array.isArray(materials) || !materials.length) return null;
+  if (expectedId) {
+    const exactIdMatch = materials.find((entry) => String(entry?.id || "").trim() === expectedId);
+    if (exactIdMatch) return exactIdMatch;
+  }
+  if (expectedName) {
+    const exactNameMatch = materials.find((entry) => normalizeMaterialNameForMatch(entry?.name) === expectedName);
+    if (exactNameMatch) return exactNameMatch;
+    const tokenMatch = materials.find((entry) => normalizeMaterialNameForMatch(entry?.name).includes(expectedName));
+    if (tokenMatch) return tokenMatch;
+  }
+  return materials[0] || null;
+}
+
+async function refreshMaterialRequestCatalogIfNeeded(store) {
+  const catalog = sanitizeMaterialRequestCatalog(store.materialRequestCatalog);
+  const today = getMaterialRefreshDate();
+  let changed = false;
+  const nextCatalog = {};
+
+  for (const category of MATERIAL_REQUEST_CATEGORIES) {
+    const categoryState = catalog[category.id] || createEmptyMaterialRequestCategoryState();
+    const nextSections = [];
+    for (const section of Array.isArray(categoryState.sections) ? categoryState.sections : []) {
+      const nextMaterials = [];
+      for (const material of Array.isArray(section.materials) ? section.materials : []) {
+        let nextMaterial = sanitizeMaterialRequestMaterial(material);
+        if (nextMaterial.corebridgeName && nextMaterial.lastCoreBridgeRefreshDate !== today) {
+          try {
+            const payload = await fetchCoreBridgeMaterials(nextMaterial.corebridgeName);
+            const match = selectCoreBridgeMaterialMatch(nextMaterial, payload.materials || []);
+            if (match) {
+              nextMaterial = sanitizeMaterialRequestMaterial({
+                ...nextMaterial,
+                corebridgeId: match.id || nextMaterial.corebridgeId,
+                corebridgeName: match.name || nextMaterial.corebridgeName,
+                corebridgeWidth: match.width || nextMaterial.corebridgeWidth,
+                corebridgeHeight: match.height || nextMaterial.corebridgeHeight,
+                corebridgeLength: match.length || nextMaterial.corebridgeLength,
+                corebridgeCostPerSquareMetre: match.costPerSquareMetre || nextMaterial.corebridgeCostPerSquareMetre,
+                lastCoreBridgeRefreshDate: today
+              });
+              changed = true;
+            }
+          } catch (error) {
+            console.error("Could not refresh CoreBridge material snapshot.", nextMaterial.corebridgeName, error);
+          }
+        }
+        nextMaterials.push(nextMaterial);
+      }
+      nextSections.push({
+        ...section,
+        materials: nextMaterials
+      });
+    }
+    nextCatalog[category.id] = {
+      sections: nextSections
+    };
+  }
+
+  return { catalog: nextCatalog, changed };
 }
 
 function buildMileageHistory(claims) {
@@ -3537,6 +3628,9 @@ function buildCoreBridgeEstimateUrl(config, params = {}) {
 
 function getCoreBridgeMaterialPathVariants(config) {
   return [
+    "/api/materialpart",
+    "/api/materialpart/simplelist",
+    "/api/materialcategory/simplelist",
     "/core/api/materialpart",
     "/core/api/materialpart/simplelist",
     "/core/api/materialpart/simplelist/categoryandid",
@@ -5095,14 +5189,29 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   const width = Number(
     pickFirst(flat, [
       "width",
+      "_widthvalue",
+      "widthvalue",
       "materialwidth",
       "metadata.width",
       "dimensions.width"
     ])
   );
+  const height = Number(
+    pickFirst(flat, [
+      "height",
+      "_heightvalue",
+      "heightvalue",
+      "materialheight",
+      "metadata.height",
+      "dimensions.height",
+      "sheetheight"
+    ])
+  );
   const length = Number(
     pickFirst(flat, [
       "length",
+      "_lengthvalue",
+      "lengthvalue",
       "materiallength",
       "metadata.length",
       "dimensions.length",
@@ -5112,6 +5221,7 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   );
   const costPerSquareMetre = Number(
     pickFirst(flat, [
+      "estimatingcost",
       "costpersquaremetre",
       "costperm2",
       "sqmcost",
@@ -5132,6 +5242,7 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
     name: sanitizeMaterialRequestText(name, 180),
     supplier: sanitizeMaterialRequestText(supplier, 120),
     width: Number.isFinite(width) ? width : 0,
+    height: Number.isFinite(height) ? height : Number.isFinite(length) ? length : 0,
     length: Number.isFinite(length) ? length : 0,
     costPerSquareMetre: Number.isFinite(costPerSquareMetre) ? costPerSquareMetre : 0,
     totalLength: Number.isFinite(totalLength) ? totalLength : Number.isFinite(length) ? length : 0,
@@ -8821,6 +8932,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.get("/api/material-requests", async (request, response) => {
     if (!requireMaterialsAccess(request, response)) return;
     const store = await readStore();
+    const refreshed = await refreshMaterialRequestCatalogIfNeeded(store);
+    if (refreshed.changed) {
+      store.materialRequestCatalog = refreshed.catalog;
+      const savedStore = await writeStore(store);
+      response.json(buildMaterialRequestPayload(savedStore, request.user));
+      return;
+    }
+    store.materialRequestCatalog = refreshed.catalog;
     response.json(buildMaterialRequestPayload(store, request.user));
   });
 

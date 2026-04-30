@@ -11145,6 +11145,75 @@ body.theme-aero .flash.error {
   padding: 0.8rem;
   border-radius: 0.9rem;
   background: #f7f8fc;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.materials-material-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.materials-material-card-head strong {
+  font-size: 1rem;
+}
+
+.materials-material-corebridge,
+.materials-client-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 0.9rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+}
+
+.materials-material-corebridge p,
+.materials-client-summary p {
+  margin: 0;
+}
+
+.materials-inline-fields-2,
+.materials-inline-fields-3 {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.materials-inline-fields-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.materials-inline-fields-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.materials-inline-fields-2 label,
+.materials-inline-fields-3 label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  color: var(--muted-text);
+}
+
+.materials-material-calc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.9rem;
+  background: #eef4ff;
+  border: 1px solid #d7e4ff;
+}
+
+.materials-material-calc-summary span {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.materials-material-list-head {
+  margin-top: 1rem;
 }
 
 .materials-checkbox {
@@ -11211,7 +11280,9 @@ body.theme-aero .flash.error {
 
 @media (max-width: 900px) {
   .materials-layout,
-  .materials-subgrid {
+  .materials-subgrid,
+  .materials-inline-fields-2,
+  .materials-inline-fields-3 {
     grid-template-columns: 1fr;
   }
 

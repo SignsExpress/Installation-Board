@@ -2539,14 +2539,18 @@ function createEmptyMaterialsSection() {
 function createEmptyMaterialsMaterial() {
   return {
     id: `material-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    name: "",
+    corebridgeId: "",
+    corebridgeName: "",
+    corebridgeWidth: "",
+    corebridgeHeight: "",
+    corebridgeLength: "",
+    corebridgeCostPerSquareMetre: "",
+    lastCoreBridgeRefreshDate: "",
+    sizeLabel: "",
     supplier: "",
-    width: "",
-    length: "",
-    costPerSquareMetre: "",
-    totalLength: "",
-    panelWidth: "",
-    panelHeight: "",
+    email: "",
+    stockWidth: "",
+    stockHeight: "",
     unit: "sqm"
   };
 }
@@ -2559,6 +2563,58 @@ function createEmptyMaterialsPreset() {
     height: "",
     length: ""
   };
+}
+
+function getMaterialsNumericValue(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function getMaterialsAreaSquareMetres(width, height) {
+  const widthNumber = getMaterialsNumericValue(width);
+  const heightNumber = getMaterialsNumericValue(height);
+  if (!widthNumber || !heightNumber) return 0;
+  return (widthNumber * heightNumber) / 1000000;
+}
+
+function formatMaterialsArea(area) {
+  return area ? `${area.toFixed(2)}m²` : "0.00m²";
+}
+
+function formatMaterialsCurrency(value) {
+  return `£${(getMaterialsNumericValue(value) || 0).toFixed(2)}`;
+}
+
+function getMaterialsOptionLabel(material) {
+  const explicit = String(material?.sizeLabel || "").trim();
+  if (explicit) return explicit;
+  const width = getMaterialsNumericValue(material?.stockWidth);
+  const height = getMaterialsNumericValue(material?.stockHeight);
+  if (width && height) return `${width}mm x ${height}mm`;
+  return String(material?.corebridgeName || material?.name || "Standard size").trim();
+}
+
+function getMaterialsCoreBridgeHeight(material) {
+  return getMaterialsNumericValue(material?.corebridgeHeight) || getMaterialsNumericValue(material?.corebridgeLength);
+}
+
+function getMaterialsConfiguredArea(material) {
+  return getMaterialsAreaSquareMetres(material?.stockWidth, material?.stockHeight);
+}
+
+function getMaterialsConfiguredCost(material) {
+  return getMaterialsConfiguredArea(material) * getMaterialsNumericValue(material?.corebridgeCostPerSquareMetre);
+}
+
+function getMaterialsDraftArea(material, draft) {
+  if (draft?.requestMode === "bespoke") {
+    return getMaterialsAreaSquareMetres(draft?.bespokeWidth, draft?.bespokeHeight);
+  }
+  return getMaterialsConfiguredArea(material);
+}
+
+function getMaterialsDraftCost(material, draft) {
+  return getMaterialsDraftArea(material, draft) * getMaterialsNumericValue(material?.corebridgeCostPerSquareMetre);
 }
 
 function VanEstimatorIcon() {
@@ -4008,6 +4064,15 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     }));
   }
 
+  function updateMaterial(categoryId, sectionId, materialId, updater) {
+    updateSection(categoryId, sectionId, (section) => ({
+      ...section,
+      materials: (Array.isArray(section.materials) ? section.materials : []).map((material) =>
+        material.id === materialId ? (typeof updater === "function" ? updater(material) : updater) : material
+      )
+    }));
+  }
+
   function addSection() {
     if (!selectedCategory) return;
     updateCategory(selectedCategory.id, (currentCategory) => ({
@@ -4032,11 +4097,11 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     }));
   }
 
-  function addPresetToSection(sectionId) {
+  function removeMaterialFromSection(sectionId, materialId) {
     if (!selectedCategory) return;
     updateSection(selectedCategory.id, sectionId, (section) => ({
       ...section,
-      sizePresets: [...(Array.isArray(section.sizePresets) ? section.sizePresets : []), createEmptyMaterialsPreset()]
+      materials: (Array.isArray(section.materials) ? section.materials : []).filter((material) => material.id !== materialId)
     }));
   }
 
@@ -4046,11 +4111,9 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     return {
       materialId: section.materials?.[0]?.id || "",
       quantity: "1",
-      requestMode: section.sizePresets?.length ? "preset" : "standard",
-      presetId: section.sizePresets?.[0]?.id || "",
+      requestMode: "standard",
       bespokeWidth: "",
-      bespokeHeight: "",
-      bespokeLength: ""
+      bespokeHeight: ""
     };
   }
 
@@ -4075,17 +4138,14 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
       return;
     }
     const quantity = Math.max(1, Number(draft.quantity) || 1);
-    const preset = (section.sizePresets || []).find((entry) => entry.id === draft.presetId) || null;
-    const requestMode = draft.requestMode === "bespoke" ? "bespoke" : draft.requestMode === "preset" ? "preset" : "standard";
+    const requestMode = draft.requestMode === "bespoke" ? "bespoke" : "standard";
     const bespokeWidth = Number(draft.bespokeWidth) || 0;
     const bespokeHeight = Number(draft.bespokeHeight) || 0;
-    const bespokeLength = Number(draft.bespokeLength) || 0;
+    const perItemCost = getMaterialsDraftCost(material, draft);
     const sizeSummary =
-      requestMode === "preset" && preset
-        ? preset.label
-        : requestMode === "bespoke"
-          ? [bespokeWidth ? `${bespokeWidth}mm W` : "", bespokeHeight ? `${bespokeHeight}mm H` : "", bespokeLength ? `${bespokeLength}mm L` : ""].filter(Boolean).join(" x ") || "Bespoke"
-          : "Standard size";
+      requestMode === "bespoke"
+        ? [bespokeWidth ? `${bespokeWidth}mm` : "", bespokeHeight ? `${bespokeHeight}mm` : ""].filter(Boolean).join(" x ") || "Bespoke"
+        : getMaterialsOptionLabel(material);
 
     setBasket((current) => [
       ...current,
@@ -4096,22 +4156,23 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
         sectionId: section.id,
         sectionTitle: section.title || "Untitled section",
         materialId: material.id,
-        materialName: material.name || "Unnamed material",
+        materialName: material.corebridgeName || "Unnamed material",
+        partName: material.corebridgeName || "Unnamed material",
         supplier: material.supplier || "",
+        email: material.email || "",
         quantity,
         requestMode,
-        presetId: preset?.id || "",
-        presetLabel: preset?.label || "",
-        bespokeWidth,
-        bespokeHeight,
-        bespokeLength,
+        sizeLabel: getMaterialsOptionLabel(material),
+        bespokeWidth: requestMode === "bespoke" ? bespokeWidth : 0,
+        bespokeHeight: requestMode === "bespoke" ? bespokeHeight : 0,
         sizeSummary,
-        width: Number(material.width) || 0,
-        length: Number(material.length) || 0,
-        costPerSquareMetre: Number(material.costPerSquareMetre) || 0,
-        totalLength: Number(material.totalLength) || 0,
+        width: requestMode === "bespoke" ? bespokeWidth : Number(material.stockWidth) || 0,
+        height: requestMode === "bespoke" ? bespokeHeight : Number(material.stockHeight) || 0,
+        length: Number(material.corebridgeLength) || 0,
+        costPerSquareMetre: Number(material.corebridgeCostPerSquareMetre) || 0,
+        corebridgeCostPerSquareMetre: Number(material.corebridgeCostPerSquareMetre) || 0,
         unit: material.unit || "sqm",
-        lineTotal: 0
+        lineTotal: Math.round(perItemCost * quantity * 100) / 100
       }
     ]);
     setMessage(createMessage("Added to material request.", "success"));
@@ -4225,14 +4286,20 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
       materials: [
         {
           ...createEmptyMaterialsMaterial(),
-          name: material.name || "",
+          corebridgeId: material.id || "",
+          corebridgeName: material.name || "",
+          corebridgeWidth: material.width || "",
+          corebridgeHeight: material.height || material.length || "",
+          corebridgeLength: material.length || "",
+          corebridgeCostPerSquareMetre: material.costPerSquareMetre || "",
+          lastCoreBridgeRefreshDate: new Date().toISOString().slice(0, 10),
+          sizeLabel:
+            material.width && (material.height || material.length)
+              ? `${material.width}mm x ${material.height || material.length}mm`
+              : "",
           supplier: material.supplier || "",
-          width: material.width || "",
-          length: material.length || "",
-          costPerSquareMetre: material.costPerSquareMetre || "",
-          totalLength: material.totalLength || "",
-          panelWidth: material.width || "",
-          panelHeight: material.length || ""
+          stockWidth: material.width || "",
+          stockHeight: material.height || material.length || ""
         }
       ]
     };
@@ -4263,6 +4330,25 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     } finally {
       setSaving(false);
     }
+  }
+
+  function renderCoreBridgeSummary(material) {
+    return (
+      <div className="materials-material-corebridge">
+        <p>
+          <strong>Part Name:</strong> {material.corebridgeName || "-"}
+        </p>
+        <p>
+          <strong>Width:</strong> {getMaterialsNumericValue(material.corebridgeWidth) ? `${Number(material.corebridgeWidth)}mm` : "-"}
+        </p>
+        <p>
+          <strong>Height:</strong> {getMaterialsCoreBridgeHeight(material) ? `${getMaterialsCoreBridgeHeight(material)}mm` : "-"}
+        </p>
+        <p>
+          <strong>Cost:</strong> {getMaterialsNumericValue(material.corebridgeCostPerSquareMetre) ? `${formatMaterialsCurrency(material.corebridgeCostPerSquareMetre)}/m2` : "-"}
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -4420,7 +4506,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                 <input
                                   type="text"
                                   value={section.title || ""}
-                                  placeholder="Header title"
+                                  placeholder="Product"
                                   onChange={(event) =>
                                     updateSection(selectedCategory.id, section.id, (current) => ({ ...current, title: event.target.value }))
                                   }
@@ -4447,150 +4533,119 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                 Allow bespoke sizing
                               </label>
 
-                              <div className="materials-subgrid">
-                                <div>
-                                  <div className="materials-subhead">
-                                    <strong>Preset sizes</strong>
-                                    <button className="ghost-button" type="button" onClick={() => addPresetToSection(section.id)}>Add preset</button>
-                                  </div>
-                                  {(section.sizePresets || []).map((preset) => (
-                                    <div key={preset.id} className="materials-inline-fields">
-                                      <input
-                                        type="text"
-                                        value={preset.label || ""}
-                                        placeholder="Preset label"
-                                        onChange={(event) =>
-                                          updateSection(selectedCategory.id, section.id, (current) => ({
-                                            ...current,
-                                            sizePresets: (current.sizePresets || []).map((entry) =>
-                                              entry.id === preset.id ? { ...entry, label: event.target.value } : entry
-                                            )
-                                          }))
-                                        }
-                                      />
-                                      <input
-                                        type="number"
-                                        value={preset.width || ""}
-                                        placeholder="Width mm"
-                                        onChange={(event) =>
-                                          updateSection(selectedCategory.id, section.id, (current) => ({
-                                            ...current,
-                                            sizePresets: (current.sizePresets || []).map((entry) =>
-                                              entry.id === preset.id ? { ...entry, width: event.target.value } : entry
-                                            )
-                                          }))
-                                        }
-                                      />
-                                      <input
-                                        type="number"
-                                        value={preset.height || ""}
-                                        placeholder="Height mm"
-                                        onChange={(event) =>
-                                          updateSection(selectedCategory.id, section.id, (current) => ({
-                                            ...current,
-                                            sizePresets: (current.sizePresets || []).map((entry) =>
-                                              entry.id === preset.id ? { ...entry, height: event.target.value } : entry
-                                            )
-                                          }))
-                                        }
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-
-                                <div>
-                                  <div className="materials-subhead">
-                                    <strong>Materials</strong>
-                                    <button className="ghost-button" type="button" onClick={() => addMaterialToSection(section.id)}>Add material</button>
-                                  </div>
-                                  {(section.materials || []).map((material) => (
+                              <div className="materials-subhead materials-material-list-head">
+                                <strong>Material options</strong>
+                                <button className="ghost-button" type="button" onClick={() => addMaterialToSection(section.id)}>Add material</button>
+                              </div>
+                              <div className="materials-section-list">
+                                {(section.materials || []).map((material) => {
+                                  const configuredArea = getMaterialsConfiguredArea(material);
+                                  const configuredCost = getMaterialsConfiguredCost(material);
+                                  return (
                                     <div key={material.id} className="materials-material-card">
-                                      <div className="materials-inline-fields">
-                                        <input
-                                          type="text"
-                                          value={material.name || ""}
-                                          placeholder="Material name"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, name: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
-                                        <input
-                                          type="text"
-                                          value={material.supplier || ""}
-                                          placeholder="Supplier"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, supplier: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
+                                      <div className="materials-material-card-head">
+                                        <strong>{material.corebridgeName || "Imported CoreBridge material"}</strong>
+                                        <button
+                                          className="text-button danger-text-button"
+                                          type="button"
+                                          onClick={() => removeMaterialFromSection(section.id, material.id)}
+                                        >
+                                          Remove
+                                        </button>
                                       </div>
-                                      <div className="materials-inline-fields">
-                                        <input
-                                          type="number"
-                                          value={material.width || ""}
-                                          placeholder="Width mm"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, width: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
-                                        <input
-                                          type="number"
-                                          value={material.length || ""}
-                                          placeholder="Length mm"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, length: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          value={material.costPerSquareMetre || ""}
-                                          placeholder="£/m²"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, costPerSquareMetre: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
-                                        <input
-                                          type="number"
-                                          value={material.totalLength || ""}
-                                          placeholder="Total roll length / panel size"
-                                          onChange={(event) =>
-                                            updateSection(selectedCategory.id, section.id, (current) => ({
-                                              ...current,
-                                              materials: (current.materials || []).map((entry) =>
-                                                entry.id === material.id ? { ...entry, totalLength: event.target.value } : entry
-                                              )
-                                            }))
-                                          }
-                                        />
+
+                                      {renderCoreBridgeSummary(material)}
+
+                                      <div className="materials-inline-fields-2">
+                                        <label>
+                                          Roll / Sheet width (mm)
+                                          <input
+                                            type="number"
+                                            value={material.stockWidth || ""}
+                                            placeholder="Width mm"
+                                            onChange={(event) =>
+                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                ...current,
+                                                stockWidth: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                        <label>
+                                          Roll / Sheet height (mm)
+                                          <input
+                                            type="number"
+                                            value={material.stockHeight || ""}
+                                            placeholder="Height mm"
+                                            onChange={(event) =>
+                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                ...current,
+                                                stockHeight: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                      </div>
+
+                                      <div className="materials-material-calc-summary">
+                                        <span>Total m2: {formatMaterialsArea(configuredArea).replace("Â²", "2")}</span>
+                                        <span>Cost: {formatMaterialsCurrency(configuredCost)}</span>
+                                      </div>
+
+                                      <div className="materials-inline-fields-2">
+                                        <label>
+                                          Size
+                                          <input
+                                            type="text"
+                                            value={material.sizeLabel || ""}
+                                            placeholder="e.g. Full roll / Half sheet"
+                                            onChange={(event) =>
+                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                ...current,
+                                                sizeLabel: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                        <label>
+                                          Supplier
+                                          <input
+                                            type="text"
+                                            value={material.supplier || ""}
+                                            placeholder="Supplier"
+                                            onChange={(event) =>
+                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                ...current,
+                                                supplier: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                      </div>
+
+                                      <div className="materials-inline-fields-2">
+                                        <label>
+                                          Email
+                                          <input
+                                            type="email"
+                                            value={material.email || ""}
+                                            placeholder="supplier@email.com"
+                                            onChange={(event) =>
+                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                ...current,
+                                                email: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                        <label>
+                                          Cost
+                                          <input type="text" value={formatMaterialsCurrency(configuredCost)} readOnly />
+                                        </label>
                                       </div>
                                     </div>
-                                  ))}
-                                </div>
+                                  );
+                                })}
                               </div>
                             </article>
                           ))}
@@ -4616,7 +4671,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                   <option value="">Choose material</option>
                                   {(section.materials || []).map((material) => (
                                     <option key={material.id} value={material.id}>
-                                      {material.name}
+                                      {getMaterialsOptionLabel(material)}
                                     </option>
                                   ))}
                                 </select>
@@ -4627,27 +4682,18 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                   onChange={(event) => updateSectionDraft(section.id, { quantity: event.target.value })}
                                   placeholder="Qty"
                                 />
-                                <select
-                                  value={draft.requestMode || "standard"}
-                                  onChange={(event) => updateSectionDraft(section.id, { requestMode: event.target.value })}
-                                >
-                                  <option value="standard">Standard size</option>
-                                  {(section.sizePresets || []).length ? <option value="preset">Preset size</option> : null}
-                                  {section.allowBespoke !== false ? <option value="bespoke">Bespoke size</option> : null}
-                                </select>
+                                {section.allowBespoke !== false ? (
+                                  <select
+                                    value={draft.requestMode || "standard"}
+                                    onChange={(event) => updateSectionDraft(section.id, { requestMode: event.target.value })}
+                                  >
+                                    <option value="standard">Standard size</option>
+                                    <option value="bespoke">Bespoke size</option>
+                                  </select>
+                                ) : (
+                                  <input type="text" value="Standard size" readOnly />
+                                )}
                               </div>
-                              {draft.requestMode === "preset" && (section.sizePresets || []).length ? (
-                                <select
-                                  value={draft.presetId || ""}
-                                  onChange={(event) => updateSectionDraft(section.id, { presetId: event.target.value })}
-                                >
-                                  {(section.sizePresets || []).map((preset) => (
-                                    <option key={preset.id} value={preset.id}>
-                                      {preset.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : null}
                               {draft.requestMode === "bespoke" ? (
                                 <div className="materials-inline-fields">
                                   <input
@@ -4662,18 +4708,25 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                     value={draft.bespokeHeight || ""}
                                     onChange={(event) => updateSectionDraft(section.id, { bespokeHeight: event.target.value })}
                                   />
-                                  <input
-                                    type="number"
-                                    placeholder="Length mm"
-                                    value={draft.bespokeLength || ""}
-                                    onChange={(event) => updateSectionDraft(section.id, { bespokeLength: event.target.value })}
-                                  />
                                 </div>
                               ) : null}
+                              <div className="materials-client-summary">
+                                {(() => {
+                                  const chosenMaterial =
+                                    (section.materials || []).find((entry) => entry.id === draft.materialId) || section.materials?.[0] || null;
+                                  if (!chosenMaterial) return <p className="muted-copy">No material options have been added yet.</p>;
+                                  return (
+                                    <>
+                                      <p><strong>Product:</strong> {section.title || "Untitled product"}</p>
+                                      <p><strong>Part Name:</strong> {chosenMaterial.corebridgeName || "-"}</p>
+                                      <p><strong>Size:</strong> {draft.requestMode === "bespoke" ? ([draft.bespokeWidth ? `${draft.bespokeWidth}mm` : "", draft.bespokeHeight ? `${draft.bespokeHeight}mm` : ""].filter(Boolean).join(" x ") || "Bespoke") : getMaterialsOptionLabel(chosenMaterial)}</p>
+                                      <p><strong>Supplier:</strong> {chosenMaterial.supplier || "-"}</p>
+                                      <p><strong>Cost:</strong> {formatMaterialsCurrency(getMaterialsDraftCost(chosenMaterial, draft))}</p>
+                                    </>
+                                  );
+                                })()}
+                              </div>
                               <div className="materials-client-actions">
-                                <small>
-                                  Supplier: {(section.materials || []).find((entry) => entry.id === draft.materialId)?.supplier || "-"}
-                                </small>
                                 <button className="ghost-button" type="button" onClick={() => addSectionLineToBasket(section)}>
                                   Add to request
                                 </button>
@@ -4702,15 +4755,17 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                               <strong>{requestItem.userName}</strong>
                               <span className={`materials-request-status status-${requestItem.status}`}>{requestItem.status}</span>
                             </div>
-                            <ul className="materials-request-lines">
-                              {(requestItem.lines || []).map((line) => (
-                                <li key={line.id}>
-                                  <strong>{line.materialName || line.sectionTitle}</strong>
-                                  <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
-                                  {line.supplier ? <small>{line.supplier}</small> : null}
-                                </li>
-                              ))}
-                            </ul>
+                              <ul className="materials-request-lines">
+                                {(requestItem.lines || []).map((line) => (
+                                  <li key={line.id}>
+                                    <strong>{line.sectionTitle || line.materialName}</strong>
+                                    <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
+                                    <small>Part name: {line.partName || line.materialName || "-"}</small>
+                                    {line.supplier ? <small>Supplier: {line.supplier}</small> : null}
+                                    {line.lineTotal ? <small>Cost: {formatMaterialsCurrency(line.lineTotal)}</small> : null}
+                                  </li>
+                                ))}
+                              </ul>
                             {requestItem.notes ? <p className="materials-request-notes">{requestItem.notes}</p> : null}
                             <div className="materials-inline-fields">
                               <select
@@ -4775,8 +4830,11 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                               <ul className="materials-request-lines">
                                 {(requestItem.lines || []).map((line) => (
                                   <li key={line.id}>
-                                    <strong>{line.materialName || line.sectionTitle}</strong>
+                                    <strong>{line.sectionTitle || line.materialName}</strong>
                                     <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
+                                    <small>Part name: {line.partName || line.materialName || "-"}</small>
+                                    {line.supplier ? <small>Supplier: {line.supplier}</small> : null}
+                                    {line.lineTotal ? <small>Cost: {formatMaterialsCurrency(line.lineTotal)}</small> : null}
                                   </li>
                                 ))}
                               </ul>
