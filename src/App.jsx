@@ -2647,14 +2647,9 @@ function MainNavBar({
   onLogout,
   notifications = [],
   aeroEnabled = false,
-  onToggleAero,
-  boardSearchEnabled = false,
-  searchJobs = [],
-  onOpenBoardSearchJob
+  onToggleAero
 }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [boardSearchQuery, setBoardSearchQuery] = useState("");
-  const [boardSearchOpen, setBoardSearchOpen] = useState(false);
 
   function goTo(path) {
     window.location.assign(path);
@@ -2703,49 +2698,6 @@ function MainNavBar({
   const navItems = [...primaryNavItems, notificationItem];
   const activeNavKey = primaryNavItems.some((item) => item.key === active) ? active : "home";
   const showAeroToggle = canToggleAeroSkin(currentUser) && typeof onToggleAero === "function";
-  const showBoardSearch = boardSearchEnabled && boardAllowed;
-  const boardSearchResults = useMemo(() => {
-    const query = String(boardSearchQuery || "").trim().toLowerCase();
-    if (!query) return [];
-    return (Array.isArray(searchJobs) ? searchJobs : [])
-      .filter((job) => {
-        const haystack = [
-          job?.orderReference,
-          job?.customerName,
-          job?.description,
-          job?.contact,
-          job?.address,
-          job?.notes
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-        return haystack.includes(query);
-      })
-      .sort((left, right) => {
-        const leftDate = String(left?.date || "");
-        const rightDate = String(right?.date || "");
-        return rightDate.localeCompare(leftDate);
-      })
-      .slice(0, 12);
-  }, [boardSearchQuery, searchJobs]);
-
-  useEffect(() => {
-    setBoardSearchQuery("");
-    setBoardSearchOpen(false);
-  }, [active]);
-
-  function handleSelectBoardSearchJob(job) {
-    if (!job) return;
-    setBoardSearchOpen(false);
-    setBoardSearchQuery("");
-    if (typeof onOpenBoardSearchJob === "function") {
-      onOpenBoardSearchJob(job);
-      return;
-    }
-    goTo(`${boardPath}?job=${encodeURIComponent(job.id || "")}`);
-  }
-
   return (
     <header className="host-nav-shell">
       <nav className="host-nav">
@@ -2782,43 +2734,6 @@ function MainNavBar({
             ))}
           </div>
           <div className="host-nav-meta">
-            {showBoardSearch ? (
-              <div className="host-nav-search">
-                <input
-                  type="search"
-                  value={boardSearchQuery}
-                  onChange={(event) => {
-                    setBoardSearchQuery(event.target.value);
-                    setBoardSearchOpen(true);
-                  }}
-                  onFocus={() => setBoardSearchOpen(true)}
-                  onBlur={() => window.setTimeout(() => setBoardSearchOpen(false), 120)}
-                  placeholder="Search historical orders"
-                  aria-label="Search historical orders"
-                />
-                {boardSearchOpen && boardSearchQuery.trim() ? (
-                  <div className="host-nav-search-results">
-                    {boardSearchResults.length ? (
-                      boardSearchResults.map((job) => (
-                        <button
-                          key={job.id}
-                          type="button"
-                          className="host-nav-search-result"
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => handleSelectBoardSearchJob(job)}
-                        >
-                          <strong>{job.orderReference || "No ref"} - {job.customerName || "Untitled job"}</strong>
-                          <span>{job.description || "No description"}</span>
-                          <small>{formatJobDate(job.date) || "Unscheduled"}</small>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="host-nav-search-empty">No matching jobs found.</div>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
             {showAeroToggle ? (
               <button
                 className={`host-nav-aero-toggle ${aeroEnabled ? "active" : ""}`}
@@ -13989,6 +13904,8 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
+  const [boardSearchQuery, setBoardSearchQuery] = useState("");
+  const [boardSearchOpen, setBoardSearchOpen] = useState(false);
   const boardNotificationJobId = useMemo(() => {
     const params = new URLSearchParams(search);
     return params.get("job") || "";
@@ -14077,6 +13994,28 @@ export default function App() {
     setPreviousMonthDepth(0);
     setFutureMonthDepth(0);
   }
+
+  const boardSearchResults = useMemo(() => {
+    const query = String(boardSearchQuery || "").trim().toLowerCase();
+    if (!query) return [];
+    return (Array.isArray(jobs) ? jobs : [])
+      .filter((job) => {
+        const haystack = [
+          job?.orderReference,
+          job?.customerName,
+          job?.description,
+          job?.contact,
+          job?.address,
+          job?.notes
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(query);
+      })
+      .sort((left, right) => String(right?.date || "").localeCompare(String(left?.date || "")))
+      .slice(0, 12);
+  }, [boardSearchQuery, jobs]);
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
@@ -16490,9 +16429,6 @@ export default function App() {
           notifications={notifications}
           aeroEnabled={aeroEnabled}
           onToggleAero={handleToggleAero}
-          boardSearchEnabled={showBoard}
-          searchJobs={jobs}
-          onOpenBoardSearchJob={openBoardSearchJob}
         />
 
         <div className="layout">
@@ -16513,6 +16449,45 @@ export default function App() {
                     <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
                       Current month
                     </button>
+                    <div className="board-history-search">
+                      <input
+                        type="search"
+                        value={boardSearchQuery}
+                        onChange={(event) => {
+                          setBoardSearchQuery(event.target.value);
+                          setBoardSearchOpen(true);
+                        }}
+                        onFocus={() => setBoardSearchOpen(true)}
+                        onBlur={() => window.setTimeout(() => setBoardSearchOpen(false), 120)}
+                        placeholder="Search historical orders"
+                        aria-label="Search historical orders"
+                      />
+                      {boardSearchOpen && boardSearchQuery.trim() ? (
+                        <div className="board-history-search-results">
+                          {boardSearchResults.length ? (
+                            boardSearchResults.map((job) => (
+                              <button
+                                key={job.id}
+                                type="button"
+                                className="board-history-search-result"
+                                onMouseDown={(event) => event.preventDefault()}
+                                onClick={() => {
+                                  setBoardSearchOpen(false);
+                                  setBoardSearchQuery("");
+                                  openBoardSearchJob(job);
+                                }}
+                              >
+                                <strong>{job.orderReference || "No ref"} - {job.customerName || "Untitled job"}</strong>
+                                <span>{job.description || "No description"}</span>
+                                <small>{formatJobDate(job.date) || "Unscheduled"}</small>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="board-history-search-empty">No matching jobs found.</div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
