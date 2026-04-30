@@ -3537,6 +3537,10 @@ function buildCoreBridgeEstimateUrl(config, params = {}) {
 
 function getCoreBridgeMaterialPathVariants(config) {
   return [
+    "/core/api/materialpart",
+    "/core/api/materialpart/simplelist",
+    "/core/api/materialpart/simplelist/categoryandid",
+    "/core/api/materialpart/simplelist/byvariable",
     config.materialPath,
     "/core/api/materials",
     "/core/api/material/simplelist",
@@ -3548,6 +3552,32 @@ function getCoreBridgeMaterialPathVariants(config) {
   ]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
+    .filter((value, index, items) => items.indexOf(value) === index);
+}
+
+function buildCoreBridgeMaterialRequestPlans(config, pathValue, query = "", take = 200) {
+  const baseParams = [
+    { take },
+    { take, sortBy: "name" }
+  ];
+  const searchParams = query
+    ? [
+        { take, search: query },
+        { take, q: query },
+        { take, name: query },
+        { take, keyword: query },
+        { take, type: "material", search: query },
+        { take, componentType: "material", search: query },
+        { take, sortBy: "name", search: query },
+        { take, sortBy: "name", q: query },
+        { take, sortBy: "name", name: query },
+        { take, sortBy: "name", keyword: query },
+        { take, sortBy: "name", type: "material", search: query },
+        { take, sortBy: "name", componentType: "material", search: query }
+      ]
+    : [];
+  return [...searchParams, ...baseParams]
+    .map((params) => buildCoreBridgeCollectionUrl(config, pathValue, params))
     .filter((value, index, items) => items.indexOf(value) === index);
 }
 
@@ -5050,6 +5080,7 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   const flat = flattenRecord(record);
   const name = pickFirst(flat, [
     "name",
+    "materialpartname",
     "materialname",
     "description",
     "formattedname"
@@ -5064,6 +5095,7 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   const width = Number(
     pickFirst(flat, [
       "width",
+      "materialwidth",
       "metadata.width",
       "dimensions.width"
     ])
@@ -5071,9 +5103,11 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   const length = Number(
     pickFirst(flat, [
       "length",
+      "materiallength",
       "metadata.length",
       "dimensions.length",
-      "rolllength"
+      "rolllength",
+      "totallength"
     ])
   );
   const costPerSquareMetre = Number(
@@ -5081,7 +5115,16 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
       "costpersquaremetre",
       "costperm2",
       "sqmcost",
-      "sqmprice"
+      "sqmprice",
+      "cost",
+      "unitcost"
+    ])
+  );
+  const totalLength = Number(
+    pickFirst(flat, [
+      "totallength",
+      "rolllength",
+      "length"
     ])
   );
   return {
@@ -5091,7 +5134,7 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
     width: Number.isFinite(width) ? width : 0,
     length: Number.isFinite(length) ? length : 0,
     costPerSquareMetre: Number.isFinite(costPerSquareMetre) ? costPerSquareMetre : 0,
-    totalLength: Number.isFinite(length) ? length : 0,
+    totalLength: Number.isFinite(totalLength) ? totalLength : Number.isFinite(length) ? length : 0,
     unit: "mm",
     raw: record
   };
@@ -5108,40 +5151,9 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
   const attempts = [];
   const query = String(searchTerm || "").trim();
   const materialPaths = getCoreBridgeMaterialPathVariants(config);
-  const requestPlans = materialPaths.flatMap((pathValue) => [
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      search: query
-    }),
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      q: query
-    }),
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      name: query
-    }),
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      keyword: query
-    }),
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      type: "material",
-      search: query
-    }),
-    buildCoreBridgeCollectionUrl(config, pathValue, {
-      take: 200,
-      sortBy: "name",
-      componentType: "material",
-      search: query
-    })
-  ]).filter((value, index, items) => items.indexOf(value) === index);
+  const requestPlans = materialPaths.flatMap((pathValue) =>
+    buildCoreBridgeMaterialRequestPlans(config, pathValue, query, 200)
+  );
 
   const filterMaterials = (materials) => {
     if (!query) return materials;
@@ -5193,22 +5205,7 @@ async function fetchCoreBridgeMaterials(searchTerm = "") {
 
   try {
     for (const pathValue of materialPaths) {
-      const fallbackCandidates = [
-        buildCoreBridgeCollectionUrl(config, pathValue, {
-          take: 500,
-          sortBy: "name"
-        }),
-        buildCoreBridgeCollectionUrl(config, pathValue, {
-          take: 500,
-          sortBy: "name",
-          type: "material"
-        }),
-        buildCoreBridgeCollectionUrl(config, pathValue, {
-          take: 500,
-          sortBy: "name",
-          componentType: "material"
-        })
-      ].filter((value, index, items) => items.indexOf(value) === index);
+      const fallbackCandidates = buildCoreBridgeMaterialRequestPlans(config, pathValue, "", 500);
 
       for (const fallbackUrl of fallbackCandidates) {
         const response = await fetch(fallbackUrl, {
@@ -5262,12 +5259,8 @@ async function debugCoreBridgeMaterialPath(pathValue, searchTerm = "") {
   }
 
   const requestPlans = [
-    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", search: query }),
-    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", q: query }),
-    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", name: query }),
-    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name", keyword: query }),
-    buildCoreBridgeCollectionUrl(config, normalizedPath, { take: 50, sortBy: "name" })
-  ].filter((value, index, items) => items.indexOf(value) === index);
+    ...buildCoreBridgeMaterialRequestPlans(config, normalizedPath, query, 50)
+  ];
 
   const attempts = [];
   let normalizedRecords = [];
