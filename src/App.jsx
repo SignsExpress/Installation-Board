@@ -29,34 +29,34 @@ const PERMISSION_OPTIONS = [
 
 const MATERIAL_REQUEST_CATEGORIES = [
   {
-    id: "consumables",
-    label: "Consumables",
-    description: "Blades, cleaners, cloths and everyday shop essentials.",
-    imagePath: "/materials/consumables.jpg"
+    id: "flatbed-uv",
+    label: "Mimaki",
+    description: "Flatbed UV boards, inks and specialist stock.",
+    imagePath: "/materials/mimaki-jfx200-2513-ex-flatbed-uv.jpg"
   },
   {
     id: "epson-surecolor",
-    label: "Epson Surecolor SC-R5000",
+    label: "Epson",
     description: "Resin print stock and matched production choices.",
     imagePath: "/materials/epson-surecolor-sc-r5000.jpg"
   },
   {
     id: "hp-latex",
-    label: "HP Latex 365",
+    label: "HP",
     description: "Latex print media and roll-based stock.",
     imagePath: "/materials/hp-latex-365.jpg"
   },
   {
-    id: "fixings",
-    label: "Fixings",
-    description: "Stand-offs, tapes, screws and mounting parts.",
-    imagePath: "/materials/fixings.jpg"
+    id: "roll-media",
+    label: "Vinyl",
+    description: "Printable rolls, laminates and film choices.",
+    imagePath: "/materials/roll-media.jpg"
   },
   {
-    id: "flatbed-uv",
-    label: "Mimaki JFX200-2513 EX Flatbed UV",
-    description: "Flatbed-ready materials and specialist board options.",
-    imagePath: "/materials/mimaki-jfx200-2513-ex-flatbed-uv.jpg"
+    id: "sheet-media",
+    label: "Panel",
+    description: "Foamex, ACM, acrylic and other sheet stock.",
+    imagePath: "/materials/sheet-media.jpg"
   },
   {
     id: "pos",
@@ -65,16 +65,16 @@ const MATERIAL_REQUEST_CATEGORIES = [
     imagePath: "/materials/pos.jpg"
   },
   {
-    id: "sheet-media",
-    label: "Sheet Media",
-    description: "Foamex, ACM, acrylic and other sheet stock.",
-    imagePath: "/materials/sheet-media.jpg"
+    id: "fixings",
+    label: "Fixings",
+    description: "Stand-offs, tapes, screws and mounting parts.",
+    imagePath: "/materials/fixings.jpg"
   },
   {
-    id: "roll-media",
-    label: "Roll Media",
-    description: "Printable rolls, laminates and film choices.",
-    imagePath: "/materials/roll-media.jpg"
+    id: "consumables",
+    label: "Consumables",
+    description: "Blades, cleaners, cloths and everyday shop essentials.",
+    imagePath: "/materials/consumables.jpg"
   }
 ];
 
@@ -3993,9 +3993,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   const [corebridgeQuery, setCorebridgeQuery] = useState("");
   const [corebridgeResults, setCorebridgeResults] = useState([]);
   const [corebridgeLoading, setCorebridgeLoading] = useState(false);
-  const [corebridgeDebugPath, setCorebridgeDebugPath] = useState("/core/api/material");
-  const [corebridgeDebugResults, setCorebridgeDebugResults] = useState(null);
-  const [corebridgeDebugLoading, setCorebridgeDebugLoading] = useState(false);
+  const [materialEditorState, setMaterialEditorState] = useState({});
 
   const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : MATERIAL_REQUEST_CATEGORIES;
   const catalog = payload.catalog && typeof payload.catalog === "object" ? payload.catalog : {};
@@ -4071,6 +4069,27 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
         material.id === materialId ? (typeof updater === "function" ? updater(material) : updater) : material
       )
     }));
+    setMaterialEditorState((current) => ({
+      ...current,
+      [materialId]: {
+        expanded: true,
+        dirty: true
+      }
+    }));
+  }
+
+  function getMaterialEditorState(materialId) {
+    return materialEditorState[materialId] || { expanded: false, dirty: false };
+  }
+
+  function setMaterialEditorPanel(materialId, patch) {
+    setMaterialEditorState((current) => ({
+      ...current,
+      [materialId]: {
+        ...(current[materialId] || { expanded: false, dirty: false }),
+        ...(typeof patch === "function" ? patch(current[materialId] || { expanded: false, dirty: false }) : patch)
+      }
+    }));
   }
 
   function addSection() {
@@ -4091,10 +4110,12 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
   function addMaterialToSection(sectionId) {
     if (!selectedCategory) return;
+    const nextMaterial = createEmptyMaterialsMaterial();
     updateSection(selectedCategory.id, sectionId, (section) => ({
       ...section,
-      materials: [...(Array.isArray(section.materials) ? section.materials : []), createEmptyMaterialsMaterial()]
+      materials: [...(Array.isArray(section.materials) ? section.materials : []), nextMaterial]
     }));
+    setMaterialEditorPanel(nextMaterial.id, { expanded: true, dirty: true });
   }
 
   function removeMaterialFromSection(sectionId, materialId) {
@@ -4103,6 +4124,11 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
       ...section,
       materials: (Array.isArray(section.materials) ? section.materials : []).filter((material) => material.id !== materialId)
     }));
+    setMaterialEditorState((current) => {
+      const nextState = { ...current };
+      delete nextState[materialId];
+      return nextState;
+    });
   }
 
   function getSectionDraft(section) {
@@ -4245,68 +4271,35 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     }
   }
 
-  async function debugCoreBridgeMaterialPathLookup() {
-    if (!corebridgeDebugPath.trim()) {
-      setMessage(createMessage("Enter a CoreBridge path to test first.", "error"));
-      return;
-    }
-    try {
-      setCorebridgeDebugLoading(true);
-      const params = new URLSearchParams({
-        path: corebridgeDebugPath.trim(),
-        query: corebridgeQuery
-      });
-      const response = await fetch(`/api/material-requests/corebridge/debug?${params.toString()}`);
-      const nextPayload = await response.json();
-      if (!response.ok) {
-        throw new Error(nextPayload.error || "Could not debug CoreBridge materials.");
-      }
-      setCorebridgeDebugResults(nextPayload);
-      setMessage(
-        createMessage(
-          Array.isArray(nextPayload.normalizedRecords) && nextPayload.normalizedRecords.length
-            ? "Debug route returned material-shaped records."
-            : "Debug route checked successfully. Review the statuses below.",
-          "success"
-        )
-      );
-    } catch (error) {
-      console.error(error);
-      setMessage(createMessage(error.message || "Could not debug CoreBridge materials.", "error"));
-    } finally {
-      setCorebridgeDebugLoading(false);
-    }
-  }
-
   function importCoreBridgeMaterial(material) {
     if (!selectedCategory) return;
+    const importedMaterial = {
+      ...createEmptyMaterialsMaterial(),
+      corebridgeId: material.id || "",
+      corebridgeName: material.name || "",
+      corebridgeWidth: material.width || "",
+      corebridgeHeight: material.height || material.length || "",
+      corebridgeLength: material.length || "",
+      corebridgeCostPerSquareMetre: material.costPerSquareMetre || "",
+      lastCoreBridgeRefreshDate: new Date().toISOString().slice(0, 10),
+      sizeLabel:
+        material.width && (material.height || material.length)
+          ? `${material.width}mm x ${material.height || material.length}mm`
+          : "",
+      supplier: material.supplier || "",
+      stockWidth: material.width || "",
+      stockHeight: material.height || material.length || ""
+    };
     const nextSection = {
       ...createEmptyMaterialsSection(),
       title: material.name || "Imported material",
-      materials: [
-        {
-          ...createEmptyMaterialsMaterial(),
-          corebridgeId: material.id || "",
-          corebridgeName: material.name || "",
-          corebridgeWidth: material.width || "",
-          corebridgeHeight: material.height || material.length || "",
-          corebridgeLength: material.length || "",
-          corebridgeCostPerSquareMetre: material.costPerSquareMetre || "",
-          lastCoreBridgeRefreshDate: new Date().toISOString().slice(0, 10),
-          sizeLabel:
-            material.width && (material.height || material.length)
-              ? `${material.width}mm x ${material.height || material.length}mm`
-              : "",
-          supplier: material.supplier || "",
-          stockWidth: material.width || "",
-          stockHeight: material.height || material.length || ""
-        }
-      ]
+      materials: [importedMaterial]
     };
     updateCategory(selectedCategory.id, (currentCategory) => ({
       ...currentCategory,
       sections: [...(Array.isArray(currentCategory.sections) ? currentCategory.sections : []), nextSection]
     }));
+    setMaterialEditorPanel(importedMaterial.id, { expanded: true, dirty: true });
     setMessage(createMessage(`Imported ${material.name}.`, "success"));
   }
 
@@ -4351,6 +4344,11 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     );
   }
 
+  function saveMaterialCard(material) {
+    setMaterialEditorPanel(material.id, { expanded: false, dirty: false });
+    setMessage(createMessage("Material saved. Save catalog to publish to the team.", "success"));
+  }
+
   return (
     <div className="app-shell">
       <div className="page">
@@ -4381,7 +4379,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
           <div className="materials-layout">
             <aside className="materials-categories">
-              {categories.map((category) => (
+              {categories.map((category, index) => (
                 <button
                   key={category.id}
                   type="button"
@@ -4390,6 +4388,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                 >
                   <img src={category.imagePath} alt="" />
                   <span className="materials-category-copy">
+                    <small className="materials-category-index">{String(index + 1).padStart(2, "0")}</small>
                     <strong>{category.label}</strong>
                     <small>{category.description}</small>
                   </span>
@@ -4436,7 +4435,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                   <div>
                                     <strong>{material.name}</strong>
                                     <small>
-                                      {material.width ? `${material.width}mm` : "No width"} · {material.length ? `${material.length}mm` : "No length"} · £{Number(material.costPerSquareMetre || 0).toFixed(2)}/m²
+                                      {material.width ? `${material.width}mm` : "No width"} · {(material.height || material.length) ? `${material.height || material.length}mm` : "No height"} · £{Number(material.costPerSquareMetre || 0).toFixed(2)}/m2
                                     </small>
                                   </div>
                                   <button className="ghost-button" type="button" onClick={() => importCoreBridgeMaterial(material)}>
@@ -4446,57 +4445,6 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                               ))}
                             </div>
                           ) : null}
-                          <details className="materials-corebridge-debug">
-                            <summary>CoreBridge debug</summary>
-                            <div className="materials-corebridge-debug-body">
-                              <div className="materials-corebridge-bar">
-                                <input
-                                  type="text"
-                                  value={corebridgeDebugPath}
-                                  placeholder="/core/api/..."
-                                  onChange={(event) => setCorebridgeDebugPath(event.target.value)}
-                                />
-                                <button
-                                  className="ghost-button"
-                                  type="button"
-                                  onClick={debugCoreBridgeMaterialPathLookup}
-                                  disabled={corebridgeDebugLoading}
-                                >
-                                  {corebridgeDebugLoading ? "Checking..." : "Try path"}
-                                </button>
-                              </div>
-                              <p className="muted-copy">
-                                Try the exact CoreBridge relative path for Materials or Components here and we’ll show the response status and any material-like records we can detect.
-                              </p>
-                              {corebridgeDebugResults?.normalizedRecords?.length ? (
-                                <div className="materials-corebridge-results">
-                                  {corebridgeDebugResults.normalizedRecords.map((material) => (
-                                    <div key={`debug-${material.id || material.name}`} className="materials-corebridge-result">
-                                      <div>
-                                        <strong>{material.name}</strong>
-                                        <small>{material.supplier || "No supplier"} · {material.width ? `${material.width}mm` : "No width"} · {material.length ? `${material.length}mm` : "No length"}</small>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {Array.isArray(corebridgeDebugResults?.attempts) && corebridgeDebugResults.attempts.length ? (
-                                <div className="materials-debug-attempts">
-                                  {corebridgeDebugResults.attempts.map((attempt) => (
-                                    <article key={attempt.url} className="materials-debug-attempt">
-                                      <div className="materials-debug-attempt-head">
-                                        <strong>{attempt.status || "ERR"}</strong>
-                                        <span>{attempt.recordCount || 0} records</span>
-                                      </div>
-                                      <code>{attempt.url}</code>
-                                      {attempt.parseError ? <small>{attempt.parseError}</small> : null}
-                                      {attempt.bodyPreview ? <pre>{attempt.bodyPreview}</pre> : null}
-                                    </article>
-                                  ))}
-                                </div>
-                              ) : null}
-                            </div>
-                          </details>
                         </div>
 
                         <div className="materials-section-list">
@@ -4541,108 +4489,138 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                 {(section.materials || []).map((material) => {
                                   const configuredArea = getMaterialsConfiguredArea(material);
                                   const configuredCost = getMaterialsConfiguredCost(material);
+                                  const materialEditor = getMaterialEditorState(material.id);
                                   return (
                                     <div key={material.id} className="materials-material-card">
                                       <div className="materials-material-card-head">
-                                        <strong>{material.corebridgeName || "Imported CoreBridge material"}</strong>
-                                        <button
-                                          className="text-button danger-text-button"
-                                          type="button"
-                                          onClick={() => removeMaterialFromSection(section.id, material.id)}
-                                        >
-                                          Remove
-                                        </button>
+                                        <div>
+                                          <strong>{material.corebridgeName || "Imported CoreBridge material"}</strong>
+                                          <small className="muted-copy">{section.title || "Untitled product"}</small>
+                                        </div>
+                                        <div className="materials-card-actions">
+                                          {materialEditor.expanded ? (
+                                            <button className="ghost-button" type="button" onClick={() => saveMaterialCard(material)}>
+                                              Save
+                                            </button>
+                                          ) : (
+                                            <button
+                                              className="ghost-button"
+                                              type="button"
+                                              onClick={() => setMaterialEditorPanel(material.id, { expanded: true })}
+                                            >
+                                              Edit
+                                            </button>
+                                          )}
+                                          <button
+                                            className="text-button danger-text-button"
+                                            type="button"
+                                            onClick={() => removeMaterialFromSection(section.id, material.id)}
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
                                       </div>
 
-                                      {renderCoreBridgeSummary(material)}
+                                      {materialEditor.expanded ? (
+                                        <>
+                                          {renderCoreBridgeSummary(material)}
 
-                                      <div className="materials-inline-fields-2">
-                                        <label>
-                                          Roll / Sheet width (mm)
-                                          <input
-                                            type="number"
-                                            value={material.stockWidth || ""}
-                                            placeholder="Width mm"
-                                            onChange={(event) =>
-                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
-                                                ...current,
-                                                stockWidth: event.target.value
-                                              }))
-                                            }
-                                          />
-                                        </label>
-                                        <label>
-                                          Roll / Sheet height (mm)
-                                          <input
-                                            type="number"
-                                            value={material.stockHeight || ""}
-                                            placeholder="Height mm"
-                                            onChange={(event) =>
-                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
-                                                ...current,
-                                                stockHeight: event.target.value
-                                              }))
-                                            }
-                                          />
-                                        </label>
-                                      </div>
+                                          <div className="materials-inline-fields-2">
+                                            <label>
+                                              Roll / Sheet width (mm)
+                                              <input
+                                                type="number"
+                                                value={material.stockWidth || ""}
+                                                placeholder="Width mm"
+                                                onChange={(event) =>
+                                                  updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                    ...current,
+                                                    stockWidth: event.target.value
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              Roll / Sheet height (mm)
+                                              <input
+                                                type="number"
+                                                value={material.stockHeight || ""}
+                                                placeholder="Height mm"
+                                                onChange={(event) =>
+                                                  updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                    ...current,
+                                                    stockHeight: event.target.value
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                          </div>
 
-                                      <div className="materials-material-calc-summary">
-                                        <span>Total m2: {formatMaterialsArea(configuredArea).replace("Â²", "2")}</span>
-                                        <span>Cost: {formatMaterialsCurrency(configuredCost)}</span>
-                                      </div>
+                                          <div className="materials-material-calc-summary">
+                                            <span>Total m2: {formatMaterialsArea(configuredArea).replace("Â²", "2")}</span>
+                                            <span>Cost: {formatMaterialsCurrency(configuredCost)}</span>
+                                          </div>
 
-                                      <div className="materials-inline-fields-2">
-                                        <label>
-                                          Size
-                                          <input
-                                            type="text"
-                                            value={material.sizeLabel || ""}
-                                            placeholder="e.g. Full roll / Half sheet"
-                                            onChange={(event) =>
-                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
-                                                ...current,
-                                                sizeLabel: event.target.value
-                                              }))
-                                            }
-                                          />
-                                        </label>
-                                        <label>
-                                          Supplier
-                                          <input
-                                            type="text"
-                                            value={material.supplier || ""}
-                                            placeholder="Supplier"
-                                            onChange={(event) =>
-                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
-                                                ...current,
-                                                supplier: event.target.value
-                                              }))
-                                            }
-                                          />
-                                        </label>
-                                      </div>
+                                          <div className="materials-inline-fields-2">
+                                            <label>
+                                              Size
+                                              <input
+                                                type="text"
+                                                value={material.sizeLabel || ""}
+                                                placeholder="e.g. 1.5L / Full roll / Half sheet"
+                                                onChange={(event) =>
+                                                  updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                    ...current,
+                                                    sizeLabel: event.target.value
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              Supplier
+                                              <input
+                                                type="text"
+                                                value={material.supplier || ""}
+                                                placeholder="Supplier"
+                                                onChange={(event) =>
+                                                  updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                    ...current,
+                                                    supplier: event.target.value
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                          </div>
 
-                                      <div className="materials-inline-fields-2">
-                                        <label>
-                                          Email
-                                          <input
-                                            type="email"
-                                            value={material.email || ""}
-                                            placeholder="supplier@email.com"
-                                            onChange={(event) =>
-                                              updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
-                                                ...current,
-                                                email: event.target.value
-                                              }))
-                                            }
-                                          />
-                                        </label>
-                                        <label>
-                                          Cost
-                                          <input type="text" value={formatMaterialsCurrency(configuredCost)} readOnly />
-                                        </label>
-                                      </div>
+                                          <div className="materials-inline-fields-2">
+                                            <label>
+                                              Email
+                                              <input
+                                                type="email"
+                                                value={material.email || ""}
+                                                placeholder="supplier@email.com"
+                                                onChange={(event) =>
+                                                  updateMaterial(selectedCategory.id, section.id, material.id, (current) => ({
+                                                    ...current,
+                                                    email: event.target.value
+                                                  }))
+                                                }
+                                              />
+                                            </label>
+                                            <label>
+                                              Cost
+                                              <input type="text" value={formatMaterialsCurrency(configuredCost)} readOnly />
+                                            </label>
+                                          </div>
+                                        </>
+                                      ) : (
+                                        <div className="materials-material-compact">
+                                          <span><strong>Part Name:</strong> {material.corebridgeName || "-"}</span>
+                                          <span><strong>Size:</strong> {getMaterialsOptionLabel(material)}</span>
+                                          <span><strong>Supplier:</strong> {material.supplier || "-"}</span>
+                                          <span><strong>Cost:</strong> {formatMaterialsCurrency(configuredCost)}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}

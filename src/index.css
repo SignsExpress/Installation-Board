@@ -10924,13 +10924,13 @@ body.theme-aero .flash.error {
 
 .materials-category-card {
   display: grid;
-  grid-template-columns: 96px 1fr;
-  gap: 0.9rem;
+  grid-template-columns: 84px 1fr;
+  gap: 0.8rem;
   align-items: center;
   width: 100%;
   text-align: left;
-  padding: 0.85rem;
-  border-radius: 1.1rem;
+  padding: 0.75rem;
+  border-radius: 1rem;
   border: 1px solid var(--border-color);
   background: #fff;
   cursor: pointer;
@@ -10942,26 +10942,34 @@ body.theme-aero .flash.error {
 }
 
 .materials-category-card img {
-  width: 96px;
-  height: 72px;
+  width: 84px;
+  height: 64px;
   object-fit: cover;
-  border-radius: 0.9rem;
+  border-radius: 0.8rem;
   background: #f4f6fb;
 }
 
 .materials-category-copy {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.12rem;
 }
 
 .materials-category-copy strong {
-  font-size: 1rem;
+  font-size: 0.98rem;
 }
 
 .materials-category-copy small {
   color: var(--muted-text);
-  line-height: 1.35;
+  line-height: 1.3;
+  font-size: 0.82rem;
+}
+
+.materials-category-index {
+  font-size: 0.72rem !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand) !important;
 }
 
 .materials-main,
@@ -11012,6 +11020,7 @@ body.theme-aero .flash.error {
 .muted-copy {
   margin: 0.25rem 0 0;
   color: var(--muted-text);
+  font-size: 0.92rem;
 }
 
 .materials-corebridge {
@@ -11119,7 +11128,7 @@ body.theme-aero .flash.error {
 }
 
 .materials-section-card {
-  padding: 1rem;
+  padding: 0.95rem;
 }
 
 .materials-section-head input,
@@ -11142,11 +11151,11 @@ body.theme-aero .flash.error {
 }
 
 .materials-material-card {
-  padding: 0.8rem;
-  border-radius: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 0.95rem;
   background: #f7f8fc;
   display: grid;
-  gap: 0.85rem;
+  gap: 0.7rem;
 }
 
 .materials-material-card-head {
@@ -11157,17 +11166,24 @@ body.theme-aero .flash.error {
 }
 
 .materials-material-card-head strong {
-  font-size: 1rem;
+  font-size: 0.95rem;
+}
+
+.materials-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .materials-material-corebridge,
 .materials-client-summary {
   display: grid;
-  gap: 0.35rem;
-  padding: 0.85rem 0.95rem;
+  gap: 0.22rem;
+  padding: 0.75rem 0.85rem;
   border-radius: 0.9rem;
   background: #fff;
   border: 1px solid var(--border-color);
+  font-size: 0.92rem;
 }
 
 .materials-material-corebridge p,
@@ -11192,8 +11208,8 @@ body.theme-aero .flash.error {
 .materials-inline-fields-2 label,
 .materials-inline-fields-3 label {
   display: grid;
-  gap: 0.35rem;
-  font-size: 0.88rem;
+  gap: 0.3rem;
+  font-size: 0.8rem;
   color: var(--muted-text);
 }
 
@@ -11201,7 +11217,7 @@ body.theme-aero .flash.error {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1.5rem;
-  padding: 0.8rem 0.95rem;
+  padding: 0.7rem 0.85rem;
   border-radius: 0.9rem;
   background: #eef4ff;
   border: 1px solid #d7e4ff;
@@ -11210,10 +11226,21 @@ body.theme-aero .flash.error {
 .materials-material-calc-summary span {
   font-weight: 700;
   color: var(--text);
+  font-size: 0.9rem;
 }
 
 .materials-material-list-head {
   margin-top: 1rem;
+}
+
+.materials-material-compact {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
 }
 
 .materials-checkbox {
