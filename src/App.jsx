@@ -4358,6 +4358,22 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
     setMessage(createMessage("Material saved. Save catalog to publish to the team.", "success"));
   }
 
+  function saveProductSection(section) {
+    const materials = Array.isArray(section.materials) ? section.materials : [];
+    setMaterialEditorState((current) => {
+      const nextState = { ...current };
+      materials.forEach((material) => {
+        nextState[material.id] = {
+          ...(nextState[material.id] || {}),
+          expanded: false,
+          dirty: false
+        };
+      });
+      return nextState;
+    });
+    setMessage(createMessage("Product section saved. Save catalog to publish to the team.", "success"));
+  }
+
   return (
     <div className="app-shell">
       <div className="page">
@@ -4471,13 +4487,6 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                   Remove
                                 </button>
                               </div>
-                              <textarea
-                                value={section.description || ""}
-                                placeholder="Optional guidance for the client"
-                                onChange={(event) =>
-                                  updateSection(selectedCategory.id, section.id, (current) => ({ ...current, description: event.target.value }))
-                                }
-                              />
                               <label className="materials-checkbox">
                                 <input
                                   type="checkbox"
@@ -4489,10 +4498,6 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                 Allow bespoke sizing
                               </label>
 
-                              <div className="materials-subhead materials-material-list-head">
-                                <strong>Material options</strong>
-                                <button className="ghost-button" type="button" onClick={() => addMaterialToSection(section.id)}>Add material</button>
-                              </div>
                               <div className="materials-section-list">
                                 {(section.materials || []).map((material) => {
                                   const configuredArea = getMaterialsConfiguredArea(material);
@@ -4636,6 +4641,24 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                   );
                                 })}
                               </div>
+
+                              <div className="materials-inline-fields-2 materials-section-bottom-row">
+                                <label>
+                                  Client guidance
+                                  <textarea
+                                    value={section.description || ""}
+                                    placeholder="Optional guidance for the client"
+                                    onChange={(event) =>
+                                      updateSection(selectedCategory.id, section.id, (current) => ({ ...current, description: event.target.value }))
+                                    }
+                                  />
+                                </label>
+                                <div className="materials-section-side-actions">
+                                  <button className="ghost-button" type="button" onClick={() => saveProductSection(section)}>
+                                    Save product
+                                  </button>
+                                </div>
+                              </div>
                             </article>
                           ))}
                         </div>
@@ -4739,39 +4762,60 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                     {adminMode ? (
                       <div className="materials-request-history">
                         {requests.map((requestItem) => (
-                          <article key={requestItem.id} className="materials-request-card">
-                            <div className="materials-request-head">
-                              <strong>{requestItem.userName}</strong>
+                          <details key={requestItem.id} className="materials-request-card materials-request-collapsible">
+                            <summary className="materials-request-summary">
+                              <div>
+                                <strong>{requestItem.userName}</strong>
+                                <small>{new Date(requestItem.createdAt).toLocaleDateString("en-GB")} · {(requestItem.lines || []).length} item(s)</small>
+                              </div>
                               <span className={`materials-request-status status-${requestItem.status}`}>{requestItem.status}</span>
-                            </div>
+                            </summary>
+                            <div className="materials-request-detail">
                               <ul className="materials-request-lines">
-                                {(requestItem.lines || []).map((line) => (
-                                  <li key={line.id}>
-                                    <strong>{line.sectionTitle || line.materialName}</strong>
-                                    <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
-                                    <small>Part name: {line.partName || line.materialName || "-"}</small>
-                                    {line.supplier ? <small>Supplier: {line.supplier}</small> : null}
-                                    {line.lineTotal ? <small>Cost: {formatMaterialsCurrency(line.lineTotal)}</small> : null}
-                                  </li>
-                                ))}
+                                  {(requestItem.lines || []).map((line) => (
+                                    <li key={line.id}>
+                                      <strong>{line.sectionTitle || line.materialName}</strong>
+                                      <span>{line.quantity} × {line.sizeSummary || line.unit || "Standard"}</span>
+                                      <small>Part name: {line.partName || line.materialName || "-"}</small>
+                                      {line.supplier ? <small>Supplier: {line.supplier}</small> : null}
+                                      {line.lineTotal ? <small>Cost: {formatMaterialsCurrency(line.lineTotal)}</small> : null}
+                                    </li>
+                                  ))}
                               </ul>
-                            {requestItem.notes ? <p className="materials-request-notes">{requestItem.notes}</p> : null}
-                            <div className="materials-inline-fields">
-                              <select
-                                value={requestItem.status || "submitted"}
-                                onChange={(event) => updateRequest(requestItem.id, { status: event.target.value, hostNotes: requestItem.hostNotes || "" })}
-                              >
-                                <option value="submitted">Submitted</option>
-                                <option value="reviewed">Reviewed</option>
-                                <option value="ordered">Ordered</option>
-                              </select>
+                              {requestItem.notes ? <p className="materials-request-notes">{requestItem.notes}</p> : null}
                               <textarea
                                 defaultValue={requestItem.hostNotes || ""}
-                                placeholder="Host notes"
+                                placeholder="Add note if denying"
                                 onBlur={(event) => updateRequest(requestItem.id, { status: requestItem.status || "submitted", hostNotes: event.target.value })}
                               />
+                              <div className="materials-request-actions">
+                                <button
+                                  className="ghost-button"
+                                  type="button"
+                                  onClick={(event) => {
+                                    const hostNotes = event.currentTarget.closest(".materials-request-detail")?.querySelector("textarea")?.value || requestItem.hostNotes || "";
+                                    updateRequest(requestItem.id, { status: "ordered", hostNotes });
+                                  }}
+                                >
+                                  Approve / ordered
+                                </button>
+                                <button
+                                  className="text-button danger-text-button"
+                                  type="button"
+                                  onClick={(event) => {
+                                    const hostNotes = event.currentTarget.closest(".materials-request-detail")?.querySelector("textarea")?.value || "";
+                                    if (!hostNotes.trim()) {
+                                      setMessage(createMessage("Add a note to explain why the request was denied.", "error"));
+                                      return;
+                                    }
+                                    updateRequest(requestItem.id, { status: "denied", hostNotes });
+                                  }}
+                                >
+                                  Deny
+                                </button>
+                              </div>
                             </div>
-                          </article>
+                          </details>
                         ))}
                         {!requests.length ? <p className="muted-copy">No material requests have been sent yet.</p> : null}
                       </div>
