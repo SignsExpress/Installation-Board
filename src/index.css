@@ -10924,13 +10924,13 @@ body.theme-aero .flash.error {
 
 .materials-category-card {
   display: grid;
-  grid-template-columns: 84px 1fr;
-  gap: 0.8rem;
+  grid-template-columns: 72px 1fr;
+  gap: 0.7rem;
   align-items: center;
   width: 100%;
   text-align: left;
-  padding: 0.75rem;
-  border-radius: 1rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 0.9rem;
   border: 1px solid var(--border-color);
   background: #fff;
   cursor: pointer;
@@ -10942,34 +10942,28 @@ body.theme-aero .flash.error {
 }
 
 .materials-category-card img {
-  width: 84px;
-  height: 64px;
+  width: 72px;
+  height: 56px;
   object-fit: cover;
-  border-radius: 0.8rem;
+  border-radius: 0.7rem;
   background: #f4f6fb;
 }
 
 .materials-category-copy {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.08rem;
 }
 
 .materials-category-copy strong {
-  font-size: 0.98rem;
+  font-size: 0.92rem;
+  line-height: 1.2;
 }
 
 .materials-category-copy small {
   color: var(--muted-text);
-  line-height: 1.3;
-  font-size: 0.82rem;
-}
-
-.materials-category-index {
-  font-size: 0.72rem !important;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--brand) !important;
+  line-height: 1.25;
+  font-size: 0.76rem;
 }
 
 .materials-main,
@@ -11020,7 +11014,12 @@ body.theme-aero .flash.error {
 .muted-copy {
   margin: 0.25rem 0 0;
   color: var(--muted-text);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.materials-section-intro {
+  max-width: 36rem;
 }
 
 .materials-corebridge {
@@ -11128,7 +11127,7 @@ body.theme-aero .flash.error {
 }
 
 .materials-section-card {
-  padding: 0.95rem;
+  padding: 0.9rem;
 }
 
 .materials-section-head input,
@@ -11166,7 +11165,8 @@ body.theme-aero .flash.error {
 }
 
 .materials-material-card-head strong {
-  font-size: 0.95rem;
+  font-size: 0.88rem;
+  line-height: 1.3;
 }
 
 .materials-card-actions {
@@ -11179,11 +11179,12 @@ body.theme-aero .flash.error {
 .materials-client-summary {
   display: grid;
   gap: 0.22rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.9rem;
   background: #fff;
   border: 1px solid var(--border-color);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .materials-material-corebridge p,
@@ -11209,7 +11210,8 @@ body.theme-aero .flash.error {
 .materials-inline-fields-3 label {
   display: grid;
   gap: 0.3rem;
-  font-size: 0.8rem;
+  font-size: 0.74rem;
+  line-height: 1.3;
   color: var(--muted-text);
 }
 
@@ -11217,7 +11219,7 @@ body.theme-aero .flash.error {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem 1.5rem;
-  padding: 0.7rem 0.85rem;
+  padding: 0.6rem 0.75rem;
   border-radius: 0.9rem;
   background: #eef4ff;
   border: 1px solid #d7e4ff;
@@ -11226,7 +11228,7 @@ body.theme-aero .flash.error {
 .materials-material-calc-summary span {
   font-weight: 700;
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
 .materials-material-list-head {
@@ -11236,11 +11238,12 @@ body.theme-aero .flash.error {
 .materials-material-compact {
   display: grid;
   gap: 0.22rem;
-  padding: 0.75rem 0.85rem;
+  padding: 0.65rem 0.75rem;
   border-radius: 0.85rem;
   background: #fff;
   border: 1px solid var(--border-color);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .materials-checkbox {

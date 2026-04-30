@@ -78,6 +78,8 @@ const MATERIAL_REQUEST_CATEGORIES = [
   }
 ];
 
+const MATERIAL_REQUEST_CATEGORY_ORDER = MATERIAL_REQUEST_CATEGORIES.map((category) => category.id);
+
 const HOLIDAY_STAFF = [
   { code: "MR", person: "Matt R", fullName: "Matt Rutlidge", colorClass: "holiday-person-black", birthDate: "" },
   { code: "DD", person: "Dawn D", fullName: "Dawn Dewhurst", colorClass: "holiday-person-black", birthDate: "" },
@@ -3995,7 +3997,14 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   const [corebridgeLoading, setCorebridgeLoading] = useState(false);
   const [materialEditorState, setMaterialEditorState] = useState({});
 
-  const categories = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : MATERIAL_REQUEST_CATEGORIES;
+  const categories = useMemo(() => {
+    const incoming = Array.isArray(payload.categories) && payload.categories.length ? payload.categories : MATERIAL_REQUEST_CATEGORIES;
+    const incomingById = new Map(incoming.map((category) => [category.id, category]));
+    return MATERIAL_REQUEST_CATEGORY_ORDER.map((id) => ({
+      ...(incomingById.get(id) || {}),
+      ...(MATERIAL_REQUEST_CATEGORIES.find((category) => category.id === id) || { id })
+    })).filter((category) => category.id);
+  }, [payload.categories]);
   const catalog = payload.catalog && typeof payload.catalog === "object" ? payload.catalog : {};
   const requests = Array.isArray(payload.requests) ? payload.requests : [];
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || categories[0] || null;
@@ -4379,7 +4388,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
           <div className="materials-layout">
             <aside className="materials-categories">
-              {categories.map((category, index) => (
+              {categories.map((category) => (
                 <button
                   key={category.id}
                   type="button"
@@ -4388,7 +4397,6 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                 >
                   <img src={category.imagePath} alt="" />
                   <span className="materials-category-copy">
-                    <small className="materials-category-index">{String(index + 1).padStart(2, "0")}</small>
                     <strong>{category.label}</strong>
                     <small>{category.description}</small>
                   </span>
@@ -4405,11 +4413,11 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                     <div className="materials-editor-head">
                       <div>
                         <h3>{selectedCategory.label}</h3>
-                        <p>{selectedCategory.description}</p>
+                        <p className="materials-section-intro">{selectedCategory.description}</p>
                       </div>
                       {adminMode ? (
                         <button className="ghost-button" type="button" onClick={addSection}>
-                          Add header
+                          Add product
                         </button>
                       ) : null}
                     </div>
@@ -4495,7 +4503,9 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                       <div className="materials-material-card-head">
                                         <div>
                                           <strong>{material.corebridgeName || "Imported CoreBridge material"}</strong>
-                                          <small className="muted-copy">{section.title || "Untitled product"}</small>
+                                          {section.title && section.title.trim() && section.title.trim() !== (material.corebridgeName || "").trim() ? (
+                                            <small className="muted-copy">{section.title}</small>
+                                          ) : null}
                                         </div>
                                         <div className="materials-card-actions">
                                           {materialEditor.expanded ? (
@@ -4527,7 +4537,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
                                           <div className="materials-inline-fields-2">
                                             <label>
-                                              Roll / Sheet width (mm)
+                                              Roll / Sheet size width (mm)
                                               <input
                                                 type="number"
                                                 value={material.stockWidth || ""}
@@ -4541,7 +4551,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                               />
                                             </label>
                                             <label>
-                                              Roll / Sheet height (mm)
+                                              Roll / Sheet size height (mm)
                                               <input
                                                 type="number"
                                                 value={material.stockHeight || ""}
@@ -4563,7 +4573,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
                                           <div className="materials-inline-fields-2">
                                             <label>
-                                              Size
+                                              Client size label
                                               <input
                                                 type="text"
                                                 value={material.sizeLabel || ""}
@@ -4594,7 +4604,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
                                           <div className="materials-inline-fields-2">
                                             <label>
-                                              Email
+                                              Supplier email
                                               <input
                                                 type="email"
                                                 value={material.email || ""}
@@ -4608,7 +4618,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                               />
                                             </label>
                                             <label>
-                                              Cost
+                                              Calculated cost
                                               <input type="text" value={formatMaterialsCurrency(configuredCost)} readOnly />
                                             </label>
                                           </div>
@@ -4616,7 +4626,8 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                                       ) : (
                                         <div className="materials-material-compact">
                                           <span><strong>Part Name:</strong> {material.corebridgeName || "-"}</span>
-                                          <span><strong>Size:</strong> {getMaterialsOptionLabel(material)}</span>
+                                          <span><strong>Roll / Sheet:</strong> {getMaterialsNumericValue(material.stockWidth) && getMaterialsNumericValue(material.stockHeight) ? `${material.stockWidth}mm x ${material.stockHeight}mm` : "-"}</span>
+                                          <span><strong>Client size:</strong> {getMaterialsOptionLabel(material)}</span>
                                           <span><strong>Supplier:</strong> {material.supplier || "-"}</span>
                                           <span><strong>Cost:</strong> {formatMaterialsCurrency(configuredCost)}</span>
                                         </div>
