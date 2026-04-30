@@ -6148,36 +6148,65 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
     } : current);
   }
 
-  function addLineItem() {
-    setDraft((current) => current ? {
-      ...current,
-      lineItems: [
-        ...current.lineItems,
-        {
-          id: `pro-forma-line-${Date.now()}`,
-          name: `Line Item ${current.lineItems.length + 1}`,
-          description: "",
-          quantity: "1",
-          unitPrice: "0",
-          lineTotal: 0,
-          chosenSource: "manual",
-          candidates: [],
+function addLineItem() {
+  setDraft((current) => current ? {
+    ...current,
+    lineItems: [
+      ...current.lineItems,
+      {
+        id: `pro-forma-line-${Date.now()}`,
+        name: `Line Item ${current.lineItems.length + 1}`,
+        description: "",
+        sortIndex: current.lineItems.length,
+        quantity: "1",
+        unitPrice: "0",
+        lineTotal: 0,
+        chosenSource: "manual",
+        candidates: [],
           rawMoneyFields: []
         }
       ]
-    } : current);
-  }
+  } : current);
+}
 
-  function removeLineItem(lineId) {
-    setDraft((current) => {
-      if (!current) return current;
-      const nextItems = current.lineItems.filter((item) => item.id !== lineId);
-      return {
-        ...current,
-        lineItems: nextItems.length ? nextItems : [{
-          id: "pro-forma-line-1",
-          name: "Line Item 1",
-          description: "",
+function moveLineItem(lineId, direction) {
+  setDraft((current) => {
+    if (!current) return current;
+    const currentIndex = current.lineItems.findIndex((item) => item.id === lineId);
+    if (currentIndex < 0) return current;
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= current.lineItems.length) return current;
+
+    const nextItems = [...current.lineItems];
+    const [movedItem] = nextItems.splice(currentIndex, 1);
+    nextItems.splice(targetIndex, 0, movedItem);
+
+    return {
+      ...current,
+      lineItems: nextItems.map((item, index) => ({
+        ...item,
+        sortIndex: index
+      }))
+    };
+  });
+}
+
+function removeLineItem(lineId) {
+  setDraft((current) => {
+    if (!current) return current;
+    const nextItems = current.lineItems.filter((item) => item.id !== lineId);
+    return {
+      ...current,
+      lineItems: nextItems.length
+        ? nextItems.map((item, index) => ({
+            ...item,
+            sortIndex: index
+          }))
+        : [{
+            id: "pro-forma-line-1",
+            name: "Line Item 1",
+            description: "",
+            sortIndex: 0,
             quantity: "1",
             unitPrice: "0",
             lineTotal: 0,
@@ -6185,9 +6214,9 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
             candidates: [],
             rawMoneyFields: []
           }]
-      };
-    });
-  }
+    };
+  });
+}
 
   function applyDepositPreset(percent) {
     const safePercent = Math.max(Number(percent) || 0, 0);
@@ -6517,7 +6546,7 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                       const quantity = Math.max(Number(item.quantity) || 0, 0);
                       const unitPrice = Math.max(Number(item.unitPrice) || 0, 0);
                       const lineTotal = roundProFormaMoney(quantity * unitPrice);
-                      const lineNumber = Number.isFinite(item.sortIndex) ? item.sortIndex + 1 : index + 1;
+                      const lineNumber = index + 1;
                       return (
                         <div key={item.id} className="pro-forma-line-card">
                           <div className="pro-forma-line-top">
@@ -6542,6 +6571,26 @@ function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onTog
                             <div className="pro-forma-line-total-block">
                               <span>Line total</span>
                               <strong>{formatProFormaMoney(lineTotal)}</strong>
+                            </div>
+                            <div className="pro-forma-line-order-tools">
+                              <button
+                                type="button"
+                                className="ghost-button pro-forma-order-button"
+                                onClick={() => moveLineItem(item.id, "up")}
+                                disabled={index === 0}
+                                aria-label={`Move ${item.name || `line item ${lineNumber}`} up`}
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-button pro-forma-order-button"
+                                onClick={() => moveLineItem(item.id, "down")}
+                                disabled={index === draft.lineItems.length - 1}
+                                aria-label={`Move ${item.name || `line item ${lineNumber}`} down`}
+                              >
+                                ↓
+                              </button>
                             </div>
                             <button type="button" className="text-button" onClick={() => removeLineItem(item.id)}>Remove</button>
                           </div>
