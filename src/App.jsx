@@ -1752,8 +1752,15 @@ function normalizeRamsCard(card = {}, fallback = {}) {
   const content = Array.isArray(merged.content)
     ? merged.content.map((line) => String(line)).filter(Boolean)
     : String(merged.content || merged.controlMeasure || "").split("\n").map((line) => line.trim()).filter(Boolean);
-  const type = String(merged.type || fallback.type || "Risk");
-  const isRisk = type !== "Method";
+  const rawType = String(merged.type || fallback.type || "Risk").trim();
+  const type = rawType.toLowerCase() === "method"
+    ? "Method"
+    : rawType.toLowerCase() === "rescue"
+      ? "Rescue"
+      : rawType.toLowerCase() === "risk"
+        ? "Risk"
+        : rawType;
+  const isRisk = type !== "Method" && type !== "Rescue";
   const normalized = {
     ...merged,
     title: String(merged.title || fallback.title || "RAMS card"),
