@@ -8018,7 +8018,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   }, []);
 
   function updateRamsLogicDraft(updater) {
-    setRamsLogicDraft((current) => (typeof updater === "function" ? updater(current) : updater));
+    setRamsLogicDraft((current) => normalizeRamsLogic(typeof updater === "function" ? updater(current) : updater));
     setLogicStatus("");
   }
 
@@ -8769,20 +8769,20 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     }));
     if (Array.isArray(savedDocument.cardOrder) && savedDocument.cardOrder.length) {
       setCardOrder(
-        savedDocument.cardOrder.filter((cardId) => Boolean(ramsLogic.cards?.[cardId]))
+        savedDocument.cardOrder.filter((cardId) => Boolean(normalizedRamsCards?.[cardId]))
       );
     }
     setRamsEdits(savedDocument.edits && typeof savedDocument.edits === "object" ? savedDocument.edits : {});
     setSaveStatus(`Loaded saved RAMS ${savedDocument.reference || ""}`.trim());
-  }, [initialRamsParams.ramsId, selectedJob?.id, ramsLogic.cards]);
+  }, [initialRamsParams.ramsId, normalizedRamsCards, selectedJob?.id]);
 
   useEffect(() => {
     setCardOrder((current) => {
       const existing = current.filter((cardId) => suggestedCardIds.includes(cardId));
       const missing = suggestedCardIds.filter((cardId) => !existing.includes(cardId));
-      return sortRamsCardOrderForFlow([...existing, ...missing], ramsLogic.cards);
+      return sortRamsCardOrderForFlow([...existing, ...missing], normalizedRamsCards);
     });
-  }, [suggestedCardIds, ramsLogic.cards]);
+  }, [normalizedRamsCards, suggestedCardIds]);
 
   function updateQuestion(key, value) {
     setQuestions((current) => ({ ...current, [key]: value }));
@@ -8978,6 +8978,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     return ramsEdits[key] ?? String(fallback || "");
   }
 
+  function getRamsRescueEdit(cardId, field, fallback = "") {
+    const rescueKey = `rescue-${cardId}-${field}`;
+    const legacyMethodKey = `method-${cardId}-${field}`;
+    return ramsEdits[rescueKey] ?? ramsEdits[legacyMethodKey] ?? String(fallback || "");
+  }
+
   function updateRamsEdit(key, value) {
     setRamsEdits((current) => ({ ...current, [key]: value }));
   }
@@ -9015,11 +9021,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   }
 
   function smartSortMethodCards() {
-    setCardOrder((current) => sortRamsCardOrderForFlow(current, ramsLogic.cards));
+    setCardOrder((current) => sortRamsCardOrderForFlow(current, normalizedRamsCards));
   }
 
   function applyRamsSetup() {
-    setCardOrder((current) => sortRamsCardOrderForFlow(current, ramsLogic.cards));
+    setCardOrder((current) => sortRamsCardOrderForFlow(current, normalizedRamsCards));
     setRamsSetupOpen(false);
   }
 
@@ -9073,6 +9079,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     }
   }
 
+  const normalizedRamsLogic = useMemo(() => normalizeRamsLogic(ramsLogic), [ramsLogic]);
+  const normalizedRamsCards = normalizedRamsLogic.cards || {};
   let ramsRenderError = null;
   let selectedCards = [];
   let methodCards = [];
@@ -9080,8 +9088,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   let riskCards = [];
   try {
     selectedCards = cardOrder
-      .filter((cardId) => Boolean(ramsLogic.cards?.[cardId]) && typeof ramsLogic.cards[cardId] === "object")
-      .map((cardId) => ({ id: cardId, ...normalizeRamsCard(ramsLogic.cards[cardId]) }))
+      .filter((cardId) => {
+        const card = normalizedRamsCards?.[cardId];
+        return Boolean(card) && typeof card === "object" && !Array.isArray(card);
+      })
+      .map((cardId) => ({ id: cardId, ...normalizeRamsCard(normalizedRamsCards[cardId]) }))
       .filter((card) => card.title);
     methodCards = selectedCards.filter((card) => card.type === "Method");
     rescueCards = selectedCards.filter((card) => card.type === "Rescue");
@@ -9090,7 +9101,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     console.error("RAMS selection build failed", {
       error,
       cardOrder,
-      cards: ramsLogic.cards
+      cards: normalizedRamsCards
     });
     ramsRenderError = error;
   }
@@ -9258,8 +9269,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
           lines: getRamsCardLines(card).map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
         })),
         rescuePlans: rescueCards.map((card) => ({
-          title: getRamsEdit(`method-${card.id}-title`, card.title),
-          lines: getRamsCardLines(card).map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
+          title: getRamsRescueEdit(card.id, "title", card.title),
+          lines: getRamsCardLines(card).map((line, lineIndex) => getRamsRescueEdit(card.id, `line-${lineIndex}`, line))
         }))
       };
   }
@@ -9609,12 +9620,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                       <div className="rams-method-prep-grid">
                         {rescueCards.map((card) => (
                           <div key={`rescue-${card.id}`} className="rams-method-info-card is-grey">
-                            <h4>{renderEditable(`method-${card.id}-title`, card.title)}</h4>
+                            <h4>{renderEditable(`rescue-${card.id}-title`, getRamsRescueEdit(card.id, "title", card.title))}</h4>
                               <p>
                                {getRamsCardLines(card).map((line, lineIndex) => (
                                   <React.Fragment key={`${card.id}-${lineIndex}`}>
                                     {lineIndex ? <br /> : null}
-                                    {renderEditable(`method-${card.id}-line-${lineIndex}`, line)}
+                                    {renderEditable(`rescue-${card.id}-line-${lineIndex}`, getRamsRescueEdit(card.id, `line-${lineIndex}`, line))}
                                 </React.Fragment>
                               ))}
                             </p>
