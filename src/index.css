@@ -2205,7 +2205,7 @@
   justify-content: space-between;
   gap: 10px;
   align-items: center;
-  padding: 6px 8px;
+  padding: 6px 10px;
   background: #dcfce7;
   border-bottom: 1px solid #bbf7d0;
 }
@@ -2218,10 +2218,10 @@
 
 .rams-doc-card-title {
   margin: 0;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: 0.02em;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
   color: inherit;
 }
@@ -2235,12 +2235,14 @@
 }
 
 .rams-doc-card ul {
-  padding: 0 8px 8px 26px;
+  padding: 9px 11px 11px 29px;
   margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.24;
 }
 
 .rams-doc-card ul li {
-  margin: 0;
+  margin: 0 0 2px;
 }
 
 .rams-doc-rescue-section .rams-method-prep-grid {
