@@ -2218,12 +2218,17 @@
 
 .rams-doc-card-title {
   margin: 0;
+  padding: 0;
+  width: auto;
+  border-radius: 0;
+  background: transparent;
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: inherit;
+  display: block;
 }
 
 .rams-doc-method-section .rams-doc-card > div {
@@ -2237,8 +2242,8 @@
 .rams-doc-card ul {
   padding: 9px 11px 11px 29px;
   margin: 0;
-  font-size: 0.82rem;
-  line-height: 1.24;
+  font-size: 0.78rem;
+  line-height: 1.18;
 }
 
 .rams-doc-card ul li {
