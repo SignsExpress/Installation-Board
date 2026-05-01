@@ -1345,8 +1345,8 @@
 }
 
 .rams-move-button {
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: #fff;
   border-color: #cbd5e1;
@@ -1355,8 +1355,8 @@
 }
 
 .rams-move-button svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
@@ -2216,11 +2216,22 @@
   font-size: 0.72rem;
 }
 
-.rams-doc-method-section .rams-doc-card > div strong {
-  color: #374151;
-  text-transform: uppercase;
+.rams-doc-card-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.15;
   letter-spacing: 0.02em;
-  font-size: 0.78rem;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.rams-doc-method-section .rams-doc-card > div {
+  align-items: center;
+}
+
+.rams-doc-method-section .rams-doc-card > div .rams-doc-card-title {
+  color: #374151;
 }
 
 .rams-doc-card ul {
@@ -2234,6 +2245,10 @@
 
 .rams-doc-rescue-section .rams-method-prep-grid {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.rams-doc-rescue-section > h4 {
+  margin-bottom: 2px;
 }
 
 .rams-doc-method-section .rams-doc-card.is-grey > div {

@@ -9599,7 +9599,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                         onDrop={() => handleCardDrop(card.id)}
                       >
                         <div>
-                          <strong>{renderEditable(`method-${card.id}-title`, card.title)}</strong>
+                          <h4 className="rams-doc-card-title">{renderEditable(`method-${card.id}-title`, card.title)}</h4>
                           <span className="rams-card-actions no-print">
                             <button type="button" className="icon-button rams-move-button" onClick={() => moveCard(card.id, -1)} disabled={cardIndex <= 0} aria-label="Move method up">
                               <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 11.5 10 7l4.5 4.5" /></svg>
@@ -9618,20 +9618,23 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                     );
                   })}
                   {rescueCards.length ? (
-                    <div className="rams-doc-method-section rams-doc-rescue-section">
-                      <h3>Rescue Plan</h3>
+                    <div className="rams-doc-section rams-doc-method-section rams-doc-rescue-section">
+                      <h4>Rescue Plan</h4>
                       <div className="rams-method-prep-grid">
                         {rescueCards.map((card) => (
-                          <div key={`rescue-${card.id}`} className="rams-method-info-card is-grey">
-                            <h4>{renderEditable(`rescue-${card.id}-title`, getRamsRescueEdit(card.id, "title", card.title))}</h4>
-                              <p>
-                                {getRamsCardLines(card).map((line, lineIndex) => (
-                                  <Fragment key={`${card.id}-${lineIndex}`}>
-                                    {lineIndex ? <br /> : null}
-                                    {renderEditable(`rescue-${card.id}-line-${lineIndex}`, getRamsRescueEdit(card.id, `line-${lineIndex}`, line))}
-                                  </Fragment>
-                                ))}
-                            </p>
+                          <div key={`rescue-${card.id}`} className="rams-doc-card is-grey">
+                            <div>
+                              <h4 className="rams-doc-card-title">
+                                {renderEditable(`rescue-${card.id}-title`, getRamsRescueEdit(card.id, "title", card.title))}
+                              </h4>
+                            </div>
+                            <ul>
+                              {getRamsCardLines(card).map((line, lineIndex) => (
+                                <li key={`rescue-${card.id}-${lineIndex}`}>
+                                  {renderEditable(`rescue-${card.id}-line-${lineIndex}`, getRamsRescueEdit(card.id, `line-${lineIndex}`, line))}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
                         ))}
                       </div>
@@ -10097,7 +10100,7 @@ function ReadOnlyRamsDocument({
           {methods.map((method, index) => (
             <div key={`${method.title}-${index}`} className="rams-doc-card is-grey">
               <div>
-                <strong>{method.title || "Method"}</strong>
+                <h4 className="rams-doc-card-title">{method.title || "Method"}</h4>
               </div>
               <ul>
                 {(Array.isArray(method.lines) ? method.lines : []).map((line, lineIndex) => (
@@ -10107,13 +10110,19 @@ function ReadOnlyRamsDocument({
             </div>
           ))}
           {rescuePlans.length ? (
-            <div className="rams-doc-method-section rams-doc-rescue-section">
-              <h3>Rescue Plan</h3>
+            <div className="rams-doc-section rams-doc-method-section rams-doc-rescue-section">
+              <h4>Rescue Plan</h4>
               <div className="rams-method-prep-grid">
                 {rescuePlans.map((method, index) => (
-                  <div key={`${method.title}-${index}`} className="rams-method-info-card is-grey">
-                    <h4>{method.title || "Rescue Plan"}</h4>
-                    <p>{Array.isArray(method.lines) ? method.lines.filter(Boolean).join(" ") : "-"}</p>
+                  <div key={`${method.title}-${index}`} className="rams-doc-card is-grey">
+                    <div>
+                      <h4 className="rams-doc-card-title">{method.title || "Rescue Plan"}</h4>
+                    </div>
+                    <ul>
+                      {(Array.isArray(method.lines) ? method.lines.filter(Boolean) : []).map((line, lineIndex) => (
+                        <li key={`${method.title}-${lineIndex}`}>{line}</li>
+                      ))}
+                    </ul>
                   </div>
                 ))}
               </div>
