@@ -1920,7 +1920,7 @@ async function saveRamsLogic(logic) {
 function getRamsCardIdsForQuestions(questions, logic = RAMS_DEFAULT_LOGIC) {
   const normalized = normalizeRamsQuestions(questions);
   const activeLogic = normalizeRamsLogic(logic);
-  const selected = new Set(activeLogic.baseCardIds);
+  const selected = new Set(activeLogic.baseCardIds.filter((cardId) => Boolean(activeLogic.cards?.[cardId])));
 
   activeLogic.optionGroups.forEach((group) => {
     const answer = normalized[group.key];
@@ -1929,7 +1929,9 @@ function getRamsCardIdsForQuestions(questions, logic = RAMS_DEFAULT_LOGIC) {
       : [String(answer || "")];
     group.options.forEach((option) => {
       if (!selectedValues.includes(String(option.value))) return;
-      option.cardIds.forEach((cardId) => selected.add(cardId));
+      option.cardIds.forEach((cardId) => {
+        if (activeLogic.cards?.[cardId]) selected.add(cardId);
+      });
     });
   });
 
@@ -1983,14 +1985,15 @@ function sortRamsMethodCardsForFlow(cards = []) {
 }
 
 function sortRamsCardOrderForFlow(cardOrder = [], cards = {}) {
-  const riskIds = cardOrder.filter((cardId) => {
+  const validCardOrder = cardOrder.filter((cardId) => Boolean(cards?.[cardId]));
+  const riskIds = validCardOrder.filter((cardId) => {
     const type = cards[cardId]?.type;
     return type !== "Method" && type !== "Rescue";
   });
-  const methodCards = cardOrder
+  const methodCards = validCardOrder
     .filter((cardId) => cards[cardId]?.type === "Method")
     .map((cardId) => ({ id: cardId, ...cards[cardId] }));
-  const rescueIds = cardOrder.filter((cardId) => cards[cardId]?.type === "Rescue");
+  const rescueIds = validCardOrder.filter((cardId) => cards[cardId]?.type === "Rescue");
   return [...riskIds, ...sortRamsMethodCardsForFlow(methodCards).map((card) => card.id), ...rescueIds];
 }
 
@@ -9071,6 +9074,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   }
 
   const selectedCards = cardOrder
+    .filter((cardId) => Boolean(ramsLogic.cards?.[cardId]))
     .map((cardId) => ({ id: cardId, ...ramsLogic.cards[cardId] }))
     .filter((card) => card.title);
   const methodCards = selectedCards.filter((card) => card.type === "Method");
