@@ -8597,6 +8597,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   const [logicStatus, setLogicStatus] = useState("");
   const [logicLoading, setLogicLoading] = useState(true);
   const [logicSaving, setLogicSaving] = useState(false);
+  const normalizedRamsLogic = useMemo(() => normalizeRamsLogic(ramsLogic), [ramsLogic]);
+  const normalizedRamsCards = normalizedRamsLogic.cards || {};
   const [cardOrder, setCardOrder] = useState(() => getRamsCardIdsForQuestions(RAMS_DEFAULT_QUESTIONS, RAMS_DEFAULT_LOGIC));
   const [draggingCardId, setDraggingCardId] = useState("");
   const [ramsEdits, setRamsEdits] = useState({});
@@ -9079,8 +9081,6 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     }
   }
 
-  const normalizedRamsLogic = useMemo(() => normalizeRamsLogic(ramsLogic), [ramsLogic]);
-  const normalizedRamsCards = normalizedRamsLogic.cards || {};
   let ramsRenderError = null;
   let selectedCards = [];
   let methodCards = [];
