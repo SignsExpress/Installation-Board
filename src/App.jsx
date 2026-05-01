@@ -8759,12 +8759,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     }));
     if (Array.isArray(savedDocument.cardOrder) && savedDocument.cardOrder.length) {
       setCardOrder(
-        savedDocument.cardOrder.filter((cardId) => Boolean(sharedRamsLogic.cards?.[cardId]))
+        savedDocument.cardOrder.filter((cardId) => Boolean(ramsLogic.cards?.[cardId]))
       );
     }
     setRamsEdits(savedDocument.edits && typeof savedDocument.edits === "object" ? savedDocument.edits : {});
     setSaveStatus(`Loaded saved RAMS ${savedDocument.reference || ""}`.trim());
-  }, [initialRamsParams.ramsId, selectedJob?.id]);
+  }, [initialRamsParams.ramsId, selectedJob?.id, ramsLogic.cards]);
 
   useEffect(() => {
     setCardOrder((current) => {
