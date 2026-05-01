@@ -665,6 +665,18 @@ const RAMS_CARD_LIBRARY = {
       "Return access routes and barriers to the agreed arrangement.",
       "Report completion, issues or snagging items to the site contact."
     ]
+  },
+  genericRescue: {
+    title: "General Rescue Arrangement",
+    type: "Rescue",
+    trigger: "Add to relevant access or work-area triggers",
+    initialRisk: "Low",
+    residualRisk: "Low",
+    content: [
+      "Stop work immediately, make the area safe and raise the alarm using the agreed site arrangements.",
+      "Do not put others at risk during a rescue. Contact the site emergency team and emergency services where required.",
+      "Only trained persons are to assist with any rescue equipment or casualty recovery."
+    ]
   }
 };
 
@@ -1958,11 +1970,15 @@ function sortRamsMethodCardsForFlow(cards = []) {
 }
 
 function sortRamsCardOrderForFlow(cardOrder = [], cards = {}) {
-  const riskIds = cardOrder.filter((cardId) => cards[cardId]?.type !== "Method");
+  const riskIds = cardOrder.filter((cardId) => {
+    const type = cards[cardId]?.type;
+    return type !== "Method" && type !== "Rescue";
+  });
   const methodCards = cardOrder
     .filter((cardId) => cards[cardId]?.type === "Method")
     .map((cardId) => ({ id: cardId, ...cards[cardId] }));
-  return [...riskIds, ...sortRamsMethodCardsForFlow(methodCards).map((card) => card.id)];
+  const rescueIds = cardOrder.filter((cardId) => cards[cardId]?.type === "Rescue");
+  return [...riskIds, ...sortRamsMethodCardsForFlow(methodCards).map((card) => card.id), ...rescueIds];
 }
 
 function getRamsLcr(card, phase = "initial") {
@@ -1994,9 +2010,10 @@ function getRamsLcr(card, phase = "initial") {
 function getRamsCardTypeRank(type = "") {
   const normalized = String(type || "").toLowerCase();
   if (normalized === "method") return 1;
-  if (normalized === "risk") return 2;
-  if (normalized === "coshh") return 3;
-  return 4;
+  if (normalized === "rescue") return 2;
+  if (normalized === "risk") return 3;
+  if (normalized === "coshh") return 4;
+  return 5;
 }
 
 function sortRamsCardEntries(entries) {
@@ -7909,15 +7926,20 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   const activeGroupIndex = Math.max(0, ramsLogicDraft.optionGroups.indexOf(activeGroup));
   const activeOption = activeGroup?.options?.[selectedOptionIndex] || activeGroup?.options?.[0] || null;
   const activeOptionIndex = activeGroup && activeOption ? Math.max(0, activeGroup.options.indexOf(activeOption)) : 0;
-  const sectionMatchesCard = (card) => logicSection === "risk" ? card?.type !== "Method" : card?.type === "Method";
+  const sectionMatchesCard = (card) => {
+    if (logicSection === "method") return card?.type === "Method";
+    if (logicSection === "rescue") return card?.type === "Rescue";
+    return card?.type !== "Method" && card?.type !== "Rescue";
+  };
   const sectionCards = sortRamsCardEntries(Object.entries(ramsLogicDraft.cards).filter(([, card]) => sectionMatchesCard(card)));
   const activeCardId = selectedCardId && ramsLogicDraft.cards[selectedCardId]
     && sectionMatchesCard(ramsLogicDraft.cards[selectedCardId])
     ? selectedCardId
     : sectionCards[0]?.[0] || "";
   const activeCard = activeCardId ? ramsLogicDraft.cards[activeCardId] : null;
-  const riskBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type !== "Method").length;
+  const riskBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type !== "Method" && card?.type !== "Rescue").length;
   const methodBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type === "Method").length;
+  const rescueBankCount = Object.values(ramsLogicDraft.cards).filter((card) => card?.type === "Rescue").length;
   const linkedTagLabels = activeCardId
     ? ramsLogicDraft.optionGroups.flatMap((group, groupIndex) =>
       group.options
@@ -8108,16 +8130,17 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   function addRamsCard() {
     const cardId = `custom-${Date.now()}`;
     const isMethod = logicSection === "method";
+    const isRescue = logicSection === "rescue";
     updateRamsLogicDraft((current) => ({
       ...current,
-      baseCardIds: isMethod || current.baseCardIds.includes(cardId)
+      baseCardIds: isMethod || isRescue || current.baseCardIds.includes(cardId)
         ? current.baseCardIds
         : [...current.baseCardIds, cardId],
       cards: {
         ...current.cards,
         [cardId]: {
-          title: isMethod ? "New method step" : "New risk assessment item",
-          type: isMethod ? "Method" : "Risk",
+          title: isMethod ? "New method step" : isRescue ? "New rescue plan step" : "New risk assessment item",
+          type: isMethod ? "Method" : isRescue ? "Rescue" : "Risk",
           trigger: "Custom",
           initialRisk: "Medium",
           residualRisk: "Low",
@@ -8128,7 +8151,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
           residualConsequence: 1,
           responsibility: "Installers from selected job",
           controlMeasure: "Write the required control measure here.",
-          content: [isMethod ? "Write the method step here." : "Write the required control measure here."]
+          content: [isMethod || isRescue ? "Write the method step here." : "Write the required control measure here."]
         }
       }
     }));
@@ -8239,12 +8262,23 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
               <strong>Method Statement</strong>
               <span>{methodBankCount} steps</span>
             </button>
+            <button
+              type="button"
+              className={logicSection === "rescue" ? "active" : ""}
+              onClick={() => {
+                setLogicSection("rescue");
+                setSelectedCardId("");
+              }}
+            >
+              <strong>Rescue Plan</strong>
+              <span>{rescueBankCount} steps</span>
+            </button>
           </div>
 
           <div className="rams-logic-allocation-grid">
             <aside className="rams-logic-bank-panel">
               <div className="rams-logic-heading">
-                <h3>{logicSection === "risk" ? "Risk bank" : "Method bank"}</h3>
+                <h3>{logicSection === "risk" ? "Risk bank" : logicSection === "method" ? "Method bank" : "Rescue bank"}</h3>
                 <button className="ghost-button" type="button" onClick={addRamsCard}>Add new</button>
               </div>
               <p className="rams-logic-help">Pick one item, then set where it appears using the trigger groups on the right.</p>
@@ -8278,8 +8312,8 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
 
             <section className="rams-logic-editor-panel rams-logic-allocation-editor">
               <div className="rams-logic-heading">
-                <h3>Edit selected {logicSection === "risk" ? "risk" : "method"}</h3>
-                <button className="ghost-button" type="button" onClick={addRamsCard}>Add new {logicSection === "risk" ? "risk" : "method"}</button>
+                <h3>Edit selected {logicSection === "risk" ? "risk" : logicSection === "method" ? "method" : "rescue plan"}</h3>
+                <button className="ghost-button" type="button" onClick={addRamsCard}>Add new {logicSection === "risk" ? "risk" : logicSection === "method" ? "method" : "rescue plan"}</button>
               </div>
 
               {activeCard ? (
@@ -8296,10 +8330,10 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                     </label>
                   </div>
                   <label className="rams-field-wide">
-                    {activeCard.type === "Method" ? "Method title" : "Hazard"}
+                    {activeCard.type === "Method" ? "Method title" : activeCard.type === "Rescue" ? "Rescue plan title" : "Hazard"}
                     <input value={activeCard.title || ""} onChange={(event) => updateRamsCard(activeCardId, "title", event.target.value)} />
                   </label>
-                  {activeCard.type === "Method" ? (
+                  {activeCard.type === "Method" || activeCard.type === "Rescue" ? (
                     <>
                       <label className="rams-field-wide">
                         Trigger note
@@ -8379,7 +8413,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                   <div className="rams-editor-tags">
                     <div className="rams-trigger-helper">
                       <strong>When should this appear?</strong>
-                      <p>Tick every job situation that should pull this {logicSection === "risk" ? "risk" : "method"} into a RAMS. Overlap is okay: if any ticked situation matches, it appears once.</p>
+                      <p>Tick every job situation that should pull this {logicSection === "risk" ? "risk" : logicSection === "method" ? "method" : "rescue plan"} into a RAMS. Overlap is okay: if any ticked situation matches, it appears once.</p>
                     </div>
                     {linkedTagLabels.length ? (
                       <div className="rams-trigger-chip-list">
@@ -8433,7 +8467,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                   </div>
                   {canDeleteRamsLogic ? (
                     <button className="text-button danger" type="button" onClick={() => removeRamsCard(activeCardId)}>
-                      Delete {activeCard.type === "Method" ? "method" : "risk"}
+                      Delete {activeCard.type === "Method" ? "method" : activeCard.type === "Rescue" ? "rescue plan" : "risk"}
                     </button>
                   ) : null}
                 </article>
@@ -9021,7 +9055,8 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     .map((cardId) => ({ id: cardId, ...ramsLogic.cards[cardId] }))
     .filter((card) => card.title);
   const methodCards = selectedCards.filter((card) => card.type === "Method");
-  const riskCards = selectedCards.filter((card) => card.type !== "Method");
+  const rescueCards = selectedCards.filter((card) => card.type === "Rescue");
+  const riskCards = selectedCards.filter((card) => card.type !== "Method" && card.type !== "Rescue");
   const selectedActivityValues = Array.isArray(questions.activity) ? questions.activity : questions.activity ? [questions.activity] : [];
   const selectedActivity = (ramsLogic.optionGroups.find((group) => group.key === "activity")?.options || [])
     .filter((option) => selectedActivityValues.includes(option.value))
@@ -9049,6 +9084,14 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   const displayedSiteHazards = getRamsEdit("notes", questions.notes?.trim() || "N/A");
   const displayedFirstAidFacility = getRamsEdit("firstAidFacility", questions.firstAidFacility || "To be selected");
   const displayedFirstAidBoxLocation = getRamsEdit("firstAidBoxLocation", questions.firstAidBoxLocation || "Signs Express Van");
+  const displayedEnvironmentalCoshh = getRamsEdit(
+    "environmentalCoshh",
+    "We minimise the amount of packaging used wherever possible. Copies of relevant Waste Carriers Licences, Recycling Transfer Notes and Copy of Hazardous Waste Registration Reports can be provided on request."
+  );
+  const displayedStandards = getRamsEdit(
+    "standards",
+    "All signs to be made to designer specifications & building regulations as per agreed artwork and (or) quotation item description."
+  );
   const activityGroup = ramsLogic.optionGroups.find((group) => group.key === "activity");
   const workAreaGroup = ramsLogic.optionGroups.find((group) => group.key === "workArea");
   const toolsGroup = ramsLogic.optionGroups.find((group) => group.key === "tools");
@@ -9139,6 +9182,16 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
         facility: displayedFirstAidFacility,
         boxLocation: displayedFirstAidBoxLocation
       },
+      supportingInfo: [
+        {
+          label: "Environmental / COSHH",
+          value: displayedEnvironmentalCoshh
+        },
+        {
+          label: "Standards",
+          value: displayedStandards
+        }
+      ],
       emergencyContacts,
       officeAddress: getRamsEdit("officeAddress", "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP"),
       risks: riskCards.map((card) => {
@@ -9164,6 +9217,10 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
         };
       }),
       methods: methodCards.map((card) => ({
+        title: getRamsEdit(`method-${card.id}-title`, card.title),
+        lines: card.content.map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
+      })),
+      rescuePlans: rescueCards.map((card) => ({
         title: getRamsEdit(`method-${card.id}-title`, card.title),
         lines: card.content.map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
       }))
@@ -9462,6 +9519,16 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                       <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
                     </div>
                   </div>
+                  <div className="rams-supporting-info-grid">
+                    <div className="rams-method-info-card is-grey">
+                      <h4>Environmental / COSHH</h4>
+                      <p>{renderEditable("environmentalCoshh", displayedEnvironmentalCoshh)}</p>
+                    </div>
+                    <div className="rams-method-info-card is-grey">
+                      <h4>Standards</h4>
+                      <p>{renderEditable("standards", displayedStandards)}</p>
+                    </div>
+                  </div>
                   {methodCards.map((card) => {
                     const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
                     return (
@@ -9493,6 +9560,26 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                       </div>
                     );
                   })}
+                  {rescueCards.length ? (
+                    <div className="rams-doc-method-section rams-doc-rescue-section">
+                      <h3>Rescue Plan</h3>
+                      <div className="rams-method-prep-grid">
+                        {rescueCards.map((card) => (
+                          <div key={`rescue-${card.id}`} className="rams-method-info-card is-grey">
+                            <h4>{renderEditable(`method-${card.id}-title`, card.title)}</h4>
+                            <p>
+                              {card.content.map((line, lineIndex) => (
+                                <React.Fragment key={`${card.id}-${lineIndex}`}>
+                                  {lineIndex ? <br /> : null}
+                                  {renderEditable(`method-${card.id}-line-${lineIndex}`, line)}
+                                </React.Fragment>
+                              ))}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="rams-emergency-grid">
                     <div className="rams-method-info-card">
                       <h5>Emergency Contacts</h5>
@@ -9712,6 +9799,7 @@ function ReadOnlyRamsDocument({
   const arrangements = Array.isArray(payload.arrangements) ? payload.arrangements : [];
   const risks = Array.isArray(payload.risks) ? payload.risks : [];
   const methods = Array.isArray(payload.methods) ? payload.methods : [];
+  const rescuePlans = Array.isArray(payload.rescuePlans) ? payload.rescuePlans : [];
   const installers = payload.meta?.find?.((item) => item.label === "Installers")?.value || getInstallerNamesForRams(job);
   const installerContacts = (Array.isArray(payload.installers) ? payload.installers : []).map((contact) => {
     const profile = getUserProfileByName(contact?.name, users);
@@ -9727,6 +9815,7 @@ function ReadOnlyRamsDocument({
   const tools = Array.isArray(payload.tools) ? payload.tools : [];
   const accessMethods = Array.isArray(payload.accessMethods) ? payload.accessMethods : [];
   const firstAid = payload.firstAid && typeof payload.firstAid === "object" ? payload.firstAid : {};
+  const supportingInfo = Array.isArray(payload.supportingInfo) ? payload.supportingInfo : [];
   const emergencyContacts = (Array.isArray(payload.emergencyContacts) ? payload.emergencyContacts : []).map((contact) => {
     const profile = getUserProfileByName(contact?.name, users);
     return {
@@ -9927,6 +10016,28 @@ function ReadOnlyRamsDocument({
               <p>{firstAid.boxLocation || "Signs Express Van"}</p>
             </div>
           </div>
+          <div className="rams-supporting-info-grid">
+            {(supportingInfo.length
+              ? supportingInfo
+              : [
+                  {
+                    label: "Environmental / COSHH",
+                    value:
+                      "We minimise the amount of packaging used wherever possible. Copies of relevant Waste Carriers Licences, Recycling Transfer Notes and Copy of Hazardous Waste Registration Reports can be provided on request."
+                  },
+                  {
+                    label: "Standards",
+                    value:
+                      "All signs to be made to designer specifications & building regulations as per agreed artwork and (or) quotation item description."
+                  }
+                ]
+            ).map((item, index) => (
+              <div key={`${item.label}-${index}`} className="rams-method-info-card is-grey">
+                <h4>{item.label}</h4>
+                <p>{item.value || "-"}</p>
+              </div>
+            ))}
+          </div>
 
           {methods.map((method, index) => (
             <div key={`${method.title}-${index}`} className="rams-doc-card">
@@ -9940,6 +10051,19 @@ function ReadOnlyRamsDocument({
               </ul>
             </div>
           ))}
+          {rescuePlans.length ? (
+            <div className="rams-doc-method-section rams-doc-rescue-section">
+              <h3>Rescue Plan</h3>
+              <div className="rams-method-prep-grid">
+                {rescuePlans.map((method, index) => (
+                  <div key={`${method.title}-${index}`} className="rams-method-info-card is-grey">
+                    <h4>{method.title || "Rescue Plan"}</h4>
+                    <p>{Array.isArray(method.lines) ? method.lines.filter(Boolean).join(" ") : "-"}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="rams-emergency-grid">
             <div className="rams-method-info-card is-green">

@@ -1473,6 +1473,12 @@
   gap: 6px;
 }
 
+.rams-supporting-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
 .rams-installer-contact-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1658,6 +1664,17 @@
 .rams-method-info-card.is-blue h5 {
   background: #dbeafe;
   color: #1d4ed8;
+}
+
+.rams-method-info-card.is-grey {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+}
+
+.rams-method-info-card.is-grey h4,
+.rams-method-info-card.is-grey h5 {
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .rams-emergency-contact-list {
@@ -2371,6 +2388,11 @@
     background: #eff6ff !important;
   }
 
+  .rams-method-info-card.is-grey {
+    border-color: #d1d5db !important;
+    background: #f3f4f6 !important;
+  }
+
   .rams-method-info-card h4,
   .rams-method-info-card h5 {
     background: #dcfce7 !important;
@@ -2414,6 +2436,12 @@
   .rams-doc-method-section .rams-method-info-card.is-blue h5 {
     background: #dbeafe !important;
     color: #1d4ed8 !important;
+  }
+
+  .rams-doc-method-section .rams-method-info-card.is-grey h4,
+  .rams-doc-method-section .rams-method-info-card.is-grey h5 {
+    background: #e5e7eb !important;
+    color: #374151 !important;
   }
 
   .rams-installer-contact-grid {
@@ -2495,6 +2523,12 @@
   }
 
   .rams-first-aid-section {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 1.4mm !important;
+    break-inside: avoid !important;
+  }
+
+  .rams-supporting-info-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     gap: 1.4mm !important;
     break-inside: avoid !important;
@@ -10621,6 +10655,7 @@ button {
   .rams-document-preview-readonly .rams-method-prep-grid,
   .rams-document-preview-readonly .rams-method-safety-grid,
   .rams-document-preview-readonly .rams-first-aid-section,
+  .rams-document-preview-readonly .rams-supporting-info-grid,
   .rams-document-preview-readonly .rams-emergency-grid,
   .rams-document-preview-readonly .rams-signoff {
     grid-template-columns: 1fr;
