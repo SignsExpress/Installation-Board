@@ -7544,6 +7544,23 @@ button {
   white-space: nowrap;
 }
 
+.attendance-cell-actions {
+  margin-top: 6px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.attendance-save-button {
+  border: 1px solid rgba(113, 76, 152, 0.28);
+  border-radius: 999px;
+  background: rgba(113, 76, 152, 0.08);
+  color: var(--sx-main);
+  padding: 4px 10px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .attendance-cell-meta {
   margin-top: 4px;
   font-size: 0.58rem;

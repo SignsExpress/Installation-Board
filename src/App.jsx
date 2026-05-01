@@ -11309,33 +11309,41 @@ function AttendancePage({
     }));
   }
 
-  async function handleAttendanceBlur(cell, field) {
+  function getAttendanceDraftChanges(cell) {
+    const key = `${cell.person}:${cell.isoDate}`;
+    const draft = drafts[key] || {};
+    const changedFields = [];
+    if (Object.prototype.hasOwnProperty.call(draft, "clockIn") && (draft.clockIn ?? "") !== (cell.clockIn ?? "")) {
+      changedFields.push("clockIn");
+    }
+    if (Object.prototype.hasOwnProperty.call(draft, "clockOut") && (draft.clockOut ?? "") !== (cell.clockOut ?? "")) {
+      changedFields.push("clockOut");
+    }
+    if (Object.prototype.hasOwnProperty.call(draft, "adminNote") && (draft.adminNote ?? "") !== (cell.adminNote ?? "")) {
+      changedFields.push("adminNote");
+    }
+    return { key, draft, changedFields };
+  }
+
+  async function handleAttendanceSave(cell) {
     const person = cell.person;
     const date = cell.isoDate;
-    const key = `${person}:${date}`;
-    const draft = drafts[key] || {};
+    const { key, draft, changedFields } = getAttendanceDraftChanges(cell);
+    if (!changedFields.length) return;
     const payload = {
       person,
       date,
-      changedFields: [field]
+      changedFields
     };
-    if (field === "clockIn") payload.clockIn = draft.clockIn ?? cell.clockIn ?? "";
-    if (field === "clockOut") payload.clockOut = draft.clockOut ?? cell.clockOut ?? "";
-    if (field === "adminNote") payload.adminNote = draft.adminNote ?? cell.adminNote ?? "";
+    if (changedFields.includes("clockIn")) payload.clockIn = draft.clockIn ?? "";
+    if (changedFields.includes("clockOut")) payload.clockOut = draft.clockOut ?? "";
+    if (changedFields.includes("adminNote")) payload.adminNote = draft.adminNote ?? "";
     const saved = await onSaveAttendanceEntry(payload);
     if (saved) {
       setDrafts((current) => {
         if (!current[key]) return current;
-        const nextDraft = { ...current[key] };
-        delete nextDraft[field];
-        if (!Object.keys(nextDraft).length) {
-          const { [key]: _removed, ...rest } = current;
-          return rest;
-        }
-        return {
-          ...current,
-          [key]: nextDraft
-        };
+        const { [key]: _removed, ...rest } = current;
+        return rest;
       });
     }
   }
@@ -11421,6 +11429,8 @@ function AttendancePage({
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
                         const displayClass = getAttendanceDisplayClass(cell);
+                        const { changedFields } = getAttendanceDraftChanges(cell);
+                        const hasDraftChanges = changedFields.length > 0;
                         if (cell.displayLabel) {
                           return (
                             <td
@@ -11440,7 +11450,6 @@ function AttendancePage({
                                   value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                   placeholder="--:--"
                                   onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
-                                  onBlur={() => handleAttendanceBlur(cell, "clockIn")}
                                 />
                                 {cell.halfDayHolidayLabel ? (
                                   <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
@@ -11452,8 +11461,14 @@ function AttendancePage({
                                   value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                 placeholder="--:--"
                                 onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
-                                onBlur={() => handleAttendanceBlur(cell, "clockOut")}
                               />
+                              {hasDraftChanges ? (
+                                <div className="attendance-cell-actions">
+                                  <button type="button" className="attendance-save-button" onClick={() => handleAttendanceSave(cell)}>
+                                    Save
+                                  </button>
+                                </div>
+                              ) : null}
                               {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
                               {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
                             </td>
