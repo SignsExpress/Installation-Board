@@ -42,6 +42,7 @@ const DEFAULT_COREBRIDGE_MATERIAL_PATH = "/core/api/material";
 const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
+const TIMEMOTO_WEBHOOK_TOKEN = String(process.env.TIMEMOTO_WEBHOOK_TOKEN || "").trim();
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -135,6 +136,7 @@ function createEmptyBoardStore() {
     holidayEvents: [],
     notifications: [],
     attendanceEntries: [],
+    attendanceWebhookEvents: [],
     mileageClaims: [],
     materialRequestCatalog: {},
     materialRequests: [],
@@ -933,6 +935,7 @@ function mergeHolidaySeed(store) {
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
+        attendanceWebhookEvents: Array.isArray(store.attendanceWebhookEvents) ? [...store.attendanceWebhookEvents] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
         materialRequestCatalog: sanitizeMaterialRequestCatalog(store.materialRequestCatalog),
         materialRequests: Array.isArray(store.materialRequests) ? [...store.materialRequests] : [],
@@ -1036,6 +1039,7 @@ async function readStore() {
             holidayEvents: [],
             notifications: [],
             attendanceEntries: [],
+            attendanceWebhookEvents: [],
             mileageClaims: [],
             materialRequestCatalog: {},
             materialRequests: [],
@@ -1061,6 +1065,7 @@ async function readStore() {
           holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
+          attendanceWebhookEvents: Array.isArray(parsed.attendanceWebhookEvents) ? parsed.attendanceWebhookEvents : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
           materialRequestCatalog:
             parsed.materialRequestCatalog && typeof parsed.materialRequestCatalog === "object" && !Array.isArray(parsed.materialRequestCatalog)
@@ -1125,6 +1130,10 @@ async function writeStore(store) {
           if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
           return String(left.person || "").localeCompare(String(right.person || ""));
         }),
+      attendanceWebhookEvents: [...(store.attendanceWebhookEvents || [])]
+        .map((entry) => sanitizeAttendanceWebhookEvent(entry))
+        .sort((left, right) => String(right.receivedAt || "").localeCompare(String(left.receivedAt || "")))
+        .slice(0, 100),
       mileageClaims: [...(store.mileageClaims || [])]
         .map((entry) => sanitizeMileageClaim(entry))
         .sort((left, right) => {
@@ -2561,6 +2570,176 @@ function sanitizeMileageClaim(payload) {
     submittedAt: String(payload?.submittedAt || new Date().toISOString()),
     createdAt: String(payload?.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeAttendanceWebhookEvent(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    provider: String(payload?.provider || "timemoto").trim().toLowerCase() || "timemoto",
+    eventType: String(payload?.eventType || payload?.type || "unknown").trim(),
+    person: String(payload?.person || "").trim(),
+    date: String(payload?.date || "").trim(),
+    clockIn: sanitizeAttendanceTime(payload?.clockIn),
+    clockOut: sanitizeAttendanceTime(payload?.clockOut),
+    imported: Boolean(payload?.imported),
+    importNote: String(payload?.importNote || "").trim(),
+    receivedAt: String(payload?.receivedAt || new Date().toISOString()),
+    payload: payload?.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
+}
+
+function pickFirstWebhookValue(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function getWebhookNestedValue(source, path) {
+  const segments = Array.isArray(path) ? path : String(path || "").split(".");
+  let current = source;
+  for (const segment of segments) {
+    if (!current || typeof current !== "object" || !(segment in current)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+function toIsoDateFromDateTimeValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const normalized = raw.replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString().slice(0, 10);
+}
+
+function toAttendanceTimeFromDateTimeValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const direct = sanitizeAttendanceTime(raw);
+  if (direct) return direct;
+  const parsed = new Date(raw.replace(" ", "T"));
+  if (Number.isNaN(parsed.getTime())) return "";
+  return `${String(parsed.getHours()).padStart(2, "0")}:${String(parsed.getMinutes()).padStart(2, "0")}`;
+}
+
+function resolveAttendanceWebhookPerson(rawPerson) {
+  const raw = String(rawPerson || "").trim();
+  if (!raw) return "";
+  const holidayMatch = getHolidayStaffEntry(raw);
+  if (holidayMatch?.person) return holidayMatch.person;
+  const directStaff = HOLIDAY_STAFF.find((entry) => {
+    const normalized = raw.toLowerCase();
+    return (
+      entry.name.toLowerCase() === normalized ||
+      entry.person.toLowerCase() === normalized ||
+      entry.code.toLowerCase() === normalized
+    );
+  });
+  if (directStaff?.person) return directStaff.person;
+  return toHolidayPersonLabel(raw);
+}
+
+function getAttendanceActionFromWebhook(payload) {
+  const text = [
+    payload?.event,
+    payload?.type,
+    payload?.action,
+    payload?.status,
+    payload?.direction,
+    getWebhookNestedValue(payload, "data.event"),
+    getWebhookNestedValue(payload, "data.type"),
+    getWebhookNestedValue(payload, "entryType"),
+    getWebhookNestedValue(payload, "clockingType")
+  ]
+    .map((value) => String(value || "").trim().toLowerCase())
+    .filter(Boolean)
+    .join(" ");
+
+  if (/\b(clock[\s_-]*out|checkout|check[\s_-]*out|out|sign[\s_-]*out)\b/.test(text)) return "out";
+  if (/\b(clock[\s_-]*in|checkin|check[\s_-]*in|in|sign[\s_-]*in)\b/.test(text)) return "in";
+  return "";
+}
+
+function extractAttendanceWebhookFields(payload) {
+  const person = resolveAttendanceWebhookPerson(
+    pickFirstWebhookValue(
+      payload?.person,
+      payload?.employeeName,
+      payload?.employee,
+      payload?.userName,
+      payload?.name,
+      getWebhookNestedValue(payload, "employee.name"),
+      getWebhookNestedValue(payload, "employee.fullName"),
+      getWebhookNestedValue(payload, "user.name"),
+      getWebhookNestedValue(payload, "user.fullName"),
+      getWebhookNestedValue(payload, "data.employeeName"),
+      getWebhookNestedValue(payload, "data.employee.name"),
+      getWebhookNestedValue(payload, "data.user.name")
+    )
+  );
+
+  const dateTimeValue = pickFirstWebhookValue(
+    payload?.timestamp,
+    payload?.datetime,
+    payload?.dateTime,
+    payload?.clockingAt,
+    payload?.occurredAt,
+    payload?.eventDateTime,
+    getWebhookNestedValue(payload, "data.timestamp"),
+    getWebhookNestedValue(payload, "data.datetime"),
+    getWebhookNestedValue(payload, "data.dateTime"),
+    getWebhookNestedValue(payload, "data.clockingAt"),
+    getWebhookNestedValue(payload, "entry.timestamp"),
+    getWebhookNestedValue(payload, "entry.datetime")
+  );
+
+  const dateValue = pickFirstWebhookValue(
+    payload?.date,
+    getWebhookNestedValue(payload, "data.date"),
+    getWebhookNestedValue(payload, "entry.date"),
+    toIsoDateFromDateTimeValue(dateTimeValue)
+  );
+
+  const timeValue = pickFirstWebhookValue(
+    payload?.time,
+    payload?.clockTime,
+    getWebhookNestedValue(payload, "data.time"),
+    getWebhookNestedValue(payload, "entry.time"),
+    toAttendanceTimeFromDateTimeValue(dateTimeValue)
+  );
+
+  const explicitClockIn = sanitizeAttendanceTime(
+    pickFirstWebhookValue(
+      payload?.clockIn,
+      getWebhookNestedValue(payload, "data.clockIn"),
+      getWebhookNestedValue(payload, "entry.clockIn")
+    )
+  );
+  const explicitClockOut = sanitizeAttendanceTime(
+    pickFirstWebhookValue(
+      payload?.clockOut,
+      getWebhookNestedValue(payload, "data.clockOut"),
+      getWebhookNestedValue(payload, "entry.clockOut")
+    )
+  );
+
+  const action = getAttendanceActionFromWebhook(payload);
+  const normalizedDate = isValidIsoDate(dateValue) ? dateValue : "";
+  const normalizedTime = sanitizeAttendanceTime(timeValue);
+
+  return {
+    person,
+    date: normalizedDate,
+    action,
+    clockIn: explicitClockIn || (action === "in" ? normalizedTime : ""),
+    clockOut: explicitClockOut || (action === "out" ? normalizedTime : ""),
+    rawTime: normalizedTime
   };
 }
 
@@ -7343,6 +7522,123 @@ function createServer() {
     next();
   });
 
+  app.post("/api/integrations/timemoto/webhook", async (request, response) => {
+    const providedToken = String(
+      request.query?.token ||
+      request.headers["x-timemoto-token"] ||
+      request.headers["x-webhook-token"] ||
+      ""
+    ).trim();
+
+    if (TIMEMOTO_WEBHOOK_TOKEN && providedToken !== TIMEMOTO_WEBHOOK_TOKEN) {
+      response.status(401).json({ error: "Invalid webhook token." });
+      return;
+    }
+
+    const payload = request.body && typeof request.body === "object" ? request.body : {};
+    const extracted = extractAttendanceWebhookFields(payload);
+    const eventType = pickFirstWebhookValue(
+      payload?.event,
+      payload?.type,
+      payload?.action,
+      getWebhookNestedValue(payload, "data.event"),
+      getWebhookNestedValue(payload, "data.type"),
+      "timemoto-webhook"
+    );
+
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    store.attendanceWebhookEvents = Array.isArray(store.attendanceWebhookEvents) ? store.attendanceWebhookEvents : [];
+
+    let imported = false;
+    let importNote = "";
+    let nextEntry = null;
+
+    if (!extracted.person || !extracted.date) {
+      importNote = "Webhook captured, but person/date could not be mapped yet.";
+    } else {
+      store.attendanceEntries = Array.isArray(store.attendanceEntries) ? store.attendanceEntries : [];
+      const identity = getHolidayStaffIdentityKey(extracted.person);
+      const existingIndex = store.attendanceEntries.findIndex(
+        (entry) =>
+          getHolidayStaffIdentityKey(entry.person) === identity &&
+          String(entry.date || "") === extracted.date
+      );
+
+      const existingEntry = existingIndex >= 0 ? sanitizeAttendanceEntry(store.attendanceEntries[existingIndex]) : null;
+      const fallbackTime = extracted.rawTime;
+      let clockIn = extracted.clockIn || existingEntry?.clockIn || "";
+      let clockOut = extracted.clockOut || existingEntry?.clockOut || "";
+
+      if (!extracted.clockIn && !extracted.clockOut && fallbackTime) {
+        if (!existingEntry?.clockIn) {
+          clockIn = fallbackTime;
+        } else if (!existingEntry?.clockOut && fallbackTime !== existingEntry.clockIn) {
+          clockOut = fallbackTime;
+        }
+      }
+
+      nextEntry = sanitizeAttendanceEntry({
+        ...(existingEntry || {}),
+        person: extracted.person,
+        date: extracted.date,
+        clockIn,
+        clockOut,
+        source: "timemoto"
+      });
+
+      if (!nextEntry.clockIn && !nextEntry.clockOut) {
+        importNote = "Webhook captured, but no usable clocking time was found.";
+        nextEntry = null;
+      } else {
+        if (existingIndex >= 0) {
+          nextEntry.id = store.attendanceEntries[existingIndex].id;
+          nextEntry.createdAt = store.attendanceEntries[existingIndex].createdAt || nextEntry.createdAt;
+          nextEntry.employeeNote = store.attendanceEntries[existingIndex].employeeNote || nextEntry.employeeNote;
+          store.attendanceEntries[existingIndex] = nextEntry;
+        } else {
+          store.attendanceEntries.unshift(nextEntry);
+        }
+        syncAttendanceMissingNotification(store, usersStore.users || [], nextEntry);
+        imported = true;
+      }
+    }
+
+    store.attendanceWebhookEvents.unshift(
+      sanitizeAttendanceWebhookEvent({
+        provider: "timemoto",
+        eventType,
+        person: extracted.person,
+        date: extracted.date,
+        clockIn: nextEntry?.clockIn || "",
+        clockOut: nextEntry?.clockOut || "",
+        imported,
+        importNote,
+        payload
+      })
+    );
+
+    await writeStore(store);
+    if (nextEntry) {
+      broadcast("attendance-updated", {
+        monthId: String(nextEntry.date || "").slice(0, 7),
+        date: nextEntry.date
+      });
+    }
+
+    response.status(202).json({
+      ok: true,
+      imported,
+      importNote,
+      mapped: {
+        person: extracted.person,
+        date: extracted.date,
+        clockIn: nextEntry?.clockIn || "",
+        clockOut: nextEntry?.clockOut || ""
+      }
+    });
+  });
+
   app.get("/api/auth/users", async (request, response) => {
     const session = getSessionFromRequest(request);
     if (!session) {
@@ -9295,6 +9591,16 @@ app.get("/api/corebridge/orders", async (request, response) => {
     if (!requireAttendanceAccess(request, response)) return;
     const payload = await getAttendancePayload(request.user, String(request.query.month || "").trim());
     response.json(payload);
+  });
+
+  app.get("/api/attendance/webhook-events", async (request, response) => {
+    if (!requireAttendanceAdmin(request, response)) return;
+    const store = await readStore();
+    response.json(
+      (Array.isArray(store.attendanceWebhookEvents) ? store.attendanceWebhookEvents : [])
+        .map((entry) => sanitizeAttendanceWebhookEvent(entry))
+        .slice(0, 30)
+    );
   });
 
   app.post("/api/attendance/entries", async (request, response) => {
