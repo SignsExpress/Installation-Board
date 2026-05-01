@@ -1804,7 +1804,10 @@ function normalizeRamsLogic(logic = {}) {
     ? Object.fromEntries(Object.entries(logic.cards).filter(([cardId]) => !LEGACY_RAMS_RISK_CARD_IDS.has(String(cardId))))
     : {};
   const incomingMethodCards = Object.fromEntries(
-    Object.entries(incomingCards).filter(([, card]) => String(card?.type || "").toLowerCase() === "method")
+    Object.entries(incomingCards).filter(([, card]) => {
+      const type = String(card?.type || "").toLowerCase();
+      return type === "method" || type === "rescue";
+    })
   );
   const workingCards = requiresRiskBankReset ? incomingMethodCards : incomingCards;
   const hasCurrentRiskCards = Object.keys(workingCards).some((cardId) => defaultRiskCardIds.includes(String(cardId)));
@@ -1872,7 +1875,10 @@ function normalizeRamsLogic(logic = {}) {
       const incomingBase = Array.isArray(logic.baseCardIds)
         ? logic.baseCardIds.map(String).filter((cardId) => cardId && !LEGACY_RAMS_RISK_CARD_IDS.has(cardId))
         : [];
-      const methodBaseIds = incomingBase.filter((cardId) => String(cardsToNormalize[cardId]?.type || "").toLowerCase() === "method");
+      const methodBaseIds = incomingBase.filter((cardId) => {
+        const type = String(cardsToNormalize[cardId]?.type || "").toLowerCase();
+        return type === "method" || type === "rescue";
+      });
       return requiresRiskBankReset || !hasCurrentRiskCards
         ? [...new Set([...RAMS_BASE_CARD_IDS, ...methodBaseIds])]
         : incomingBase;
