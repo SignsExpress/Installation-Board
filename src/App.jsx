@@ -8308,8 +8308,8 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                     (count, group) => count + group.options.filter((option) => option.cardIds.includes(cardId)).length,
                     0
                   );
-                  const residual = getRamsLcr(card, "residual");
-                  const band = getRamsRiskBand(residual.rating);
+                  const isRiskCard = card.type !== "Method" && card.type !== "Rescue";
+                  const band = isRiskCard ? getRamsRiskBand(getRamsLcr(card, "residual").rating) : null;
                   return (
                     <button
                       key={cardId}
@@ -8323,7 +8323,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
                           ? "Always on RAMS"
                           : `${tagCount} trigger${tagCount === 1 ? "" : "s"}`}
                       </span>
-                      {card.type !== "Method" ? <small className={`rams-mini-risk ${band.className}`}>{band.code}</small> : null}
+                      {isRiskCard && band ? <small className={`rams-mini-risk ${band.className}`}>{band.code}</small> : null}
                     </button>
                   );
                 })}
