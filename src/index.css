@@ -2012,6 +2012,12 @@
   color: #1d4ed8;
 }
 
+.rams-doc-method-section .rams-method-info-card.is-grey h4,
+.rams-doc-method-section .rams-method-info-card.is-grey h5 {
+  background: #e5e7eb;
+  color: #374151;
+}
+
 .rams-doc-risk-section h4 {
   color: #9a3412;
   background: #ffedd5;
@@ -2028,8 +2034,8 @@
 }
 
 .rams-doc-method-section .rams-doc-card {
-  background: #f8fff9;
-  border-color: #bbf7d0;
+  background: #f3f4f6;
+  border-color: #d1d5db;
 }
 
 .rams-doc-risk-section .rams-doc-card {
@@ -2211,7 +2217,10 @@
 }
 
 .rams-doc-method-section .rams-doc-card > div strong {
-  color: #166534;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 0.78rem;
 }
 
 .rams-doc-card ul {
@@ -2225,6 +2234,11 @@
 
 .rams-doc-rescue-section .rams-method-prep-grid {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.rams-doc-method-section .rams-doc-card.is-grey > div {
+  background: #e5e7eb;
+  border-bottom: 1px solid #d1d5db;
 }
 
 .job-rams-pill {

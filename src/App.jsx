@@ -9586,7 +9586,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                     return (
                       <div
                         key={`doc-${card.id}`}
-                        className="rams-doc-card"
+                        className="rams-doc-card is-grey"
                         draggable
                         onDragStart={() => setDraggingCardId(card.id)}
                         onDragEnd={() => setDraggingCardId("")}
@@ -9633,7 +9633,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                     </div>
                   ) : null}
                   <div className="rams-emergency-grid">
-                    <div className="rams-method-info-card">
+                    <div className="rams-method-info-card is-red">
                       <h5>Emergency Contacts</h5>
                       <div className="rams-emergency-contact-list">
                         {emergencyContacts.map((contact, index) => (
@@ -9654,7 +9654,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                         ))}
                       </div>
                     </div>
-                    <div className="rams-method-info-card">
+                    <div className="rams-method-info-card is-grey">
                       <h5>Signs Express Office</h5>
                       <p>{renderEditable("officeAddress", "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP")}</p>
                     </div>
@@ -10090,7 +10090,7 @@ function ReadOnlyRamsDocument({
           </div>
 
           {methods.map((method, index) => (
-            <div key={`${method.title}-${index}`} className="rams-doc-card">
+            <div key={`${method.title}-${index}`} className="rams-doc-card is-grey">
               <div>
                 <strong>{method.title || "Method"}</strong>
               </div>
@@ -10116,7 +10116,7 @@ function ReadOnlyRamsDocument({
           ) : null}
 
           <div className="rams-emergency-grid">
-            <div className="rams-method-info-card is-green">
+            <div className="rams-method-info-card is-red">
               <h5>Emergency Contacts</h5>
               <div className="rams-emergency-contact-list">
                 {emergencyContacts.map((contact, index) => (
@@ -10126,7 +10126,7 @@ function ReadOnlyRamsDocument({
                 ))}
               </div>
             </div>
-            <div className="rams-method-info-card is-green">
+            <div className="rams-method-info-card is-grey">
               <h5>Signs Express Office</h5>
               <p>{officeAddress}</p>
             </div>
