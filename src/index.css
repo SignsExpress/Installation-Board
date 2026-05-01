@@ -7512,11 +7512,34 @@ button {
   background: rgba(255, 255, 255, 0.9);
 }
 
+.attendance-toolbar-actions {
+  align-items: center;
+  gap: 10px;
+}
+
+.attendance-save-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 6px;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.attendance-save-all-button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
 .attendance-cell-stack {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
+  gap: 2px;
 }
 
 .attendance-time-input {
@@ -7531,6 +7554,11 @@ button {
   color: #0f172a;
   font-size: 0.68rem;
   line-height: 1.1;
+}
+
+.attendance-time-input.is-edited {
+  border-color: rgba(113, 76, 152, 0.42);
+  background: rgba(113, 76, 152, 0.06);
 }
 
 .attendance-time-input:focus {
@@ -7548,35 +7576,6 @@ button {
   font-weight: 800;
   line-height: 1.1;
   white-space: nowrap;
-}
-
-.attendance-cell-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.attendance-save-button {
-  border: 1px solid rgba(113, 76, 152, 0.28);
-  border-radius: 999px;
-  background: rgba(113, 76, 152, 0.08);
-  color: var(--sx-main);
-  padding: 4px 8px;
-  font-size: 0.58rem;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.attendance-save-button.is-idle {
-  opacity: 0.55;
-}
-
-.attendance-save-button:disabled {
-  cursor: default;
-}
-
-.attendance-save-button.is-active {
-  background: rgba(113, 76, 152, 0.14);
-  border-color: rgba(113, 76, 152, 0.38);
 }
 
 .attendance-cell-edited,
@@ -7597,6 +7596,7 @@ button {
   color: #64748b;
   text-align: left;
   word-break: break-word;
+  white-space: normal;
 }
 
 .attendance-cell-meta-warning {

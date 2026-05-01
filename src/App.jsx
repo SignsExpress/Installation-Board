@@ -11325,25 +11325,47 @@ function AttendancePage({
     return { key, draft, changedFields };
   }
 
-  async function handleAttendanceSave(cell) {
+  function buildAttendanceSavePayload(cell) {
     const person = cell.person;
     const date = cell.isoDate;
     const { key, draft, changedFields } = getAttendanceDraftChanges(cell);
-    if (!changedFields.length) return;
+    if (!changedFields.length) return null;
     const payload = {
       person,
       date,
-      changedFields
+      changedFields,
+      draftKey: key
     };
     if (changedFields.includes("clockIn")) payload.clockIn = draft.clockIn ?? "";
     if (changedFields.includes("clockOut")) payload.clockOut = draft.clockOut ?? "";
     if (changedFields.includes("adminNote")) payload.adminNote = draft.adminNote ?? "";
-    const saved = await onSaveAttendanceEntry(payload);
-    if (saved) {
+    return payload;
+  }
+
+  const changedAttendanceCells = adminMode
+    ? rows.flatMap((row) =>
+        row.cells
+          .filter((cell) => !cell.displayLabel)
+          .map((cell) => ({ cell, payload: buildAttendanceSavePayload(cell) }))
+          .filter((entry) => entry.payload)
+      )
+    : [];
+
+  async function handleSaveAllAttendanceChanges() {
+    if (!changedAttendanceCells.length) return;
+    const clearedKeys = [];
+    for (const entry of changedAttendanceCells) {
+      const saved = await onSaveAttendanceEntry(entry.payload);
+      if (!saved) break;
+      clearedKeys.push(entry.payload.draftKey);
+    }
+    if (clearedKeys.length) {
       setDrafts((current) => {
-        if (!current[key]) return current;
-        const { [key]: _removed, ...rest } = current;
-        return rest;
+        const next = { ...current };
+        clearedKeys.forEach((key) => {
+          delete next[key];
+        });
+        return next;
       });
     }
   }
@@ -11376,7 +11398,20 @@ function AttendancePage({
               <h2>Attendance</h2>
               <p>{attendanceMonthLabel}</p>
             </div>
-            <div className="holidays-toolbar-actions">
+            <div className="holidays-toolbar-actions attendance-toolbar-actions">
+              {adminMode ? (
+                <div className="attendance-save-summary">
+                  <span>{changedAttendanceCells.length ? `${changedAttendanceCells.length} edited entr${changedAttendanceCells.length === 1 ? "y" : "ies"}` : "No unsaved edits"}</span>
+                  <button
+                    className="primary-button attendance-save-all-button"
+                    type="button"
+                    onClick={handleSaveAllAttendanceChanges}
+                    disabled={!changedAttendanceCells.length || Boolean(attendanceSavingKey)}
+                  >
+                    {attendanceSavingKey ? "Saving..." : "Save attendance changes"}
+                  </button>
+                </div>
+              ) : null}
               <button className="ghost-button" type="button" onClick={() => setAttendanceMonthId(shiftMonthId(attendanceMonthId, -1))}>
                 Previous month
               </button>
@@ -11447,7 +11482,7 @@ function AttendancePage({
                               <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
                                 <div className="attendance-cell-stack">
                                   <input
-                                    className="attendance-time-input"
+                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
@@ -11461,21 +11496,11 @@ function AttendancePage({
                               <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
                                 <div className="attendance-cell-stack">
                                   <input
-                                    className="attendance-time-input"
+                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
-                                  <div className="attendance-cell-actions">
-                                    <button
-                                      type="button"
-                                      className={`attendance-save-button ${hasDraftChanges ? "is-active" : "is-idle"}`}
-                                      onClick={() => handleAttendanceSave(cell)}
-                                      disabled={!hasDraftChanges || attendanceSavingKey === `${cell.person}:${row.isoDate}`}
-                                    >
-                                      {attendanceSavingKey === `${cell.person}:${row.isoDate}` ? "Saving..." : "Save"}
-                                    </button>
-                                  </div>
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
                                   {cell.punchSummary ? <div className="attendance-cell-meta">Punches: {cell.punchSummary}</div> : null}
                                   {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
