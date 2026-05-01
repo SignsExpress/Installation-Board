@@ -9073,13 +9073,27 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     }
   }
 
-  const selectedCards = cardOrder
-    .filter((cardId) => Boolean(ramsLogic.cards?.[cardId]))
-    .map((cardId) => ({ id: cardId, ...ramsLogic.cards[cardId] }))
-    .filter((card) => card.title);
-  const methodCards = selectedCards.filter((card) => card.type === "Method");
-  const rescueCards = selectedCards.filter((card) => card.type === "Rescue");
-  const riskCards = selectedCards.filter((card) => card.type !== "Method" && card.type !== "Rescue");
+  let ramsRenderError = null;
+  let selectedCards = [];
+  let methodCards = [];
+  let rescueCards = [];
+  let riskCards = [];
+  try {
+    selectedCards = cardOrder
+      .filter((cardId) => Boolean(ramsLogic.cards?.[cardId]) && typeof ramsLogic.cards[cardId] === "object")
+      .map((cardId) => ({ id: cardId, ...normalizeRamsCard(ramsLogic.cards[cardId]) }))
+      .filter((card) => card.title);
+    methodCards = selectedCards.filter((card) => card.type === "Method");
+    rescueCards = selectedCards.filter((card) => card.type === "Rescue");
+    riskCards = selectedCards.filter((card) => card.type !== "Method" && card.type !== "Rescue");
+  } catch (error) {
+    console.error("RAMS selection build failed", {
+      error,
+      cardOrder,
+      cards: ramsLogic.cards
+    });
+    ramsRenderError = error;
+  }
   const selectedActivityValues = Array.isArray(questions.activity) ? questions.activity : questions.activity ? [questions.activity] : [];
   const selectedActivity = (ramsLogic.optionGroups.find((group) => group.key === "activity")?.options || [])
     .filter((option) => selectedActivityValues.includes(option.value))
@@ -9309,6 +9323,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
 
           {jobError ? <div className="flash error">{jobError}</div> : null}
           {saveStatus ? <div className={`flash no-print ${saveStatus.toLowerCase().includes("could not") ? "error" : "success"}`}>{saveStatus}</div> : null}
+          {ramsRenderError ? (
+            <div className="flash error">
+              RAMS render failed: {ramsRenderError.message || "Unknown error."}
+              {rescueCards.length ? ` Active rescue plans: ${rescueCards.map((card) => card.title).join(", ")}` : ""}
+            </div>
+          ) : null}
 
           <div className="rams-builder-grid">
             <aside className="rams-question-panel">
