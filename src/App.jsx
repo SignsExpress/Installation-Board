@@ -5100,6 +5100,7 @@ const DEFAULT_PRO_FORMA_TEMPLATE = {
 
 const DEFAULT_PRO_FORMA_LOGO = "/branding/pdf-reference/invoice-logo.png";
 const DEFAULT_PRO_FORMA_TERMS_PDF = "/branding/pdf-reference/terms-and-conditions.pdf";
+const DEFAULT_PRO_FORMA_TERMS_IMAGE = "/branding/pdf-reference/terms-and-conditions-page-1.png";
 const DEFAULT_PRO_FORMA_ACCREDITATION_ASSETS = [
   { url: "/branding/pdf-reference/accreditation-nhs.png", widthMm: 23.9, alt: "NHS Approved Supplier" },
   { url: "/branding/pdf-reference/accreditation-dementia-friends.png", widthMm: 21.3, alt: "Dementia Friends" },
@@ -6429,6 +6430,7 @@ function removeLineItem(lineId) {
       const termsAsset = latestTemplate?.termsPdfAsset || null;
       const termsAssetUrl = getProFormaTemplateAssetUrl(termsAsset);
       const defaultTermsUrl = `${window.location.origin}${DEFAULT_PRO_FORMA_TERMS_PDF}`;
+      const defaultTermsImageUrl = `${window.location.origin}${DEFAULT_PRO_FORMA_TERMS_IMAGE}`;
       const resolvedTermsUrl = termsAssetUrl || defaultTermsUrl;
       const isTermsImageAsset = isProFormaImageAsset(termsAsset) || /\.(png|jpe?g|webp|gif|bmp|svg)(?:$|[?#])/i.test(resolvedTermsUrl);
       let termsPageImages = !resolvedTermsUrl
@@ -6438,6 +6440,9 @@ function removeLineItem(lineId) {
           : await renderPdfAssetToPageImages(resolvedTermsUrl);
       if (!termsPageImages.length && resolvedTermsUrl !== defaultTermsUrl) {
         termsPageImages = await renderPdfAssetToPageImages(defaultTermsUrl);
+      }
+      if (!termsPageImages.length) {
+        termsPageImages = [defaultTermsImageUrl];
       }
       if (resolvedTermsUrl && !termsPageImages.length) {
         console.warn("T&Cs file was present but rendered zero pages.", resolvedTermsUrl);
@@ -6648,17 +6653,17 @@ function removeLineItem(lineId) {
                       Total paid
                       <input value={draft.totalPaid} onChange={(event) => updateDraft("totalPaid", event.target.value)} inputMode="decimal" />
                     </label>
-                    <label className="span-2">
+                    <label className="pro-forma-vat-field">
                       Notes / scope
                       <textarea rows={1} value={draft.notes} onChange={(event) => updateDraft("notes", event.target.value)} />
                     </label>
                     <label className="span-2">
-                      Site address
-                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
-                    </label>
-                    <label className="span-2">
                       Billing address
                       <textarea rows={4} value={draft.billingAddress} onChange={(event) => updateDraft("billingAddress", event.target.value)} />
+                    </label>
+                    <label className="span-2">
+                      Site address
+                      <textarea rows={4} value={draft.siteAddress} onChange={(event) => updateDraft("siteAddress", event.target.value)} />
                     </label>
                   </div>
 
