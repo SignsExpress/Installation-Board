@@ -2020,21 +2020,21 @@
 .rams-doc-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 5px 8px;
+  padding: 0;
   display: grid;
   gap: 4px;
   break-inside: avoid;
-  border-left: 5px solid #d7cbdd;
+  overflow: hidden;
 }
 
 .rams-doc-method-section .rams-doc-card {
-  border-left-color: #16a34a;
   background: #f8fff9;
+  border-color: #bbf7d0;
 }
 
 .rams-doc-risk-section .rams-doc-card {
-  border-left-color: #ea580c;
   background: #fffaf5;
+  border-color: #fed7aa;
 }
 
 .rams-risk-table-wrap {
@@ -2198,12 +2198,33 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  background: #dcfce7;
+  border-bottom: 1px solid #bbf7d0;
 }
 
 .rams-doc-card > div span {
   color: #64748b;
   font-weight: 700;
   font-size: 0.72rem;
+}
+
+.rams-doc-method-section .rams-doc-card > div strong {
+  color: #166534;
+}
+
+.rams-doc-card ul {
+  padding: 0 8px 8px 26px;
+  margin: 0;
+}
+
+.rams-doc-card ul li {
+  margin: 0;
+}
+
+.rams-doc-rescue-section .rams-method-prep-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .job-rams-pill {

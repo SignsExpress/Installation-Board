@@ -9396,13 +9396,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                 </div>
                 <div className="rams-doc-section rams-doc-job-section">
                   <h4>Job Details</h4>
-                  <div className="rams-doc-meta">
-                    <span><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</span>
-                    <span><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</span>
-                    <span><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</span>
-                    <span><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</span>
-                    <span className="meta-full"><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</span>
-                  </div>
+                  <p><strong>Installation date:</strong> {renderEditable("installDate", displayedInstallDate)}</p>
+                  <p><strong>RAMS created:</strong> {renderEditable("createdDate", displayedCreatedDate)}</p>
+                  <p><strong>Duration:</strong> {renderEditable("duration", displayedDuration)}</p>
+                  <p><strong>Activity:</strong> {renderEditable("activity", displayedActivity)}</p>
+                  <p><strong>Installers:</strong> {renderEditable("installers", displayedInstallers)}</p>
                 </div>
                 <div className="rams-doc-section">
                   <h4>Site Details</h4>
@@ -9908,13 +9906,11 @@ function ReadOnlyRamsDocument({
 
         <div className="rams-doc-section rams-doc-job-section">
           <h4>Job Details</h4>
-          <div className="rams-doc-meta">
-            {meta.map((item, index) => (
-              <span key={`${item.label}-${index}`} className={item.label === "Installers" ? "meta-full" : ""}>
-                <strong>{item.label}:</strong> {item.value || "-"}
-              </span>
-            ))}
-          </div>
+          {meta.map((item, index) => (
+            <p key={`${item.label}-${index}`}>
+              <strong>{item.label}:</strong> {item.value || "-"}
+            </p>
+          ))}
         </div>
 
         <div className="rams-doc-section">
