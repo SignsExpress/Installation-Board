@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 
 const JOB_TYPES = [
@@ -9622,12 +9622,12 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                           <div key={`rescue-${card.id}`} className="rams-method-info-card is-grey">
                             <h4>{renderEditable(`rescue-${card.id}-title`, getRamsRescueEdit(card.id, "title", card.title))}</h4>
                               <p>
-                               {getRamsCardLines(card).map((line, lineIndex) => (
-                                  <React.Fragment key={`${card.id}-${lineIndex}`}>
+                                {getRamsCardLines(card).map((line, lineIndex) => (
+                                  <Fragment key={`${card.id}-${lineIndex}`}>
                                     {lineIndex ? <br /> : null}
                                     {renderEditable(`rescue-${card.id}-line-${lineIndex}`, getRamsRescueEdit(card.id, `line-${lineIndex}`, line))}
-                                </React.Fragment>
-                              ))}
+                                  </Fragment>
+                                ))}
                             </p>
                           </div>
                         ))}
