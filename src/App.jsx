@@ -11445,33 +11445,42 @@ function AttendancePage({
                           return (
                             <>
                               <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
-                                <input
-                                  className="attendance-time-input"
-                                  value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
-                                  placeholder="--:--"
-                                  onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
-                                />
-                                {cell.halfDayHolidayLabel ? (
-                                  <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
-                                ) : null}
+                                <div className="attendance-cell-stack">
+                                  <input
+                                    className="attendance-time-input"
+                                    value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
+                                    placeholder="--:--"
+                                    onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
+                                  />
+                                  {cell.halfDayHolidayLabel ? (
+                                    <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                                  ) : null}
+                                  {hasDraftChanges ? <div className="attendance-cell-edited">Edited</div> : <div className="attendance-cell-spacer" />}
+                                </div>
                               </td>
                               <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
-                                <input
-                                  className="attendance-time-input"
-                                  value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
-                                placeholder="--:--"
-                                onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
-                              />
-                              {hasDraftChanges ? (
-                                <div className="attendance-cell-actions">
-                                  <button type="button" className="attendance-save-button" onClick={() => handleAttendanceSave(cell)}>
-                                    Save
-                                  </button>
+                                <div className="attendance-cell-stack">
+                                  <input
+                                    className="attendance-time-input"
+                                    value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
+                                    placeholder="--:--"
+                                    onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
+                                  />
+                                  <div className="attendance-cell-actions">
+                                    <button
+                                      type="button"
+                                      className={`attendance-save-button ${hasDraftChanges ? "is-active" : "is-idle"}`}
+                                      onClick={() => handleAttendanceSave(cell)}
+                                      disabled={!hasDraftChanges || attendanceSavingKey === `${cell.person}:${row.isoDate}`}
+                                    >
+                                      {attendanceSavingKey === `${cell.person}:${row.isoDate}` ? "Saving..." : "Save"}
+                                    </button>
+                                  </div>
+                                  {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
+                                  {cell.punchSummary ? <div className="attendance-cell-meta">Punches: {cell.punchSummary}</div> : null}
+                                  {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
                                 </div>
-                              ) : null}
-                              {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
-                              {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
-                            </td>
+                              </td>
                           </>
                         );
                       })}

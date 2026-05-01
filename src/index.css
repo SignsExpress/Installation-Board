@@ -7422,16 +7422,16 @@ button {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .attendance-grid-table th,
 .attendance-grid-table td {
   border-right: 1px solid rgba(203, 213, 225, 0.75);
   border-bottom: 1px solid rgba(203, 213, 225, 0.75);
-  padding: 4px 4px;
+  padding: 3px 3px;
   text-align: center;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 .attendance-grid-table thead th {
@@ -7490,7 +7490,7 @@ button {
 
 .attendance-staff-head span {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
 }
 
 .attendance-staff-head small {
@@ -7504,25 +7504,32 @@ button {
 }
 
 .attendance-sub-head {
-  width: 48px;
-  min-width: 48px;
+  width: 52px;
+  min-width: 52px;
 }
 
 .attendance-value-cell {
   background: rgba(255, 255, 255, 0.9);
 }
 
+.attendance-cell-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+}
+
 .attendance-time-input {
   width: 100%;
-  min-width: 40px;
+  min-width: 42px;
   border: 1px solid var(--sx-border);
-  border-radius: 8px;
+  border-radius: 7px;
   background: white;
-  padding: 4px 4px;
+  padding: 3px 4px;
   text-align: center;
   font: inherit;
   color: #0f172a;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   line-height: 1.1;
 }
 
@@ -7533,7 +7540,6 @@ button {
 
 .attendance-half-day-chip {
   display: inline-block;
-  margin-top: 3px;
   border-radius: 999px;
   background: rgba(220, 252, 231, 0.95);
   color: #166534;
@@ -7545,7 +7551,6 @@ button {
 }
 
 .attendance-cell-actions {
-  margin-top: 6px;
   display: flex;
   justify-content: flex-end;
 }
@@ -7555,17 +7560,43 @@ button {
   border-radius: 999px;
   background: rgba(113, 76, 152, 0.08);
   color: var(--sx-main);
-  padding: 4px 10px;
-  font-size: 0.62rem;
+  padding: 4px 8px;
+  font-size: 0.58rem;
   font-weight: 800;
   line-height: 1;
 }
 
+.attendance-save-button.is-idle {
+  opacity: 0.55;
+}
+
+.attendance-save-button:disabled {
+  cursor: default;
+}
+
+.attendance-save-button.is-active {
+  background: rgba(113, 76, 152, 0.14);
+  border-color: rgba(113, 76, 152, 0.38);
+}
+
+.attendance-cell-edited,
+.attendance-cell-spacer {
+  min-height: 0.72rem;
+  font-size: 0.54rem;
+  line-height: 1.2;
+}
+
+.attendance-cell-edited {
+  color: var(--sx-main);
+  font-weight: 800;
+}
+
 .attendance-cell-meta {
-  margin-top: 4px;
-  font-size: 0.58rem;
-  line-height: 1.25;
+  font-size: 0.54rem;
+  line-height: 1.2;
   color: #64748b;
+  text-align: left;
+  word-break: break-word;
 }
 
 .attendance-cell-meta-warning {
