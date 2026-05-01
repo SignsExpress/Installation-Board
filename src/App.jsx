@@ -11309,15 +11309,35 @@ function AttendancePage({
     }));
   }
 
-  async function handleAttendanceBlur(cell) {
+  async function handleAttendanceBlur(cell, field) {
     const person = cell.person;
     const date = cell.isoDate;
     const key = `${person}:${date}`;
     const draft = drafts[key] || {};
-    const clockIn = draft.clockIn ?? cell.clockIn ?? "";
-    const clockOut = draft.clockOut ?? cell.clockOut ?? "";
-    const adminNote = draft.adminNote ?? cell.adminNote ?? "";
-    await onSaveAttendanceEntry({ person, date, clockIn, clockOut, adminNote });
+    const payload = {
+      person,
+      date,
+      changedFields: [field]
+    };
+    if (field === "clockIn") payload.clockIn = draft.clockIn ?? cell.clockIn ?? "";
+    if (field === "clockOut") payload.clockOut = draft.clockOut ?? cell.clockOut ?? "";
+    if (field === "adminNote") payload.adminNote = draft.adminNote ?? cell.adminNote ?? "";
+    const saved = await onSaveAttendanceEntry(payload);
+    if (saved) {
+      setDrafts((current) => {
+        if (!current[key]) return current;
+        const nextDraft = { ...current[key] };
+        delete nextDraft[field];
+        if (!Object.keys(nextDraft).length) {
+          const { [key]: _removed, ...rest } = current;
+          return rest;
+        }
+        return {
+          ...current,
+          [key]: nextDraft
+        };
+      });
+    }
   }
 
   async function submitEmployeeNote(event) {
@@ -11420,7 +11440,7 @@ function AttendancePage({
                                   value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                   placeholder="--:--"
                                   onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
-                                  onBlur={() => handleAttendanceBlur(cell)}
+                                  onBlur={() => handleAttendanceBlur(cell, "clockIn")}
                                 />
                                 {cell.halfDayHolidayLabel ? (
                                   <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
@@ -11432,8 +11452,10 @@ function AttendancePage({
                                   value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                 placeholder="--:--"
                                 onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
-                                onBlur={() => handleAttendanceBlur(cell)}
+                                onBlur={() => handleAttendanceBlur(cell, "clockOut")}
                               />
+                              {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
+                              {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
                             </td>
                           </>
                         );
@@ -11475,6 +11497,8 @@ function AttendancePage({
                             <span>Out: <strong>{cell.clockOut || "--:--"}</strong></span>
                           </div>
                         )}
+                        {!cell.displayLabel && cell.breakSummary ? <p className="attendance-self-note">Breaks: {cell.breakSummary}</p> : null}
+                        {!cell.displayLabel && cell.anomalySummary ? <p className="attendance-self-note">{cell.anomalySummary}</p> : null}
                         {!cell.displayLabel && cell.canExplain ? (
                           <button
                             type="button"
@@ -15053,13 +15077,13 @@ export default function App() {
     setNotifications(Array.isArray(payload) ? payload : []);
   }
 
-  async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "" }) {
+  async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "", changedFields = [] }) {
     setAttendanceSavingKey(`${person}:${date}`);
     try {
       const response = await fetch("/api/attendance/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ person, date, clockIn, clockOut, adminNote })
+        body: JSON.stringify({ person, date, clockIn, clockOut, adminNote, changedFields })
       });
       const payload = await response.json();
       if (!response.ok) {
@@ -15067,9 +15091,11 @@ export default function App() {
       }
       setAttendanceData(payload);
       setMessage(createMessage(`Updated attendance for ${person} on ${formatJobDate(date)}.`, "success"));
+      return payload;
     } catch (error) {
       console.error(error);
       setMessage(createMessage(error.message || "Could not save attendance.", "error"));
+      return null;
     } finally {
       setAttendanceSavingKey("");
     }

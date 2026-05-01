@@ -2526,13 +2526,59 @@ function sanitizeAttendanceTime(value) {
 }
 
 function sanitizeAttendanceEntry(payload) {
+  const source = String(payload.source || "manual").trim().toLowerCase() || "manual";
+  const legacyClockIn = sanitizeAttendanceTime(payload.clockIn);
+  const legacyClockOut = sanitizeAttendanceTime(payload.clockOut);
+  const hasManualClockInKey = Object.prototype.hasOwnProperty.call(payload || {}, "manualClockIn");
+  const hasManualClockOutKey = Object.prototype.hasOwnProperty.call(payload || {}, "manualClockOut");
+  const hasTimeMotoClockInKey = Object.prototype.hasOwnProperty.call(payload || {}, "timeMotoClockIn");
+  const hasTimeMotoClockOutKey = Object.prototype.hasOwnProperty.call(payload || {}, "timeMotoClockOut");
+  const rawPunches = Array.isArray(payload.rawPunches || payload.punches)
+    ? (payload.rawPunches || payload.punches)
+        .map((punch) => sanitizeAttendancePunch(punch))
+        .filter((punch) => punch.type && punch.time)
+    : [];
+  const punchDerived = deriveAttendanceFromPunches(rawPunches);
+  const manualClockIn =
+    sanitizeAttendanceTime(payload.manualClockIn) ||
+    (!("manualClockIn" in (payload || {})) && source === "manual" && !rawPunches.length ? legacyClockIn : "");
+  const manualClockOut =
+    sanitizeAttendanceTime(payload.manualClockOut) ||
+    (!("manualClockOut" in (payload || {})) && source === "manual" && !rawPunches.length ? legacyClockOut : "");
+  const timeMotoClockIn =
+    sanitizeAttendanceTime(payload.timeMotoClockIn) ||
+    (rawPunches.length ? punchDerived.clockIn : "") ||
+    (!("timeMotoClockIn" in (payload || {})) && source === "timemoto" ? legacyClockIn : "");
+  const timeMotoClockOut =
+    sanitizeAttendanceTime(payload.timeMotoClockOut) ||
+    (rawPunches.length ? punchDerived.clockOut : "") ||
+    (!("timeMotoClockOut" in (payload || {})) && source === "timemoto" ? legacyClockOut : "");
+  const breaks = (rawPunches.length ? punchDerived.breaks : Array.isArray(payload.breaks) ? payload.breaks : [])
+    .map((entry) => sanitizeAttendanceBreak(entry))
+    .filter((entry) => entry.start && entry.end);
+
   return {
     id: String(payload.id || makeId()),
     person: String(payload.person || "").trim(),
     date: String(payload.date || "").trim(),
-    clockIn: sanitizeAttendanceTime(payload.clockIn),
-    clockOut: sanitizeAttendanceTime(payload.clockOut),
-    source: String(payload.source || "manual").trim().toLowerCase() || "manual",
+    clockIn:
+      manualClockIn ||
+      timeMotoClockIn ||
+      (!hasManualClockInKey && !hasTimeMotoClockInKey && source === "manual" ? legacyClockIn : ""),
+    clockOut:
+      manualClockOut ||
+      timeMotoClockOut ||
+      (!hasManualClockOutKey && !hasTimeMotoClockOutKey && source === "manual" ? legacyClockOut : ""),
+    manualClockIn,
+    manualClockOut,
+    timeMotoClockIn,
+    timeMotoClockOut,
+    rawPunches,
+    breaks,
+    breakSummary: breaks.map((entry) => `${entry.start}-${entry.end}`).join(", "),
+    punchSummary: rawPunches.map((punch) => `${punch.type === "in" ? "In" : "Out"} ${punch.time}`).join(", "),
+    anomalySummary: punchDerived.anomalies.join("; "),
+    source,
     adminNote: String(payload.adminNote || "").trim(),
     employeeNote: String(payload.employeeNote || "").trim(),
     missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
@@ -2570,6 +2616,85 @@ function sanitizeMileageClaim(payload) {
     submittedAt: String(payload?.submittedAt || new Date().toISOString()),
     createdAt: String(payload?.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeAttendancePunch(payload) {
+  const rawType = String(payload?.type || payload?.clockingType || payload?.action || "").trim().toLowerCase();
+  const type = rawType === "out" || rawType === "clock out" ? "out" : rawType === "in" || rawType === "clock in" ? "in" : "";
+  const time = sanitizeAttendanceTime(payload?.time || payload?.clockTime || payload?.rawTime);
+  return {
+    id: String(payload?.id || makeId()),
+    type,
+    time,
+    source: String(payload?.source || "timemoto").trim().toLowerCase() || "timemoto",
+    receivedAt: String(payload?.receivedAt || payload?.createdAt || new Date().toISOString())
+  };
+}
+
+function sanitizeAttendanceBreak(payload) {
+  return {
+    start: sanitizeAttendanceTime(payload?.start),
+    end: sanitizeAttendanceTime(payload?.end)
+  };
+}
+
+function compareAttendanceTimes(left, right) {
+  if (!left || !right) return 0;
+  return left.localeCompare(right);
+}
+
+function deriveAttendanceFromPunches(punches) {
+  const normalized = [...(punches || [])]
+    .map((punch) => sanitizeAttendancePunch(punch))
+    .filter((punch) => punch.type && punch.time)
+    .sort((left, right) => compareAttendanceTimes(left.time, right.time) || String(left.receivedAt).localeCompare(String(right.receivedAt)));
+
+  const breaks = [];
+  const anomalies = [];
+  let firstIn = "";
+  let lastOut = "";
+  let activeIn = "";
+  let pendingBreakStart = "";
+
+  normalized.forEach((punch) => {
+    if (punch.type === "in") {
+      if (!firstIn) {
+        firstIn = punch.time;
+      }
+      if (pendingBreakStart && compareAttendanceTimes(pendingBreakStart, punch.time) < 0) {
+        breaks.push({ start: pendingBreakStart, end: punch.time });
+      } else if (pendingBreakStart) {
+        anomalies.push(`Out ${pendingBreakStart} before in ${punch.time}`);
+      }
+      pendingBreakStart = "";
+      activeIn = punch.time;
+      return;
+    }
+
+    if (!firstIn) {
+      lastOut = punch.time;
+      anomalies.push(`Out ${punch.time} before first in`);
+      return;
+    }
+
+    if (!activeIn) {
+      lastOut = punch.time;
+      pendingBreakStart = punch.time;
+      anomalies.push(`Extra out ${punch.time}`);
+      return;
+    }
+
+    lastOut = punch.time;
+    pendingBreakStart = punch.time;
+    activeIn = "";
+  });
+
+  return {
+    clockIn: firstIn,
+    clockOut: lastOut,
+    breaks,
+    anomalies
   };
 }
 
@@ -3605,10 +3730,7 @@ function syncAttendanceMissingNotification(store, users, attendanceEntry) {
     String(notification.link || "") === getAttendanceLinkForUser(matchingUser, attendanceEntry.date)
   );
 
-  const hasMissingClock = Boolean(
-    (attendanceEntry.clockIn && !attendanceEntry.clockOut) ||
-    (!attendanceEntry.clockIn && attendanceEntry.clockOut)
-  );
+  const hasMissingClock = hasAttendanceMissingClock(attendanceEntry);
 
   if (hasMissingClock) {
     const title = "Missing clocking data";
@@ -3727,10 +3849,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         if (usesContractedHours) {
           displayLabel = "";
         }
-        const hasMissingClock = Boolean(
-          attendanceEntry &&
-          ((attendanceEntry.clockIn && !attendanceEntry.clockOut) || (!attendanceEntry.clockIn && attendanceEntry.clockOut))
-        );
+        const hasMissingClock = Boolean(attendanceEntry && hasAttendanceMissingClock(attendanceEntry));
 
         return {
           person: staffEntry.person,
@@ -3744,6 +3863,9 @@ async function getAttendancePayload(forUser, monthId = "") {
           isWorkingDay,
           clockIn: attendanceEntry?.clockIn || (usesContractedHours ? contractedHours.in : ""),
           clockOut: attendanceEntry?.clockOut || (usesContractedHours ? contractedHours.out : ""),
+          breakSummary: attendanceEntry?.breakSummary || "",
+          punchSummary: attendanceEntry?.punchSummary || "",
+          anomalySummary: attendanceEntry?.anomalySummary || "",
           adminNote: attendanceEntry?.adminNote || "",
           employeeNote: attendanceEntry?.employeeNote || "",
           hasMissingClock: usesContractedHours || isContractedOff ? false : hasMissingClock,
@@ -3792,6 +3914,14 @@ function getCoreBridgeConfig() {
     materialPath: String(process.env.COREBRIDGE_MATERIAL_PATH || DEFAULT_COREBRIDGE_MATERIAL_PATH).trim(),
     apiVersion: String(process.env.COREBRIDGE_API_VERSION || "v3.0").trim()
   };
+}
+
+function hasAttendanceMissingClock(attendanceEntry) {
+  return Boolean(
+    (attendanceEntry.clockIn && !attendanceEntry.clockOut) ||
+    (!attendanceEntry.clockIn && attendanceEntry.clockOut) ||
+    attendanceEntry?.anomalySummary
+  );
 }
 
 function buildCoreBridgeCollectionUrl(config, pathValue, params = {}) {
@@ -7580,14 +7710,35 @@ function createServer() {
 
       const existingEntry = existingIndex >= 0 ? sanitizeAttendanceEntry(store.attendanceEntries[existingIndex]) : null;
       const fallbackTime = extracted.rawTime;
-      let clockIn = extracted.clockIn || existingEntry?.clockIn || "";
-      let clockOut = extracted.clockOut || existingEntry?.clockOut || "";
+      const nextPunches = Array.isArray(existingEntry?.rawPunches) ? [...existingEntry.rawPunches] : [];
+      const punchTime = extracted.clockIn || extracted.clockOut || fallbackTime || "";
+      const punchType = extracted.action || (extracted.clockOut ? "out" : extracted.clockIn ? "in" : "");
+      if (punchTime && punchType) {
+        const nextPunch = sanitizeAttendancePunch({
+          id: payload?.id || getWebhookNestedValue(payload, "id") || makeId(),
+          type: punchType,
+          time: punchTime,
+          source: "timemoto",
+          receivedAt: new Date().toISOString()
+        });
+        const duplicatePunch = nextPunches.some(
+          (entry) =>
+            (nextPunch.id && entry.id === nextPunch.id) ||
+            (entry.type === nextPunch.type && entry.time === nextPunch.time && entry.source === nextPunch.source)
+        );
+        if (!duplicatePunch) {
+          nextPunches.push(nextPunch);
+        }
+      }
+
+      let timeMotoClockIn = extracted.clockIn || existingEntry?.timeMotoClockIn || "";
+      let timeMotoClockOut = extracted.clockOut || existingEntry?.timeMotoClockOut || "";
 
       if (!extracted.clockIn && !extracted.clockOut && fallbackTime) {
-        if (!existingEntry?.clockIn) {
-          clockIn = fallbackTime;
-        } else if (!existingEntry?.clockOut && fallbackTime !== existingEntry.clockIn) {
-          clockOut = fallbackTime;
+        if (!existingEntry?.timeMotoClockIn) {
+          timeMotoClockIn = fallbackTime;
+        } else if (!existingEntry?.timeMotoClockOut && fallbackTime !== existingEntry.timeMotoClockIn) {
+          timeMotoClockOut = fallbackTime;
         }
       }
 
@@ -7595,8 +7746,9 @@ function createServer() {
         ...(existingEntry || {}),
         person: extracted.person,
         date: extracted.date,
-        clockIn,
-        clockOut,
+        rawPunches: nextPunches,
+        timeMotoClockIn,
+        timeMotoClockOut,
         source: "timemoto"
       });
 
@@ -9634,19 +9786,39 @@ app.get("/api/corebridge/orders", async (request, response) => {
         String(entry.date || "") === nextEntry.date
     );
 
+    const existingEntry = existingIndex >= 0 ? sanitizeAttendanceEntry(store.attendanceEntries[existingIndex]) : null;
+    const changedFields = Array.isArray(request.body?.changedFields)
+      ? request.body.changedFields.map((field) => String(field || "").trim()).filter(Boolean)
+      : [];
+
+    const mergedEntry = sanitizeAttendanceEntry({
+      ...(existingEntry || {}),
+      person: nextEntry.person,
+      date: nextEntry.date,
+      manualClockIn: changedFields.includes("clockIn")
+        ? sanitizeAttendanceTime(request.body?.clockIn)
+        : existingEntry?.manualClockIn || "",
+      manualClockOut: changedFields.includes("clockOut")
+        ? sanitizeAttendanceTime(request.body?.clockOut)
+        : existingEntry?.manualClockOut || "",
+      adminNote: changedFields.includes("adminNote")
+        ? String(request.body?.adminNote || "").trim()
+        : nextEntry.adminNote || existingEntry?.adminNote || ""
+    });
+
     if (existingIndex >= 0) {
-      nextEntry.id = store.attendanceEntries[existingIndex].id;
-      nextEntry.createdAt = store.attendanceEntries[existingIndex].createdAt || nextEntry.createdAt;
-      nextEntry.employeeNote = store.attendanceEntries[existingIndex].employeeNote || nextEntry.employeeNote;
-      store.attendanceEntries[existingIndex] = nextEntry;
+      mergedEntry.id = store.attendanceEntries[existingIndex].id;
+      mergedEntry.createdAt = store.attendanceEntries[existingIndex].createdAt || mergedEntry.createdAt;
+      mergedEntry.employeeNote = store.attendanceEntries[existingIndex].employeeNote || mergedEntry.employeeNote;
+      store.attendanceEntries[existingIndex] = mergedEntry;
     } else {
-      store.attendanceEntries.unshift(nextEntry);
+      store.attendanceEntries.unshift(mergedEntry);
     }
 
-    syncAttendanceMissingNotification(store, usersStore.users || [], nextEntry);
+    syncAttendanceMissingNotification(store, usersStore.users || [], mergedEntry);
     const savedStore = await writeStore(store);
-    broadcast("attendance-updated", { monthId: String(nextEntry.date || "").slice(0, 7), date: nextEntry.date });
-    const payload = await getAttendancePayload(request.user, String(nextEntry.date || "").slice(0, 7));
+    broadcast("attendance-updated", { monthId: String(mergedEntry.date || "").slice(0, 7), date: mergedEntry.date });
+    const payload = await getAttendancePayload(request.user, String(mergedEntry.date || "").slice(0, 7));
     response.json(payload);
   });
 

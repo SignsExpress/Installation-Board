@@ -7544,6 +7544,18 @@ button {
   white-space: nowrap;
 }
 
+.attendance-cell-meta {
+  margin-top: 4px;
+  font-size: 0.58rem;
+  line-height: 1.25;
+  color: #64748b;
+}
+
+.attendance-cell-meta-warning {
+  color: #b45309;
+  font-weight: 700;
+}
+
 .attendance-cell-missing {
   background: rgba(244, 114, 182, 0.18);
 }
