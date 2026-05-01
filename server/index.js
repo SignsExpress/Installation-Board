@@ -2652,8 +2652,10 @@ function getAttendanceActionFromWebhook(payload) {
     payload?.action,
     payload?.status,
     payload?.direction,
+    payload?.clockingType,
     getWebhookNestedValue(payload, "data.event"),
     getWebhookNestedValue(payload, "data.type"),
+    getWebhookNestedValue(payload, "data.clockingType"),
     getWebhookNestedValue(payload, "entryType"),
     getWebhookNestedValue(payload, "clockingType")
   ]
@@ -2674,10 +2676,15 @@ function extractAttendanceWebhookFields(payload) {
       payload?.employee,
       payload?.userName,
       payload?.name,
+      payload?.userFullName,
       getWebhookNestedValue(payload, "employee.name"),
       getWebhookNestedValue(payload, "employee.fullName"),
       getWebhookNestedValue(payload, "user.name"),
       getWebhookNestedValue(payload, "user.fullName"),
+      getWebhookNestedValue(payload, "data.userFullName"),
+      getWebhookNestedValue(payload, "data.userFirstName") && getWebhookNestedValue(payload, "data.userLastName")
+        ? `${getWebhookNestedValue(payload, "data.userFirstName")} ${getWebhookNestedValue(payload, "data.userLastName")}`
+        : "",
       getWebhookNestedValue(payload, "data.employeeName"),
       getWebhookNestedValue(payload, "data.employee.name"),
       getWebhookNestedValue(payload, "data.user.name")
@@ -2691,10 +2698,16 @@ function extractAttendanceWebhookFields(payload) {
     payload?.clockingAt,
     payload?.occurredAt,
     payload?.eventDateTime,
+    payload?.timeLogged,
+    payload?.timeLoggedRounded,
+    payload?.timeInserted,
     getWebhookNestedValue(payload, "data.timestamp"),
     getWebhookNestedValue(payload, "data.datetime"),
     getWebhookNestedValue(payload, "data.dateTime"),
     getWebhookNestedValue(payload, "data.clockingAt"),
+    getWebhookNestedValue(payload, "data.timeLogged"),
+    getWebhookNestedValue(payload, "data.timeLoggedRounded"),
+    getWebhookNestedValue(payload, "data.timeInserted"),
     getWebhookNestedValue(payload, "entry.timestamp"),
     getWebhookNestedValue(payload, "entry.datetime")
   );
