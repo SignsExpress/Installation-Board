@@ -1987,6 +1987,10 @@ function sortRamsCardOrderForFlow(cardOrder = [], cards = {}) {
   return [...riskIds, ...sortRamsMethodCardsForFlow(methodCards).map((card) => card.id), ...rescueIds];
 }
 
+function getRamsCardLines(card) {
+  return Array.isArray(card?.content) ? card.content : [];
+}
+
 function getRamsLcr(card, phase = "initial") {
   const explicitLikelihood = phase === "initial" ? card?.initialLikelihood : card?.residualLikelihood;
   const explicitConsequence = phase === "initial" ? card?.initialConsequence : card?.residualConsequence;
@@ -8754,7 +8758,9 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
       jobId: String(selectedJob.id || "")
     }));
     if (Array.isArray(savedDocument.cardOrder) && savedDocument.cardOrder.length) {
-      setCardOrder(savedDocument.cardOrder);
+      setCardOrder(
+        savedDocument.cardOrder.filter((cardId) => Boolean(sharedRamsLogic.cards?.[cardId]))
+      );
     }
     setRamsEdits(savedDocument.edits && typeof savedDocument.edits === "object" ? savedDocument.edits : {});
     setSaveStatus(`Loaded saved RAMS ${savedDocument.reference || ""}`.trim());
@@ -9222,15 +9228,15 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
           controls: controlLines.map((line, lineIndex) => getRamsEdit(`risk-${card.id}-control-${lineIndex}`, line))
         };
       }),
-      methods: methodCards.map((card) => ({
-        title: getRamsEdit(`method-${card.id}-title`, card.title),
-        lines: card.content.map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
-      })),
-      rescuePlans: rescueCards.map((card) => ({
-        title: getRamsEdit(`method-${card.id}-title`, card.title),
-        lines: card.content.map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
-      }))
-    };
+        methods: methodCards.map((card) => ({
+          title: getRamsEdit(`method-${card.id}-title`, card.title),
+          lines: getRamsCardLines(card).map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
+        })),
+        rescuePlans: rescueCards.map((card) => ({
+          title: getRamsEdit(`method-${card.id}-title`, card.title),
+          lines: getRamsCardLines(card).map((line, lineIndex) => getRamsEdit(`method-${card.id}-line-${lineIndex}`, line))
+        }))
+      };
   }
 
   async function deleteSavedRams() {
@@ -9558,11 +9564,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                             </button>
                           </span>
                         </div>
-                        <ul>
-                          {card.content.map((line, lineIndex) => (
-                            <li key={`doc-${card.id}-${line}`}>{renderEditable(`method-${card.id}-line-${lineIndex}`, line)}</li>
-                          ))}
-                        </ul>
+                          <ul>
+                           {getRamsCardLines(card).map((line, lineIndex) => (
+                              <li key={`doc-${card.id}-${line}`}>{renderEditable(`method-${card.id}-line-${lineIndex}`, line)}</li>
+                            ))}
+                          </ul>
                       </div>
                     );
                   })}
@@ -9573,11 +9579,11 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                         {rescueCards.map((card) => (
                           <div key={`rescue-${card.id}`} className="rams-method-info-card is-grey">
                             <h4>{renderEditable(`method-${card.id}-title`, card.title)}</h4>
-                            <p>
-                              {card.content.map((line, lineIndex) => (
-                                <React.Fragment key={`${card.id}-${lineIndex}`}>
-                                  {lineIndex ? <br /> : null}
-                                  {renderEditable(`method-${card.id}-line-${lineIndex}`, line)}
+                              <p>
+                               {getRamsCardLines(card).map((line, lineIndex) => (
+                                  <React.Fragment key={`${card.id}-${lineIndex}`}>
+                                    {lineIndex ? <br /> : null}
+                                    {renderEditable(`method-${card.id}-line-${lineIndex}`, line)}
                                 </React.Fragment>
                               ))}
                             </p>
