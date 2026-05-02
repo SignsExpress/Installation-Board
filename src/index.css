@@ -2744,28 +2744,61 @@
 
   .rams-risk-table ul,
   .rams-doc-card ul {
-    padding-left: 3mm !important;
+    padding: 2.4mm 2.9mm 2.9mm 7.6mm !important;
     margin: 0 !important;
+    font-size: 7.2pt !important;
+    line-height: 1.18 !important;
   }
 
   .rams-doc-card {
-    padding: 1.4mm 2mm !important;
-    gap: 1mm !important;
-    border-radius: 2mm !important;
-    box-shadow: inset 1.3mm 0 0 #d7cbdd !important;
-    background: #fbfafc !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    border-radius: 2.2mm !important;
+    box-shadow: none !important;
+    background: #f9fafb !important;
+    border: 0.35mm solid #d1d5db !important;
+    overflow: hidden !important;
   }
 
   .rams-doc-method-section .rams-doc-card {
-    background: #f0fdf4 !important;
-    border-color: #bbf7d0 !important;
-    box-shadow: inset 1.3mm 0 0 #16a34a !important;
+    background: #f3f4f6 !important;
+    border-color: #d1d5db !important;
+    box-shadow: none !important;
   }
 
   .rams-doc-risk-section .rams-doc-card {
     background: #fff7ed !important;
     border-color: #fed7aa !important;
-    box-shadow: inset 1.3mm 0 0 #ea580c !important;
+    box-shadow: none !important;
+  }
+
+  .rams-doc-card > div {
+    padding: 1.6mm 2.6mm !important;
+    background: #e5e7eb !important;
+    border-bottom: 0.35mm solid #d1d5db !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 2mm !important;
+  }
+
+  .rams-doc-method-section .rams-doc-card > div .rams-doc-card-title {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #374151 !important;
+    font-size: 7pt !important;
+    font-weight: 700 !important;
+    line-height: 1.1 !important;
+    letter-spacing: 0.03em !important;
+    text-transform: uppercase !important;
+    display: block !important;
+  }
+
+  .rams-doc-card ul li {
+    margin: 0 0 0.5mm !important;
   }
 
   .rams-editable:hover,
