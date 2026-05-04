@@ -2038,6 +2038,11 @@
   background: #ffedd5;
 }
 
+.rams-doc-risk-section > h4 {
+  color: #fff;
+  background: var(--sx-main);
+}
+
 .rams-doc-card {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
