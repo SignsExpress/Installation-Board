@@ -1628,6 +1628,17 @@
   background: #f5f3ff;
 }
 
+.rams-method-info-card.is-green {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.rams-method-info-card.is-green h4,
+.rams-method-info-card.is-green h5 {
+  background: #dcfce7;
+  color: #166534;
+}
+
 .rams-method-info-card.is-purple h4,
 .rams-method-info-card.is-purple h5 {
   background: #ede9fe;
@@ -2501,6 +2512,11 @@
     background: #f5f3ff !important;
   }
 
+  .rams-method-info-card.is-green {
+    border-color: #bbf7d0 !important;
+    background: #f0fdf4 !important;
+  }
+
   .rams-method-info-card.is-red {
     border-color: #ef4444 !important;
     background: #fff1f2 !important;
@@ -2546,6 +2562,12 @@
   .rams-doc-method-section .rams-method-info-card.is-purple h5 {
     background: #ede9fe !important;
     color: #4c1d95 !important;
+  }
+
+  .rams-doc-method-section .rams-method-info-card.is-green h4,
+  .rams-doc-method-section .rams-method-info-card.is-green h5 {
+    background: #dcfce7 !important;
+    color: #166534 !important;
   }
 
   .rams-doc-method-section .rams-method-info-card.is-red h4,
