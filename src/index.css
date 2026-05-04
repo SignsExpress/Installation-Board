@@ -1988,10 +1988,10 @@
   min-width: 0;
   text-align: center;
   padding: 7px 14px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--sx-main);
   border-radius: 10px;
-  background: #fff;
-  color: #111827;
+  background: var(--sx-main);
+  color: #fff;
 }
 
 .rams-doc-method-section .rams-method-info-card h4,
@@ -2686,14 +2686,18 @@
     color: #4f365f !important;
   }
 
-  .rams-doc-method-section h4 {
-    background: #dcfce7 !important;
-    color: #166534 !important;
-  }
-
-  .rams-doc-risk-section h4 {
-    background: #ffedd5 !important;
-    color: #9a3412 !important;
+  .rams-doc-risk-section > h4,
+  .rams-doc-method-section > h4,
+  .rams-doc-rescue-section > h4 {
+    width: 100% !important;
+    min-width: 0 !important;
+    justify-self: stretch !important;
+    text-align: center !important;
+    padding: 1.6mm 3mm !important;
+    border: 0.35mm solid var(--sx-main) !important;
+    border-radius: 2.2mm !important;
+    background: var(--sx-main) !important;
+    color: #fff !important;
   }
 
   .rams-doc-section p {
