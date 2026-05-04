@@ -2201,11 +2201,9 @@
 }
 
 .rams-doc-card > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  padding: 6px 10px;
+  position: relative;
+  display: block;
+  padding: 0;
   background: #dcfce7;
   border-bottom: 1px solid #bbf7d0;
 }
@@ -2218,36 +2216,34 @@
 
 .rams-doc-card-title {
   margin: 0;
-  padding: 0;
-  width: auto;
+  padding: 6px 10px;
+  width: 100%;
   border-radius: 0;
   background: transparent;
   font-size: 0.78rem;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: normal;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: inherit;
   display: block;
-}
-
-.rams-doc-method-section .rams-doc-card > div {
-  align-items: center;
+  padding-right: 54px;
 }
 
 .rams-doc-method-section .rams-doc-card > div .rams-doc-card-title {
   display: block;
-  width: auto;
+  width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 6px 10px;
   border-radius: 0;
   background: transparent;
   color: #374151;
   font-size: 0.78rem;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: normal;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+  padding-right: 54px;
 }
 
 .rams-doc-card ul {
@@ -2278,6 +2274,15 @@
 .rams-doc-method-section .rams-doc-card.is-grey > div {
   background: #e5e7eb;
   border-bottom: 1px solid #d1d5db;
+}
+
+.rams-doc-card > div .rams-card-actions {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
 }
 
 .job-rams-pill {
@@ -2790,28 +2795,36 @@
   }
 
   .rams-doc-card > div {
-    padding: 1.6mm 2.6mm !important;
+    position: relative !important;
+    padding: 0 !important;
     background: #e5e7eb !important;
     border-bottom: 0.35mm solid #d1d5db !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    gap: 2mm !important;
+    display: block !important;
   }
 
   .rams-doc-method-section .rams-doc-card > div .rams-doc-card-title {
     margin: 0 !important;
-    padding: 0 !important;
-    width: auto !important;
+    padding: 1.2mm 2mm !important;
+    width: 100% !important;
     border-radius: 0 !important;
     background: transparent !important;
     color: #374151 !important;
-    font-size: 7pt !important;
+    font-size: 7.5pt !important;
     font-weight: 700 !important;
-    line-height: 1.1 !important;
+    line-height: normal !important;
     letter-spacing: 0.03em !important;
     text-transform: uppercase !important;
     display: block !important;
+    padding-right: 16mm !important;
+  }
+
+  .rams-doc-card > div .rams-card-actions {
+    position: absolute !important;
+    top: 50% !important;
+    right: 2mm !important;
+    transform: translateY(-50%) !important;
+    display: flex !important;
+    gap: 1mm !important;
   }
 
   .rams-doc-card ul li {
