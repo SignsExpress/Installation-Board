@@ -2236,7 +2236,18 @@
 }
 
 .rams-doc-method-section .rams-doc-card > div .rams-doc-card-title {
+  display: block;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: #374151;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .rams-doc-card ul {
@@ -2244,6 +2255,12 @@
   margin: 0;
   font-size: 0.78rem;
   line-height: 1.18;
+}
+
+.rams-doc-method-section .rams-doc-card ul,
+.rams-doc-rescue-section .rams-doc-card ul {
+  font-size: 0.82rem;
+  line-height: 1.24;
 }
 
 .rams-doc-card ul li {
