@@ -2293,6 +2293,15 @@
   grid-template-columns: minmax(0, 1fr) !important;
 }
 
+.rams-doc-rescue-section .rams-doc-card ul {
+  list-style: none;
+  padding-left: 11px;
+}
+
+.rams-doc-rescue-section .rams-doc-card ul li {
+  margin-left: 0;
+}
+
 .rams-doc-rescue-section > h4 {
   margin-bottom: 2px;
 }
