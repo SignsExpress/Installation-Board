@@ -2417,6 +2417,12 @@
     display: none !important;
   }
 
+  .rams-card-actions,
+  .rams-move-button,
+  .icon-button.rams-move-button {
+    display: none !important;
+  }
+
   .print-only {
     display: inline-flex !important;
   }
