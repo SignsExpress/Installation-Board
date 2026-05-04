@@ -9576,21 +9576,22 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                       <p>{renderEditable("firstAidBoxLocation", displayedFirstAidBoxLocation)}</p>
                     </div>
                   </div>
-                  <div className="rams-supporting-info-grid">
-                    <div className="rams-method-info-card is-grey">
-                      <h4>Environmental / COSHH</h4>
-                      <p>{renderEditable("environmentalCoshh", displayedEnvironmentalCoshh)}</p>
-                    </div>
+                    <div className="rams-supporting-info-grid">
+                      <div className="rams-method-info-card is-grey">
+                        <h4>Environmental / COSHH</h4>
+                        <p>{renderEditable("environmentalCoshh", displayedEnvironmentalCoshh)}</p>
+                      </div>
                     <div className="rams-method-info-card is-grey">
                       <h4>Standards</h4>
-                      <p>{renderEditable("standards", displayedStandards)}</p>
+                        <p>{renderEditable("standards", displayedStandards)}</p>
+                      </div>
                     </div>
-                  </div>
-                  {methodCards.map((card) => {
-                    const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
-                    return (
-                      <div
-                        key={`doc-${card.id}`}
+                    <h4>Sequence of Works</h4>
+                    {methodCards.map((card) => {
+                      const cardIndex = selectedCards.findIndex((entry) => entry.id === card.id);
+                      return (
+                        <div
+                          key={`doc-${card.id}`}
                         className="rams-doc-card is-grey"
                         draggable
                         onDragStart={() => setDraggingCardId(card.id)}
@@ -10074,11 +10075,11 @@ function ReadOnlyRamsDocument({
               <p>{firstAid.boxLocation || "Signs Express Van"}</p>
             </div>
           </div>
-          <div className="rams-supporting-info-grid">
-            {(supportingInfo.length
-              ? supportingInfo
-              : [
-                  {
+            <div className="rams-supporting-info-grid">
+              {(supportingInfo.length
+                ? supportingInfo
+                : [
+                    {
                     label: "Environmental / COSHH",
                     value:
                       "We minimise the amount of packaging used wherever possible. Copies of relevant Waste Carriers Licences, Recycling Transfer Notes and Copy of Hazardous Waste Registration Reports can be provided on request."
@@ -10090,17 +10091,18 @@ function ReadOnlyRamsDocument({
                   }
                 ]
             ).map((item, index) => (
-              <div key={`${item.label}-${index}`} className="rams-method-info-card is-grey">
-                <h4>{item.label}</h4>
-                <p>{item.value || "-"}</p>
-              </div>
-            ))}
-          </div>
+                <div key={`${item.label}-${index}`} className="rams-method-info-card is-grey">
+                  <h4>{item.label}</h4>
+                  <p>{item.value || "-"}</p>
+                </div>
+              ))}
+            </div>
+            <h4>Sequence of Works</h4>
 
-          {methods.map((method, index) => (
-            <div key={`${method.title}-${index}`} className="rams-doc-card is-grey">
-              <div>
-                <h4 className="rams-doc-card-title">{method.title || "Method"}</h4>
+            {methods.map((method, index) => (
+              <div key={`${method.title}-${index}`} className="rams-doc-card is-grey">
+                <div>
+                  <h4 className="rams-doc-card-title">{method.title || "Method"}</h4>
               </div>
               <ul>
                 {(Array.isArray(method.lines) ? method.lines : []).map((line, lineIndex) => (
