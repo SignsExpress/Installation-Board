@@ -1345,18 +1345,19 @@
 }
 
 .rams-move-button {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 999px;
   background: #fff;
   border-color: #cbd5e1;
   color: #4f365f;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  padding: 0;
 }
 
 .rams-move-button svg {
-  width: 15px;
-  height: 15px;
+  width: 12px;
+  height: 12px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.4;
@@ -1979,6 +1980,19 @@
   background: #dcfce7;
 }
 
+.rams-doc-risk-section > h4,
+.rams-doc-method-section > h4,
+.rams-doc-rescue-section > h4 {
+  justify-self: center;
+  min-width: 180px;
+  text-align: center;
+  padding: 6px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #111827;
+}
+
 .rams-doc-method-section .rams-method-info-card h4,
 .rams-doc-method-section .rams-method-info-card h5 {
   display: block;
@@ -2220,12 +2234,13 @@
   width: 100%;
   border-radius: 0;
   background: transparent;
+  font-family: inherit;
   font-size: 0.78rem;
   font-weight: 700;
-  line-height: normal;
+  line-height: 1.2;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: inherit;
+  color: #374151;
   display: block;
   padding-right: 54px;
 }
@@ -2237,10 +2252,11 @@
   padding: 6px 10px;
   border-radius: 0;
   background: transparent;
+  font-family: inherit;
   color: #374151;
   font-size: 0.78rem;
   font-weight: 700;
-  line-height: normal;
+  line-height: 1.2;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   padding-right: 54px;
