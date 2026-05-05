@@ -9797,6 +9797,10 @@ app.get("/api/corebridge/orders", async (request, response) => {
       ...(existingEntry || {}),
       person: nextEntry.person,
       date: nextEntry.date,
+      source:
+        changedFields.includes("clockIn") || changedFields.includes("clockOut")
+          ? "manual"
+          : existingEntry?.source || nextEntry.source || "manual",
       manualClockIn: changedFields.includes("clockIn")
         ? sanitizeAttendanceTime(request.body?.clockIn)
         : existingEntry?.manualClockIn || "",

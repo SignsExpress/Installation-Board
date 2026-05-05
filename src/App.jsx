@@ -11442,6 +11442,7 @@ function AttendancePage({
   setAttendanceMonthId,
   attendanceSavingKey,
   attendanceNoteSavingKey,
+  attendanceDebugMessage,
   attendanceFocusDate,
   onSaveAttendanceEntry,
   onSubmitAttendanceExplanation
@@ -11613,6 +11614,7 @@ function AttendancePage({
               </button>
             </div>
           </div>
+          {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
 
           {loading ? <div className="board-loading">Loading attendance...</div> : null}
 
@@ -14217,6 +14219,7 @@ export default function App() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSavingKey, setAttendanceSavingKey] = useState("");
   const [attendanceNoteSavingKey, setAttendanceNoteSavingKey] = useState("");
+  const [attendanceDebugMessage, setAttendanceDebugMessage] = useState("");
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
   const [editingId, setEditingId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -15315,6 +15318,8 @@ export default function App() {
 
   async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "", changedFields = [] }) {
     setAttendanceSavingKey(`${person}:${date}`);
+    const debugPayload = { person, date, clockIn, clockOut, adminNote, changedFields };
+    setAttendanceDebugMessage(`Saving ${person} on ${formatJobDate(date)}: ${JSON.stringify(debugPayload)}`);
     try {
       const response = await fetch("/api/attendance/entries", {
         method: "POST",
@@ -15326,10 +15331,12 @@ export default function App() {
         throw new Error(payload.error || "Could not save attendance.");
       }
       setAttendanceData(payload);
+      setAttendanceDebugMessage(`Saved ${person} on ${formatJobDate(date)}. Returned month ${payload?.monthId || ""}.`);
       setMessage(createMessage(`Updated attendance for ${person} on ${formatJobDate(date)}.`, "success"));
       return payload;
     } catch (error) {
       console.error(error);
+      setAttendanceDebugMessage(`Save failed for ${person} on ${formatJobDate(date)}: ${error.message || "Unknown error"}`);
       setMessage(createMessage(error.message || "Could not save attendance.", "error"));
       return null;
     } finally {
@@ -16687,22 +16694,23 @@ export default function App() {
 
   if (showAttendance) {
     return (
-      <AttendancePage
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
-        attendanceData={attendanceData}
-        loading={attendanceLoading}
-        attendanceMonthId={attendanceMonthId}
-        setAttendanceMonthId={setAttendanceMonthId}
-        attendanceSavingKey={attendanceSavingKey}
-        attendanceNoteSavingKey={attendanceNoteSavingKey}
-        attendanceFocusDate={attendanceNotificationDate}
-        onSaveAttendanceEntry={saveAttendanceEntry}
-        onSubmitAttendanceExplanation={submitAttendanceExplanation}
-      />
+                <AttendancePage
+                  currentUser={currentUser}
+                  onLogout={handleLogout}
+                  notifications={notifications}
+                  aeroEnabled={aeroEnabled}
+                  onToggleAero={handleToggleAero}
+                  attendanceData={attendanceData}
+                  loading={attendanceLoading}
+                  attendanceMonthId={attendanceMonthId}
+                  setAttendanceMonthId={setAttendanceMonthId}
+                  attendanceSavingKey={attendanceSavingKey}
+                  attendanceNoteSavingKey={attendanceNoteSavingKey}
+                  attendanceDebugMessage={attendanceDebugMessage}
+                  attendanceFocusDate={attendanceNotificationDate}
+                  onSaveAttendanceEntry={saveAttendanceEntry}
+                  onSubmitAttendanceExplanation={submitAttendanceExplanation}
+                />
     );
   }
 
