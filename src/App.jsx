@@ -11690,24 +11690,6 @@ function AttendancePage({
           {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
           {adminMode ? (
             <section className="attendance-admin-editor">
-              <div className="attendance-admin-editor-head">
-                <div>
-                  <strong>Selected attendance entry</strong>
-                  <p>
-                    {selectedAttendanceCell
-                      ? `${selectedAttendanceEditor.person} · ${formatJobDate(selectedAttendanceEditor.date)}`
-                      : "Click a working-day attendance cell to mark absent, add a note, or notify the employee."}
-                  </p>
-                </div>
-                <button
-                  className="ghost-button"
-                  type="button"
-                  disabled={!selectedAttendanceCell}
-                  onClick={applyAttendanceAdminEditor}
-                >
-                  Apply to draft
-                </button>
-              </div>
               <div className="attendance-admin-editor-grid">
                 <label>
                   <span>Status</span>
@@ -11730,7 +11712,17 @@ function AttendancePage({
                   <span>Notify employee when saved</span>
                 </label>
                 <label className="attendance-admin-editor-note">
-                  <span>Manager note</span>
+                  <span className="attendance-admin-editor-note-head">
+                    <span>Manager note</span>
+                    <button
+                      className="ghost-button attendance-admin-apply-button"
+                      type="button"
+                      disabled={!selectedAttendanceCell}
+                      onClick={applyAttendanceAdminEditor}
+                    >
+                      Apply to draft
+                    </button>
+                  </span>
                   <textarea
                     value={selectedAttendanceEditor.adminNote}
                     onChange={(event) => updateAttendanceAdminEditor({ adminNote: event.target.value })}
@@ -11784,6 +11776,14 @@ function AttendancePage({
                         const { changedFields } = getAttendanceDraftChanges(cell, row.isoDate);
                         const hasDraftChanges = changedFields.length > 0;
                         const displayAdminNote = String(cell.adminNote || "").replace(/^note:\s*/i, "").trim();
+                        const sharedNoteClass =
+                          cell.adminStatus === "absent"
+                            ? "attendance-admin-note-chip attendance-admin-note-chip-shared is-absence"
+                            : "attendance-admin-note-chip attendance-admin-note-chip-shared";
+                        const mergedNoteClass =
+                          cell.adminStatus === "absent"
+                            ? "attendance-admin-note-chip is-absence"
+                            : "attendance-admin-note-chip";
                         const isSelected =
                           selectedAttendanceEditor.person === cell.person && selectedAttendanceEditor.date === row.isoDate;
                         if (cell.displayLabel) {
@@ -11796,7 +11796,7 @@ function AttendancePage({
                             >
                               <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>
                                 {cell.displayLabel}
-                                {displayAdminNote ? <small className="attendance-admin-note-chip">{displayAdminNote}</small> : null}
+                                {displayAdminNote ? <small className={mergedNoteClass}>{displayAdminNote}</small> : null}
                               </span>
                             </td>
                           );
@@ -11833,7 +11833,7 @@ function AttendancePage({
                                   />
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
                                 </div>
-                                {displayAdminNote ? <div className="attendance-admin-note-chip attendance-admin-note-chip-shared">{displayAdminNote}</div> : null}
+                                {displayAdminNote ? <div className={sharedNoteClass}>{displayAdminNote}</div> : null}
                               </div>
                             </td>
                         );

@@ -7944,13 +7944,18 @@ button {
   max-width: 100%;
   padding: 2px 7px;
   border-radius: 999px;
-  background: rgba(113, 76, 152, 0.1);
-  color: #714c98;
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
   font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.2;
   text-align: center;
   justify-self: center;
+}
+
+.attendance-admin-note-chip.is-absence {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
 }
 
 .attendance-admin-note-chip-shared {
@@ -7967,26 +7972,6 @@ button {
   padding: 6px 8px;
   display: grid;
   gap: 4px;
-}
-
-.attendance-admin-editor-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.attendance-admin-editor-head strong {
-  display: block;
-  color: #0f172a;
-  font-size: 0.68rem;
-}
-
-.attendance-admin-editor-head p {
-  margin: 1px 0 0;
-  color: #64748b;
-  font-size: 0.56rem;
-  line-height: 1.2;
 }
 
 .attendance-admin-editor-grid {
@@ -8054,6 +8039,21 @@ button {
 
 .attendance-admin-editor-note {
   grid-column: 3;
+}
+
+.attendance-admin-editor-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.attendance-admin-apply-button {
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  white-space: nowrap;
 }
 
 .attendance-merged-holiday {
