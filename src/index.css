@@ -7683,11 +7683,20 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   position: sticky;
-  top: 0;
   z-index: 5;
   padding-top: 4px;
   padding-bottom: 4px;
   line-height: 1.15;
+}
+
+.attendance-grid-table thead tr:first-child th {
+  top: 0;
+  z-index: 7;
+}
+
+.attendance-grid-table thead tr:last-child th {
+  top: 27px;
+  z-index: 6;
 }
 
 .attendance-date-head,
@@ -7697,6 +7706,7 @@ button {
 }
 
 .attendance-date-head {
+  top: 0;
   z-index: 6;
   background: rgba(248, 250, 252, 0.98);
 }
@@ -7870,11 +7880,12 @@ button {
 }
 
 .attendance-merged-cell > span {
-  display: inline-flex;
-  min-height: 100%;
+  display: flex;
+  min-height: 28px;
   align-items: center;
   justify-content: center;
   text-align: center;
+  width: 100%;
 }
 
 .attendance-merged-holiday {
