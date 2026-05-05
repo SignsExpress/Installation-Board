@@ -7639,7 +7639,7 @@ button {
 .attendance-panel {
   gap: 18px;
   padding: 16px 18px;
-  width: min(1380px, calc(100vw - 48px));
+  width: min(1180px, calc(100vw - 40px));
   margin-inline: auto;
 }
 
@@ -7698,28 +7698,19 @@ button {
 }
 
 .attendance-date-cell {
-  width: 62px;
-  min-width: 62px;
+  width: 54px;
+  min-width: 54px;
   text-align: left;
 }
 
-.attendance-date-cell span,
-.attendance-date-cell strong {
-  display: block;
-}
-
 .attendance-date-cell span {
+  display: block;
   color: #64748b;
-  font-size: 0.52rem;
+  font-size: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  margin-top: 1px;
-}
-
-.attendance-date-cell strong {
-  color: #0f172a;
-  font-size: 0.72rem;
-  line-height: 1.05;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .attendance-staff-head span {

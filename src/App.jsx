@@ -11659,8 +11659,7 @@ function AttendancePage({
                   {rows.map((row) => (
                     <tr key={row.isoDate} className={row.isToday ? "attendance-row-today" : ""}>
                       <th className="attendance-date-cell">
-                        <strong>{row.dateLabel}</strong>
-                        <span>{row.weekdayLabel}{row.isToday ? " · Today" : ""}</span>
+                        <span>{`${row.weekdayLabel}: ${row.dateLabel}${row.isToday ? " · Today" : ""}`}</span>
                       </th>
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
