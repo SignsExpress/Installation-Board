@@ -11692,8 +11692,6 @@ function AttendancePage({
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
-                                  {cell.punchSummary ? <div className="attendance-cell-meta">Punches: {cell.punchSummary}</div> : null}
-                                  {cell.anomalySummary ? <div className="attendance-cell-meta attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
                                 </div>
                               </td>
                           </>
@@ -11737,7 +11735,6 @@ function AttendancePage({
                           </div>
                         )}
                         {!cell.displayLabel && cell.breakSummary ? <p className="attendance-self-note">Breaks: {cell.breakSummary}</p> : null}
-                        {!cell.displayLabel && cell.anomalySummary ? <p className="attendance-self-note">{cell.anomalySummary}</p> : null}
                         {!cell.displayLabel && cell.canExplain ? (
                           <button
                             type="button"

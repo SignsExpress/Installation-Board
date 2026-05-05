@@ -2516,7 +2516,7 @@ function sanitizeHolidayAllowance(payload) {
 
 function sanitizeAttendanceTime(value) {
   const raw = String(value || "").trim();
-  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  const match = raw.match(/^(\d{1,2})(?:[:.,\s]?(\d{2}))$/);
   if (!match) return "";
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
@@ -2556,19 +2556,22 @@ function sanitizeAttendanceEntry(payload) {
   const breaks = (rawPunches.length ? punchDerived.breaks : Array.isArray(payload.breaks) ? payload.breaks : [])
     .map((entry) => sanitizeAttendanceBreak(entry))
     .filter((entry) => entry.start && entry.end);
+  const resolvedClockIn =
+    manualClockIn ||
+    timeMotoClockIn ||
+    (!hasManualClockInKey && !hasTimeMotoClockInKey && source === "manual" ? legacyClockIn : "");
+  const resolvedClockOut =
+    manualClockOut ||
+    timeMotoClockOut ||
+    (!hasManualClockOutKey && !hasTimeMotoClockOutKey && source === "manual" ? legacyClockOut : "");
+  const resolvedAnomalySummary = resolvedClockIn && resolvedClockOut ? "" : punchDerived.anomalies.join("; ");
 
   return {
     id: String(payload.id || makeId()),
     person: String(payload.person || "").trim(),
     date: String(payload.date || "").trim(),
-    clockIn:
-      manualClockIn ||
-      timeMotoClockIn ||
-      (!hasManualClockInKey && !hasTimeMotoClockInKey && source === "manual" ? legacyClockIn : ""),
-    clockOut:
-      manualClockOut ||
-      timeMotoClockOut ||
-      (!hasManualClockOutKey && !hasTimeMotoClockOutKey && source === "manual" ? legacyClockOut : ""),
+    clockIn: resolvedClockIn,
+    clockOut: resolvedClockOut,
     manualClockIn,
     manualClockOut,
     timeMotoClockIn,
@@ -2577,7 +2580,7 @@ function sanitizeAttendanceEntry(payload) {
     breaks,
     breakSummary: breaks.map((entry) => `${entry.start}-${entry.end}`).join(", "),
     punchSummary: rawPunches.map((punch) => `${punch.type === "in" ? "In" : "Out"} ${punch.time}`).join(", "),
-    anomalySummary: punchDerived.anomalies.join("; "),
+    anomalySummary: resolvedAnomalySummary,
     source,
     adminNote: String(payload.adminNote || "").trim(),
     employeeNote: String(payload.employeeNote || "").trim(),
@@ -3919,8 +3922,7 @@ function getCoreBridgeConfig() {
 function hasAttendanceMissingClock(attendanceEntry) {
   return Boolean(
     (attendanceEntry.clockIn && !attendanceEntry.clockOut) ||
-    (!attendanceEntry.clockIn && attendanceEntry.clockOut) ||
-    attendanceEntry?.anomalySummary
+    (!attendanceEntry.clockIn && attendanceEntry.clockOut)
   );
 }
 
