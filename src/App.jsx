@@ -11443,6 +11443,7 @@ function AttendancePage({
   attendanceSavingKey,
   attendanceNoteSavingKey,
   attendanceDebugMessage,
+  setAttendanceDebugMessage,
   attendanceFocusDate,
   onSaveAttendanceEntry,
   onSubmitAttendanceExplanation
@@ -16721,6 +16722,7 @@ export default function App() {
                   attendanceSavingKey={attendanceSavingKey}
                   attendanceNoteSavingKey={attendanceNoteSavingKey}
                   attendanceDebugMessage={attendanceDebugMessage}
+                  setAttendanceDebugMessage={setAttendanceDebugMessage}
                   attendanceFocusDate={attendanceNotificationDate}
                   onSaveAttendanceEntry={saveAttendanceEntry}
                   onSubmitAttendanceExplanation={submitAttendanceExplanation}
