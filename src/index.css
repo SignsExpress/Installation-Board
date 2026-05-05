@@ -7854,12 +7854,16 @@ button {
 
 .attendance-cell-edited,
 .attendance-cell-spacer {
-  min-height: 0.6rem;
   font-size: 0.5rem;
   line-height: 1.2;
 }
 
+.attendance-cell-spacer {
+  display: none;
+}
+
 .attendance-cell-edited {
+  min-height: 0.6rem;
   color: var(--sx-main);
   font-weight: 800;
 }
