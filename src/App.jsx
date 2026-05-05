@@ -11625,11 +11625,7 @@ function AttendancePage({
               </button>
             </div>
           </div>
-          {adminMode ? (
-            <div className="attendance-debug-banner">
-              {attendanceDebugMessage || `Draft rows: ${Object.keys(drafts).length}. Savable rows: ${changedAttendanceCells.length}.`}
-            </div>
-          ) : null}
+          {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
 
           {loading ? <div className="board-loading">Loading attendance...</div> : null}
 
@@ -11647,7 +11643,6 @@ function AttendancePage({
                         title={person.fullName || person.person}
                       >
                         <span>{person.code || person.fullName || person.person}</span>
-                        <small>{person.fullName || person.person}</small>
                       </th>
                     ))}
                   </tr>
@@ -11664,9 +11659,8 @@ function AttendancePage({
                   {rows.map((row) => (
                     <tr key={row.isoDate} className={row.isToday ? "attendance-row-today" : ""}>
                       <th className="attendance-date-cell">
-                        <span>{row.weekdayLabel}</span>
                         <strong>{row.dateLabel}</strong>
-                        {row.isToday ? <em>Today</em> : null}
+                        <span>{row.weekdayLabel}{row.isToday ? " · Today" : ""}</span>
                       </th>
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";

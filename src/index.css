@@ -7650,9 +7650,9 @@ button {
 .attendance-grid-wrap {
   overflow: auto;
   border: 1px solid var(--sx-border);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(255, 255, 255, 0.86);
-  max-height: calc(100vh - 195px);
+  max-height: calc(100vh - 155px);
 }
 
 .attendance-grid-table {
@@ -7661,14 +7661,14 @@ button {
   border-collapse: separate;
   border-spacing: 0;
   table-layout: fixed;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
 }
 
 .attendance-grid-table th,
 .attendance-grid-table td {
   border-right: 1px solid rgba(203, 213, 225, 0.75);
   border-bottom: 1px solid rgba(203, 213, 225, 0.75);
-  padding: 3px 3px;
+  padding: 2px 2px;
   text-align: center;
   vertical-align: top;
 }
@@ -7676,14 +7676,14 @@ button {
 .attendance-grid-table thead th {
   background: rgba(248, 250, 252, 0.96);
   color: #475569;
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   position: sticky;
   top: 0;
   z-index: 2;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
 }
 
 .attendance-date-head,
@@ -7695,56 +7695,39 @@ button {
 }
 
 .attendance-date-cell {
-  width: 72px;
-  min-width: 72px;
+  width: 62px;
+  min-width: 62px;
   text-align: left;
 }
 
 .attendance-date-cell span,
-.attendance-date-cell strong,
-.attendance-date-cell em {
+.attendance-date-cell strong {
   display: block;
 }
 
 .attendance-date-cell span {
   color: #64748b;
-  font-size: 0.58rem;
+  font-size: 0.52rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  margin-top: 1px;
 }
 
 .attendance-date-cell strong {
   color: #0f172a;
-  font-size: 0.78rem;
-  margin-top: 2px;
-}
-
-.attendance-date-cell em {
-  margin-top: 2px;
-  color: var(--sx-main);
-  font-style: normal;
-  font-size: 0.56rem;
-  font-weight: 700;
+  font-size: 0.72rem;
+  line-height: 1.05;
 }
 
 .attendance-staff-head span {
   display: block;
-  font-size: 0.68rem;
-}
-
-.attendance-staff-head small {
-  display: block;
-  margin-top: 1px;
-  color: #64748b;
-  font-size: 0.5rem;
+  font-size: 0.62rem;
   line-height: 1.1;
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .attendance-sub-head {
-  width: 52px;
-  min-width: 52px;
+  width: 46px;
+  min-width: 46px;
 }
 
 .attendance-value-cell {
@@ -7753,16 +7736,16 @@ button {
 
 .attendance-toolbar-actions {
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .attendance-save-summary {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-right: 6px;
   color: #64748b;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 700;
 }
 
@@ -7778,10 +7761,10 @@ button {
 }
 
 .attendance-save-all-button {
-  min-height: 36px;
-  padding: 0 14px;
+  min-height: 32px;
+  padding: 0 12px;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   white-space: nowrap;
 }
 
@@ -7789,20 +7772,20 @@ button {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 2px;
+  gap: 1px;
 }
 
 .attendance-time-input {
   width: 100%;
-  min-width: 42px;
+  min-width: 38px;
   border: 1px solid var(--sx-border);
-  border-radius: 7px;
+  border-radius: 6px;
   background: white;
-  padding: 3px 4px;
+  padding: 2px 3px;
   text-align: center;
   font: inherit;
   color: #0f172a;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   line-height: 1.1;
 }
 
@@ -7821,8 +7804,8 @@ button {
   border-radius: 999px;
   background: rgba(220, 252, 231, 0.95);
   color: #166534;
-  padding: 2px 6px;
-  font-size: 0.54rem;
+  padding: 1px 5px;
+  font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.1;
   white-space: nowrap;
@@ -7830,8 +7813,8 @@ button {
 
 .attendance-cell-edited,
 .attendance-cell-spacer {
-  min-height: 0.72rem;
-  font-size: 0.54rem;
+  min-height: 0.6rem;
+  font-size: 0.5rem;
   line-height: 1.2;
 }
 
@@ -7841,7 +7824,7 @@ button {
 }
 
 .attendance-cell-meta {
-  font-size: 0.54rem;
+  font-size: 0.5rem;
   line-height: 1.2;
   color: #64748b;
   text-align: left;
@@ -7862,9 +7845,9 @@ button {
   background: rgba(248, 250, 252, 0.92);
   color: #475569;
   font-weight: 700;
-  font-size: 0.66rem;
+  font-size: 0.6rem;
   line-height: 1.15;
-  padding: 4px 3px;
+  padding: 3px 2px;
 }
 
 .attendance-merged-holiday {
