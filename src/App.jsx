@@ -11504,8 +11504,8 @@ function AttendancePage({
     }));
   }
 
-  function getAttendanceDraftChanges(cell) {
-    const key = getAttendanceCellKey(cell.person, cell.isoDate);
+  function getAttendanceDraftChanges(cell, isoDate) {
+    const key = getAttendanceCellKey(cell.person, isoDate);
     const draft = drafts[key] || {};
     const changedFields = [];
     if (Object.prototype.hasOwnProperty.call(draft, "clockIn") && (draft.clockIn ?? "") !== (cell.clockIn ?? "")) {
@@ -11520,10 +11520,10 @@ function AttendancePage({
     return { key, draft, changedFields };
   }
 
-  function buildAttendanceSavePayload(cell) {
+  function buildAttendanceSavePayload(cell, isoDate) {
     const person = cell.person;
-    const date = cell.isoDate;
-    const { key, draft, changedFields } = getAttendanceDraftChanges(cell);
+    const date = isoDate;
+    const { key, draft, changedFields } = getAttendanceDraftChanges(cell, isoDate);
     if (!changedFields.length) return null;
     const payload = {
       person,
@@ -11541,7 +11541,7 @@ function AttendancePage({
     ? rows.flatMap((row) =>
         row.cells
           .filter((cell) => !cell.displayLabel)
-          .map((cell) => ({ cell, payload: buildAttendanceSavePayload(cell) }))
+          .map((cell) => ({ cell, payload: buildAttendanceSavePayload(cell, row.isoDate) }))
           .filter((entry) => entry.payload)
       )
     : [];
@@ -11670,7 +11670,7 @@ function AttendancePage({
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
                         const displayClass = getAttendanceDisplayClass(cell);
-                        const { changedFields } = getAttendanceDraftChanges(cell);
+                        const { changedFields } = getAttendanceDraftChanges(cell, row.isoDate);
                         const hasDraftChanges = changedFields.length > 0;
                         if (cell.displayLabel) {
                           return (
