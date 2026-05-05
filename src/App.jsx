@@ -11484,13 +11484,17 @@ function AttendancePage({
     });
   }, [adminMode, missingEntries, noteForm.date]);
 
+  function getAttendanceCellKey(person, date) {
+    return `${person}::${date}`;
+  }
+
   function getDraftValue(person, date, field, fallback = "") {
-    const key = `${person}:${date}`;
+    const key = getAttendanceCellKey(person, date);
     return drafts[key]?.[field] ?? fallback;
   }
 
   function setDraftValue(person, date, updates) {
-    const key = `${person}:${date}`;
+    const key = getAttendanceCellKey(person, date);
     setDrafts((current) => ({
       ...current,
       [key]: {
@@ -11501,7 +11505,7 @@ function AttendancePage({
   }
 
   function getAttendanceDraftChanges(cell) {
-    const key = `${cell.person}:${cell.isoDate}`;
+    const key = getAttendanceCellKey(cell.person, cell.isoDate);
     const draft = drafts[key] || {};
     const changedFields = [];
     if (Object.prototype.hasOwnProperty.call(draft, "clockIn") && (draft.clockIn ?? "") !== (cell.clockIn ?? "")) {
@@ -11543,7 +11547,13 @@ function AttendancePage({
     : [];
 
   async function handleSaveAllAttendanceChanges() {
-    if (!changedAttendanceCells.length) return;
+    if (!changedAttendanceCells.length) {
+      setAttendanceDebugMessage(`No savable edits detected. Draft rows: ${Object.keys(drafts).length}.`);
+      return;
+    }
+    setAttendanceDebugMessage(
+      `Attempting save for ${changedAttendanceCells.length} row${changedAttendanceCells.length === 1 ? "" : "s"}. Draft rows: ${Object.keys(drafts).length}.`
+    );
     const clearedKeys = [];
     for (const entry of changedAttendanceCells) {
       const saved = await onSaveAttendanceEntry(entry.payload);
@@ -11614,7 +11624,11 @@ function AttendancePage({
               </button>
             </div>
           </div>
-          {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
+          {adminMode ? (
+            <div className="attendance-debug-banner">
+              {attendanceDebugMessage || `Draft rows: ${Object.keys(drafts).length}. Savable rows: ${changedAttendanceCells.length}.`}
+            </div>
+          ) : null}
 
           {loading ? <div className="board-loading">Loading attendance...</div> : null}
 
