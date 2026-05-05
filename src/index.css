@@ -7639,6 +7639,8 @@ button {
 .attendance-panel {
   gap: 18px;
   padding: 16px 18px;
+  width: min(1380px, calc(100vw - 48px));
+  margin-inline: auto;
 }
 
 .attendance-toolbar p {
@@ -7653,6 +7655,7 @@ button {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.86);
   max-height: calc(100vh - 155px);
+  width: 100%;
 }
 
 .attendance-grid-table {
