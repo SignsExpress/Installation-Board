@@ -11783,6 +11783,7 @@ function AttendancePage({
                         const displayClass = getAttendanceDisplayClass(cell);
                         const { changedFields } = getAttendanceDraftChanges(cell, row.isoDate);
                         const hasDraftChanges = changedFields.length > 0;
+                        const displayAdminNote = String(cell.adminNote || "").replace(/^note:\s*/i, "").trim();
                         const isSelected =
                           selectedAttendanceEditor.person === cell.person && selectedAttendanceEditor.date === row.isoDate;
                         if (cell.displayLabel) {
@@ -11795,7 +11796,7 @@ function AttendancePage({
                             >
                               <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>
                                 {cell.displayLabel}
-                                {cell.adminNote ? <small className="attendance-admin-note-chip">{cell.adminNote}</small> : null}
+                                {displayAdminNote ? <small className="attendance-admin-note-chip">{displayAdminNote}</small> : null}
                               </span>
                             </td>
                           );
@@ -11832,7 +11833,7 @@ function AttendancePage({
                                   />
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
                                 </div>
-                                {cell.adminNote ? <div className="attendance-admin-note-chip attendance-admin-note-chip-shared">{cell.adminNote}</div> : null}
+                                {displayAdminNote ? <div className="attendance-admin-note-chip attendance-admin-note-chip-shared">{displayAdminNote}</div> : null}
                               </div>
                             </td>
                         );

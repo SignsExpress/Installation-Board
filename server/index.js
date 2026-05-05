@@ -2569,6 +2569,8 @@ function sanitizeAttendanceEntry(payload) {
     ? String(payload.adminStatus || "").trim().toLowerCase()
     : "";
 
+  const adminNote = String(payload.adminNote || "").trim().replace(/^note:\s*/i, "");
+
   return {
     id: String(payload.id || makeId()),
     person: String(payload.person || "").trim(),
@@ -2586,7 +2588,7 @@ function sanitizeAttendanceEntry(payload) {
     anomalySummary: resolvedAnomalySummary,
     source,
     adminStatus,
-    adminNote: String(payload.adminNote || "").trim(),
+    adminNote,
     employeeNote: String(payload.employeeNote || "").trim(),
     missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
     missingNotificationResolvedAt: String(payload.missingNotificationResolvedAt || "").trim(),
