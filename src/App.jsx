@@ -11489,6 +11489,16 @@ function AttendancePage({
     return `${person}::${date}`;
   }
 
+  function getAttendanceStaffLabel(person) {
+    const rawName = (person?.fullName || person?.person || "").trim();
+    if (!rawName) return person?.code || "";
+    const parts = rawName.split(/\s+/).filter(Boolean);
+    if (parts.length === 1) return parts[0];
+    const firstName = parts[0];
+    const secondInitial = parts[1]?.charAt(0)?.toUpperCase() || "";
+    return secondInitial ? `${firstName} ${secondInitial}` : firstName;
+  }
+
   function getDraftValue(person, date, field, fallback = "") {
     const key = getAttendanceCellKey(person, date);
     return drafts[key]?.[field] ?? fallback;
@@ -11642,7 +11652,7 @@ function AttendancePage({
                         colSpan={2}
                         title={person.fullName || person.person}
                       >
-                        <span>{person.code || person.fullName || person.person}</span>
+                        <span>{getAttendanceStaffLabel(person)}</span>
                       </th>
                     ))}
                   </tr>
@@ -11659,7 +11669,9 @@ function AttendancePage({
                   {rows.map((row) => (
                     <tr key={row.isoDate} className={row.isToday ? "attendance-row-today" : ""}>
                       <th className="attendance-date-cell">
-                        <span>{`${row.weekdayLabel}: ${row.dateLabel}${row.isToday ? " · Today" : ""}`}</span>
+                        <strong>{row.weekdayLabel}</strong>
+                        <span>{row.dateLabel}</span>
+                        {row.isToday ? <em>Today</em> : null}
                       </th>
                       {row.cells.map((cell) => {
                         const missingClass = cell.hasMissingClock ? "attendance-cell-missing" : "";
@@ -17825,4 +17837,5 @@ export default function App() {
     </div>
   );
 }
+
 
