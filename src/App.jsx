@@ -11714,21 +11714,23 @@ function AttendancePage({
                 <label className="attendance-admin-editor-note">
                   <span className="attendance-admin-editor-note-head">
                     <span>Manager note</span>
+                  </span>
+                  <div className="attendance-admin-editor-note-row">
+                    <textarea
+                      value={selectedAttendanceEditor.adminNote}
+                      onChange={(event) => updateAttendanceAdminEditor({ adminNote: event.target.value })}
+                      placeholder="Add a note about a manual override, absence, forgotten key fob, or anything the team should remember."
+                      disabled={!selectedAttendanceCell}
+                    />
                     <button
                       className="ghost-button attendance-admin-apply-button"
                       type="button"
                       disabled={!selectedAttendanceCell}
                       onClick={applyAttendanceAdminEditor}
                     >
-                      Apply to draft
+                      Submit note
                     </button>
-                  </span>
-                  <textarea
-                    value={selectedAttendanceEditor.adminNote}
-                    onChange={(event) => updateAttendanceAdminEditor({ adminNote: event.target.value })}
-                    placeholder="Add a note about a manual override, absence, forgotten key fob, or anything the team should remember."
-                    disabled={!selectedAttendanceCell}
-                  />
+                  </div>
                 </label>
               </div>
             </section>
