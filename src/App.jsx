@@ -135,6 +135,14 @@ const EMPTY_ATTENDANCE_NOTE_FORM = {
   note: ""
 };
 
+const EMPTY_ATTENDANCE_ADMIN_EDITOR = {
+  person: "",
+  date: "",
+  adminStatus: "",
+  adminNote: "",
+  notifyEmployee: true
+};
+
 const RAMS_ACTIVITY_OPTIONS = [
   { value: "internal", label: "Internal signs / wall graphics" },
   { value: "external", label: "External signs / fascia" },
@@ -11451,9 +11459,14 @@ function AttendancePage({
   const adminMode = canEditAttendance(currentUser);
   const [drafts, setDrafts] = useState({});
   const [noteForm, setNoteForm] = useState(EMPTY_ATTENDANCE_NOTE_FORM);
+  const [selectedAttendanceEditor, setSelectedAttendanceEditor] = useState(EMPTY_ATTENDANCE_ADMIN_EDITOR);
 
   useEffect(() => {
     setDrafts({});
+  }, [attendanceData?.monthId]);
+
+  useEffect(() => {
+    setSelectedAttendanceEditor(EMPTY_ATTENDANCE_ADMIN_EDITOR);
   }, [attendanceData?.monthId]);
 
   useEffect(() => {
@@ -11528,6 +11541,9 @@ function AttendancePage({
     if (Object.prototype.hasOwnProperty.call(draft, "adminNote") && (draft.adminNote ?? "") !== (cell.adminNote ?? "")) {
       changedFields.push("adminNote");
     }
+    if (Object.prototype.hasOwnProperty.call(draft, "adminStatus") && (draft.adminStatus ?? "") !== (cell.adminStatus ?? "")) {
+      changedFields.push("adminStatus");
+    }
     return { key, draft, changedFields };
   }
 
@@ -11545,13 +11561,15 @@ function AttendancePage({
     if (changedFields.includes("clockIn")) payload.clockIn = draft.clockIn ?? "";
     if (changedFields.includes("clockOut")) payload.clockOut = draft.clockOut ?? "";
     if (changedFields.includes("adminNote")) payload.adminNote = draft.adminNote ?? "";
+    if (changedFields.includes("adminStatus")) payload.adminStatus = draft.adminStatus ?? "";
+    if (draft.notifyEmployee) payload.notifyEmployee = true;
     return payload;
   }
 
   const changedAttendanceCells = adminMode
     ? rows.flatMap((row) =>
         row.cells
-          .filter((cell) => !cell.displayLabel)
+          .filter((cell) => cell.canAdminEdit)
           .map((cell) => ({ cell, payload: buildAttendanceSavePayload(cell, row.isoDate) }))
           .filter((entry) => entry.payload)
       )
@@ -11591,6 +11609,40 @@ function AttendancePage({
     });
     setNoteForm(EMPTY_ATTENDANCE_NOTE_FORM);
   }
+
+  function openAttendanceAdminEditor(cell, isoDate) {
+    const key = getAttendanceCellKey(cell.person, isoDate);
+    const draft = drafts[key] || {};
+    setSelectedAttendanceEditor({
+      person: cell.person,
+      date: isoDate,
+      adminStatus: draft.adminStatus ?? cell.adminStatus ?? "",
+      adminNote: draft.adminNote ?? cell.adminNote ?? "",
+      notifyEmployee: draft.notifyEmployee ?? true
+    });
+  }
+
+  function updateAttendanceAdminEditor(updates) {
+    setSelectedAttendanceEditor((current) => ({ ...current, ...updates }));
+  }
+
+  function applyAttendanceAdminEditor() {
+    if (!selectedAttendanceEditor.person || !selectedAttendanceEditor.date) return;
+    const nextStatus = String(selectedAttendanceEditor.adminStatus || "").trim().toLowerCase();
+    setDraftValue(selectedAttendanceEditor.person, selectedAttendanceEditor.date, {
+      adminStatus: nextStatus,
+      adminNote: selectedAttendanceEditor.adminNote || "",
+      notifyEmployee: Boolean(selectedAttendanceEditor.notifyEmployee),
+      ...(nextStatus === "absent" ? { clockIn: "", clockOut: "" } : {})
+    });
+  }
+
+  const selectedAttendanceCell =
+    selectedAttendanceEditor.person && selectedAttendanceEditor.date
+      ? rows
+          .find((row) => row.isoDate === selectedAttendanceEditor.date)
+          ?.cells.find((cell) => cell.person === selectedAttendanceEditor.person) || null
+      : null;
 
   return (
     <div className="app-shell holidays-shell">
@@ -11636,6 +11688,59 @@ function AttendancePage({
             </div>
           </div>
           {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
+          {adminMode ? (
+            <section className="attendance-admin-editor">
+              <div className="attendance-admin-editor-head">
+                <div>
+                  <strong>Selected attendance entry</strong>
+                  <p>
+                    {selectedAttendanceCell
+                      ? `${selectedAttendanceEditor.person} · ${formatJobDate(selectedAttendanceEditor.date)}`
+                      : "Click a working-day attendance cell to mark absent, add a note, or notify the employee."}
+                  </p>
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  disabled={!selectedAttendanceCell}
+                  onClick={applyAttendanceAdminEditor}
+                >
+                  Apply to draft
+                </button>
+              </div>
+              <div className="attendance-admin-editor-grid">
+                <label>
+                  <span>Status</span>
+                  <select
+                    value={selectedAttendanceEditor.adminStatus}
+                    onChange={(event) => updateAttendanceAdminEditor({ adminStatus: event.target.value })}
+                    disabled={!selectedAttendanceCell}
+                  >
+                    <option value="">Present / normal</option>
+                    <option value="absent">Absent</option>
+                  </select>
+                </label>
+                <label className="attendance-admin-toggle">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(selectedAttendanceEditor.notifyEmployee)}
+                    onChange={(event) => updateAttendanceAdminEditor({ notifyEmployee: event.target.checked })}
+                    disabled={!selectedAttendanceCell}
+                  />
+                  <span>Notify employee when saved</span>
+                </label>
+                <label className="attendance-admin-editor-note">
+                  <span>Manager note</span>
+                  <textarea
+                    value={selectedAttendanceEditor.adminNote}
+                    onChange={(event) => updateAttendanceAdminEditor({ adminNote: event.target.value })}
+                    placeholder="Add a note about a manual override, absence, forgotten key fob, or anything the team should remember."
+                    disabled={!selectedAttendanceCell}
+                  />
+                </label>
+              </div>
+            </section>
+          ) : null}
 
           {loading ? <div className="board-loading">Loading attendance...</div> : null}
 
@@ -11678,20 +11783,30 @@ function AttendancePage({
                         const displayClass = getAttendanceDisplayClass(cell);
                         const { changedFields } = getAttendanceDraftChanges(cell, row.isoDate);
                         const hasDraftChanges = changedFields.length > 0;
+                        const isSelected =
+                          selectedAttendanceEditor.person === cell.person && selectedAttendanceEditor.date === row.isoDate;
                         if (cell.displayLabel) {
                           return (
                             <td
                               key={`${row.isoDate}-${cell.person}`}
-                              className={`attendance-merged-cell ${displayClass} ${missingClass}`.trim()}
+                              className={`attendance-merged-cell ${displayClass} ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`.trim()}
                               colSpan={2}
+                              onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
                             >
-                              <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>{cell.displayLabel}</span>
+                              <span className={cell.isHoliday ? "attendance-merged-holiday" : ""}>
+                                {cell.displayLabel}
+                                {cell.adminNote ? <small className="attendance-admin-note-chip">{cell.adminNote}</small> : null}
+                              </span>
                             </td>
                           );
                         }
                           return (
                             <>
-                              <td key={`${row.isoDate}-${cell.person}-in`} className={`attendance-value-cell ${missingClass}`}>
+                              <td
+                                key={`${row.isoDate}-${cell.person}-in`}
+                                className={`attendance-value-cell ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`}
+                                onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
+                              >
                                 <div className="attendance-cell-stack">
                                   <input
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
@@ -11705,7 +11820,11 @@ function AttendancePage({
                                   {hasDraftChanges ? <div className="attendance-cell-edited">Edited</div> : <div className="attendance-cell-spacer" />}
                                 </div>
                               </td>
-                              <td key={`${row.isoDate}-${cell.person}-out`} className={`attendance-value-cell ${missingClass}`}>
+                              <td
+                                key={`${row.isoDate}-${cell.person}-out`}
+                                className={`attendance-value-cell ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`}
+                                onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
+                              >
                                 <div className="attendance-cell-stack">
                                   <input
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
@@ -11713,6 +11832,7 @@ function AttendancePage({
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
+                                  {cell.adminNote ? <div className="attendance-cell-meta attendance-cell-meta-note">Note: {cell.adminNote}</div> : null}
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
                                 </div>
                               </td>
@@ -15336,15 +15456,15 @@ export default function App() {
     setNotifications(Array.isArray(payload) ? payload : []);
   }
 
-  async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "", changedFields = [] }) {
+  async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "", adminStatus = "", notifyEmployee = false, changedFields = [] }) {
     setAttendanceSavingKey(`${person}:${date}`);
-    const debugPayload = { person, date, clockIn, clockOut, adminNote, changedFields };
+    const debugPayload = { person, date, clockIn, clockOut, adminNote, adminStatus, notifyEmployee, changedFields };
     setAttendanceDebugMessage(`Saving ${person} on ${formatJobDate(date)}: ${JSON.stringify(debugPayload)}`);
     try {
       const response = await fetch("/api/attendance/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ person, date, clockIn, clockOut, adminNote, changedFields })
+        body: JSON.stringify({ person, date, clockIn, clockOut, adminNote, adminStatus, notifyEmployee, changedFields })
       });
       const payload = await response.json();
       if (!response.ok) {

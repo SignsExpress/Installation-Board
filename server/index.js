@@ -2565,6 +2565,9 @@ function sanitizeAttendanceEntry(payload) {
     timeMotoClockOut ||
     (!hasManualClockOutKey && !hasTimeMotoClockOutKey && source === "manual" ? legacyClockOut : "");
   const resolvedAnomalySummary = resolvedClockIn && resolvedClockOut ? "" : punchDerived.anomalies.join("; ");
+  const adminStatus = ["", "absent"].includes(String(payload.adminStatus || "").trim().toLowerCase())
+    ? String(payload.adminStatus || "").trim().toLowerCase()
+    : "";
 
   return {
     id: String(payload.id || makeId()),
@@ -2582,6 +2585,7 @@ function sanitizeAttendanceEntry(payload) {
     punchSummary: rawPunches.map((punch) => `${punch.type === "in" ? "In" : "Out"} ${punch.time}`).join(", "),
     anomalySummary: resolvedAnomalySummary,
     source,
+    adminStatus,
     adminNote: String(payload.adminNote || "").trim(),
     employeeNote: String(payload.employeeNote || "").trim(),
     missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
@@ -3763,6 +3767,44 @@ function syncAttendanceMissingNotification(store, users, attendanceEntry) {
   }
 }
 
+function notifyAttendanceAdminAction(store, users, attendanceEntry, actorName, options = {}) {
+  const personKey = getHolidayStaffIdentityKey(attendanceEntry.person);
+  const matchingUser = (users || []).find((user) => {
+    if (!canAccessAttendance(sanitizeUser(user))) return false;
+    return getHolidayStaffIdentityKey(getHolidayStaffPerson(user.displayName) || user.displayName) === personKey;
+  });
+  if (!matchingUser?.id) return;
+
+  const dateLabel = formatBoardNotificationDate(attendanceEntry.date);
+  const note = String(attendanceEntry.adminNote || "").trim();
+  const actor = actorName || "A manager";
+  let title = "Attendance updated";
+  let message = `${actor} updated your attendance on ${dateLabel}.`;
+
+  if (attendanceEntry.adminStatus === "absent") {
+    title = "Attendance marked absent";
+    message = `${actor} marked you absent on ${dateLabel}.`;
+  } else if (options.manualOverride) {
+    title = "Attendance updated manually";
+    message = `${actor} updated your attendance manually on ${dateLabel}.`;
+  }
+
+  if (note) {
+    message += ` Note: ${note}`;
+  }
+
+  store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
+  store.notifications.unshift(
+    createNotification({
+      userId: matchingUser.id,
+      type: "attendance-update",
+      title,
+      message,
+      link: getAttendanceLinkForUser(matchingUser, attendanceEntry.date)
+    })
+  );
+}
+
 async function getAttendancePayload(forUser, monthId = "") {
   const store = await readStore();
   const usersStore = await readUsersStore();
@@ -3852,7 +3894,11 @@ async function getAttendancePayload(forUser, monthId = "") {
         if (usesContractedHours) {
           displayLabel = "";
         }
+        if (!displayLabel && attendanceEntry?.adminStatus === "absent") {
+          displayLabel = "Absent";
+        }
         const hasMissingClock = Boolean(attendanceEntry && hasAttendanceMissingClock(attendanceEntry));
+        const canAdminEdit = !holidayEntry && !bankHolidayLabel && !isWeekend && !isContractedOff && !usesContractedHours;
 
         return {
           person: staffEntry.person,
@@ -3870,9 +3916,11 @@ async function getAttendancePayload(forUser, monthId = "") {
           punchSummary: attendanceEntry?.punchSummary || "",
           anomalySummary: attendanceEntry?.anomalySummary || "",
           adminNote: attendanceEntry?.adminNote || "",
+          adminStatus: attendanceEntry?.adminStatus || "",
           employeeNote: attendanceEntry?.employeeNote || "",
-          hasMissingClock: usesContractedHours || isContractedOff ? false : hasMissingClock,
+          hasMissingClock: usesContractedHours || isContractedOff || attendanceEntry?.adminStatus === "absent" ? false : hasMissingClock,
           entryId: attendanceEntry?.id || "",
+          canAdminEdit,
           canExplain:
             !usesContractedHours &&
             !isContractedOff &&
@@ -9792,6 +9840,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const changedFields = Array.isArray(request.body?.changedFields)
       ? request.body.changedFields.map((field) => String(field || "").trim()).filter(Boolean)
       : [];
+    const nextAdminStatus = changedFields.includes("adminStatus")
+      ? String(request.body?.adminStatus || "").trim().toLowerCase()
+      : existingEntry?.adminStatus || "";
 
     const mergedEntry = sanitizeAttendanceEntry({
       ...(existingEntry || {}),
@@ -9802,11 +9853,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
           ? "manual"
           : existingEntry?.source || nextEntry.source || "manual",
       manualClockIn: changedFields.includes("clockIn")
-        ? sanitizeAttendanceTime(request.body?.clockIn)
+        ? (nextAdminStatus === "absent" ? "" : sanitizeAttendanceTime(request.body?.clockIn))
         : existingEntry?.manualClockIn || "",
       manualClockOut: changedFields.includes("clockOut")
-        ? sanitizeAttendanceTime(request.body?.clockOut)
+        ? (nextAdminStatus === "absent" ? "" : sanitizeAttendanceTime(request.body?.clockOut))
         : existingEntry?.manualClockOut || "",
+      adminStatus: nextAdminStatus,
       adminNote: changedFields.includes("adminNote")
         ? String(request.body?.adminNote || "").trim()
         : nextEntry.adminNote || existingEntry?.adminNote || ""
@@ -9819,6 +9871,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
       store.attendanceEntries[existingIndex] = mergedEntry;
     } else {
       store.attendanceEntries.unshift(mergedEntry);
+    }
+
+    if (Boolean(request.body?.notifyEmployee)) {
+      notifyAttendanceAdminAction(store, usersStore.users || [], mergedEntry, request.user?.displayName || "A manager", {
+        manualOverride: changedFields.includes("clockIn") || changedFields.includes("clockOut")
+      });
     }
 
     syncAttendanceMissingNotification(store, usersStore.users || [], mergedEntry);
