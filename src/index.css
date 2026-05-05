@@ -7673,7 +7673,7 @@ button {
   border-bottom: 1px solid rgba(203, 213, 225, 0.75);
   padding: 3px 3px;
   text-align: center;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .attendance-grid-table thead th {
@@ -7707,6 +7707,7 @@ button {
   min-width: 68px;
   text-align: center;
   background: #fff9de;
+  vertical-align: middle;
 }
 
 .attendance-date-cell strong,
@@ -7745,6 +7746,7 @@ button {
 
 .attendance-value-cell {
   background: rgba(255, 255, 255, 0.9);
+  vertical-align: middle;
 }
 
 .attendance-toolbar-actions {
@@ -7784,8 +7786,10 @@ button {
 .attendance-cell-stack {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: stretch;
   gap: 1px;
+  min-height: 100%;
 }
 
 .attendance-time-input {
@@ -7862,6 +7866,15 @@ button {
   font-size: 0.62rem;
   line-height: 1.15;
   padding: 4px 3px;
+  vertical-align: middle;
+}
+
+.attendance-merged-cell > span {
+  display: inline-flex;
+  min-height: 100%;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .attendance-merged-holiday {
