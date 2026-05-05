@@ -7925,60 +7925,62 @@ button {
 .attendance-admin-note-chip {
   display: inline-block;
   max-width: 100%;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 999px;
   background: rgba(113, 76, 152, 0.1);
   color: #714c98;
-  font-size: 0.48rem;
+  font-size: 0.5rem;
   font-weight: 800;
   line-height: 1.2;
+  text-align: center;
+  justify-self: center;
 }
 
 .attendance-admin-editor {
-  margin-top: 12px;
+  margin-top: 8px;
   border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 16px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.94);
-  padding: 14px 16px;
+  padding: 10px 12px;
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .attendance-admin-editor-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .attendance-admin-editor-head strong {
   display: block;
   color: #0f172a;
-  font-size: 0.84rem;
+  font-size: 0.76rem;
 }
 
 .attendance-admin-editor-head p {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #64748b;
-  font-size: 0.72rem;
-  line-height: 1.35;
+  font-size: 0.65rem;
+  line-height: 1.25;
 }
 
 .attendance-admin-editor-grid {
   display: grid;
-  grid-template-columns: 180px 220px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
+  grid-template-columns: 150px 170px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
 }
 
 .attendance-admin-editor-grid label {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .attendance-admin-editor-grid label > span {
   color: #475569;
-  font-size: 0.68rem;
+  font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -7995,21 +7997,24 @@ button {
 }
 
 .attendance-admin-editor-grid select {
-  min-height: 36px;
-  padding: 0 10px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.72rem;
 }
 
 .attendance-admin-editor-grid textarea {
-  min-height: 74px;
-  padding: 10px 12px;
+  min-height: 30px;
+  padding: 7px 9px;
   resize: vertical;
+  font-size: 0.72rem;
+  line-height: 1.25;
 }
 
 .attendance-admin-toggle {
   display: flex !important;
   align-items: center;
-  gap: 8px;
-  padding-top: 24px;
+  gap: 6px;
+  padding-top: 18px;
 }
 
 .attendance-admin-toggle input {
@@ -8018,7 +8023,7 @@ button {
 
 .attendance-admin-toggle span {
   color: #0f172a !important;
-  font-size: 0.74rem !important;
+  font-size: 0.68rem !important;
   font-weight: 700 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;

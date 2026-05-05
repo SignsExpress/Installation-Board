@@ -11814,6 +11814,7 @@ function AttendancePage({
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
                                   />
+                                  {cell.adminNote ? <div className="attendance-admin-note-chip">{cell.adminNote}</div> : null}
                                   {cell.halfDayHolidayLabel ? (
                                     <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
                                   ) : null}
@@ -11832,7 +11833,7 @@ function AttendancePage({
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
-                                  {cell.adminNote ? <div className="attendance-cell-meta attendance-cell-meta-note">Note: {cell.adminNote}</div> : null}
+                                  {cell.adminNote ? <div className="attendance-admin-note-chip">{cell.adminNote}</div> : null}
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
                                 </div>
                               </td>
