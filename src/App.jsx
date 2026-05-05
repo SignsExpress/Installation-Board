@@ -11801,43 +11801,40 @@ function AttendancePage({
                           );
                         }
                           return (
-                            <>
-                              <td
-                                key={`${row.isoDate}-${cell.person}-in`}
-                                className={`attendance-value-cell ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`}
-                                onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
-                              >
-                                <div className="attendance-cell-stack">
+                            <td
+                              key={`${row.isoDate}-${cell.person}-dual`}
+                              className={`attendance-value-cell attendance-dual-cell ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`}
+                              colSpan={2}
+                              onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
+                            >
+                              <div className="attendance-dual-grid">
+                                <div className="attendance-cell-stack attendance-cell-stack-dual">
                                   <input
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
                                   />
-                                  {cell.adminNote ? <div className="attendance-admin-note-chip">{cell.adminNote}</div> : null}
                                   {cell.halfDayHolidayLabel ? (
                                     <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
-                                  ) : null}
-                                  {hasDraftChanges ? <div className="attendance-cell-edited">Edited</div> : <div className="attendance-cell-spacer" />}
+                                  ) : hasDraftChanges ? (
+                                    <div className="attendance-cell-edited">Edited</div>
+                                  ) : (
+                                    <div className="attendance-cell-spacer" />
+                                  )}
                                 </div>
-                              </td>
-                              <td
-                                key={`${row.isoDate}-${cell.person}-out`}
-                                className={`attendance-value-cell ${missingClass} ${isSelected ? "is-selected" : ""} ${cell.canAdminEdit ? "is-clickable" : ""}`}
-                                onClick={cell.canAdminEdit ? () => openAttendanceAdminEditor(cell, row.isoDate) : undefined}
-                              >
-                                <div className="attendance-cell-stack">
+                                <div className="attendance-cell-stack attendance-cell-stack-dual">
                                   <input
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                     placeholder="--:--"
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
-                                  {cell.adminNote ? <div className="attendance-admin-note-chip">{cell.adminNote}</div> : null}
-                                  {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : null}
+                                  {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
                                 </div>
-                              </td>
-                          </>
+                                {cell.adminNote ? <div className="attendance-admin-note-chip attendance-admin-note-chip-shared">{cell.adminNote}</div> : null}
+                              </div>
+                            </td>
                         );
                       })}
                     </tr>
