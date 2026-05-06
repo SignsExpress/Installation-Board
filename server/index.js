@@ -6488,7 +6488,7 @@ function shouldAcceptProFormaMoneyValue(meta, key = "") {
   if (/(id|code|account|class|type|number|locator|sequence|sort|status|version)/i.test(text)) return false;
   if (meta.hasCurrency || meta.hasDecimals) return true;
   if (!meta.integerOnly) return true;
-  return /(unitprice|priceperitem|sellprice|sellunit|lineitemprice|priceeach|itemtotal|linetotal|extendedprice|extendedamount|lineprice|lineamount|subtotal|pretax|pre-tax|taxexclusive|nettotal|vatamount|vattotal|taxtotal|taxamount|grandtotal|ordertotal|invoiceamount|totalpaid|amountpaid|balancedue|amountdue|discountamount|discounttotal)/i.test(text) && Math.abs(meta.amount) < 1000;
+  return /(unitprice|priceperitem|sellprice|sellunit|lineitemprice|priceeach|itemtotal|linetotal|extendedprice|extendedamount|lineprice|lineamount|subtotal|pretax|pre-tax|taxexclusive|nettotal|vatamount|vattotal|taxtotal|taxamount|grandtotal|ordertotal|invoiceamount|totalpaid|amountpaid|balancedue|amountdue|discountamount|discounttotal)/i.test(text);
 }
 
 function scoreProFormaUnitPriceField(leaf) {
