@@ -4833,7 +4833,7 @@ function normalizeCoreBridgeOrder(record, index) {
           ""
       ).trim(),
     number: orderDestinationPhone || preferredRolePhone || directRolePhone,
-    address: billingAddress || orderDestinationAddress || destinationRoleAddress,
+    address: orderDestinationAddress || destinationRoleAddress || billingAddress,
     billingAddress: billingAddress || "",
     siteAddress: orderDestinationAddress || destinationRoleAddress || "",
     notes: pickFirst(flat, [
@@ -4892,12 +4892,26 @@ function getCoreBridgeDestinationAddressFromRecord(record) {
 function pickBestCoreBridgeDestinationRecord(records) {
   if (!Array.isArray(records) || !records.length) return null;
 
+  const recordHasShipToAddress = (record) => {
+    const roles = getCoreBridgeRoles(record);
+    return roles.some(
+      (role) =>
+        String(role?.RoleType || "").toLowerCase() === "shipto" &&
+        Boolean(buildAddressFromRole(role))
+    );
+  };
+
+  const recordHasAnyAddress = (record) => Boolean(getCoreBridgeDestinationAddressFromRecord(record));
+
   return (
-    records.find((record) => record?.IsDefault) ||
+    records.find((record) => recordHasShipToAddress(record)) ||
+    records.find((record) => record?.IsDefault && recordHasAnyAddress(record)) ||
     records.find((record) => {
       const roles = getCoreBridgeRoles(record);
       return roles.some((role) => String(role?.RoleType || "").toLowerCase() === "shipto");
     }) ||
+    records.find((record) => recordHasAnyAddress(record)) ||
+    records.find((record) => record?.IsDefault) ||
     records[0]
   );
 }
@@ -4906,7 +4920,7 @@ function pickBestOrderDestinationRecord(record) {
   const destinations = Array.isArray(record?.Destinations) ? record.Destinations : [];
   if (!destinations.length) return null;
 
-  return destinations.find((destination) => destination?.IsDefault) || destinations[0];
+  return pickBestCoreBridgeDestinationRecord(destinations);
 }
 
 function getOrderDestinationAddressFromOrderRecord(record) {
