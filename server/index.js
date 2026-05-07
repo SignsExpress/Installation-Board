@@ -2591,12 +2591,12 @@ function roundAttendancePayrollNetMinutes(minutes) {
 
 function applyAttendanceCreditGrace(minutes) {
   const normalized = roundAttendanceVarianceMinutes(minutes);
-  return normalized > ATTENDANCE_OVERTIME_GRACE_MINUTES ? normalized : 0;
+  return normalized >= ATTENDANCE_OVERTIME_GRACE_MINUTES ? normalized : 0;
 }
 
 function applyAttendanceDeductionGrace(minutes) {
   const normalized = roundAttendanceVarianceMinutes(minutes);
-  return normalized > ATTENDANCE_DEDUCTION_GRACE_MINUTES ? normalized : 0;
+  return normalized >= ATTENDANCE_DEDUCTION_GRACE_MINUTES ? normalized : 0;
 }
 
 function sanitizeAttendanceEntry(payload) {
