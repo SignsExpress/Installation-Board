@@ -2551,6 +2551,9 @@ function formatAttendanceNetMinutes(minutes) {
     : `Deduction ${formatAttendanceMinutes(Math.abs(normalized))}`;
 }
 
+const ATTENDANCE_MORNING_HOLIDAY_END_MINUTES = 12 * 60;
+const ATTENDANCE_AFTERNOON_HOLIDAY_START_MINUTES = 12 * 60 + 30;
+
 function sanitizeAttendanceEntry(payload) {
   const source = String(payload.source || "manual").trim().toLowerCase() || "manual";
   const legacyClockIn = sanitizeAttendanceTime(payload.clockIn);
@@ -3894,8 +3897,10 @@ async function getAttendancePayload(forUser, monthId = "") {
           person: entry.person,
           code: entry.code,
           fullName: entry.fullName || entry.name || entry.person,
-          earlyMinutes: 0,
-          lateMinutes: 0
+          earlyStartMinutes: 0,
+          lateFinishMinutes: 0,
+          lateStartMinutes: 0,
+          earlyFinishMinutes: 0
         }
       ];
     })
@@ -3950,36 +3955,49 @@ async function getAttendancePayload(forUser, monthId = "") {
         const contractedClockOutMinutes = attendanceTimeToMinutes(contractedHours.out);
         const actualClockInMinutes = attendanceTimeToMinutes(attendanceEntry?.clockIn || "");
         const actualClockOutMinutes = attendanceTimeToMinutes(attendanceEntry?.clockOut || "");
+        let expectedClockInMinutes = contractedClockInMinutes;
+        let expectedClockOutMinutes = contractedClockOutMinutes;
+        const halfDayDuration = String(holidayEntry?.duration || "").trim().toLowerCase();
+        if (halfDayDuration === "morning") {
+          expectedClockInMinutes = ATTENDANCE_AFTERNOON_HOLIDAY_START_MINUTES;
+        } else if (halfDayDuration === "afternoon") {
+          expectedClockOutMinutes =
+            contractedClockOutMinutes !== null
+              ? Math.min(contractedClockOutMinutes, ATTENDANCE_MORNING_HOLIDAY_END_MINUTES)
+              : ATTENDANCE_MORNING_HOLIDAY_END_MINUTES;
+        }
         const shouldMeasureVariance =
           !isWeekend &&
           !bankHolidayLabel &&
           !isContractedOff &&
-          !usesContractedHours &&
           attendanceEntry?.adminStatus !== "absent" &&
           attendanceMode !== "exempt" &&
-          contractedClockInMinutes !== null &&
-          contractedClockOutMinutes !== null;
-        let earlyMinutes = 0;
-        let lateMinutes = 0;
-        const halfDayDuration = String(holidayEntry?.duration || "").trim().toLowerCase();
-        if (shouldMeasureVariance && actualClockInMinutes !== null && halfDayDuration !== "morning") {
-          if (actualClockInMinutes <= contractedClockInMinutes) {
-            earlyMinutes += contractedClockInMinutes - actualClockInMinutes;
+          expectedClockInMinutes !== null &&
+          expectedClockOutMinutes !== null;
+        let earlyStartMinutes = 0;
+        let lateFinishMinutes = 0;
+        let lateStartMinutes = 0;
+        let earlyFinishMinutes = 0;
+        if (shouldMeasureVariance && actualClockInMinutes !== null) {
+          if (actualClockInMinutes <= expectedClockInMinutes) {
+            earlyStartMinutes += expectedClockInMinutes - actualClockInMinutes;
           } else {
-            lateMinutes += actualClockInMinutes - contractedClockInMinutes;
+            lateStartMinutes += actualClockInMinutes - expectedClockInMinutes;
           }
         }
-        if (shouldMeasureVariance && actualClockOutMinutes !== null && halfDayDuration !== "afternoon") {
-          if (actualClockOutMinutes >= contractedClockOutMinutes) {
-            earlyMinutes += actualClockOutMinutes - contractedClockOutMinutes;
+        if (shouldMeasureVariance && actualClockOutMinutes !== null) {
+          if (actualClockOutMinutes >= expectedClockOutMinutes) {
+            lateFinishMinutes += actualClockOutMinutes - expectedClockOutMinutes;
           } else {
-            lateMinutes += contractedClockOutMinutes - actualClockOutMinutes;
+            earlyFinishMinutes += expectedClockOutMinutes - actualClockOutMinutes;
           }
         }
         const summaryEntry = attendanceSummaryByPersonKey.get(personKey);
         if (summaryEntry) {
-          summaryEntry.earlyMinutes += earlyMinutes;
-          summaryEntry.lateMinutes += lateMinutes;
+          summaryEntry.earlyStartMinutes += earlyStartMinutes;
+          summaryEntry.lateFinishMinutes += lateFinishMinutes;
+          summaryEntry.lateStartMinutes += lateStartMinutes;
+          summaryEntry.earlyFinishMinutes += earlyFinishMinutes;
         }
 
         return {
@@ -4005,8 +4023,10 @@ async function getAttendancePayload(forUser, monthId = "") {
           canAdminEdit,
           canEditClockIn: canAdminEdit,
           canEditClockOut: canAdminEdit,
-          earlyMinutes,
-          lateMinutes,
+          earlyStartMinutes,
+          lateFinishMinutes,
+          lateStartMinutes,
+          earlyFinishMinutes,
           canExplain:
             !usesContractedHours &&
             !isContractedOff &&
@@ -4041,15 +4061,25 @@ async function getAttendancePayload(forUser, monthId = "") {
           person: entry.person,
           code: entry.code,
           fullName: entry.fullName || entry.name || entry.person,
-          earlyMinutes: 0,
-          lateMinutes: 0
+          earlyStartMinutes: 0,
+          lateFinishMinutes: 0,
+          lateStartMinutes: 0,
+          earlyFinishMinutes: 0
         };
-      const netMinutes = summaryEntry.earlyMinutes - summaryEntry.lateMinutes;
+      const creditMinutes = summaryEntry.earlyStartMinutes + summaryEntry.lateFinishMinutes;
+      const deductionMinutes = summaryEntry.lateStartMinutes + summaryEntry.earlyFinishMinutes;
+      const netMinutes = creditMinutes - deductionMinutes;
       return {
         ...summaryEntry,
+        creditMinutes,
+        deductionMinutes,
         netMinutes,
-        earlyLabel: formatAttendanceMinutes(summaryEntry.earlyMinutes),
-        lateLabel: formatAttendanceMinutes(summaryEntry.lateMinutes),
+        earlyStartLabel: formatAttendanceMinutes(summaryEntry.earlyStartMinutes),
+        lateFinishLabel: formatAttendanceMinutes(summaryEntry.lateFinishMinutes),
+        lateStartLabel: formatAttendanceMinutes(summaryEntry.lateStartMinutes),
+        earlyFinishLabel: formatAttendanceMinutes(summaryEntry.earlyFinishMinutes),
+        creditLabel: formatAttendanceMinutes(creditMinutes),
+        deductionLabel: formatAttendanceMinutes(deductionMinutes),
         netLabel: formatAttendanceNetMinutes(netMinutes)
       };
     }),
