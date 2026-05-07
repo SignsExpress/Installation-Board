@@ -4008,26 +4008,32 @@ async function getAttendancePayload(forUser, monthId = "") {
         let lateFinishMinutes = 0;
         let lateStartMinutes = 0;
         let earlyFinishMinutes = 0;
-        let clockInStatus = "neutral";
-        let clockOutStatus = "neutral";
         if (shouldMeasureVariance && actualClockInMinutes !== null) {
           if (actualClockInMinutes <= expectedClockInMinutes) {
             earlyStartMinutes += expectedClockInMinutes - actualClockInMinutes;
-            clockInStatus = actualClockInMinutes < expectedClockInMinutes ? "positive" : "neutral";
           } else {
             lateStartMinutes += actualClockInMinutes - expectedClockInMinutes;
-            clockInStatus = "negative";
           }
         }
         if (shouldMeasureVariance && actualClockOutMinutes !== null) {
           if (actualClockOutMinutes >= expectedClockOutMinutes) {
             lateFinishMinutes += actualClockOutMinutes - expectedClockOutMinutes;
-            clockOutStatus = actualClockOutMinutes > expectedClockOutMinutes ? "positive" : "neutral";
           } else {
             earlyFinishMinutes += expectedClockOutMinutes - actualClockOutMinutes;
-            clockOutStatus = "negative";
           }
         }
+        const clockInStatus =
+          applyAttendanceCreditGrace(earlyStartMinutes) > 0
+            ? "positive"
+            : applyAttendanceDeductionGrace(lateStartMinutes) > 0
+              ? "negative"
+              : "neutral";
+        const clockOutStatus =
+          applyAttendanceCreditGrace(lateFinishMinutes) > 0
+            ? "positive"
+            : applyAttendanceDeductionGrace(earlyFinishMinutes) > 0
+              ? "negative"
+              : "neutral";
         const summaryEntry = attendanceSummaryByPersonKey.get(personKey);
         if (summaryEntry) {
           summaryEntry.earlyStartMinutes += earlyStartMinutes;
