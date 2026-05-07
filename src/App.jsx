@@ -12076,7 +12076,7 @@ function AttendancePage({
                       </th>
                       {staff.map((person) => {
                         const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
-                        const netMinutes = Number(summaryEntry?.netMinutes || 0);
+                        const netMinutes = Number((summaryEntry?.payrollNetMinutes ?? summaryEntry?.netMinutes) || 0);
                         const netClass =
                           netMinutes > 0
                             ? "attendance-summary-net is-positive"
@@ -12279,7 +12279,7 @@ function AttendancePage({
                     </div>
                     <div className="attendance-client-summary-cell">
                       <span className="attendance-client-summary-label">NET TOTAL</span>
-                      <div className={`attendance-summary-net ${Number(selfSummaryEntry.netMinutes || 0) > 0 ? "is-positive" : Number(selfSummaryEntry.netMinutes || 0) < 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
+                      <div className={`attendance-summary-net ${Number((selfSummaryEntry.payrollNetMinutes ?? selfSummaryEntry.netMinutes) || 0) > 0 ? "is-positive" : Number((selfSummaryEntry.payrollNetMinutes ?? selfSummaryEntry.netMinutes) || 0) < 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
                         {selfSummaryEntry.netLabel || "Balanced"}
                       </div>
                     </div>

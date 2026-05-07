@@ -4192,6 +4192,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         summaryEntry.lateStartMinutes +
         summaryEntry.earlyFinishMinutes;
       const netMinutes = creditMinutes - deductionMinutes;
+      const payrollNetMinutes = roundAttendancePayrollNetMinutes(netMinutes);
       const personKey = getHolidayStaffIdentityKey(entry.person);
       const mileagePounds = Number(mileagePoundsByPersonKey.get(personKey) || 0);
       const monthNote = String(monthNotesByPersonKey.get(personKey)?.note || "");
@@ -4200,6 +4201,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         creditMinutes,
         deductionMinutes,
         netMinutes,
+        payrollNetMinutes,
         mileagePounds,
         monthNote,
         earlyStartLabel: formatAttendanceMinutes(summaryEntry.earlyStartMinutes),
