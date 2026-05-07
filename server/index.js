@@ -2590,13 +2590,19 @@ function roundAttendancePayrollNetMinutes(minutes) {
 }
 
 function applyAttendanceCreditGrace(minutes) {
-  const normalized = roundAttendanceVarianceMinutes(minutes);
-  return normalized >= ATTENDANCE_OVERTIME_GRACE_MINUTES ? normalized : 0;
+  const rawMinutes = Number.isFinite(minutes) ? Math.max(0, Number(minutes)) : 0;
+  if (rawMinutes < ATTENDANCE_OVERTIME_GRACE_MINUTES) {
+    return 0;
+  }
+  return roundAttendanceVarianceMinutes(rawMinutes);
 }
 
 function applyAttendanceDeductionGrace(minutes) {
-  const normalized = roundAttendanceVarianceMinutes(minutes);
-  return normalized >= ATTENDANCE_DEDUCTION_GRACE_MINUTES ? normalized : 0;
+  const rawMinutes = Number.isFinite(minutes) ? Math.max(0, Number(minutes)) : 0;
+  if (rawMinutes < ATTENDANCE_DEDUCTION_GRACE_MINUTES) {
+    return 0;
+  }
+  return roundAttendanceVarianceMinutes(rawMinutes);
 }
 
 function sanitizeAttendanceEntry(payload) {
