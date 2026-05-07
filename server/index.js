@@ -2553,6 +2553,18 @@ function formatAttendanceNetMinutes(minutes) {
 
 const ATTENDANCE_MORNING_HOLIDAY_END_MINUTES = 12 * 60;
 const ATTENDANCE_AFTERNOON_HOLIDAY_START_MINUTES = 12 * 60 + 30;
+const ATTENDANCE_OVERTIME_GRACE_MINUTES = 10;
+const ATTENDANCE_DEDUCTION_GRACE_MINUTES = 5;
+
+function applyAttendanceCreditGrace(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
+  return normalized > ATTENDANCE_OVERTIME_GRACE_MINUTES ? normalized : 0;
+}
+
+function applyAttendanceDeductionGrace(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
+  return normalized > ATTENDANCE_DEDUCTION_GRACE_MINUTES ? normalized : 0;
+}
 
 function sanitizeAttendanceEntry(payload) {
   const source = String(payload.source || "manual").trim().toLowerCase() || "manual";
@@ -4066,8 +4078,12 @@ async function getAttendancePayload(forUser, monthId = "") {
           lateStartMinutes: 0,
           earlyFinishMinutes: 0
         };
-      const creditMinutes = summaryEntry.earlyStartMinutes + summaryEntry.lateFinishMinutes;
-      const deductionMinutes = summaryEntry.lateStartMinutes + summaryEntry.earlyFinishMinutes;
+      const creditMinutes =
+        applyAttendanceCreditGrace(summaryEntry.earlyStartMinutes) +
+        applyAttendanceCreditGrace(summaryEntry.lateFinishMinutes);
+      const deductionMinutes =
+        applyAttendanceDeductionGrace(summaryEntry.lateStartMinutes) +
+        applyAttendanceDeductionGrace(summaryEntry.earlyFinishMinutes);
       const netMinutes = creditMinutes - deductionMinutes;
       return {
         ...summaryEntry,
