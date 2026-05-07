@@ -2556,13 +2556,19 @@ const ATTENDANCE_AFTERNOON_HOLIDAY_START_MINUTES = 12 * 60 + 30;
 const ATTENDANCE_OVERTIME_GRACE_MINUTES = 10;
 const ATTENDANCE_DEDUCTION_GRACE_MINUTES = 5;
 
+function roundAttendanceVarianceMinutes(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.max(0, Number(minutes)) : 0;
+  if (!normalized) return 0;
+  return Math.round(normalized / 5) * 5;
+}
+
 function applyAttendanceCreditGrace(minutes) {
-  const normalized = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
+  const normalized = roundAttendanceVarianceMinutes(minutes);
   return normalized > ATTENDANCE_OVERTIME_GRACE_MINUTES ? normalized : 0;
 }
 
 function applyAttendanceDeductionGrace(minutes) {
-  const normalized = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
+  const normalized = roundAttendanceVarianceMinutes(minutes);
   return normalized > ATTENDANCE_DEDUCTION_GRACE_MINUTES ? normalized : 0;
 }
 
@@ -4090,10 +4096,10 @@ async function getAttendancePayload(forUser, monthId = "") {
         creditMinutes,
         deductionMinutes,
         netMinutes,
-        earlyStartLabel: formatAttendanceMinutes(summaryEntry.earlyStartMinutes),
-        lateFinishLabel: formatAttendanceMinutes(summaryEntry.lateFinishMinutes),
-        lateStartLabel: formatAttendanceMinutes(summaryEntry.lateStartMinutes),
-        earlyFinishLabel: formatAttendanceMinutes(summaryEntry.earlyFinishMinutes),
+        earlyStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.earlyStartMinutes)),
+        lateFinishLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateFinishMinutes)),
+        lateStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateStartMinutes)),
+        earlyFinishLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.earlyFinishMinutes)),
         creditLabel: formatAttendanceMinutes(creditMinutes),
         deductionLabel: formatAttendanceMinutes(deductionMinutes),
         netLabel: formatAttendanceNetMinutes(netMinutes)

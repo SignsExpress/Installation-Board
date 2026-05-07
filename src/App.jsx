@@ -11849,9 +11849,8 @@ function AttendancePage({
                                   />
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
                                 </div>
-                                {cell.punchSummary || cell.anomalySummary ? (
+                                {cell.anomalySummary ? (
                                   <div className="attendance-cell-meta attendance-cell-meta-wide">
-                                    {cell.punchSummary ? <div>Punches: {cell.punchSummary}</div> : null}
                                     {cell.anomalySummary ? <div className="attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
                                   </div>
                                 ) : null}
@@ -11871,7 +11870,6 @@ function AttendancePage({
             <section className="attendance-summary-wrap">
               <div className="attendance-summary-header">
                 <h3>Deductions and overtime</h3>
-                <p>Calculated against each person&apos;s contracted start and finish hours from Permissions.</p>
               </div>
               <div className="attendance-grid-wrap attendance-summary-grid-wrap">
                 <table className="attendance-grid-table attendance-summary-table">
@@ -11882,7 +11880,7 @@ function AttendancePage({
                         <th
                           key={`summary-staff-${person.person}`}
                           className="attendance-staff-head"
-                          colSpan={1}
+                          colSpan={2}
                           title={person.fullName || person.person}
                         >
                           <span>{getAttendanceStaffLabel(person)}</span>
@@ -11891,71 +11889,53 @@ function AttendancePage({
                     </tr>
                     <tr>
                       {staff.map((person) => (
-                        <th key={`summary-cols-${person.person}`} className="attendance-sub-head">Summary</th>
+                        <Fragment key={`summary-cols-${person.person}`}>
+                          <th className="attendance-sub-head">In</th>
+                          <th className="attendance-sub-head">Out</th>
+                        </Fragment>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
                       <th className="attendance-date-cell attendance-summary-label-cell">
-                        <strong>Early starts</strong>
-                        <span>Before contracted start</span>
+                        <strong>Overtime</strong>
                       </th>
                       {staff.map((person) => {
                         const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
                         return (
-                          <td key={`summary-early-start-${person.person}`} className="attendance-value-cell attendance-summary-value-cell">
-                            {summaryEntry?.earlyStartLabel || "0m"}
-                          </td>
+                          <Fragment key={`summary-overtime-${person.person}`}>
+                            <td className="attendance-value-cell attendance-summary-value-cell attendance-summary-value-positive">
+                              {summaryEntry?.earlyStartLabel || "0m"}
+                            </td>
+                            <td className="attendance-value-cell attendance-summary-value-cell attendance-summary-value-positive">
+                              {summaryEntry?.lateFinishLabel || "0m"}
+                            </td>
+                          </Fragment>
                         );
                       })}
                     </tr>
                     <tr>
                       <th className="attendance-date-cell attendance-summary-label-cell">
-                        <strong>Late finishes</strong>
-                        <span>After contracted finish</span>
+                        <strong>Deductions</strong>
                       </th>
                       {staff.map((person) => {
                         const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
                         return (
-                          <td key={`summary-late-finish-${person.person}`} className="attendance-value-cell attendance-summary-value-cell">
-                            {summaryEntry?.lateFinishLabel || "0m"}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    <tr>
-                      <th className="attendance-date-cell attendance-summary-label-cell">
-                        <strong>Late starts</strong>
-                        <span>After contracted start</span>
-                      </th>
-                      {staff.map((person) => {
-                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
-                        return (
-                          <td key={`summary-late-start-${person.person}`} className="attendance-value-cell attendance-summary-value-cell">
-                            {summaryEntry?.lateStartLabel || "0m"}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                    <tr>
-                      <th className="attendance-date-cell attendance-summary-label-cell">
-                        <strong>Early finishes</strong>
-                        <span>Before contracted finish</span>
-                      </th>
-                      {staff.map((person) => {
-                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
-                        return (
-                          <td key={`summary-early-finish-${person.person}`} className="attendance-value-cell attendance-summary-value-cell">
-                            {summaryEntry?.earlyFinishLabel || "0m"}
-                          </td>
+                          <Fragment key={`summary-deductions-${person.person}`}>
+                            <td className="attendance-value-cell attendance-summary-value-cell attendance-summary-value-negative">
+                              {summaryEntry?.lateStartLabel || "0m"}
+                            </td>
+                            <td className="attendance-value-cell attendance-summary-value-cell attendance-summary-value-negative">
+                              {summaryEntry?.earlyFinishLabel || "0m"}
+                            </td>
+                          </Fragment>
                         );
                       })}
                     </tr>
                     <tr>
                       <th className="attendance-date-cell attendance-summary-label-cell">
                         <strong>Net total</strong>
-                        <span>Overtime / deduction</span>
                       </th>
                       {staff.map((person) => {
                         const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
@@ -11970,6 +11950,7 @@ function AttendancePage({
                           <td
                             key={`summary-net-${person.person}`}
                             className="attendance-value-cell attendance-summary-net-cell"
+                            colSpan={2}
                           >
                             <div className={netClass}>{summaryEntry?.netLabel || "Balanced"}</div>
                           </td>
