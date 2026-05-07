@@ -7650,11 +7650,10 @@ button {
 }
 
 .attendance-grid-wrap {
-  overflow: auto;
+  overflow: visible;
   border: 1px solid var(--sx-border);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.86);
-  max-height: calc(100vh - 155px);
   width: 100%;
 }
 
