@@ -8059,6 +8059,31 @@ button {
   color: #475569;
 }
 
+.attendance-summary-note-cell {
+  background: rgba(255, 255, 255, 0.96);
+  padding: 6px;
+}
+
+.attendance-summary-note-input {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 12px;
+  background: #fff;
+  color: #1f2937;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.attendance-summary-note-input:focus {
+  outline: none;
+  border-color: rgba(107, 70, 193, 0.45);
+  box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.12);
+}
+
 .attendance-summary-notes {
   margin-top: 10px;
   padding: 10px 12px;

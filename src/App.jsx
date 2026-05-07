@@ -11449,20 +11449,24 @@ function AttendancePage({
   attendanceMonthId,
   setAttendanceMonthId,
   attendanceSavingKey,
+  attendanceMonthNoteSaving,
   attendanceNoteSavingKey,
   attendanceDebugMessage,
   setAttendanceDebugMessage,
   attendanceFocusDate,
   onSaveAttendanceEntry,
+  onSaveAttendanceMonthNote,
   onSubmitAttendanceExplanation
 }) {
   const adminMode = canEditAttendance(currentUser);
   const [drafts, setDrafts] = useState({});
+  const [monthNoteDrafts, setMonthNoteDrafts] = useState({});
   const [noteForm, setNoteForm] = useState(EMPTY_ATTENDANCE_NOTE_FORM);
   const [selectedAttendanceEditor, setSelectedAttendanceEditor] = useState(EMPTY_ATTENDANCE_ADMIN_EDITOR);
 
   useEffect(() => {
     setDrafts({});
+    setMonthNoteDrafts({});
   }, [attendanceData?.monthId]);
 
   useEffect(() => {
@@ -11585,6 +11589,21 @@ function AttendancePage({
       })
     : [];
 
+  const changedMonthNotes = adminMode
+    ? staff
+        .map((person) => {
+          const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+          const currentNote = String(summaryEntry?.monthNote || "");
+          const draftNote = Object.prototype.hasOwnProperty.call(monthNoteDrafts, person.person)
+            ? String(monthNoteDrafts[person.person] || "")
+            : currentNote;
+          return draftNote !== currentNote
+            ? { person: person.person, monthId: attendanceData?.monthId || attendanceMonthId, note: draftNote }
+            : null;
+        })
+        .filter(Boolean)
+    : [];
+
   async function handleSaveAllAttendanceChanges() {
     if (!changedAttendanceCells.length) {
       setAttendanceDebugMessage(`No savable edits detected. Draft rows: ${Object.keys(drafts).length}.`);
@@ -11608,6 +11627,14 @@ function AttendancePage({
         return next;
       });
     }
+  }
+
+  async function handleSaveAttendanceMonthNotes() {
+    for (const entry of changedMonthNotes) {
+      const saved = await onSaveAttendanceMonthNote(entry);
+      if (!saved) return;
+    }
+    setMonthNoteDrafts({});
   }
 
   async function submitEmployeeNote(event) {
@@ -11675,7 +11702,11 @@ function AttendancePage({
             <div className="holidays-toolbar-actions attendance-toolbar-actions">
               {adminMode ? (
                 <div className="attendance-save-summary">
-                  <span>{changedAttendanceCells.length ? `${changedAttendanceCells.length} edited entr${changedAttendanceCells.length === 1 ? "y" : "ies"}` : "No unsaved edits"}</span>
+                  <span>
+                    {changedAttendanceCells.length || changedMonthNotes.length
+                      ? `${changedAttendanceCells.length} edited entr${changedAttendanceCells.length === 1 ? "y" : "ies"} • ${changedMonthNotes.length} note${changedMonthNotes.length === 1 ? "" : "s"}`
+                      : "No unsaved edits"}
+                  </span>
                   <button
                     className="primary-button attendance-save-all-button"
                     type="button"
@@ -11683,6 +11714,14 @@ function AttendancePage({
                     disabled={!changedAttendanceCells.length || Boolean(attendanceSavingKey)}
                   >
                     {attendanceSavingKey ? "Saving..." : "Save attendance changes"}
+                  </button>
+                  <button
+                    className="ghost-button attendance-save-all-button"
+                    type="button"
+                    onClick={handleSaveAttendanceMonthNotes}
+                    disabled={!changedMonthNotes.length || Boolean(attendanceMonthNoteSaving)}
+                  >
+                    {attendanceMonthNoteSaving ? "Saving notes..." : "Save notes"}
                   </button>
                 </div>
               ) : null}
@@ -11830,9 +11869,7 @@ function AttendancePage({
                                     onClick={(event) => event.stopPropagation()}
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
                                   />
-                                  {cell.halfDayHolidayLabel ? (
-                                    <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
-                                  ) : hasDraftChanges ? (
+                                  {hasDraftChanges ? (
                                     <div className="attendance-cell-edited">Edited</div>
                                   ) : (
                                     <div className="attendance-cell-spacer" />
@@ -11847,8 +11884,16 @@ function AttendancePage({
                                     onClick={(event) => event.stopPropagation()}
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
-                                  {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
+                                  <div className="attendance-cell-spacer" />
                                 </div>
+                                {cell.halfDayHolidayLabel ? (
+                                  <div className="attendance-cell-meta attendance-cell-meta-wide">
+                                    <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                                  </div>
+                                ) : null}
+                                {cell.breakSummary ? (
+                                  <div className="attendance-cell-meta attendance-cell-meta-wide">Breaks: {cell.breakSummary}</div>
+                                ) : null}
                                 {cell.anomalySummary ? (
                                   <div className="attendance-cell-meta attendance-cell-meta-wide">
                                     {cell.anomalySummary ? <div className="attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
@@ -11969,7 +12014,7 @@ function AttendancePage({
                             className="attendance-value-cell attendance-summary-net-cell"
                             colSpan={2}
                           >
-                            <div className="attendance-summary-net attendance-summary-net-neutral">
+                            <div className={`attendance-summary-net ${Number(summaryEntry?.sickDaysLabel || 0) > 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
                               {summaryEntry?.sickDaysLabel || "0"}
                             </div>
                           </td>
@@ -11988,9 +12033,40 @@ function AttendancePage({
                             className="attendance-value-cell attendance-summary-net-cell"
                             colSpan={2}
                           >
-                            <div className="attendance-summary-net attendance-summary-net-neutral">
-                              {summaryEntry?.mileageLabel || "£0.00"}
+                            <div className={`attendance-summary-net ${Number(summaryEntry?.mileagePounds || 0) > 0 ? "is-positive" : "attendance-summary-net-neutral"}`}>
+                              {summaryEntry?.mileageLabel || "\u00A30.00"}
                             </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <th className="attendance-date-cell attendance-summary-label-cell">
+                        <strong>Notes</strong>
+                      </th>
+                      {staff.map((person) => {
+                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+                        const currentNote = String(summaryEntry?.monthNote || "");
+                        const noteValue = Object.prototype.hasOwnProperty.call(monthNoteDrafts, person.person)
+                          ? monthNoteDrafts[person.person]
+                          : currentNote;
+                        return (
+                          <td
+                            key={`summary-note-${person.person}`}
+                            className="attendance-value-cell attendance-summary-note-cell"
+                            colSpan={2}
+                          >
+                            <textarea
+                              className="attendance-summary-note-input"
+                              value={noteValue}
+                              placeholder="Add month note"
+                              onChange={(event) =>
+                                setMonthNoteDrafts((current) => ({
+                                  ...current,
+                                  [person.person]: event.target.value
+                                }))
+                              }
+                            />
                           </td>
                         );
                       })}
@@ -14525,6 +14601,7 @@ export default function App() {
   const [attendanceMonthId, setAttendanceMonthId] = useState(toMonthIdFromIso(getLocalTodayIso()));
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSavingKey, setAttendanceSavingKey] = useState("");
+  const [attendanceMonthNoteSaving, setAttendanceMonthNoteSaving] = useState(false);
   const [attendanceNoteSavingKey, setAttendanceNoteSavingKey] = useState("");
   const [attendanceDebugMessage, setAttendanceDebugMessage] = useState("");
   const [form, setForm] = useState({ ...EMPTY_FORM, date: getLocalTodayIso() });
@@ -15648,6 +15725,30 @@ export default function App() {
       return null;
     } finally {
       setAttendanceSavingKey("");
+    }
+  }
+
+  async function saveAttendanceMonthNote({ person, monthId, note }) {
+    setAttendanceMonthNoteSaving(true);
+    try {
+      const response = await fetch("/api/attendance/month-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ person, monthId, note })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not save attendance note.");
+      }
+      setAttendanceData(payload);
+      setMessage(createMessage(`Saved attendance note for ${person}.`, "success"));
+      return payload;
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not save attendance note.", "error"));
+      return null;
+    } finally {
+      setAttendanceMonthNoteSaving(false);
     }
   }
 
@@ -17012,11 +17113,13 @@ export default function App() {
                   attendanceMonthId={attendanceMonthId}
                   setAttendanceMonthId={setAttendanceMonthId}
                   attendanceSavingKey={attendanceSavingKey}
+                  attendanceMonthNoteSaving={attendanceMonthNoteSaving}
                   attendanceNoteSavingKey={attendanceNoteSavingKey}
                   attendanceDebugMessage={attendanceDebugMessage}
                   setAttendanceDebugMessage={setAttendanceDebugMessage}
                   attendanceFocusDate={attendanceNotificationDate}
                   onSaveAttendanceEntry={saveAttendanceEntry}
+                  onSaveAttendanceMonthNote={saveAttendanceMonthNote}
                   onSubmitAttendanceExplanation={submitAttendanceExplanation}
                 />
     );

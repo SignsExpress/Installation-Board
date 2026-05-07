@@ -136,6 +136,7 @@ function createEmptyBoardStore() {
     holidayEvents: [],
     notifications: [],
     attendanceEntries: [],
+    attendanceMonthNotes: [],
     attendanceWebhookEvents: [],
     mileageClaims: [],
     materialRequestCatalog: {},
@@ -935,6 +936,7 @@ function mergeHolidaySeed(store) {
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
+        attendanceMonthNotes: Array.isArray(store.attendanceMonthNotes) ? [...store.attendanceMonthNotes] : [],
         attendanceWebhookEvents: Array.isArray(store.attendanceWebhookEvents) ? [...store.attendanceWebhookEvents] : [],
         mileageClaims: Array.isArray(store.mileageClaims) ? [...store.mileageClaims] : [],
         materialRequestCatalog: sanitizeMaterialRequestCatalog(store.materialRequestCatalog),
@@ -1039,6 +1041,7 @@ async function readStore() {
             holidayEvents: [],
             notifications: [],
             attendanceEntries: [],
+            attendanceMonthNotes: [],
             attendanceWebhookEvents: [],
             mileageClaims: [],
             materialRequestCatalog: {},
@@ -1065,6 +1068,7 @@ async function readStore() {
           holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
+          attendanceMonthNotes: Array.isArray(parsed.attendanceMonthNotes) ? parsed.attendanceMonthNotes : [],
           attendanceWebhookEvents: Array.isArray(parsed.attendanceWebhookEvents) ? parsed.attendanceWebhookEvents : [],
           mileageClaims: Array.isArray(parsed.mileageClaims) ? parsed.mileageClaims : [],
           materialRequestCatalog:
@@ -1128,6 +1132,12 @@ async function writeStore(store) {
         .map((entry) => sanitizeAttendanceEntry(entry))
         .sort((left, right) => {
           if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+          return String(left.person || "").localeCompare(String(right.person || ""));
+        }),
+      attendanceMonthNotes: [...(store.attendanceMonthNotes || [])]
+        .map((entry) => sanitizeAttendanceMonthNote(entry))
+        .sort((left, right) => {
+          if (left.monthId !== right.monthId) return String(left.monthId || "").localeCompare(String(right.monthId || ""));
           return String(left.person || "").localeCompare(String(right.person || ""));
         }),
       attendanceWebhookEvents: [...(store.attendanceWebhookEvents || [])]
@@ -2692,6 +2702,18 @@ function sanitizeMileageClaim(payload) {
   };
 }
 
+function sanitizeAttendanceMonthNote(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    person: String(payload?.person || "").trim(),
+    monthId: String(payload?.monthId || "").trim(),
+    note: String(payload?.note || "").trim(),
+    updatedBy: String(payload?.updatedBy || "").trim(),
+    createdAt: String(payload?.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
 function sanitizeAttendancePunch(payload) {
   const rawType = String(payload?.type || payload?.clockingType || payload?.action || "").trim().toLowerCase();
   const type = rawType === "out" || rawType === "clock out" ? "out" : rawType === "in" || rawType === "clock in" ? "in" : "";
@@ -3890,10 +3912,16 @@ async function getAttendancePayload(forUser, monthId = "") {
   );
   const bankHolidayMap = getHolidayMap(start, end);
   const attendanceEntries = (store.attendanceEntries || []).map((entry) => sanitizeAttendanceEntry(entry));
+  const attendanceMonthNotes = (store.attendanceMonthNotes || []).map((entry) => sanitizeAttendanceMonthNote(entry));
   const entryByKey = new Map(
     attendanceEntries
       .filter((entry) => entry.date >= startIso && entry.date <= endIso)
       .map((entry) => [`${getHolidayStaffIdentityKey(entry.person)}::${entry.date}`, entry])
+  );
+  const monthNotesByPersonKey = new Map(
+    attendanceMonthNotes
+      .filter((entry) => String(entry.monthId || "") === resolvedMonthId)
+      .map((entry) => [getHolidayStaffIdentityKey(entry.person), entry])
   );
 
   const attendanceUsers = (usersStore.users || [])
@@ -3937,7 +3965,8 @@ async function getAttendancePayload(forUser, monthId = "") {
           lateStartMinutes: 0,
           earlyFinishMinutes: 0,
           sickDays: 0,
-          mileagePounds: 0
+          mileagePounds: 0,
+          monthNote: ""
         }
       ];
     })
@@ -4142,7 +4171,8 @@ async function getAttendancePayload(forUser, monthId = "") {
           lateStartMinutes: 0,
           earlyFinishMinutes: 0,
           sickDays: 0,
-          mileagePounds: 0
+          mileagePounds: 0,
+          monthNote: ""
         };
       const creditMinutes =
         applyAttendanceCreditGrace(summaryEntry.earlyStartMinutes) +
@@ -4153,12 +4183,14 @@ async function getAttendancePayload(forUser, monthId = "") {
       const netMinutes = creditMinutes - deductionMinutes;
       const personKey = getHolidayStaffIdentityKey(entry.person);
       const mileagePounds = Number(mileagePoundsByPersonKey.get(personKey) || 0);
+      const monthNote = String(monthNotesByPersonKey.get(personKey)?.note || "");
       return {
         ...summaryEntry,
         creditMinutes,
         deductionMinutes,
         netMinutes,
         mileagePounds,
+        monthNote,
         earlyStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.earlyStartMinutes)),
         lateFinishLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateFinishMinutes)),
         lateStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateStartMinutes)),
@@ -10119,6 +10151,50 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const savedStore = await writeStore(store);
     broadcast("attendance-updated", { monthId: String(mergedEntry.date || "").slice(0, 7), date: mergedEntry.date });
     const payload = await getAttendancePayload(request.user, String(mergedEntry.date || "").slice(0, 7));
+    response.json(payload);
+  });
+
+  app.post("/api/attendance/month-notes", async (request, response) => {
+    if (!requireAttendanceAdmin(request, response)) return;
+    const person = String(request.body?.person || "").trim();
+    const monthId = String(request.body?.monthId || "").trim();
+    const note = String(request.body?.note || "").trim();
+    if (!person || !parseMonthId(monthId)) {
+      response.status(400).json({ error: "A valid employee and attendance month are required." });
+      return;
+    }
+
+    const store = await readStore();
+    store.attendanceMonthNotes = Array.isArray(store.attendanceMonthNotes) ? store.attendanceMonthNotes : [];
+    const identity = getHolidayStaffIdentityKey(person);
+    const existingIndex = store.attendanceMonthNotes.findIndex(
+      (entry) =>
+        getHolidayStaffIdentityKey(entry.person) === identity &&
+        String(entry.monthId || "") === monthId
+    );
+
+    if (note) {
+      const nextNote = sanitizeAttendanceMonthNote({
+        ...(existingIndex >= 0 ? store.attendanceMonthNotes[existingIndex] : {}),
+        person,
+        monthId,
+        note,
+        updatedBy: request.user?.displayName || ""
+      });
+      if (existingIndex >= 0) {
+        nextNote.id = store.attendanceMonthNotes[existingIndex].id || nextNote.id;
+        nextNote.createdAt = store.attendanceMonthNotes[existingIndex].createdAt || nextNote.createdAt;
+        store.attendanceMonthNotes[existingIndex] = nextNote;
+      } else {
+        store.attendanceMonthNotes.unshift(nextNote);
+      }
+    } else if (existingIndex >= 0) {
+      store.attendanceMonthNotes = store.attendanceMonthNotes.filter((_, index) => index !== existingIndex);
+    }
+
+    await writeStore(store);
+    broadcast("attendance-updated", { monthId });
+    const payload = await getAttendancePayload(request.user, monthId);
     response.json(payload);
   });
 
