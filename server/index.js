@@ -2525,6 +2525,32 @@ function sanitizeAttendanceTime(value) {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+function attendanceTimeToMinutes(value) {
+  const normalized = sanitizeAttendanceTime(value);
+  if (!normalized) return null;
+  const [hours, minutes] = normalized.split(":").map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+function formatAttendanceMinutes(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.max(0, Math.round(minutes)) : 0;
+  if (!normalized) return "0m";
+  const hours = Math.floor(normalized / 60);
+  const remainder = normalized % 60;
+  if (hours && remainder) return `${hours}h ${String(remainder).padStart(2, "0")}m`;
+  if (hours) return `${hours}h`;
+  return `${remainder}m`;
+}
+
+function formatAttendanceNetMinutes(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.round(minutes) : 0;
+  if (!normalized) return "Balanced";
+  return normalized > 0
+    ? `Overtime ${formatAttendanceMinutes(normalized)}`
+    : `Deduction ${formatAttendanceMinutes(Math.abs(normalized))}`;
+}
+
 function sanitizeAttendanceEntry(payload) {
   const source = String(payload.source || "manual").trim().toLowerCase() || "manual";
   const legacyClockIn = sanitizeAttendanceTime(payload.clockIn);
@@ -3859,6 +3885,22 @@ async function getAttendancePayload(forUser, monthId = "") {
     return mode !== "exempt";
   });
 
+  const attendanceSummaryByPersonKey = new Map(
+    filteredVisibleStaff.map((entry) => {
+      const identityKey = getHolidayStaffIdentityKey(entry.person);
+      return [
+        identityKey,
+        {
+          person: entry.person,
+          code: entry.code,
+          fullName: entry.fullName || entry.name || entry.person,
+          earlyMinutes: 0,
+          lateMinutes: 0
+        }
+      ];
+    })
+  );
+
   const rows = enumerateIsoDates(startIso, endIso).map((isoDate) => {
     const parsed = parseIsoDate(isoDate);
     const weekday = parsed?.getUTCDay() ?? 0;
@@ -3872,16 +3914,19 @@ async function getAttendancePayload(forUser, monthId = "") {
         : "",
       isToday: isoDate === todayIso,
       cells: filteredVisibleStaff.map((staffEntry) => {
-        const key = `${getHolidayStaffIdentityKey(staffEntry.person)}::${isoDate}`;
+        const personKey = getHolidayStaffIdentityKey(staffEntry.person);
+        const key = `${personKey}::${isoDate}`;
         const holidayEntry = holidayByKey.get(key);
         const attendanceEntry = entryByKey.get(key) || null;
-        const user = attendanceUserByPersonKey.get(getHolidayStaffIdentityKey(staffEntry.person));
+        const user = attendanceUserByPersonKey.get(personKey);
         const attendanceProfile = user?.attendanceProfile || { mode: "required", contractedHours: {} };
         const attendanceMode = String(attendanceProfile.mode || "required").trim().toLowerCase();
         const weekdayKey = getWeekdayKeyFromIso(isoDate);
         const contractedHours = attendanceProfile.contractedHours?.[weekdayKey] || { in: "", out: "", off: false };
         let displayLabel = getAttendanceDisplayLabel(holidayEntry, bankHolidayLabel);
         const halfDayHolidayLabel = getAttendanceHalfDayLabel(holidayEntry);
+        const isHalfDayEntry = Boolean(holidayEntry && isHalfDayHoliday(holidayEntry));
+        const isFullDayHoliday = Boolean(holidayEntry) && !isHalfDayEntry;
         const isWorkingDay = !displayLabel && !isWeekend;
         const isContractedOff = Boolean(contractedHours.off) && isWorkingDay;
         const usesContractedHours =
@@ -3900,7 +3945,42 @@ async function getAttendancePayload(forUser, monthId = "") {
           displayLabel = "Absent";
         }
         const hasMissingClock = Boolean(attendanceEntry && hasAttendanceMissingClock(attendanceEntry));
-        const canAdminEdit = !holidayEntry && !bankHolidayLabel && !isWeekend && !isContractedOff && !usesContractedHours;
+        const canAdminEdit = !isFullDayHoliday && !bankHolidayLabel && !isWeekend && !isContractedOff;
+        const contractedClockInMinutes = attendanceTimeToMinutes(contractedHours.in);
+        const contractedClockOutMinutes = attendanceTimeToMinutes(contractedHours.out);
+        const actualClockInMinutes = attendanceTimeToMinutes(attendanceEntry?.clockIn || "");
+        const actualClockOutMinutes = attendanceTimeToMinutes(attendanceEntry?.clockOut || "");
+        const shouldMeasureVariance =
+          !isWeekend &&
+          !bankHolidayLabel &&
+          !isContractedOff &&
+          !usesContractedHours &&
+          attendanceEntry?.adminStatus !== "absent" &&
+          attendanceMode !== "exempt" &&
+          contractedClockInMinutes !== null &&
+          contractedClockOutMinutes !== null;
+        let earlyMinutes = 0;
+        let lateMinutes = 0;
+        const halfDayDuration = String(holidayEntry?.duration || "").trim().toLowerCase();
+        if (shouldMeasureVariance && actualClockInMinutes !== null && halfDayDuration !== "morning") {
+          if (actualClockInMinutes <= contractedClockInMinutes) {
+            earlyMinutes += contractedClockInMinutes - actualClockInMinutes;
+          } else {
+            lateMinutes += actualClockInMinutes - contractedClockInMinutes;
+          }
+        }
+        if (shouldMeasureVariance && actualClockOutMinutes !== null && halfDayDuration !== "afternoon") {
+          if (actualClockOutMinutes >= contractedClockOutMinutes) {
+            earlyMinutes += actualClockOutMinutes - contractedClockOutMinutes;
+          } else {
+            lateMinutes += contractedClockOutMinutes - actualClockOutMinutes;
+          }
+        }
+        const summaryEntry = attendanceSummaryByPersonKey.get(personKey);
+        if (summaryEntry) {
+          summaryEntry.earlyMinutes += earlyMinutes;
+          summaryEntry.lateMinutes += lateMinutes;
+        }
 
         return {
           person: staffEntry.person,
@@ -3923,6 +4003,10 @@ async function getAttendancePayload(forUser, monthId = "") {
           hasMissingClock: usesContractedHours || isContractedOff || attendanceEntry?.adminStatus === "absent" ? false : hasMissingClock,
           entryId: attendanceEntry?.id || "",
           canAdminEdit,
+          canEditClockIn: canAdminEdit,
+          canEditClockOut: canAdminEdit,
+          earlyMinutes,
+          lateMinutes,
           canExplain:
             !usesContractedHours &&
             !isContractedOff &&
@@ -3950,6 +4034,25 @@ async function getAttendancePayload(forUser, monthId = "") {
         attendanceUserByPersonKey.get(getHolidayStaffIdentityKey(entry.person))?.attendanceProfile?.mode || "required"
     })),
     rows,
+    attendanceSummary: filteredVisibleStaff.map((entry) => {
+      const summaryEntry =
+        attendanceSummaryByPersonKey.get(getHolidayStaffIdentityKey(entry.person)) ||
+        {
+          person: entry.person,
+          code: entry.code,
+          fullName: entry.fullName || entry.name || entry.person,
+          earlyMinutes: 0,
+          lateMinutes: 0
+        };
+      const netMinutes = summaryEntry.earlyMinutes - summaryEntry.lateMinutes;
+      return {
+        ...summaryEntry,
+        netMinutes,
+        earlyLabel: formatAttendanceMinutes(summaryEntry.earlyMinutes),
+        lateLabel: formatAttendanceMinutes(summaryEntry.lateMinutes),
+        netLabel: formatAttendanceNetMinutes(netMinutes)
+      };
+    }),
     adminMode: canEditAttendance(forUser),
     missingEntries
   };

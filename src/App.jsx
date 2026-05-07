@@ -11483,8 +11483,18 @@ function AttendancePage({
 
   const rows = Array.isArray(attendanceData?.rows) ? attendanceData.rows : [];
   const staff = Array.isArray(attendanceData?.staff) ? attendanceData.staff : [];
+  const attendanceSummary = Array.isArray(attendanceData?.attendanceSummary) ? attendanceData.attendanceSummary : [];
   const missingEntries = Array.isArray(attendanceData?.missingEntries) ? attendanceData.missingEntries : [];
   const attendanceMonthLabel = attendanceData?.monthLabel || "Attendance";
+  const attendanceCellLookup = useMemo(() => {
+    const lookup = new Map();
+    rows.forEach((row) => {
+      row.cells.forEach((cell) => {
+        lookup.set(getAttendanceCellKey(cell.person, row.isoDate), { row, cell });
+      });
+    });
+    return lookup;
+  }, [rows]);
   const focusedMissingEntry =
     missingEntries.find((entry) => entry.isoDate === noteForm.date) || missingEntries[0] || null;
 
@@ -11567,12 +11577,12 @@ function AttendancePage({
   }
 
   const changedAttendanceCells = adminMode
-    ? rows.flatMap((row) =>
-        row.cells
-          .filter((cell) => cell.canAdminEdit)
-          .map((cell) => ({ cell, payload: buildAttendanceSavePayload(cell, row.isoDate) }))
-          .filter((entry) => entry.payload)
-      )
+    ? Object.keys(drafts).flatMap((key) => {
+        const entry = attendanceCellLookup.get(key);
+        if (!entry) return [];
+        const payload = buildAttendanceSavePayload(entry.cell, entry.row.isoDate);
+        return payload ? [{ cell: entry.cell, row: entry.row, payload }] : [];
+      })
     : [];
 
   async function handleSaveAllAttendanceChanges() {
@@ -11816,6 +11826,8 @@ function AttendancePage({
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                     placeholder="--:--"
+                                    disabled={!cell.canEditClockIn}
+                                    onClick={(event) => event.stopPropagation()}
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
                                   />
                                   {cell.halfDayHolidayLabel ? (
@@ -11831,10 +11843,18 @@ function AttendancePage({
                                     className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                     placeholder="--:--"
+                                    disabled={!cell.canEditClockOut}
+                                    onClick={(event) => event.stopPropagation()}
                                     onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
                                   />
                                   {cell.breakSummary ? <div className="attendance-cell-meta">Breaks: {cell.breakSummary}</div> : <div className="attendance-cell-spacer" />}
                                 </div>
+                                {cell.punchSummary || cell.anomalySummary ? (
+                                  <div className="attendance-cell-meta attendance-cell-meta-wide">
+                                    {cell.punchSummary ? <div>Punches: {cell.punchSummary}</div> : null}
+                                    {cell.anomalySummary ? <div className="attendance-cell-meta-warning">{cell.anomalySummary}</div> : null}
+                                  </div>
+                                ) : null}
                                 {displayAdminNote ? <div className={sharedNoteClass}>{displayAdminNote}</div> : null}
                               </div>
                             </td>
@@ -11845,6 +11865,88 @@ function AttendancePage({
                 </tbody>
               </table>
             </div>
+          ) : null}
+
+          {!loading && adminMode ? (
+            <section className="attendance-summary-wrap">
+              <div className="attendance-summary-header">
+                <h3>Deductions and overtime</h3>
+                <p>Calculated against each person&apos;s contracted start and finish hours from Permissions.</p>
+              </div>
+              <div className="attendance-grid-wrap attendance-summary-grid-wrap">
+                <table className="attendance-grid-table attendance-summary-table">
+                  <thead>
+                    <tr>
+                      <th className="attendance-date-head" rowSpan={2}>Summary</th>
+                      {staff.map((person) => (
+                        <th
+                          key={`summary-staff-${person.person}`}
+                          className="attendance-staff-head"
+                          colSpan={2}
+                          title={person.fullName || person.person}
+                        >
+                          <span>{getAttendanceStaffLabel(person)}</span>
+                        </th>
+                      ))}
+                    </tr>
+                    <tr>
+                      {staff.map((person) => (
+                        <Fragment key={`summary-cols-${person.person}`}>
+                          <th className="attendance-sub-head">Early</th>
+                          <th className="attendance-sub-head">Late</th>
+                        </Fragment>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th className="attendance-date-cell attendance-summary-label-cell">
+                        <strong>Early</strong>
+                        <span>Late</span>
+                      </th>
+                      {staff.map((person) => {
+                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+                        return (
+                          <Fragment key={`summary-values-${person.person}`}>
+                            <td className="attendance-value-cell attendance-summary-value-cell">
+                              {summaryEntry?.earlyLabel || "0m"}
+                            </td>
+                            <td className="attendance-value-cell attendance-summary-value-cell">
+                              {summaryEntry?.lateLabel || "0m"}
+                            </td>
+                          </Fragment>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <th className="attendance-date-cell attendance-summary-label-cell">
+                        <strong>Net total</strong>
+                        <span>Overtime / deduction</span>
+                      </th>
+                      {staff.map((person) => {
+                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+                        const netMinutes = Number(summaryEntry?.netMinutes || 0);
+                        const netClass =
+                          netMinutes > 0
+                            ? "attendance-summary-net is-positive"
+                            : netMinutes < 0
+                              ? "attendance-summary-net is-negative"
+                              : "attendance-summary-net";
+                        return (
+                          <td
+                            key={`summary-net-${person.person}`}
+                            className="attendance-value-cell attendance-summary-net-cell"
+                            colSpan={2}
+                          >
+                            <div className={netClass}>{summaryEntry?.netLabel || "Balanced"}</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           ) : null}
 
           {!loading && !adminMode ? (
