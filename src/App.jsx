@@ -11960,6 +11960,16 @@ function AttendancePage({
                   </tbody>
                 </table>
               </div>
+              <div className="attendance-summary-notes">
+                <strong>Overtime and deduction rules</strong>
+                <ul>
+                  <li>Each start and finish variance is rounded to the nearest 5 minutes before it is counted.</li>
+                  <li>Early starts and late finishes count as overtime only when they are more than 10 minutes.</li>
+                  <li>Late starts and early finishes count as deductions only when they are more than 5 minutes.</li>
+                  <li>Half-day holidays use the worked half of the day only when measuring overtime and deductions.</li>
+                  <li>The final net total is rounded to payroll blocks of 30 minutes: 20 minutes or below rounds down, 25 minutes or above rounds up.</li>
+                </ul>
+              </div>
             </section>
           ) : null}
 

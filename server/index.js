@@ -2545,10 +2545,11 @@ function formatAttendanceMinutes(minutes) {
 
 function formatAttendanceNetMinutes(minutes) {
   const normalized = Number.isFinite(minutes) ? Math.round(minutes) : 0;
-  if (!normalized) return "Balanced";
-  return normalized > 0
-    ? `Overtime ${formatAttendanceMinutes(normalized)}`
-    : `Deduction ${formatAttendanceMinutes(Math.abs(normalized))}`;
+  const rounded = roundAttendancePayrollNetMinutes(normalized);
+  if (!rounded) return "Balanced";
+  return rounded > 0
+    ? `Overtime ${formatAttendanceMinutes(rounded)}`
+    : `Deduction ${formatAttendanceMinutes(Math.abs(rounded))}`;
 }
 
 const ATTENDANCE_MORNING_HOLIDAY_END_MINUTES = 12 * 60;
@@ -2560,6 +2561,17 @@ function roundAttendanceVarianceMinutes(minutes) {
   const normalized = Number.isFinite(minutes) ? Math.max(0, Number(minutes)) : 0;
   if (!normalized) return 0;
   return Math.round(normalized / 5) * 5;
+}
+
+function roundAttendancePayrollNetMinutes(minutes) {
+  const normalized = Number.isFinite(minutes) ? Math.round(minutes) : 0;
+  if (!normalized) return 0;
+  const sign = normalized < 0 ? -1 : 1;
+  const absoluteMinutes = Math.abs(normalized);
+  const blockBase = Math.floor(absoluteMinutes / 30) * 30;
+  const remainder = absoluteMinutes - blockBase;
+  const roundedAbsolute = remainder >= 25 ? blockBase + 30 : blockBase;
+  return roundedAbsolute * sign;
 }
 
 function applyAttendanceCreditGrace(minutes) {

@@ -8036,6 +8036,32 @@ button {
   color: #b91c1c;
 }
 
+.attendance-summary-notes {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.75);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.72);
+  color: #475569;
+  font-size: 0.72rem;
+}
+
+.attendance-summary-notes strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #1f2937;
+  font-size: 0.76rem;
+}
+
+.attendance-summary-notes ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.attendance-summary-notes li + li {
+  margin-top: 4px;
+}
+
 .attendance-admin-note-chip-shared {
   grid-column: 1 / -1;
   align-self: start;
