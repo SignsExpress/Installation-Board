@@ -12260,41 +12260,43 @@ function AttendancePage({
               {selfSummaryEntry ? (
                 <section className="attendance-self-panel">
                   <h3>Deductions and overtime</h3>
-                  <div className="attendance-client-summary">
-                    <div className="attendance-client-summary-row">
-                      <span>Overtime</span>
-                      <div className="attendance-client-summary-pair">
-                        <div className="attendance-summary-net is-positive">{selfSummaryEntry.earlyStartLabel || "0m"}</div>
-                        <div className="attendance-summary-net is-positive">{selfSummaryEntry.lateFinishLabel || "0m"}</div>
-                      </div>
+                  <div className="attendance-client-summary-grid">
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">OT IN</span>
+                      <div className="attendance-summary-net is-positive">{selfSummaryEntry.earlyStartLabel || "0m"}</div>
                     </div>
-                    <div className="attendance-client-summary-row">
-                      <span>Deductions</span>
-                      <div className="attendance-client-summary-pair">
-                        <div className="attendance-summary-net is-negative">{selfSummaryEntry.lateStartLabel || "0m"}</div>
-                        <div className="attendance-summary-net is-negative">{selfSummaryEntry.earlyFinishLabel || "0m"}</div>
-                      </div>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">OT OUT</span>
+                      <div className="attendance-summary-net is-positive">{selfSummaryEntry.lateFinishLabel || "0m"}</div>
                     </div>
-                    <div className="attendance-client-summary-row">
-                      <span>Net total</span>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">DED IN</span>
+                      <div className="attendance-summary-net is-negative">{selfSummaryEntry.lateStartLabel || "0m"}</div>
+                    </div>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">DED OUT</span>
+                      <div className="attendance-summary-net is-negative">{selfSummaryEntry.earlyFinishLabel || "0m"}</div>
+                    </div>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">NET TOTAL</span>
                       <div className={`attendance-summary-net ${Number(selfSummaryEntry.netMinutes || 0) > 0 ? "is-positive" : Number(selfSummaryEntry.netMinutes || 0) < 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
                         {selfSummaryEntry.netLabel || "Balanced"}
                       </div>
                     </div>
-                    <div className="attendance-client-summary-row">
-                      <span>Sick days</span>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">SICK DAYS</span>
                       <div className={`attendance-summary-net ${Number(selfSummaryEntry.sickDays || 0) > 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
                         {selfSummaryEntry.sickDaysLabel || "0"}
                       </div>
                     </div>
-                    <div className="attendance-client-summary-row">
-                      <span>Mileage</span>
+                    <div className="attendance-client-summary-cell">
+                      <span className="attendance-client-summary-label">MILEAGE</span>
                       <div className={`attendance-summary-net ${Number(selfSummaryEntry.mileagePounds || 0) > 0 ? "is-positive" : "attendance-summary-net-neutral"}`}>
                         {selfSummaryEntry.mileageLabel || "£0.00"}
                       </div>
                     </div>
-                    <div className="attendance-client-summary-row attendance-client-summary-row-note">
-                      <span>Notes</span>
+                    <div className="attendance-client-summary-cell attendance-client-summary-cell-note">
+                      <span className="attendance-client-summary-label">NOTES</span>
                       <div className="attendance-summary-note-readonly">
                         {selfSummaryEntry.monthNote || "No note added for this month."}
                       </div>

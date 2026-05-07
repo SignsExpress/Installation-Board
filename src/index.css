@@ -8265,7 +8265,7 @@ button {
 
 .attendance-client-weeks {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -8445,34 +8445,29 @@ button {
   margin-top: 0;
 }
 
-.attendance-client-summary {
+.attendance-client-summary-grid {
   display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   gap: 8px;
+  align-items: start;
 }
 
-.attendance-client-summary-row {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-}
-
-.attendance-client-summary-row > span {
+.attendance-client-summary-label {
   color: #64748b;
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
 }
 
-.attendance-client-summary-pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
+.attendance-client-summary-cell {
+  min-width: 0;
 }
 
 .attendance-summary-note-readonly {
-  min-height: 40px;
+  min-height: 42px;
   padding: 8px 10px;
   border: 1px solid rgba(203, 213, 225, 0.95);
   border-radius: 12px;
@@ -8480,6 +8475,43 @@ button {
   color: #475569;
   font-size: 0.7rem;
   line-height: 1.35;
+}
+
+.attendance-client-summary-cell-note .attendance-summary-note-readonly {
+  min-height: 54px;
+}
+
+@media (max-width: 1600px) {
+  .attendance-client-weeks {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .attendance-client-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .attendance-client-weeks {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .attendance-client-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .attendance-client-weeks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .attendance-client-weeks,
+  .attendance-client-summary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .host-landing-brand {

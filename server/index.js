@@ -3829,7 +3829,7 @@ function syncAttendanceMissingNotification(store, users, attendanceEntry) {
     String(notification.link || "") === getAttendanceLinkForUser(matchingUser, attendanceEntry.date)
   );
 
-  const hasMissingClock = hasAttendanceMissingClock(attendanceEntry);
+  const hasMissingClock = shouldFlagAttendanceMissingClock(attendanceEntry);
 
   if (hasMissingClock) {
     const title = "Missing clocking data";
@@ -4041,7 +4041,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         if (!displayLabel && attendanceEntry?.adminStatus === "absent") {
           displayLabel = "Absent";
         }
-        const hasMissingClock = Boolean(attendanceEntry && hasAttendanceMissingClock(attendanceEntry));
+        const hasMissingClock = Boolean(attendanceEntry && shouldFlagAttendanceMissingClock(attendanceEntry, todayIso));
         const canAdminEdit = !isFullDayHoliday && !bankHolidayLabel && !isWeekend && !isContractedOff;
         const contractedClockInMinutes = attendanceTimeToMinutes(contractedHours.in);
         const contractedClockOutMinutes = attendanceTimeToMinutes(contractedHours.out);
@@ -4064,6 +4064,7 @@ async function getAttendancePayload(forUser, monthId = "") {
           !isContractedOff &&
           attendanceEntry?.adminStatus !== "absent" &&
           attendanceMode !== "exempt" &&
+          isoDate < todayIso &&
           expectedClockInMinutes !== null &&
           expectedClockOutMinutes !== null;
         let earlyStartMinutes = 0;
@@ -4232,6 +4233,17 @@ function hasAttendanceMissingClock(attendanceEntry) {
     (attendanceEntry.clockIn && !attendanceEntry.clockOut) ||
     (!attendanceEntry.clockIn && attendanceEntry.clockOut)
   );
+}
+
+function shouldFlagAttendanceMissingClock(attendanceEntry, todayIso = toIsoDate(getTodayInLondon())) {
+  if (!attendanceEntry || !hasAttendanceMissingClock(attendanceEntry)) {
+    return false;
+  }
+  const entryDate = String(attendanceEntry.date || "");
+  if (!entryDate || !isValidIsoDate(entryDate)) {
+    return false;
+  }
+  return entryDate < String(todayIso || "");
 }
 
 function buildCoreBridgeCollectionUrl(config, pathValue, params = {}) {
