@@ -8247,7 +8247,6 @@ button {
 
 .attendance-self-service {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
   gap: 18px;
 }
 
@@ -8260,108 +8259,125 @@ button {
   gap: 14px;
 }
 
-.attendance-self-list {
-  display: grid;
-  gap: 12px;
+.attendance-self-board-panel {
+  overflow: visible;
 }
 
-.attendance-self-card {
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  border-radius: 20px;
-  background: #fff;
-  padding: 14px 16px;
-  display: grid;
-  gap: 10px;
+.attendance-self-grid-shell {
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
-.attendance-self-card.is-today {
-  border-color: rgba(113, 76, 152, 0.5);
-  box-shadow: 0 0 0 2px rgba(113, 76, 152, 0.08);
+.attendance-self-grid-table {
+  min-width: max-content;
 }
 
-.attendance-self-card.is-missing {
-  background: rgba(244, 114, 182, 0.08);
-  border-color: rgba(244, 114, 182, 0.4);
+.attendance-self-day-head {
+  min-width: 124px;
+  text-align: center;
 }
 
-.attendance-self-card.is-focused {
-  box-shadow: 0 0 0 2px rgba(113, 76, 152, 0.16);
-}
-
-.attendance-self-card-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-}
-
-.attendance-self-card-head strong,
-.attendance-self-card-head span {
+.attendance-self-day-head span,
+.attendance-self-day-head strong {
   display: block;
 }
 
-.attendance-self-card-head span {
+.attendance-self-day-head span {
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: #64748b;
-  font-size: 0.88rem;
 }
 
-.attendance-self-status {
-  align-self: flex-start;
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(219, 234, 254, 0.85);
-  color: #1d4ed8;
-  font-size: 0.8rem;
-  font-weight: 700;
-  white-space: nowrap;
+.attendance-self-day-head strong {
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: #1f2937;
 }
 
-.attendance-self-status.missing {
-  background: rgba(244, 114, 182, 0.18);
-  color: #be185d;
+.attendance-self-day-head.is-today {
+  background: rgba(113, 76, 152, 0.08);
 }
 
-.attendance-self-status.holiday {
-  background: rgba(220, 252, 231, 0.9);
-  color: #166534;
+.attendance-self-day-cell {
+  min-width: 124px;
+  vertical-align: top;
+  background: rgba(255, 255, 255, 0.92);
 }
 
-.attendance-self-times {
+.attendance-self-day-cell.is-today {
+  background: rgba(248, 250, 252, 0.98);
+}
+
+.attendance-self-day-cell.is-focused {
+  box-shadow: inset 0 0 0 2px rgba(113, 76, 152, 0.16);
+}
+
+.attendance-self-day-cell.is-missing {
+  background: rgba(254, 242, 242, 0.88);
+}
+
+.attendance-self-day-display {
   display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  min-height: 98px;
+  padding: 10px 8px;
+  text-align: center;
   color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
-.attendance-self-note {
-  color: #475569;
-  margin: 0;
-}
-
-.attendance-note-button {
-  justify-self: flex-start;
-}
-
-.attendance-missing-list {
-  display: flex;
+.attendance-self-day-times {
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.attendance-missing-chip {
-  border: 1px solid var(--sx-border);
-  border-radius: 999px;
-  background: #fff;
+.attendance-self-time-button {
+  width: 100%;
+  cursor: default;
+}
+
+.attendance-self-time-button.is-alert {
+  cursor: pointer;
+  animation: attendance-missing-pulse 1.2s ease-in-out infinite;
+  background: rgba(239, 68, 68, 0.14) !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  color: #b91c1c !important;
+}
+
+.attendance-self-time-button:disabled {
+  opacity: 1;
+}
+
+.attendance-self-meta-row {
+  margin-top: 4px;
+}
+
+.attendance-self-note-line,
+.attendance-self-missing-hint {
+  margin-top: 4px;
+  font-size: 0.62rem;
+  line-height: 1.35;
+}
+
+.attendance-self-note-line {
   color: #475569;
-  padding: 8px 12px;
-  font: inherit;
-  font-weight: 600;
 }
 
-.attendance-missing-chip.active {
-  border-color: rgba(113, 76, 152, 0.45);
-  background: rgba(113, 76, 152, 0.12);
-  color: var(--sx-main);
+.attendance-self-missing-hint {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+@keyframes attendance-missing-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.22);
+  }
 }
 
 .attendance-note-form {
@@ -8389,6 +8405,10 @@ button {
 .attendance-note-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.attendance-summary-notes-client {
+  margin-top: 0;
 }
 
 .host-landing-brand {

@@ -2644,6 +2644,8 @@ function sanitizeAttendanceEntry(payload) {
     : "";
 
   const adminNote = String(payload.adminNote || "").trim().replace(/^note:\s*/i, "");
+  const requestedClockIn = sanitizeAttendanceTime(payload.requestedClockIn);
+  const requestedClockOut = sanitizeAttendanceTime(payload.requestedClockOut);
 
   return {
     id: String(payload.id || makeId()),
@@ -2664,6 +2666,8 @@ function sanitizeAttendanceEntry(payload) {
     adminStatus,
     adminNote,
     employeeNote: String(payload.employeeNote || "").trim(),
+    requestedClockIn,
+    requestedClockOut,
     missingNotificationSentAt: String(payload.missingNotificationSentAt || "").trim(),
     missingNotificationResolvedAt: String(payload.missingNotificationResolvedAt || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
@@ -4121,6 +4125,8 @@ async function getAttendancePayload(forUser, monthId = "") {
           adminNote: attendanceEntry?.adminNote || "",
           adminStatus: attendanceEntry?.adminStatus || "",
           employeeNote: attendanceEntry?.employeeNote || "",
+          requestedClockIn: attendanceEntry?.requestedClockIn || "",
+          requestedClockOut: attendanceEntry?.requestedClockOut || "",
           hasMissingClock: usesContractedHours || isContractedOff || attendanceEntry?.adminStatus === "absent" ? false : hasMissingClock,
           entryId: attendanceEntry?.id || "",
           canAdminEdit,
@@ -10129,7 +10135,13 @@ app.get("/api/corebridge/orders", async (request, response) => {
       adminStatus: nextAdminStatus,
       adminNote: changedFields.includes("adminNote")
         ? String(request.body?.adminNote || "").trim()
-        : nextEntry.adminNote || existingEntry?.adminNote || ""
+        : nextEntry.adminNote || existingEntry?.adminNote || "",
+      requestedClockIn: changedFields.includes("clockIn")
+        ? ""
+        : existingEntry?.requestedClockIn || "",
+      requestedClockOut: changedFields.includes("clockOut")
+        ? ""
+        : existingEntry?.requestedClockOut || ""
     });
 
     if (existingIndex >= 0) {
@@ -10201,7 +10213,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.post("/api/attendance/explanations", async (request, response) => {
     if (!requireAttendanceAccess(request, response)) return;
     const targetDate = String(request.body?.date || "").trim();
-    const note = String(request.body?.employeeNote || "").trim();
+    const note = String(request.body?.employeeNote ?? request.body?.note ?? "").trim();
+    const proposedClockIn = sanitizeAttendanceTime(request.body?.proposedClockIn);
+    const proposedClockOut = sanitizeAttendanceTime(request.body?.proposedClockOut);
     if (!isValidIsoDate(targetDate)) {
       response.status(400).json({ error: "A valid attendance date is required." });
       return;
@@ -10226,13 +10240,17 @@ app.get("/api/corebridge/orders", async (request, response) => {
     let nextEntry = sanitizeAttendanceEntry({
       person,
       date: targetDate,
-      employeeNote: note
+      employeeNote: note,
+      requestedClockIn: proposedClockIn,
+      requestedClockOut: proposedClockOut
     });
 
     if (existingIndex >= 0) {
       nextEntry = sanitizeAttendanceEntry({
         ...store.attendanceEntries[existingIndex],
-        employeeNote: note
+        employeeNote: note,
+        requestedClockIn: proposedClockIn || store.attendanceEntries[existingIndex]?.requestedClockIn || "",
+        requestedClockOut: proposedClockOut || store.attendanceEntries[existingIndex]?.requestedClockOut || ""
       });
       store.attendanceEntries[existingIndex] = nextEntry;
     } else {
@@ -10240,7 +10258,11 @@ app.get("/api/corebridge/orders", async (request, response) => {
     }
 
     const adminRecipients = (usersStore.users || []).filter((user) => canEditAttendance(sanitizeUser(user)));
-    const explanationMessage = `${person} added an attendance note for ${formatBoardNotificationDate(targetDate)}${note ? ` (${note})` : "."}`;
+    const requestedBits = [
+      proposedClockIn ? `In ${proposedClockIn}` : "",
+      proposedClockOut ? `Out ${proposedClockOut}` : ""
+    ].filter(Boolean);
+    const explanationMessage = `${person} requested an attendance correction for ${formatBoardNotificationDate(targetDate)}${requestedBits.length ? ` (${requestedBits.join(", ")})` : ""}${note ? ` - ${note}` : "."}`;
     adminRecipients.forEach((user) => {
       store.notifications.unshift(
         createNotification({

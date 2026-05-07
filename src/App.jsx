@@ -132,7 +132,10 @@ const EMPTY_HOLIDAY_EVENT_FORM = {
 
 const EMPTY_ATTENDANCE_NOTE_FORM = {
   date: "",
-  note: ""
+  note: "",
+  proposedClockIn: "",
+  proposedClockOut: "",
+  missingField: ""
 };
 
 const EMPTY_ATTENDANCE_ADMIN_EDITOR = {
@@ -11480,7 +11483,10 @@ function AttendancePage({
         ? current
         : {
             date: attendanceFocusDate,
-            note: ""
+            note: "",
+            proposedClockIn: "",
+            proposedClockOut: "",
+            missingField: ""
           }
     );
   }, [attendanceFocusDate]);
@@ -11501,6 +11507,9 @@ function AttendancePage({
   }, [rows]);
   const focusedMissingEntry =
     missingEntries.find((entry) => entry.isoDate === noteForm.date) || missingEntries[0] || null;
+  const selfRows = !adminMode ? rows.filter((row) => row.cells[0]) : [];
+  const focusedSelfRow = !adminMode ? selfRows.find((row) => row.isoDate === noteForm.date) || null : null;
+  const focusedSelfCell = focusedSelfRow?.cells?.[0] || null;
 
   useEffect(() => {
     if (adminMode) return;
@@ -11508,7 +11517,10 @@ function AttendancePage({
     if (!missingEntries.length) return;
     setNoteForm({
       date: missingEntries[0].isoDate,
-      note: missingEntries[0].employeeNote || ""
+      note: missingEntries[0].employeeNote || "",
+      proposedClockIn: missingEntries[0].requestedClockIn || "",
+      proposedClockOut: missingEntries[0].requestedClockOut || "",
+      missingField: missingEntries[0].clockIn ? "clockOut" : missingEntries[0].clockOut ? "clockIn" : "both"
     });
   }, [adminMode, missingEntries, noteForm.date]);
 
@@ -11639,12 +11651,35 @@ function AttendancePage({
 
   async function submitEmployeeNote(event) {
     event.preventDefault();
-    if (!noteForm.date || !noteForm.note.trim()) return;
+    if (
+      !noteForm.date ||
+      !noteForm.note.trim() ||
+      ((noteForm.missingField === "clockIn" || noteForm.missingField === "both") && !noteForm.proposedClockIn) ||
+      ((noteForm.missingField === "clockOut" || noteForm.missingField === "both") && !noteForm.proposedClockOut)
+    ) {
+      return;
+    }
     await onSubmitAttendanceExplanation({
       date: noteForm.date,
-      note: noteForm.note.trim()
+      note: noteForm.note.trim(),
+      proposedClockIn:
+        noteForm.missingField === "clockIn" || noteForm.missingField === "both" ? noteForm.proposedClockIn : "",
+      proposedClockOut:
+        noteForm.missingField === "clockOut" || noteForm.missingField === "both" ? noteForm.proposedClockOut : ""
     });
     setNoteForm(EMPTY_ATTENDANCE_NOTE_FORM);
+  }
+
+  function openClientAttendanceRequest(cell, isoDate) {
+    const requestedClockIn = cell.requestedClockIn || "";
+    const requestedClockOut = cell.requestedClockOut || "";
+    setNoteForm({
+      date: isoDate,
+      note: cell.employeeNote || "",
+      proposedClockIn: requestedClockIn || (cell.clockIn || ""),
+      proposedClockOut: requestedClockOut || (cell.clockOut || ""),
+      missingField: !cell.clockIn && !cell.clockOut ? "both" : !cell.clockIn ? "clockIn" : !cell.clockOut ? "clockOut" : ""
+    });
   }
 
   function openAttendanceAdminEditor(cell, isoDate) {
@@ -12091,95 +12126,160 @@ function AttendancePage({
 
           {!loading && !adminMode ? (
             <div className="attendance-self-service">
-              <section className="attendance-self-panel">
-                <h3>Your times</h3>
-                <div className="attendance-self-list">
-                  {rows.map((row) => {
-                    const cell = row.cells[0];
-                    if (!cell) return null;
-                    return (
-                      <article
-                        key={row.isoDate}
-                        className={`attendance-self-card ${row.isToday ? "is-today" : ""} ${cell.hasMissingClock ? "is-missing" : ""} ${noteForm.date === row.isoDate ? "is-focused" : ""}`}
-                      >
-                        <div className="attendance-self-card-head">
-                          <div>
-                            <strong>{row.dateLabel}</strong>
-                            <span>{row.weekdayLabel}</span>
-                          </div>
-                          {cell.displayLabel ? <span className="attendance-self-status">{cell.displayLabel}</span> : null}
-                           {!cell.displayLabel && cell.hasMissingClock ? <span className="attendance-self-status missing">Missing clocking</span> : null}
-                           {!cell.displayLabel && cell.halfDayHolidayLabel ? (
-                             <span className="attendance-self-status holiday">{cell.halfDayHolidayLabel}</span>
-                           ) : null}
-                          </div>
-                        {cell.displayLabel ? null : (
-                          <div className="attendance-self-times">
-                            <span>In: <strong>{cell.clockIn || "--:--"}</strong></span>
-                            <span>Out: <strong>{cell.clockOut || "--:--"}</strong></span>
-                          </div>
-                        )}
-                        {!cell.displayLabel && cell.breakSummary ? <p className="attendance-self-note">Breaks: {cell.breakSummary}</p> : null}
-                        {!cell.displayLabel && cell.canExplain ? (
-                          <button
-                            type="button"
-                            className="ghost-button attendance-note-button"
-                            onClick={() => setNoteForm({ date: row.isoDate, note: cell.employeeNote || "" })}
+              <section className="attendance-self-panel attendance-self-board-panel">
+                <h3>Your attendance</h3>
+                <div className="attendance-self-grid-shell">
+                  <table className="attendance-grid-table attendance-self-grid-table">
+                    <thead>
+                      <tr>
+                        {selfRows.map((row) => (
+                          <th
+                            key={`self-head-${row.isoDate}`}
+                            className={`attendance-self-day-head ${row.isToday ? "is-today" : ""}`}
                           >
-                            {cell.employeeNote ? "Update note" : "Add note"}
-                          </button>
-                        ) : null}
-                        {cell.employeeNote ? <p className="attendance-self-note">{cell.employeeNote}</p> : null}
-                      </article>
-                    );
-                  })}
+                            <span>{row.weekdayLabel}</span>
+                            <strong>{row.dateLabel}</strong>
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {selfRows.map((row) => {
+                          const cell = row.cells[0];
+                          if (!cell) return null;
+                          const canRequestClockIn = !cell.displayLabel && cell.canExplain && !cell.clockIn;
+                          const canRequestClockOut = !cell.displayLabel && cell.canExplain && !cell.clockOut;
+                          const isSelected = noteForm.date === row.isoDate;
+                          return (
+                            <td
+                              key={`self-cell-${row.isoDate}`}
+                              className={`attendance-self-day-cell ${row.isToday ? "is-today" : ""} ${cell.hasMissingClock ? "is-missing" : ""} ${isSelected ? "is-focused" : ""}`}
+                            >
+                              {cell.displayLabel ? (
+                                <div className="attendance-self-day-display">{cell.displayLabel}</div>
+                              ) : (
+                                <>
+                                  <div className="attendance-self-day-times">
+                                    <button
+                                      type="button"
+                                      className={`attendance-time-input attendance-self-time-button ${cell.clockInStatus ? `is-${cell.clockInStatus}` : "is-neutral"} ${canRequestClockIn ? "is-alert" : ""}`}
+                                      onClick={canRequestClockIn ? () => openClientAttendanceRequest(cell, row.isoDate) : undefined}
+                                      disabled={!canRequestClockIn}
+                                    >
+                                      {cell.clockIn || "Add in"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className={`attendance-time-input attendance-self-time-button ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : "is-neutral"} ${canRequestClockOut ? "is-alert" : ""}`}
+                                      onClick={canRequestClockOut ? () => openClientAttendanceRequest(cell, row.isoDate) : undefined}
+                                      disabled={!canRequestClockOut}
+                                    >
+                                      {cell.clockOut || "Add out"}
+                                    </button>
+                                  </div>
+                                  {cell.halfDayHolidayLabel ? (
+                                    <div className="attendance-cell-meta attendance-cell-meta-wide attendance-self-meta-row">
+                                      <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                                    </div>
+                                  ) : null}
+                                  {cell.breakSummary ? (
+                                    <div className="attendance-cell-meta attendance-cell-meta-wide attendance-self-meta-row">
+                                      Breaks: {cell.breakSummary}
+                                    </div>
+                                  ) : null}
+                                  {cell.employeeNote ? (
+                                    <div className="attendance-self-note-line">Request sent: {cell.employeeNote}</div>
+                                  ) : null}
+                                  {cell.hasMissingClock ? (
+                                    <div className="attendance-self-missing-hint">
+                                      Tap the red box to request a correction.
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </section>
 
               <section className="attendance-self-panel">
-                <h3>Missing clockings</h3>
-                {missingEntries.length ? (
-                  <>
-                    <div className="attendance-missing-list">
-                      {missingEntries.map((entry) => (
-                        <button
-                          key={`${entry.person}-${entry.isoDate}`}
-                          type="button"
-                          className={`attendance-missing-chip ${noteForm.date === entry.isoDate ? "active" : ""}`}
-                          onClick={() => setNoteForm({ date: entry.isoDate, note: entry.employeeNote || "" })}
-                        >
-                          {entry.dateLabel}: {entry.clockIn ? "Missing out" : entry.clockOut ? "Missing in" : "Missing in/out"}
-                        </button>
-                      ))}
-                    </div>
-                    <form className="attendance-note-form" onSubmit={submitEmployeeNote}>
+                <h3>Missing clocking request</h3>
+                {focusedSelfCell?.hasMissingClock ? (
+                  <form className="attendance-note-form" onSubmit={submitEmployeeNote}>
+                    <label>
+                      <span>Date</span>
+                      <input type="text" value={focusedSelfRow?.dateLabel || ""} readOnly />
+                    </label>
+                    {(noteForm.missingField === "clockIn" || noteForm.missingField === "both") ? (
                       <label>
-                        <span>Date</span>
-                        <input type="text" value={focusedMissingEntry?.dateLabel || ""} readOnly />
-                      </label>
-                      <label>
-                        <span>Explanation</span>
-                        <textarea
-                          rows={4}
-                          value={noteForm.note}
-                          onChange={(event) => setNoteForm((current) => ({ ...current, note: event.target.value }))}
-                          placeholder="Explain the missing clocking so admin can check it."
+                        <span>Proposed start time</span>
+                        <input
+                          type="time"
+                          value={noteForm.proposedClockIn}
+                          onChange={(event) => setNoteForm((current) => ({ ...current, proposedClockIn: event.target.value }))}
                         />
                       </label>
-                      <div className="attendance-note-actions">
-                        <button
-                          className="primary-button"
-                          type="submit"
-                          disabled={!noteForm.date || !noteForm.note.trim() || attendanceNoteSavingKey === noteForm.date}
-                        >
-                          {attendanceNoteSavingKey === noteForm.date ? "Saving..." : "Send note"}
-                        </button>
-                      </div>
-                    </form>
-                  </>
+                    ) : null}
+                    {(noteForm.missingField === "clockOut" || noteForm.missingField === "both") ? (
+                      <label>
+                        <span>Proposed finish time</span>
+                        <input
+                          type="time"
+                          value={noteForm.proposedClockOut}
+                          onChange={(event) => setNoteForm((current) => ({ ...current, proposedClockOut: event.target.value }))}
+                        />
+                      </label>
+                    ) : null}
+                    <label>
+                      <span>Explanation</span>
+                      <textarea
+                        rows={4}
+                        value={noteForm.note}
+                        onChange={(event) => setNoteForm((current) => ({ ...current, note: event.target.value }))}
+                        placeholder="Explain the missing clocking so Matt can approve it."
+                      />
+                    </label>
+                    <div className="attendance-note-actions">
+                      <button
+                        className="primary-button"
+                        type="submit"
+                        disabled={
+                          !noteForm.date ||
+                          !noteForm.note.trim() ||
+                          ((noteForm.missingField === "clockIn" || noteForm.missingField === "both") && !noteForm.proposedClockIn) ||
+                          ((noteForm.missingField === "clockOut" || noteForm.missingField === "both") && !noteForm.proposedClockOut) ||
+                          attendanceNoteSavingKey === noteForm.date
+                        }
+                      >
+                        {attendanceNoteSavingKey === noteForm.date ? "Sending..." : "Send for approval"}
+                      </button>
+                    </div>
+                  </form>
+                ) : missingEntries.length ? (
+                  <div className="notifications-empty">Tap a red missing clocking box above to send a correction request.</div>
                 ) : (
                   <div className="notifications-empty">No missing clockings for this month.</div>
                 )}
+              </section>
+
+              <section className="attendance-self-panel">
+                <h3>How overtime is worked out</h3>
+                <div className="attendance-summary-notes attendance-summary-notes-client">
+                  <ul>
+                    <li>Each start and finish variance is rounded to the nearest 5 minutes before it is counted.</li>
+                    <li>Early starts and late finishes count as overtime only when they are more than 10 minutes.</li>
+                    <li>Late starts and early finishes count as deductions only when they are more than 5 minutes.</li>
+                    <li>Half-day holidays use the worked half of the day only when measuring overtime and deductions.</li>
+                    <li>The final net total is rounded to payroll blocks of 30 minutes: 20 minutes or below rounds down, 25 minutes or above rounds up.</li>
+                    <li>Sick days are tracked separately and do not reduce overtime totals.</li>
+                    <li>Mileage shows the month value from the mileage module at £0.45 per mile.</li>
+                  </ul>
+                </div>
               </section>
             </div>
           ) : null}
@@ -15752,13 +15852,13 @@ export default function App() {
     }
   }
 
-  async function submitAttendanceExplanation({ date, note }) {
+  async function submitAttendanceExplanation({ date, note, proposedClockIn = "", proposedClockOut = "" }) {
     setAttendanceNoteSavingKey(date);
     try {
       const response = await fetch("/api/attendance/explanations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, note })
+        body: JSON.stringify({ date, note, proposedClockIn, proposedClockOut })
       });
       const payload = await response.json();
       if (!response.ok) {
