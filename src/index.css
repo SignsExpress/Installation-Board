@@ -7894,6 +7894,20 @@ button {
   color: #94a3b8;
 }
 
+.attendance-time-input.is-neutral {
+  color: #0f172a;
+}
+
+.attendance-time-input.is-positive {
+  color: #166534;
+  font-weight: 700;
+}
+
+.attendance-time-input.is-negative {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
 .attendance-half-day-chip {
   display: inline-block;
   border-radius: 999px;

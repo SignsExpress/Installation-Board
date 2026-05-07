@@ -4008,18 +4008,24 @@ async function getAttendancePayload(forUser, monthId = "") {
         let lateFinishMinutes = 0;
         let lateStartMinutes = 0;
         let earlyFinishMinutes = 0;
+        let clockInStatus = "neutral";
+        let clockOutStatus = "neutral";
         if (shouldMeasureVariance && actualClockInMinutes !== null) {
           if (actualClockInMinutes <= expectedClockInMinutes) {
             earlyStartMinutes += expectedClockInMinutes - actualClockInMinutes;
+            clockInStatus = actualClockInMinutes < expectedClockInMinutes ? "positive" : "neutral";
           } else {
             lateStartMinutes += actualClockInMinutes - expectedClockInMinutes;
+            clockInStatus = "negative";
           }
         }
         if (shouldMeasureVariance && actualClockOutMinutes !== null) {
           if (actualClockOutMinutes >= expectedClockOutMinutes) {
             lateFinishMinutes += actualClockOutMinutes - expectedClockOutMinutes;
+            clockOutStatus = actualClockOutMinutes > expectedClockOutMinutes ? "positive" : "neutral";
           } else {
             earlyFinishMinutes += expectedClockOutMinutes - actualClockOutMinutes;
+            clockOutStatus = "negative";
           }
         }
         const summaryEntry = attendanceSummaryByPersonKey.get(personKey);
@@ -4053,6 +4059,8 @@ async function getAttendancePayload(forUser, monthId = "") {
           canAdminEdit,
           canEditClockIn: canAdminEdit,
           canEditClockOut: canAdminEdit,
+          clockInStatus,
+          clockOutStatus,
           earlyStartMinutes,
           lateFinishMinutes,
           lateStartMinutes,

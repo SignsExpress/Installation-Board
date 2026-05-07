@@ -11823,7 +11823,7 @@ function AttendancePage({
                               <div className="attendance-dual-grid">
                                 <div className="attendance-cell-stack attendance-cell-stack-dual">
                                   <input
-                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
+                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""} ${cell.clockInStatus ? `is-${cell.clockInStatus}` : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
                                     placeholder="--:--"
                                     disabled={!cell.canEditClockIn}
@@ -11840,7 +11840,7 @@ function AttendancePage({
                                 </div>
                                 <div className="attendance-cell-stack attendance-cell-stack-dual">
                                   <input
-                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""}`}
+                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""} ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : ""}`}
                                     value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
                                     placeholder="--:--"
                                     disabled={!cell.canEditClockOut}
