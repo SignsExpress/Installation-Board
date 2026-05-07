@@ -7828,6 +7828,27 @@ button {
   white-space: nowrap;
 }
 
+.attendance-summary-wrap {
+  margin-top: 14px;
+}
+
+.attendance-summary-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.attendance-summary-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.attendance-summary-grid-wrap {
+  max-height: none;
+}
+
 .attendance-cell-stack {
   display: grid;
   align-content: center;
@@ -7867,6 +7888,12 @@ button {
   border-color: var(--sx-main);
 }
 
+.attendance-time-input:disabled {
+  cursor: not-allowed;
+  background: rgba(248, 250, 252, 0.92);
+  color: #94a3b8;
+}
+
 .attendance-half-day-chip {
   display: inline-block;
   border-radius: 999px;
@@ -7902,6 +7929,11 @@ button {
   text-align: left;
   word-break: break-word;
   white-space: normal;
+}
+
+.attendance-cell-meta-wide {
+  grid-column: 1 / -1;
+  padding-top: 1px;
 }
 
 .attendance-cell-meta-note {
@@ -7954,6 +7986,52 @@ button {
 }
 
 .attendance-admin-note-chip.is-absence {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.attendance-summary-label-cell {
+  background: rgba(248, 250, 252, 0.98);
+}
+
+.attendance-summary-value-cell,
+.attendance-summary-net-cell {
+  background: rgba(255, 255, 255, 0.95);
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.attendance-summary-table td.attendance-summary-value-positive {
+  color: #166534 !important;
+  font-weight: 800;
+}
+
+.attendance-summary-table td.attendance-summary-value-negative {
+  color: #b91c1c !important;
+  font-weight: 800;
+}
+
+.attendance-summary-net {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  width: 100%;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
+  color: #475569;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.attendance-summary-net.is-positive {
+  background: rgba(22, 163, 74, 0.12);
+  color: #166534;
+}
+
+.attendance-summary-net.is-negative {
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
 }
