@@ -11957,6 +11957,44 @@ function AttendancePage({
                         );
                       })}
                     </tr>
+                    <tr>
+                      <th className="attendance-date-cell attendance-summary-label-cell">
+                        <strong>Sick days</strong>
+                      </th>
+                      {staff.map((person) => {
+                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+                        return (
+                          <td
+                            key={`summary-sick-${person.person}`}
+                            className="attendance-value-cell attendance-summary-net-cell"
+                            colSpan={2}
+                          >
+                            <div className="attendance-summary-net attendance-summary-net-neutral">
+                              {summaryEntry?.sickDaysLabel || "0"}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    <tr>
+                      <th className="attendance-date-cell attendance-summary-label-cell">
+                        <strong>Mileage</strong>
+                      </th>
+                      {staff.map((person) => {
+                        const summaryEntry = attendanceSummary.find((entry) => entry.person === person.person);
+                        return (
+                          <td
+                            key={`summary-mileage-${person.person}`}
+                            className="attendance-value-cell attendance-summary-net-cell"
+                            colSpan={2}
+                          >
+                            <div className="attendance-summary-net attendance-summary-net-neutral">
+                              {summaryEntry?.mileageLabel || "£0.00"}
+                            </div>
+                          </td>
+                        );
+                      })}
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -11968,6 +12006,8 @@ function AttendancePage({
                   <li>Late starts and early finishes count as deductions only when they are more than 5 minutes.</li>
                   <li>Half-day holidays use the worked half of the day only when measuring overtime and deductions.</li>
                   <li>The final net total is rounded to payroll blocks of 30 minutes: 20 minutes or below rounds down, 25 minutes or above rounds up.</li>
+                  <li>Sick days are tracked separately and do not reduce overtime totals.</li>
+                  <li>Mileage shows the month value from the mileage module at £0.45 per mile.</li>
                 </ul>
               </div>
             </section>

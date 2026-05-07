@@ -2552,6 +2552,11 @@ function formatAttendanceNetMinutes(minutes) {
     : `Deduction ${formatAttendanceMinutes(Math.abs(rounded))}`;
 }
 
+function formatAttendanceMileagePounds(value) {
+  const normalized = Number.isFinite(value) ? Math.max(0, Number(value)) : 0;
+  return `£${normalized.toFixed(2)}`;
+}
+
 const ATTENDANCE_MORNING_HOLIDAY_END_MINUTES = 12 * 60;
 const ATTENDANCE_AFTERNOON_HOLIDAY_START_MINUTES = 12 * 60 + 30;
 const ATTENDANCE_OVERTIME_GRACE_MINUTES = 10;
@@ -3930,11 +3935,35 @@ async function getAttendancePayload(forUser, monthId = "") {
           earlyStartMinutes: 0,
           lateFinishMinutes: 0,
           lateStartMinutes: 0,
-          earlyFinishMinutes: 0
+          earlyFinishMinutes: 0,
+          sickDays: 0,
+          mileagePounds: 0
         }
       ];
     })
   );
+
+  const mileageClaims = (store.mileageClaims || []).map((claim) => sanitizeMileageClaim(claim));
+  const mileagePoundsByPersonKey = new Map();
+  filteredVisibleStaff.forEach((entry) => {
+    const personKey = getHolidayStaffIdentityKey(entry.person);
+    const user = attendanceUserByPersonKey.get(personKey);
+    if (!user?.id) {
+      mileagePoundsByPersonKey.set(personKey, 0);
+      return;
+    }
+    const totalMiles = mileageClaims
+      .filter((claim) => String(claim.userId || "") === String(user.id || ""))
+      .reduce((sum, claim) => {
+        const claimMiles = (claim.lines || []).reduce((lineSum, line) => {
+          const lineMonthId = getMileageLineMonthId(line, claim.monthId);
+          if (lineMonthId !== resolvedMonthId) return lineSum;
+          return lineSum + Number(line.miles || 0);
+        }, 0);
+        return sum + claimMiles;
+      }, 0);
+    mileagePoundsByPersonKey.set(personKey, Math.round(totalMiles * 45) / 100);
+  });
 
   const rows = enumerateIsoDates(startIso, endIso).map((isoDate) => {
     const parsed = parseIsoDate(isoDate);
@@ -4036,6 +4065,9 @@ async function getAttendancePayload(forUser, monthId = "") {
               : "neutral";
         const summaryEntry = attendanceSummaryByPersonKey.get(personKey);
         if (summaryEntry) {
+          if (attendanceEntry?.adminStatus === "absent") {
+            summaryEntry.sickDays += 1;
+          }
           summaryEntry.earlyStartMinutes += earlyStartMinutes;
           summaryEntry.lateFinishMinutes += lateFinishMinutes;
           summaryEntry.lateStartMinutes += lateStartMinutes;
@@ -4108,7 +4140,9 @@ async function getAttendancePayload(forUser, monthId = "") {
           earlyStartMinutes: 0,
           lateFinishMinutes: 0,
           lateStartMinutes: 0,
-          earlyFinishMinutes: 0
+          earlyFinishMinutes: 0,
+          sickDays: 0,
+          mileagePounds: 0
         };
       const creditMinutes =
         applyAttendanceCreditGrace(summaryEntry.earlyStartMinutes) +
@@ -4117,18 +4151,23 @@ async function getAttendancePayload(forUser, monthId = "") {
         applyAttendanceDeductionGrace(summaryEntry.lateStartMinutes) +
         applyAttendanceDeductionGrace(summaryEntry.earlyFinishMinutes);
       const netMinutes = creditMinutes - deductionMinutes;
+      const personKey = getHolidayStaffIdentityKey(entry.person);
+      const mileagePounds = Number(mileagePoundsByPersonKey.get(personKey) || 0);
       return {
         ...summaryEntry,
         creditMinutes,
         deductionMinutes,
         netMinutes,
+        mileagePounds,
         earlyStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.earlyStartMinutes)),
         lateFinishLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateFinishMinutes)),
         lateStartLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.lateStartMinutes)),
         earlyFinishLabel: formatAttendanceMinutes(roundAttendanceVarianceMinutes(summaryEntry.earlyFinishMinutes)),
         creditLabel: formatAttendanceMinutes(creditMinutes),
         deductionLabel: formatAttendanceMinutes(deductionMinutes),
-        netLabel: formatAttendanceNetMinutes(netMinutes)
+        netLabel: formatAttendanceNetMinutes(netMinutes),
+        sickDaysLabel: String(summaryEntry.sickDays || 0),
+        mileageLabel: formatAttendanceMileagePounds(mileagePounds)
       };
     }),
     adminMode: canEditAttendance(forUser),
