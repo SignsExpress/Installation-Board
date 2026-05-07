@@ -11510,6 +11510,63 @@ function AttendancePage({
   const selfRows = !adminMode ? rows.filter((row) => row.cells[0]) : [];
   const focusedSelfRow = !adminMode ? selfRows.find((row) => row.isoDate === noteForm.date) || null : null;
   const focusedSelfCell = focusedSelfRow?.cells?.[0] || null;
+  const selfSummaryEntry = !adminMode ? attendanceSummary.find((entry) => entry.person === currentUser?.displayName || entry.person === selfRows[0]?.cells?.[0]?.person) || attendanceSummary[0] || null : null;
+  const selfWeeks = useMemo(() => {
+    if (adminMode) return [];
+    const monthId = String(attendanceData?.monthId || attendanceMonthId || "");
+    const monthMatch = monthId.match(/^(\d{4})-(\d{2})$/);
+    if (!monthMatch) return [];
+    const [, yearText, monthText] = monthMatch;
+    const year = Number(yearText);
+    const monthIndex = Number(monthText) - 1;
+    if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) return [];
+    const monthStart = new Date(Date.UTC(year, monthIndex, 1));
+    const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+    const rangeStart = new Date(monthStart);
+    while (rangeStart.getUTCDay() !== 1) {
+      rangeStart.setUTCDate(rangeStart.getUTCDate() - 1);
+    }
+    const rangeEnd = new Date(monthEnd);
+    while (rangeEnd.getUTCDay() !== 0) {
+      rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 1);
+    }
+    const rowByIso = new Map(selfRows.map((row) => [row.isoDate, row]));
+    const weeks = [];
+    let currentWeek = [];
+    let cursor = new Date(rangeStart);
+    let weekNumber = 1;
+    while (cursor <= rangeEnd) {
+      const isoDate = cursor.toISOString().slice(0, 10);
+      const existingRow = rowByIso.get(isoDate);
+      const rowDateLabel = `${String(cursor.getUTCDate()).padStart(2, "0")}/${String(cursor.getUTCMonth() + 1).padStart(2, "0")}/${String(cursor.getUTCFullYear()).slice(-2)}`;
+      currentWeek.push({
+        isoDate,
+        dateLabel: existingRow?.dateLabel || rowDateLabel,
+        weekdayLabel: cursor.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }),
+        isCurrentMonth: cursor.getUTCMonth() === monthIndex,
+        isToday: existingRow?.isToday || false,
+        cell: existingRow?.cells?.[0] || null
+      });
+      if (cursor.getUTCDay() === 0) {
+        weeks.push({
+          id: `week-${weekNumber}`,
+          label: `Week ${weekNumber}`,
+          days: currentWeek
+        });
+        currentWeek = [];
+        weekNumber += 1;
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    if (currentWeek.length) {
+      weeks.push({
+        id: `week-${weekNumber}`,
+        label: `Week ${weekNumber}`,
+        days: currentWeek
+      });
+    }
+    return weeks;
+  }, [adminMode, attendanceData?.monthId, attendanceMonthId, selfRows]);
 
   useEffect(() => {
     if (adminMode) return;
@@ -12128,84 +12185,123 @@ function AttendancePage({
             <div className="attendance-self-service">
               <section className="attendance-self-panel attendance-self-board-panel">
                 <h3>Your attendance</h3>
-                <div className="attendance-self-grid-shell">
-                  <table className="attendance-grid-table attendance-self-grid-table">
-                    <thead>
-                      <tr>
-                        {selfRows.map((row) => (
-                          <th
-                            key={`self-head-${row.isoDate}`}
-                            className={`attendance-self-day-head ${row.isToday ? "is-today" : ""}`}
-                          >
-                            <span>{row.weekdayLabel}</span>
-                            <strong>{row.dateLabel}</strong>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        {selfRows.map((row) => {
-                          const cell = row.cells[0];
-                          if (!cell) return null;
-                          const canRequestClockIn = !cell.displayLabel && cell.canExplain && !cell.clockIn;
-                          const canRequestClockOut = !cell.displayLabel && cell.canExplain && !cell.clockOut;
-                          const isSelected = noteForm.date === row.isoDate;
+                <div className="attendance-client-weeks">
+                  {selfWeeks.map((week) => (
+                    <article key={week.id} className="attendance-client-week-card">
+                      <div className="attendance-client-week-head">{week.label}</div>
+                      <div className="attendance-client-week-body">
+                        {week.days.map((day) => {
+                          const cell = day.cell;
+                          const canRequestClockIn = !cell?.displayLabel && cell?.canExplain && !cell?.clockIn;
+                          const canRequestClockOut = !cell?.displayLabel && cell?.canExplain && !cell?.clockOut;
+                          const isSelected = noteForm.date === day.isoDate;
                           return (
-                            <td
-                              key={`self-cell-${row.isoDate}`}
-                              className={`attendance-self-day-cell ${row.isToday ? "is-today" : ""} ${cell.hasMissingClock ? "is-missing" : ""} ${isSelected ? "is-focused" : ""}`}
+                            <div
+                              key={`${week.id}-${day.isoDate}`}
+                              className={`attendance-client-day-row ${day.isCurrentMonth ? "" : "is-muted"} ${day.isToday ? "is-today" : ""} ${cell?.hasMissingClock ? "is-missing" : ""} ${isSelected ? "is-focused" : ""}`}
                             >
-                              {cell.displayLabel ? (
-                                <div className="attendance-self-day-display">{cell.displayLabel}</div>
-                              ) : (
-                                <>
-                                  <div className="attendance-self-day-times">
-                                    <button
-                                      type="button"
-                                      className={`attendance-time-input attendance-self-time-button ${cell.clockInStatus ? `is-${cell.clockInStatus}` : "is-neutral"} ${canRequestClockIn ? "is-alert" : ""}`}
-                                      onClick={canRequestClockIn ? () => openClientAttendanceRequest(cell, row.isoDate) : undefined}
-                                      disabled={!canRequestClockIn}
-                                    >
-                                      {cell.clockIn || "Add in"}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className={`attendance-time-input attendance-self-time-button ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : "is-neutral"} ${canRequestClockOut ? "is-alert" : ""}`}
-                                      onClick={canRequestClockOut ? () => openClientAttendanceRequest(cell, row.isoDate) : undefined}
-                                      disabled={!canRequestClockOut}
-                                    >
-                                      {cell.clockOut || "Add out"}
-                                    </button>
-                                  </div>
-                                  {cell.halfDayHolidayLabel ? (
-                                    <div className="attendance-cell-meta attendance-cell-meta-wide attendance-self-meta-row">
-                                      <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                              <div className="attendance-client-day-label">
+                                <span>{day.weekdayLabel.toUpperCase()}</span>
+                                <strong>{day.dateLabel}</strong>
+                              </div>
+                              <div className="attendance-client-day-values">
+                                {!cell ? (
+                                  <div className="attendance-client-day-display">-</div>
+                                ) : cell.displayLabel ? (
+                                  <div className="attendance-client-day-display">{cell.displayLabel}</div>
+                                ) : (
+                                  <>
+                                    <div className="attendance-client-time-pair">
+                                      <button
+                                        type="button"
+                                        className={`attendance-time-input attendance-self-time-button ${cell.clockInStatus ? `is-${cell.clockInStatus}` : "is-neutral"} ${canRequestClockIn ? "is-alert" : ""}`}
+                                        onClick={canRequestClockIn ? () => openClientAttendanceRequest(cell, day.isoDate) : undefined}
+                                        disabled={!canRequestClockIn}
+                                      >
+                                        {cell.clockIn || "Add in"}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`attendance-time-input attendance-self-time-button ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : "is-neutral"} ${canRequestClockOut ? "is-alert" : ""}`}
+                                        onClick={canRequestClockOut ? () => openClientAttendanceRequest(cell, day.isoDate) : undefined}
+                                        disabled={!canRequestClockOut}
+                                      >
+                                        {cell.clockOut || "Add out"}
+                                      </button>
                                     </div>
-                                  ) : null}
-                                  {cell.breakSummary ? (
-                                    <div className="attendance-cell-meta attendance-cell-meta-wide attendance-self-meta-row">
-                                      Breaks: {cell.breakSummary}
-                                    </div>
-                                  ) : null}
-                                  {cell.employeeNote ? (
-                                    <div className="attendance-self-note-line">Request sent: {cell.employeeNote}</div>
-                                  ) : null}
-                                  {cell.hasMissingClock ? (
-                                    <div className="attendance-self-missing-hint">
-                                      Tap the red box to request a correction.
-                                    </div>
-                                  ) : null}
-                                </>
-                              )}
-                            </td>
+                                    {cell.halfDayHolidayLabel ? (
+                                      <div className="attendance-cell-meta attendance-cell-meta-wide attendance-self-meta-row">
+                                        <span className="attendance-half-day-chip">{cell.halfDayHolidayLabel}</span>
+                                      </div>
+                                    ) : null}
+                                    {cell.breakSummary ? (
+                                      <div className="attendance-self-note-line">Breaks: {cell.breakSummary}</div>
+                                    ) : null}
+                                    {cell.employeeNote ? (
+                                      <div className="attendance-self-note-line">Request sent: {cell.employeeNote}</div>
+                                    ) : null}
+                                    {cell.hasMissingClock ? (
+                                      <div className="attendance-self-missing-hint">
+                                        Tap the red box to request a correction.
+                                      </div>
+                                    ) : null}
+                                  </>
+                                )}
+                              </div>
+                            </div>
                           );
                         })}
-                      </tr>
-                    </tbody>
-                  </table>
+                      </div>
+                    </article>
+                  ))}
                 </div>
               </section>
+
+              {selfSummaryEntry ? (
+                <section className="attendance-self-panel">
+                  <h3>Deductions and overtime</h3>
+                  <div className="attendance-client-summary">
+                    <div className="attendance-client-summary-row">
+                      <span>Overtime</span>
+                      <div className="attendance-client-summary-pair">
+                        <div className="attendance-summary-net is-positive">{selfSummaryEntry.earlyStartLabel || "0m"}</div>
+                        <div className="attendance-summary-net is-positive">{selfSummaryEntry.lateFinishLabel || "0m"}</div>
+                      </div>
+                    </div>
+                    <div className="attendance-client-summary-row">
+                      <span>Deductions</span>
+                      <div className="attendance-client-summary-pair">
+                        <div className="attendance-summary-net is-negative">{selfSummaryEntry.lateStartLabel || "0m"}</div>
+                        <div className="attendance-summary-net is-negative">{selfSummaryEntry.earlyFinishLabel || "0m"}</div>
+                      </div>
+                    </div>
+                    <div className="attendance-client-summary-row">
+                      <span>Net total</span>
+                      <div className={`attendance-summary-net ${Number(selfSummaryEntry.netMinutes || 0) > 0 ? "is-positive" : Number(selfSummaryEntry.netMinutes || 0) < 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
+                        {selfSummaryEntry.netLabel || "Balanced"}
+                      </div>
+                    </div>
+                    <div className="attendance-client-summary-row">
+                      <span>Sick days</span>
+                      <div className={`attendance-summary-net ${Number(selfSummaryEntry.sickDays || 0) > 0 ? "is-negative" : "attendance-summary-net-neutral"}`}>
+                        {selfSummaryEntry.sickDaysLabel || "0"}
+                      </div>
+                    </div>
+                    <div className="attendance-client-summary-row">
+                      <span>Mileage</span>
+                      <div className={`attendance-summary-net ${Number(selfSummaryEntry.mileagePounds || 0) > 0 ? "is-positive" : "attendance-summary-net-neutral"}`}>
+                        {selfSummaryEntry.mileageLabel || "£0.00"}
+                      </div>
+                    </div>
+                    <div className="attendance-client-summary-row attendance-client-summary-row-note">
+                      <span>Notes</span>
+                      <div className="attendance-summary-note-readonly">
+                        {selfSummaryEntry.monthNote || "No note added for this month."}
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : null}
 
               <section className="attendance-self-panel">
                 <h3>Missing clocking request</h3>
@@ -12238,7 +12334,7 @@ function AttendancePage({
                     <label>
                       <span>Explanation</span>
                       <textarea
-                        rows={4}
+                        rows={3}
                         value={noteForm.note}
                         onChange={(event) => setNoteForm((current) => ({ ...current, note: event.target.value }))}
                         placeholder="Explain the missing clocking so Matt can approve it."

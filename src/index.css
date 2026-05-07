@@ -8263,79 +8263,110 @@ button {
   overflow: visible;
 }
 
-.attendance-self-grid-shell {
-  overflow-x: auto;
-  padding-bottom: 4px;
+.attendance-client-weeks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
 }
 
-.attendance-self-grid-table {
-  min-width: max-content;
+.attendance-client-week-card {
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
 }
 
-.attendance-self-day-head {
-  min-width: 124px;
-  text-align: center;
-}
-
-.attendance-self-day-head span,
-.attendance-self-day-head strong {
-  display: block;
-}
-
-.attendance-self-day-head span {
-  font-size: 0.64rem;
+.attendance-client-week-head {
+  padding: 10px 12px;
+  background: rgba(248, 250, 252, 0.9);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  color: #475569;
+  font-size: 0.72rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #64748b;
 }
 
-.attendance-self-day-head strong {
-  margin-top: 2px;
-  font-size: 0.82rem;
-  color: #1f2937;
+.attendance-client-week-body {
+  display: grid;
 }
 
-.attendance-self-day-head.is-today {
-  background: rgba(113, 76, 152, 0.08);
+.attendance-client-day-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(241, 245, 249, 0.95);
+  background: rgba(255, 255, 255, 0.94);
 }
 
-.attendance-self-day-cell {
-  min-width: 124px;
-  vertical-align: top;
-  background: rgba(255, 255, 255, 0.92);
+.attendance-client-day-row:first-child {
+  border-top: 0;
 }
 
-.attendance-self-day-cell.is-today {
-  background: rgba(248, 250, 252, 0.98);
+.attendance-client-day-row.is-muted {
+  background: rgba(248, 250, 252, 0.8);
 }
 
-.attendance-self-day-cell.is-focused {
+.attendance-client-day-row.is-muted .attendance-client-day-label,
+.attendance-client-day-row.is-muted .attendance-client-day-values {
+  opacity: 0.58;
+}
+
+.attendance-client-day-row.is-today {
+  background: rgba(113, 76, 152, 0.06);
+}
+
+.attendance-client-day-row.is-focused {
   box-shadow: inset 0 0 0 2px rgba(113, 76, 152, 0.16);
 }
 
-.attendance-self-day-cell.is-missing {
-  background: rgba(254, 242, 242, 0.88);
+.attendance-client-day-row.is-missing {
+  background: rgba(254, 242, 242, 0.9);
 }
 
-.attendance-self-day-display {
+.attendance-client-day-label span,
+.attendance-client-day-label strong {
+  display: block;
+}
+
+.attendance-client-day-label span {
+  color: #64748b;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attendance-client-day-label strong {
+  margin-top: 2px;
+  color: #1f2937;
+  font-size: 0.74rem;
+  line-height: 1.2;
+}
+
+.attendance-client-day-values {
+  min-width: 0;
+}
+
+.attendance-client-day-display {
+  min-height: 38px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 98px;
-  padding: 10px 8px;
-  text-align: center;
   color: #475569;
   font-size: 0.72rem;
   font-weight: 800;
 }
 
-.attendance-self-day-times {
+.attendance-client-time-pair {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .attendance-self-time-button {
   width: 100%;
+  min-height: 30px;
+  font-size: 0.68rem;
   cursor: default;
 }
 
@@ -8353,12 +8384,13 @@ button {
 
 .attendance-self-meta-row {
   margin-top: 4px;
+  font-size: 0.6rem;
 }
 
 .attendance-self-note-line,
 .attendance-self-missing-hint {
   margin-top: 4px;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   line-height: 1.35;
 }
 
@@ -8382,23 +8414,25 @@ button {
 
 .attendance-note-form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .attendance-note-form label {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   color: #475569;
   font-weight: 600;
+  font-size: 0.72rem;
 }
 
 .attendance-note-form input,
 .attendance-note-form textarea {
   width: 100%;
   border: 1px solid var(--sx-border);
-  border-radius: 16px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  padding: 10px 12px;
   font: inherit;
+  font-size: 0.76rem;
   background: white;
 }
 
@@ -8409,6 +8443,43 @@ button {
 
 .attendance-summary-notes-client {
   margin-top: 0;
+}
+
+.attendance-client-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.attendance-client-summary-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.attendance-client-summary-row > span {
+  color: #64748b;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.attendance-client-summary-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.attendance-summary-note-readonly {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #475569;
+  font-size: 0.7rem;
+  line-height: 1.35;
 }
 
 .host-landing-brand {
