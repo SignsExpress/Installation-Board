@@ -10017,6 +10017,42 @@ app.get("/api/corebridge/orders", async (request, response) => {
     );
   });
 
+  app.post("/api/notifications/broadcast", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const message = String(request.body?.message || "").trim();
+    const customTitle = String(request.body?.title || "").trim();
+    if (!message) {
+      response.status(400).json({ error: "Write a message before sending it." });
+      return;
+    }
+
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    const senderId = String(request.user?.id || "");
+    const senderName = String(request.user?.displayName || "Admin").trim() || "Admin";
+    const title = customTitle || `Message from ${senderName}`;
+    const recipients = (usersStore.users || []).filter((user) => String(user.id || "") && String(user.id || "") !== senderId);
+
+    recipients.forEach((user) => {
+      store.notifications.unshift(
+        createNotification({
+          userId: user.id,
+          title,
+          message,
+          link: "/notifications",
+          type: "message"
+        })
+      );
+    });
+
+    await writeStore(store);
+    response.json({
+      delivered: recipients.length,
+      title,
+      message
+    });
+  });
+
   app.get("/api/material-requests", async (request, response) => {
     if (!requireMaterialsAccess(request, response)) return;
     const store = await readStore();

@@ -3536,6 +3536,8 @@ function NotificationsPage({
   onOpenNotification,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  onBroadcastNotificationMessage,
+  messageSending = false,
   pushSupported = false,
   pushPermission = "default",
   pushEnabled = false,
@@ -3546,6 +3548,8 @@ function NotificationsPage({
   onToggleAero
 }) {
   const [activeFilter, setActiveFilter] = useState("all");
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastMessage, setBroadcastMessage] = useState("");
   const filterOptions = [
     { value: "all", label: "All" },
     { value: "unread", label: "Unread" },
@@ -3556,6 +3560,7 @@ function NotificationsPage({
     { value: "message", label: "Messages" }
   ];
   const unreadCount = notifications.filter((entry) => !entry.read).length;
+  const canBroadcast = canEditBoard(currentUser);
   const filteredNotifications = notifications.filter((notification) => {
     const category = getNotificationCategory(notification).label.toLowerCase();
     if (activeFilter === "all") return true;
@@ -3612,6 +3617,49 @@ function NotificationsPage({
               ) : null}
             </div>
           </div>
+
+          {canBroadcast ? (
+            <section className="broadcast-message-panel">
+              <div className="broadcast-message-copy">
+                <strong>Send a desktop message</strong>
+                <p>This goes to everyone else as both an SX notification and a browser push alert.</p>
+              </div>
+              <div className="broadcast-message-fields">
+                <input
+                  type="text"
+                  value={broadcastTitle}
+                  onChange={(event) => setBroadcastTitle(event.target.value)}
+                  placeholder={`Message from ${currentUser?.displayName || "Admin"}`}
+                  maxLength={120}
+                />
+                <textarea
+                  value={broadcastMessage}
+                  onChange={(event) => setBroadcastMessage(event.target.value)}
+                  placeholder="Write the message you want everyone else to see."
+                  rows={3}
+                />
+              </div>
+              <div className="broadcast-message-actions">
+                <button
+                  className="primary-button"
+                  type="button"
+                  disabled={messageSending || !broadcastMessage.trim()}
+                  onClick={async () => {
+                    const sent = await onBroadcastNotificationMessage?.({
+                      title: broadcastTitle,
+                      message: broadcastMessage
+                    });
+                    if (sent) {
+                      setBroadcastTitle("");
+                      setBroadcastMessage("");
+                    }
+                  }}
+                >
+                  {messageSending ? "Sending..." : "Send message"}
+                </button>
+              </div>
+            </section>
+          ) : null}
 
           <div className="notifications-filter-row">
             {filterOptions.map((option) => (
@@ -14888,6 +14936,7 @@ export default function App() {
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushSaving, setPushSaving] = useState(false);
   const [pushError, setPushError] = useState("");
+  const [broadcastMessageSending, setBroadcastMessageSending] = useState(false);
   const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -16047,6 +16096,44 @@ export default function App() {
       setMessage(createMessage(error.message || "Could not update desktop alerts.", "error"));
     } finally {
       setPushSaving(false);
+    }
+  }
+
+  async function broadcastNotificationMessage({ title = "", message = "" } = {}) {
+    const trimmedMessage = String(message || "").trim();
+    const trimmedTitle = String(title || "").trim();
+    if (!trimmedMessage) {
+      setMessage(createMessage("Write a message before sending it.", "error"));
+      return false;
+    }
+    setBroadcastMessageSending(true);
+    try {
+      const response = await fetch("/api/notifications/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          message: trimmedMessage
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not send the message.");
+      }
+      await refreshNotifications();
+      setMessage(
+        createMessage(
+          `Message sent to ${payload.delivered || 0} ${Number(payload.delivered || 0) === 1 ? "person" : "people"}.`,
+          "success"
+        )
+      );
+      return true;
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not send the message.", "error"));
+      return false;
+    } finally {
+      setBroadcastMessageSending(false);
     }
   }
 
@@ -17334,6 +17421,8 @@ export default function App() {
         onOpenNotification={openNotification}
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
+        onBroadcastNotificationMessage={broadcastNotificationMessage}
+        messageSending={broadcastMessageSending}
         pushSupported={pushSupported}
         pushPermission={pushPermission}
         pushEnabled={pushEnabled}
