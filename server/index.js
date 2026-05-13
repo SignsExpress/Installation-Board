@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const webPush = require("web-push");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -43,6 +44,10 @@ const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
 const TIMEMOTO_WEBHOOK_TOKEN = String(process.env.TIMEMOTO_WEBHOOK_TOKEN || "").trim();
+const PUSH_VAPID_SUBJECT = String(process.env.PUSH_VAPID_SUBJECT || "mailto:portal@sxpreston.com").trim();
+const PUSH_VAPID_PUBLIC_KEY_ENV = String(process.env.PUSH_VAPID_PUBLIC_KEY || "").trim();
+const PUSH_VAPID_PRIVATE_KEY_ENV = String(process.env.PUSH_VAPID_PRIVATE_KEY || "").trim();
+let cachedPushKeys = null;
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -135,6 +140,7 @@ function createEmptyBoardStore() {
     holidayAllowances: [],
     holidayEvents: [],
     notifications: [],
+    pushSubscriptions: [],
     attendanceEntries: [],
     attendanceMonthNotes: [],
     attendanceWebhookEvents: [],
@@ -150,6 +156,52 @@ function createEmptyBoardStore() {
     socialPostQueue: [],
     holidayResetVersion: HOLIDAY_RESET_VERSION
   };
+}
+
+function getPushKeysFile() {
+  return path.join(path.dirname(getDataFile()), "push-vapid.json");
+}
+
+function ensurePushKeysFile() {
+  const file = getPushKeysFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (PUSH_VAPID_PUBLIC_KEY_ENV && PUSH_VAPID_PRIVATE_KEY_ENV) {
+    const payload = {
+      publicKey: PUSH_VAPID_PUBLIC_KEY_ENV,
+      privateKey: PUSH_VAPID_PRIVATE_KEY_ENV
+    };
+    if (!fs.existsSync(file)) {
+      fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    }
+    return payload;
+  }
+  if (!fs.existsSync(file)) {
+    const generated = webPush.generateVAPIDKeys();
+    fs.writeFileSync(file, `${JSON.stringify(generated, null, 2)}\n`, "utf8");
+    return generated;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (parsed?.publicKey && parsed?.privateKey) {
+      return {
+        publicKey: String(parsed.publicKey).trim(),
+        privateKey: String(parsed.privateKey).trim()
+      };
+    }
+  } catch (error) {
+    console.error("Invalid push VAPID key file, regenerating.", error);
+  }
+  const generated = webPush.generateVAPIDKeys();
+  fs.writeFileSync(file, `${JSON.stringify(generated, null, 2)}\n`, "utf8");
+  return generated;
+}
+
+function getPushKeys() {
+  if (!cachedPushKeys) {
+    cachedPushKeys = ensurePushKeysFile();
+    webPush.setVapidDetails(PUSH_VAPID_SUBJECT, cachedPushKeys.publicKey, cachedPushKeys.privateKey);
+  }
+  return cachedPushKeys;
 }
 
 function getDefaultProFormaTemplate() {
@@ -733,6 +785,115 @@ function getJobNotificationSummary(job) {
   return parts.join(" - ") || getJobNotificationLabel(job);
 }
 
+function getSiteOrigin(request = null) {
+  const configured = String(process.env.PUBLIC_APP_ORIGIN || process.env.APP_ORIGIN || "").trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  if (request?.headers?.host) {
+    const proto = String(request.headers["x-forwarded-proto"] || request.protocol || "https").trim();
+    return `${proto}://${request.headers.host}`;
+  }
+  return "https://www.sxpreston.com";
+}
+
+function safeParseStoreJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    return null;
+  }
+}
+
+function createPushPayload(notification, origin) {
+  return JSON.stringify({
+    title: String(notification?.title || "SX Portal").trim() || "SX Portal",
+    body: String(notification?.message || "").trim(),
+    link: String(notification?.link || "/notifications").trim() || "/notifications",
+    url: `${origin}${String(notification?.link || "/notifications").startsWith("/") ? String(notification?.link || "/notifications") : `/${String(notification?.link || "/notifications")}`}`,
+    notificationId: String(notification?.id || "").trim(),
+    type: String(notification?.type || "general").trim().toLowerCase(),
+    createdAt: String(notification?.createdAt || new Date().toISOString())
+  });
+}
+
+async function dispatchPushNotifications(previousStore, nextStore, request = null) {
+  const previousIds = new Set(
+    Array.isArray(previousStore?.notifications)
+      ? previousStore.notifications.map((entry) => String(entry?.id || "")).filter(Boolean)
+      : []
+  );
+  const subscriptions = Array.isArray(nextStore?.pushSubscriptions)
+    ? nextStore.pushSubscriptions.map((entry) => sanitizePushSubscription(entry)).filter((entry) => entry.userId && entry.endpoint && entry.keys?.p256dh && entry.keys?.auth)
+    : [];
+  if (!subscriptions.length) return nextStore;
+
+  const freshNotifications = (Array.isArray(nextStore?.notifications) ? nextStore.notifications : [])
+    .filter((entry) => entry && !previousIds.has(String(entry.id || "")));
+  if (!freshNotifications.length) return nextStore;
+
+  getPushKeys();
+  const origin = getSiteOrigin(request);
+  const subscriptionsByUser = new Map();
+  subscriptions.forEach((entry) => {
+    const bucket = subscriptionsByUser.get(entry.userId) || [];
+    bucket.push(entry);
+    subscriptionsByUser.set(entry.userId, bucket);
+  });
+
+  const nextSubscriptions = [...subscriptions];
+  let subscriptionsChanged = false;
+  const removeSubscriptionById = (subscriptionId) => {
+    const index = nextSubscriptions.findIndex((entry) => String(entry.id || "") === String(subscriptionId || ""));
+    if (index >= 0) {
+      nextSubscriptions.splice(index, 1);
+      subscriptionsChanged = true;
+    }
+  };
+
+  for (const notification of freshNotifications) {
+    const userSubscriptions = subscriptionsByUser.get(String(notification.userId || "")) || [];
+    if (!userSubscriptions.length) continue;
+    const payload = createPushPayload(notification, origin);
+    await Promise.all(
+      userSubscriptions.map(async (subscription) => {
+        try {
+          await webPush.sendNotification(
+            {
+              endpoint: subscription.endpoint,
+              keys: subscription.keys
+            },
+            payload
+          );
+          const target = nextSubscriptions.find((entry) => String(entry.id || "") === String(subscription.id || ""));
+          if (target) {
+            target.lastSuccessAt = new Date().toISOString();
+            target.lastErrorAt = "";
+            target.lastError = "";
+          }
+        } catch (error) {
+          const statusCode = Number(error?.statusCode || 0);
+          const target = nextSubscriptions.find((entry) => String(entry.id || "") === String(subscription.id || ""));
+          if (statusCode === 404 || statusCode === 410) {
+            removeSubscriptionById(subscription.id);
+            return;
+          }
+          if (target) {
+            target.lastErrorAt = new Date().toISOString();
+            target.lastError = String(error?.body || error?.message || "Push send failed");
+          }
+          console.error("Could not deliver browser push notification.", error);
+        }
+      })
+    );
+  }
+
+  if (subscriptionsChanged) {
+    nextStore.pushSubscriptions = nextSubscriptions.map((entry) => sanitizePushSubscription(entry));
+  } else {
+    nextStore.pushSubscriptions = nextSubscriptions.map((entry) => sanitizePushSubscription(entry));
+  }
+  return nextStore;
+}
+
 function pushBoardNotification(store, users, buildPayload) {
   store.notifications = Array.isArray(store.notifications) ? store.notifications : [];
   getBoardNotificationRecipients(users).forEach((user) => {
@@ -935,6 +1096,7 @@ function mergeHolidaySeed(store) {
         holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
         notifications: Array.isArray(store.notifications) ? [...store.notifications] : [],
+        pushSubscriptions: Array.isArray(store.pushSubscriptions) ? store.pushSubscriptions.map((entry) => sanitizePushSubscription(entry)) : [],
         attendanceEntries: Array.isArray(store.attendanceEntries) ? [...store.attendanceEntries] : [],
         attendanceMonthNotes: Array.isArray(store.attendanceMonthNotes) ? [...store.attendanceMonthNotes] : [],
         attendanceWebhookEvents: Array.isArray(store.attendanceWebhookEvents) ? [...store.attendanceWebhookEvents] : [],
@@ -1000,6 +1162,7 @@ function applyHolidayResetMigration(store) {
         : [],
       holidayEvents: [],
       notifications: Array.isArray(store.notifications) ? store.notifications : [],
+      pushSubscriptions: Array.isArray(store.pushSubscriptions) ? store.pushSubscriptions : [],
       holidayResetVersion: HOLIDAY_RESET_VERSION
     };
 }
@@ -1040,6 +1203,7 @@ async function readStore() {
             holidayAllowances: [],
             holidayEvents: [],
             notifications: [],
+            pushSubscriptions: [],
             attendanceEntries: [],
             attendanceMonthNotes: [],
             attendanceWebhookEvents: [],
@@ -1067,6 +1231,7 @@ async function readStore() {
           holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
           holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
           notifications: Array.isArray(parsed.notifications) ? parsed.notifications : [],
+          pushSubscriptions: Array.isArray(parsed.pushSubscriptions) ? parsed.pushSubscriptions : [],
           attendanceEntries: Array.isArray(parsed.attendanceEntries) ? parsed.attendanceEntries : [],
           attendanceMonthNotes: Array.isArray(parsed.attendanceMonthNotes) ? parsed.attendanceMonthNotes : [],
           attendanceWebhookEvents: Array.isArray(parsed.attendanceWebhookEvents) ? parsed.attendanceWebhookEvents : [],
@@ -1168,6 +1333,12 @@ async function writeStore(store) {
       notifications: [...(store.notifications || [])].sort((left, right) =>
         String(right.createdAt || "").localeCompare(String(left.createdAt || ""))
       ),
+      pushSubscriptions: [...(store.pushSubscriptions || [])]
+        .map((entry) => sanitizePushSubscription(entry))
+        .sort((left, right) => {
+          if (left.userId !== right.userId) return String(left.userId || "").localeCompare(String(right.userId || ""));
+          return String(left.endpoint || "").localeCompare(String(right.endpoint || ""));
+        }),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
   if (boardStoreCorruptionError && fs.existsSync(dataFile)) {
@@ -1181,10 +1352,16 @@ async function writeStore(store) {
   boardStoreWriteQueue = boardStoreWriteQueue
     .catch(() => {})
     .then(async () => {
+      const previousRaw = fs.existsSync(dataFile) ? await fsp.readFile(dataFile, "utf8") : "";
+      const previousStore = safeParseStoreJson(previousRaw) || createEmptyBoardStore();
       await snapshotFile(dataFile, "jobs-store");
       await writeTextFileAtomically(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`);
+      const updatedStore = await dispatchPushNotifications(previousStore, nextStore);
+      if (JSON.stringify(updatedStore.pushSubscriptions || []) !== JSON.stringify(nextStore.pushSubscriptions || [])) {
+        await writeTextFileAtomically(dataFile, `${JSON.stringify(updatedStore, null, 2)}\n`);
+      }
       boardStoreCorruptionError = null;
-      return nextStore;
+      return updatedStore;
     });
   return boardStoreWriteQueue;
 }
@@ -3362,6 +3539,25 @@ function sanitizeNotification(payload) {
     read: Boolean(payload.read),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizePushSubscription(payload) {
+  const keys = payload?.keys && typeof payload.keys === "object" ? payload.keys : {};
+  return {
+    id: String(payload?.id || makeId()),
+    userId: String(payload?.userId || "").trim(),
+    endpoint: String(payload?.endpoint || "").trim(),
+    keys: {
+      p256dh: String(keys.p256dh || "").trim(),
+      auth: String(keys.auth || "").trim()
+    },
+    userAgent: String(payload?.userAgent || "").trim(),
+    createdAt: String(payload?.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString(),
+    lastSuccessAt: String(payload?.lastSuccessAt || "").trim(),
+    lastErrorAt: String(payload?.lastErrorAt || "").trim(),
+    lastError: String(payload?.lastError || "").trim()
   };
 }
 
@@ -9697,6 +9893,89 @@ app.get("/api/corebridge/orders", async (request, response) => {
       (entry) => String(entry.userId || "") === userId
     );
     response.json(notifications);
+  });
+
+  app.get("/api/push/public-key", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Authentication required." });
+      return;
+    }
+    const keys = getPushKeys();
+    response.json({ publicKey: keys.publicKey });
+  });
+
+  app.get("/api/push/subscription", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Authentication required." });
+      return;
+    }
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    const subscriptions = (store.pushSubscriptions || []).filter((entry) => String(entry.userId || "") === userId);
+    response.json({
+      enabled: subscriptions.length > 0,
+      subscriptions: subscriptions.map((entry) => ({
+        id: entry.id,
+        endpoint: entry.endpoint,
+        updatedAt: entry.updatedAt || entry.createdAt || "",
+        lastSuccessAt: entry.lastSuccessAt || "",
+        lastErrorAt: entry.lastErrorAt || "",
+        lastError: entry.lastError || ""
+      }))
+    });
+  });
+
+  app.post("/api/push/subscribe", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Authentication required." });
+      return;
+    }
+    const endpoint = String(request.body?.endpoint || "").trim();
+    const p256dh = String(request.body?.keys?.p256dh || "").trim();
+    const auth = String(request.body?.keys?.auth || "").trim();
+    if (!endpoint || !p256dh || !auth) {
+      response.status(400).json({ error: "A complete browser push subscription is required." });
+      return;
+    }
+    const store = await readStore();
+    const userId = String(request.user?.id || "");
+    const existing = (store.pushSubscriptions || []).find((entry) => String(entry.endpoint || "") === endpoint);
+    const nextSubscription = sanitizePushSubscription({
+      ...(existing || {}),
+      userId,
+      endpoint,
+      keys: { p256dh, auth },
+      userAgent: request.get("user-agent") || "",
+      createdAt: existing?.createdAt || new Date().toISOString()
+    });
+    const others = (store.pushSubscriptions || []).filter((entry) => String(entry.endpoint || "") !== endpoint);
+    store.pushSubscriptions = [...others, nextSubscription];
+    const savedStore = await writeStore(store);
+    response.json({
+      enabled: true,
+      subscriptions: (savedStore.pushSubscriptions || []).filter((entry) => String(entry.userId || "") === userId)
+    });
+  });
+
+  app.post("/api/push/unsubscribe", async (request, response) => {
+    if (!request.user) {
+      response.status(401).json({ error: "Authentication required." });
+      return;
+    }
+    const endpoint = String(request.body?.endpoint || "").trim();
+    const userId = String(request.user?.id || "");
+    const store = await readStore();
+    store.pushSubscriptions = (store.pushSubscriptions || []).filter((entry) => {
+      if (!endpoint) {
+        return String(entry.userId || "") !== userId;
+      }
+      return String(entry.endpoint || "") !== endpoint;
+    });
+    const savedStore = await writeStore(store);
+    response.json({
+      enabled: (savedStore.pushSubscriptions || []).some((entry) => String(entry.userId || "") === userId),
+      subscriptions: (savedStore.pushSubscriptions || []).filter((entry) => String(entry.userId || "") === userId)
+    });
   });
 
   app.patch("/api/notifications/:id/read", async (request, response) => {

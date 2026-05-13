@@ -2747,6 +2747,20 @@ function buildBoardUrl(startIso = "", endIso = "") {
   return "/api/board";
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`.replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+async function registerPortalServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    throw new Error("This browser does not support background notifications.");
+  }
+  return navigator.serviceWorker.register("/sw.js");
+}
+
 function MainNavBar({
   currentUser,
   active = "home",
@@ -3522,6 +3536,12 @@ function NotificationsPage({
   onOpenNotification,
   onMarkNotificationRead,
   onMarkAllNotificationsRead,
+  pushSupported = false,
+  pushPermission = "default",
+  pushEnabled = false,
+  pushSaving = false,
+  pushError = "",
+  onTogglePushNotifications,
   aeroEnabled,
   onToggleAero
 }) {
@@ -3561,11 +3581,36 @@ function NotificationsPage({
               <h2>Notifications</h2>
               <p>{unreadCount ? `${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}` : "You're all caught up."}</p>
             </div>
-            {notifications.length ? (
-              <button className="ghost-button" type="button" onClick={onMarkAllNotificationsRead}>
-                Mark all read
-              </button>
-            ) : null}
+            <div className="notifications-panel-tools">
+              <div className={`push-notifications-card ${pushEnabled ? "active" : ""} ${!pushSupported ? "disabled" : ""}`}>
+                <div>
+                  <strong>Desktop alerts</strong>
+                  <p>
+                    {!pushSupported
+                      ? "This browser does not support background alerts."
+                      : pushEnabled
+                        ? "On for this device."
+                        : pushPermission === "denied"
+                          ? "Browser permission is blocked."
+                          : "Send browser notifications when the portal is closed."}
+                  </p>
+                  {pushError ? <small className="push-notifications-error">{pushError}</small> : null}
+                </div>
+                <button
+                  className="ghost-button"
+                  type="button"
+                  disabled={!pushSupported || pushSaving}
+                  onClick={onTogglePushNotifications}
+                >
+                  {pushSaving ? "Saving..." : pushEnabled ? "Turn off" : "Turn on"}
+                </button>
+              </div>
+              {notifications.length ? (
+                <button className="ghost-button" type="button" onClick={onMarkAllNotificationsRead}>
+                  Mark all read
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="notifications-filter-row">
@@ -14838,6 +14883,11 @@ export default function App() {
   const [loginError, setLoginError] = useState("");
   const [permissionSavingKey, setPermissionSavingKey] = useState("");
   const [notifications, setNotifications] = useState([]);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState("default");
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSaving, setPushSaving] = useState(false);
+  const [pushError, setPushError] = useState("");
   const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -15021,6 +15071,46 @@ export default function App() {
       active = false;
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    setPushSupported(Boolean(typeof window !== "undefined" && "Notification" in window && "serviceWorker" in navigator && "PushManager" in window));
+    setPushPermission(typeof window !== "undefined" && "Notification" in window ? Notification.permission : "default");
+  }, []);
+
+  useEffect(() => {
+    if (!currentUser || !pushSupported) {
+      setPushEnabled(false);
+      setPushSaving(false);
+      setPushError("");
+      return undefined;
+    }
+    let active = true;
+
+    async function loadPushStatus() {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        const browserSubscription = registration ? await registration.pushManager.getSubscription() : null;
+        const response = await fetch("/api/push/subscription");
+        if (!response.ok) {
+          throw new Error("Could not load desktop alert settings.");
+        }
+        const payload = await response.json();
+        if (!active) return;
+        setPushEnabled(Boolean(browserSubscription) && Boolean(payload?.enabled));
+        setPushError(payload?.subscriptions?.find?.((entry) => entry.lastError)?.lastError || "");
+      } catch (error) {
+        console.error(error);
+        if (!active) return;
+        setPushEnabled(false);
+        setPushError(error.message || "Could not load desktop alert settings.");
+      }
+    }
+
+    loadPushStatus();
+    return () => {
+      active = false;
+    };
+  }, [currentUser, pushSupported]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -15896,6 +15986,68 @@ export default function App() {
     if (!response.ok) throw new Error("Could not refresh notifications.");
     const payload = await response.json();
     setNotifications(Array.isArray(payload) ? payload : []);
+  }
+
+  async function togglePushNotifications() {
+    if (!pushSupported) {
+      setPushError("This browser does not support desktop alerts.");
+      return;
+    }
+    setPushSaving(true);
+    setPushError("");
+    try {
+      const registration = await registerPortalServiceWorker();
+      const existingSubscription = await registration.pushManager.getSubscription();
+
+      if (pushEnabled && existingSubscription) {
+        await fetch("/api/push/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: existingSubscription.endpoint })
+        });
+        await existingSubscription.unsubscribe();
+        setPushEnabled(false);
+        setPushPermission(Notification.permission);
+        setMessage(createMessage("Desktop alerts turned off for this device.", "success"));
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      setPushPermission(permission);
+      if (permission !== "granted") {
+        throw new Error("Browser notification permission was not granted.");
+      }
+
+      const keyResponse = await fetch("/api/push/public-key");
+      if (!keyResponse.ok) {
+        throw new Error("Could not load the desktop alert key.");
+      }
+      const { publicKey } = await keyResponse.json();
+      const subscription =
+        existingSubscription ||
+        (await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey)
+        }));
+
+      const subscribeResponse = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription.toJSON())
+      });
+      if (!subscribeResponse.ok) {
+        const payload = await subscribeResponse.json().catch(() => ({}));
+        throw new Error(payload.error || "Could not save desktop alert settings.");
+      }
+      setPushEnabled(true);
+      setMessage(createMessage("Desktop alerts turned on for this device.", "success"));
+    } catch (error) {
+      console.error(error);
+      setPushError(error.message || "Could not update desktop alerts.");
+      setMessage(createMessage(error.message || "Could not update desktop alerts.", "error"));
+    } finally {
+      setPushSaving(false);
+    }
   }
 
   async function saveAttendanceEntry({ person, date, clockIn, clockOut, adminNote = "", adminStatus = "", notifyEmployee = false, changedFields = [] }) {
@@ -17182,6 +17334,12 @@ export default function App() {
         onOpenNotification={openNotification}
         onMarkNotificationRead={markNotificationRead}
         onMarkAllNotificationsRead={markAllNotificationsRead}
+        pushSupported={pushSupported}
+        pushPermission={pushPermission}
+        pushEnabled={pushEnabled}
+        pushSaving={pushSaving}
+        pushError={pushError}
+        onTogglePushNotifications={togglePushNotifications}
         aeroEnabled={aeroEnabled}
         onToggleAero={handleToggleAero}
       />
