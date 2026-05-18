@@ -2384,10 +2384,6 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
-      : key === "reports"
-        ? user?.role === "host"
-          ? "admin"
-          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2500,20 +2496,10 @@ function canEditProForma(user) {
   return getPermissionForApp(user, "proForma") === "admin";
 }
 
-function canAccessReports(user) {
-  if (user?.canManagePermissions) return true;
-  return getPermissionForApp(user, "reports") !== "none";
-}
-
-function canEditReports(user) {
-  if (user?.canManagePermissions) return true;
-  return getPermissionForApp(user, "reports") === "admin";
-}
-
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || canEditReports(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
   );
 }
 
@@ -2585,16 +2571,6 @@ function MaterialsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4h7M8.5 12h7M8.5 15h4.5" />
-    </svg>
-  );
-}
-
-function ReportsIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 4h9l4 4v11.5A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5v-14A1.5 1.5 0 0 1 6.5 4Z" />
-      <path d="M15 4v4h4" />
-      <path d="M8 11h8M8 14h8M8 17h5" />
     </svg>
   );
 }
@@ -2809,7 +2785,6 @@ function MainNavBar({
   const socialPostAllowed = canAccessSocialPost(currentUser);
   const descriptionPullAllowed = canAccessDescriptionPull(currentUser);
   const proFormaAllowed = canAccessProForma(currentUser);
-  const reportsAllowed = canAccessReports(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -2837,7 +2812,6 @@ function MainNavBar({
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
-    { key: "reports", label: "Reports", path: "/reports", allowed: reportsAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
@@ -3073,7 +3047,6 @@ function PermissionsPanel({
             const socialPostPermission = getPermissionForApp(user, "socialPost");
             const descriptionPullPermission = getPermissionForApp(user, "descriptionPull");
             const proFormaPermission = getPermissionForApp(user, "proForma");
-            const reportsPermission = getPermissionForApp(user, "reports");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -3367,24 +3340,6 @@ function PermissionsPanel({
                             className={`permission-chip ${proFormaPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:proForma`}
                             onClick={() => onChangePermission(user.id, "proForma", option.value)}
-                            title={permissionsLocked ? "Owner access is always admin" : ""}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="permissions-app-row">
-                      <span className="permissions-app-label">Reports</span>
-                      <div className="permission-segment">
-                        {PERMISSION_OPTIONS.map((option) => (
-                          <button
-                            key={`${user.id}-reports-${option.value}`}
-                            type="button"
-                            className={`permission-chip ${reportsPermission === option.value ? "active" : ""}`}
-                            disabled={permissionsLocked || savingKey === `${user.id}:reports`}
-                            onClick={() => onChangePermission(user.id, "reports", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3816,9 +3771,6 @@ function HostLaunchIcon({ type }) {
     invoice: (
       <svg {...iconProps}><path {...commonProps} d="M7 3.5h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path {...commonProps} d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path {...commonProps} d="M15.5 18.5h2.5" /></svg>
     ),
-    reports: (
-      <svg {...iconProps}><path {...commonProps} d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path {...commonProps} d="M14 3.5V8h4" /><path {...commonProps} d="M9 11h6M9 14h6M9 17h4" /></svg>
-    ),
     vehicle: (
       <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
     ),
@@ -3914,9 +3866,6 @@ function HostLandingPage({
             ) : null}
               {canAccessProForma(currentUser) ? (
                <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-            ) : null}
-            {canAccessReports(currentUser) ? (
-              <HostLaunchCard icon="reports" label="Reports" description="AI client reporting" onClick={() => goTo("/reports")} />
             ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
@@ -4016,9 +3965,6 @@ function ClientLandingPage({
             ) : null}
               {canAccessProForma(currentUser) ? (
                <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-            ) : null}
-            {canAccessReports(currentUser) ? (
-              <HostLaunchCard icon="reports" label="Reports" description="AI client reporting" onClick={() => goTo("/reports")} />
             ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
@@ -15145,7 +15091,6 @@ export default function App() {
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
   const isTvInstallsRoute = pathname.startsWith("/tv/installs");
-  const isReportsRoute = pathname.startsWith("/reports");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
   const isClientProFormaRoute = pathname.startsWith("/client/pro-forma");
   const isProFormaRoute = pathname.startsWith("/pro-forma") && !isProFormaTemplateRoute;
@@ -15255,7 +15200,6 @@ export default function App() {
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
   const showTvInstalls = Boolean(currentUser && canAccessBoard(currentUser) && isTvInstallsRoute);
-  const showReports = Boolean(currentUser && canAccessReports(currentUser) && isReportsRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
   const showProForma = Boolean(
     currentUser &&
@@ -15272,8 +15216,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessReports(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -15692,11 +15636,6 @@ export default function App() {
       return;
     }
 
-    if (isReportsRoute && !canAccessReports(currentUser)) {
-      window.location.replace(nextHomePath);
-      return;
-    }
-
     if ((isProFormaRoute || isClientProFormaRoute) && !canAccessProForma(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -15727,7 +15666,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -15740,7 +15679,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isReportsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -17777,18 +17716,6 @@ export default function App() {
   if (showDescriptionPull) {
     return (
       <DescriptionPullPage
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
-      />
-    );
-  }
-
-  if (showReports) {
-    return (
-      <ReportsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}

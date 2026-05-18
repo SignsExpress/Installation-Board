@@ -48,8 +48,7 @@ function getDefaultPermissions(role) {
       rams: "admin",
       socialPost: "admin",
       descriptionPull: "admin",
-      proForma: "admin",
-      reports: "admin"
+      proForma: "admin"
     };
   }
 
@@ -64,8 +63,7 @@ function getDefaultPermissions(role) {
     rams: "none",
     socialPost: "none",
     descriptionPull: "none",
-    proForma: "none",
-    reports: "none"
+    proForma: "none"
   };
 }
 
@@ -160,8 +158,7 @@ function normalizePermissions(permissions, role) {
     rams: normalizePermissionValue(permissions?.rams, defaults.rams),
     socialPost: normalizePermissionValue(permissions?.socialPost, defaults.socialPost),
     descriptionPull: normalizePermissionValue(permissions?.descriptionPull, defaults.descriptionPull),
-    proForma: normalizePermissionValue(permissions?.proForma, defaults.proForma),
-    reports: normalizePermissionValue(permissions?.reports, defaults.reports)
+    proForma: normalizePermissionValue(permissions?.proForma, defaults.proForma)
   };
 }
 
@@ -258,8 +255,7 @@ function normalizeStore(parsed, options = {}) {
         rams: "admin",
         socialPost: "admin",
         descriptionPull: "admin",
-        proForma: "admin",
-        reports: "admin"
+        proForma: "admin"
       };
     }
   }
