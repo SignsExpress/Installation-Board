@@ -7485,6 +7485,19 @@ button {
   background: #e4d6ff;
 }
 
+.holiday-day-bank-holiday {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  padding: 3px 5px;
+  background: rgba(22, 163, 74, 0.14);
+  color: #166534;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: left;
+}
+
 .holiday-day-cell.is-editable {
   cursor: pointer;
   transition: background 120ms ease, box-shadow 120ms ease;

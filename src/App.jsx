@@ -10879,6 +10879,11 @@ function HolidaysPage({
                                 {event.title}
                               </button>
                             ))}
+                            {day.bankHoliday ? (
+                              <span className="holiday-day-bank-holiday">
+                                {day.bankHoliday}
+                              </span>
+                            ) : null}
                             {day.holidays.map((holiday) => (
                               <span
                                 key={`${day.key}-${holiday.id}`}
