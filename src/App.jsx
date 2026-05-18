@@ -2384,6 +2384,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "reports"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : user?.role === "host"
         ? "admin"
         : "none";
@@ -2496,10 +2500,20 @@ function canEditProForma(user) {
   return getPermissionForApp(user, "proForma") === "admin";
 }
 
+function canAccessReports(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "reports") !== "none";
+}
+
+function canEditReports(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "reports") === "admin";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || canEditReports(user) || user.canManagePermissions)
   );
 }
 
@@ -2571,6 +2585,16 @@ function MaterialsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm2.5 4h7M8.5 12h7M8.5 15h4.5" />
+    </svg>
+  );
+}
+
+function ReportsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 4h9l4 4v11.5A1.5 1.5 0 0 1 17.5 21h-11A1.5 1.5 0 0 1 5 19.5v-14A1.5 1.5 0 0 1 6.5 4Z" />
+      <path d="M15 4v4h4" />
+      <path d="M8 11h8M8 14h8M8 17h5" />
     </svg>
   );
 }
@@ -2785,6 +2809,7 @@ function MainNavBar({
   const socialPostAllowed = canAccessSocialPost(currentUser);
   const descriptionPullAllowed = canAccessDescriptionPull(currentUser);
   const proFormaAllowed = canAccessProForma(currentUser);
+  const reportsAllowed = canAccessReports(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
@@ -2812,6 +2837,7 @@ function MainNavBar({
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
+    { key: "reports", label: "Reports", path: "/reports", allowed: reportsAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
@@ -3047,6 +3073,7 @@ function PermissionsPanel({
             const socialPostPermission = getPermissionForApp(user, "socialPost");
             const descriptionPullPermission = getPermissionForApp(user, "descriptionPull");
             const proFormaPermission = getPermissionForApp(user, "proForma");
+            const reportsPermission = getPermissionForApp(user, "reports");
             const attendanceProfile = normalizeAttendanceDraft(user.attendanceProfile);
             const attendanceDraft = attendanceDrafts[user.id] || attendanceProfile;
             const attendanceMode = String(attendanceDraft.mode || "required");
@@ -3340,6 +3367,24 @@ function PermissionsPanel({
                             className={`permission-chip ${proFormaPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:proForma`}
                             onClick={() => onChangePermission(user.id, "proForma", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Reports</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-reports-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${reportsPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:reports`}
+                            onClick={() => onChangePermission(user.id, "reports", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3771,6 +3816,9 @@ function HostLaunchIcon({ type }) {
     invoice: (
       <svg {...iconProps}><path {...commonProps} d="M7 3.5h10a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path {...commonProps} d="M8.5 8h7M8.5 12h7M8.5 16h4" /><path {...commonProps} d="M15.5 18.5h2.5" /></svg>
     ),
+    reports: (
+      <svg {...iconProps}><path {...commonProps} d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1Z" /><path {...commonProps} d="M14 3.5V8h4" /><path {...commonProps} d="M9 11h6M9 14h6M9 17h4" /></svg>
+    ),
     vehicle: (
       <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
     ),
@@ -3866,7 +3914,10 @@ function HostLandingPage({
             ) : null}
               {canAccessProForma(currentUser) ? (
                <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-              ) : null}
+            ) : null}
+            {canAccessReports(currentUser) ? (
+              <HostLaunchCard icon="reports" label="Reports" description="AI client reporting" onClick={() => goTo("/reports")} />
+            ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -3965,7 +4016,10 @@ function ClientLandingPage({
             ) : null}
               {canAccessProForma(currentUser) ? (
                <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-              ) : null}
+            ) : null}
+            {canAccessReports(currentUser) ? (
+              <HostLaunchCard icon="reports" label="Reports" description="AI client reporting" onClick={() => goTo("/reports")} />
+            ) : null}
             {canAccessVanEstimator(currentUser) ? (
               <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
             ) : null}
@@ -6877,6 +6931,234 @@ function removeLineItem(lineId) {
   );
 }
 
+function formatReportsDisplayDate(isoDate = "") {
+  if (!isoDate) return "";
+  const [year, month, day] = String(isoDate || "").split("-").map(Number);
+  if (!year || !month || !day) return isoDate;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
+
+function ReportsPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const today = new Date();
+  const defaultYear = today.getFullYear();
+  const [companyName, setCompanyName] = useState("");
+  const [dateFrom, setDateFrom] = useState(`${defaultYear}-01-01`);
+  const [dateTo, setDateTo] = useState(`${defaultYear}-12-31`);
+  const [instructions, setInstructions] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const [reportText, setReportText] = useState("");
+  const [reportSource, setReportSource] = useState("");
+  const [dataset, setDataset] = useState(null);
+  const [lookupAttempts, setLookupAttempts] = useState([]);
+  const [copyState, setCopyState] = useState("");
+
+  async function generateReport(event) {
+    event.preventDefault();
+    if (!companyName.trim()) {
+      setError("Enter a company name.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError("");
+      setWarning("");
+      setCopyState("");
+      const response = await fetch("/api/reports/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName,
+          dateFrom,
+          dateTo,
+          instructions
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.detail || payload.error || "Could not generate the report.");
+      }
+      setDataset(payload.dataset || null);
+      setReportText(String(payload.report || ""));
+      setReportSource(String(payload.source || ""));
+      setWarning(String(payload.warning || ""));
+      setLookupAttempts(Array.isArray(payload.lookupAttempts) ? payload.lookupAttempts : []);
+    } catch (reportError) {
+      setDataset(null);
+      setReportText("");
+      setReportSource("");
+      setLookupAttempts([]);
+      setError(reportError.message || "Could not generate the report.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyReportText() {
+    if (!reportText.trim()) return;
+    try {
+      await navigator.clipboard.writeText(reportText);
+      setCopyState("Copied");
+      window.setTimeout(() => setCopyState(""), 2000);
+    } catch (copyError) {
+      setCopyState("Copy failed");
+      window.setTimeout(() => setCopyState(""), 2000);
+    }
+  }
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page reports-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="reports"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+
+        <section className="panel social-post-panel reports-panel">
+          <div className="reports-grid">
+            <form className="social-post-card reports-config-card" onSubmit={generateReport}>
+              <h3>Reports</h3>
+              <p className="muted-copy">Ask AI to build a client-facing report from CoreBridge orders and invoices, while keeping the factual line-item data visible underneath.</p>
+
+              <label>
+                Company name
+                <input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Avove Limited" />
+              </label>
+
+              <div className="reports-date-grid">
+                <label>
+                  Date from
+                  <input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+                </label>
+                <label>
+                  Date to
+                  <input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+                </label>
+              </div>
+
+              <label>
+                AI brief
+                <textarea
+                  rows={7}
+                  value={instructions}
+                  onChange={(event) => setInstructions(event.target.value)}
+                  placeholder="List all orders / invoices from 1st Jan 2025 to 31st Dec 2025 and their individual line items, quantities and prices."
+                />
+              </label>
+
+              <div className="reports-form-actions">
+                <button className="primary-button" type="submit" disabled={loading}>
+                  {loading ? "Creating report..." : "Create report"}
+                </button>
+              </div>
+
+              {error ? <p className="form-error">{error}</p> : null}
+              {warning ? <p className="form-warning">{warning}</p> : null}
+
+              {lookupAttempts.length ? (
+                <div className="reports-attempts">
+                  <strong>Lookup attempts</strong>
+                  <ul>
+                    {lookupAttempts.map((attempt, index) => (
+                      <li key={`${attempt.searchTerm}-${index}`}>
+                        <span>{attempt.searchTerm}</span>
+                        <small>{attempt.error ? attempt.error : `${attempt.count || 0} matches`}</small>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </form>
+
+            <div className="social-post-card reports-output-card">
+              <div className="reports-output-head">
+                <div>
+                  <h3>Generated report</h3>
+                  <p className="muted-copy">
+                    {dataset
+                      ? `${dataset.orderCount} documents, ${dataset.lineItemCount} line items, ${formatProFormaMoney(dataset.totalValue || 0)} combined value`
+                      : "Your AI-written report will appear here once you generate it."}
+                  </p>
+                </div>
+                <div className="reports-output-actions">
+                  {reportSource ? <span className={`reports-source-pill ${reportSource}`}>{reportSource === "ai" ? "Generated with AI" : "Template fallback"}</span> : null}
+                  <button className="ghost-button" type="button" onClick={copyReportText} disabled={!reportText.trim()}>
+                    {copyState || "Copy report"}
+                  </button>
+                </div>
+              </div>
+
+              <textarea
+                className="reports-output-text"
+                rows={18}
+                value={reportText}
+                readOnly
+                placeholder="The generated report will appear here."
+              />
+
+              {dataset?.entries?.length ? (
+                <div className="reports-results">
+                  <div className="reports-results-head">
+                    <h4>Source data</h4>
+                    <span>{dataset.companyName} | {formatReportsDisplayDate(dataset.dateFrom)} to {formatReportsDisplayDate(dataset.dateTo)}</span>
+                  </div>
+                  <div className="reports-order-list">
+                    {dataset.entries.map((entry) => (
+                      <article key={`${entry.reference}-${entry.id}`} className="reports-order-card">
+                        <div className="reports-order-head">
+                          <div>
+                            <strong>{entry.reference || "-"}</strong>
+                            <small>{entry.documentKind} | {formatReportsDisplayDate(entry.date)}{entry.status ? ` | ${entry.status}` : ""}</small>
+                          </div>
+                          <div className="reports-order-total">{formatProFormaMoney(entry.total || 0)}</div>
+                        </div>
+                        <div className="reports-order-meta">
+                          <span>{entry.customerName || "-"}</span>
+                          {entry.siteAddress ? <small>{entry.siteAddress}</small> : null}
+                        </div>
+                        <div className="reports-line-table">
+                          <div className="reports-line-table-head">
+                            <span>Line item</span>
+                            <span>Qty</span>
+                            <span>Unit price</span>
+                            <span>Line total</span>
+                          </div>
+                          {(entry.lineItems || []).map((line, index) => (
+                            <div key={`${entry.reference}-${index}`} className="reports-line-row">
+                              <div>
+                                <strong>{line.name || "Line item"}</strong>
+                                {line.description ? <small>{line.description}</small> : null}
+                              </div>
+                              <span>{line.quantity || 0}</span>
+                              <span>{formatProFormaMoney(line.unitPrice || 0)}</span>
+                              <span>{formatProFormaMoney(line.lineTotal || 0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
   const [template, setTemplate] = useState(cloneDefaultProFormaTemplate());
   const [selectedSection, setSelectedSection] = useState("title");
@@ -9744,6 +10026,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                         ))}
                       </div>
                     </div>
+
                   ) : null}
                   <div className="rams-emergency-grid">
                     <div className="rams-method-info-card is-red">
@@ -14862,6 +15145,7 @@ export default function App() {
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
   const isTvInstallsRoute = pathname.startsWith("/tv/installs");
+  const isReportsRoute = pathname.startsWith("/reports");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
   const isClientProFormaRoute = pathname.startsWith("/client/pro-forma");
   const isProFormaRoute = pathname.startsWith("/pro-forma") && !isProFormaTemplateRoute;
@@ -14971,6 +15255,7 @@ export default function App() {
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
   const showTvInstalls = Boolean(currentUser && canAccessBoard(currentUser) && isTvInstallsRoute);
+  const showReports = Boolean(currentUser && canAccessReports(currentUser) && isReportsRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
   const showProForma = Boolean(
     currentUser &&
@@ -14987,8 +15272,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessReports(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -15407,6 +15692,11 @@ export default function App() {
       return;
     }
 
+    if (isReportsRoute && !canAccessReports(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if ((isProFormaRoute || isClientProFormaRoute) && !canAccessProForma(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -15437,7 +15727,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isReportsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -15450,7 +15740,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isReportsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -17487,6 +17777,18 @@ export default function App() {
   if (showDescriptionPull) {
     return (
       <DescriptionPullPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showReports) {
+    return (
+      <ReportsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
