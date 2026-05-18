@@ -1449,7 +1449,7 @@ function lastWeekdayOfMonth(year, month, weekday) {
   const last = new Date(Date.UTC(year, month + 1, 0));
   const lastWeekday = last.getUTCDay();
   const delta = (lastWeekday - weekday + 7) % 7;
-  return new Date(Date.UTC(year, month + 1, last.getUTCDate() - delta));
+  return new Date(Date.UTC(year, month, last.getUTCDate() - delta));
 }
 
 function getEasterSunday(year) {
