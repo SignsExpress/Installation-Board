@@ -2105,6 +2105,15 @@ function escapePdfText(value) {
     .replace(/\)/g, "\\)");
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function wrapPdfText(value, maxLength = 78) {
   const words = String(value || "").split(/\s+/).filter(Boolean);
   if (!words.length) return [""];
