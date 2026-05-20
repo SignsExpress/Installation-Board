@@ -15081,6 +15081,319 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications, aeroEnabled,
   );
 }
 
+const EMPTY_CREDIT_REFERENCE = {
+  tradingName: "",
+  address: "",
+  postCode: "",
+  email: ""
+};
+
+const EMPTY_CREDIT_APPLICATION_FORM = {
+  companyName: "",
+  tradingName: "",
+  address: "",
+  postCode: "",
+  telephone: "",
+  companyRegNo: "",
+  vatNo: "",
+  contactName: "",
+  email: "",
+  references: [{ ...EMPTY_CREDIT_REFERENCE }, { ...EMPTY_CREDIT_REFERENCE }],
+  declarationName: "",
+  position: "",
+  signatureName: "",
+  acceptedCancellationNotice: false
+};
+
+function CreditApplicationPage() {
+  const [form, setForm] = useState(EMPTY_CREDIT_APPLICATION_FORM);
+  const [supportingDocument, setSupportingDocument] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  function updateReference(index, field, value) {
+    setForm((current) => ({
+      ...current,
+      references: current.references.map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )
+    }));
+  }
+
+  async function submitCreditApplication(event) {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const payload = {
+        ...form,
+        references: form.references.map((entry) => ({ ...entry }))
+      };
+      if (supportingDocument) {
+        payload.supportingDocument = {
+          originalName: supportingDocument.name,
+          dataUrl: await readFileAsDataUrl(supportingDocument)
+        };
+      }
+
+      const response = await fetch("/api/credit-applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const responsePayload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(responsePayload.error || "Could not submit the credit application.");
+      }
+      setSubmitted(true);
+    } catch (submitError) {
+      console.error(submitError);
+      setError(submitError.message || "Could not submit the credit application.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="credit-application-shell">
+      <div className="credit-application-page">
+        <section className="credit-application-hero">
+          <img src="/branding/signs-express-logo.svg" alt="Signs Express" className="credit-application-logo" />
+          <div>
+            <span className="panel-kicker">Customer form</span>
+            <h1>Credit account application</h1>
+            <p>
+              Complete the form below and we’ll send the finished application to our accounts team as a PDF for review.
+            </p>
+          </div>
+        </section>
+
+        <section className="panel credit-application-panel">
+          {submitted ? (
+            <div className="credit-application-success">
+              <h2>Application sent</h2>
+              <p>
+                Thank you. Your credit application has been submitted to Signs Express Central Lancashire &amp; Southport
+                and sent to our accounts team for review.
+              </p>
+            </div>
+          ) : (
+            <form className="credit-application-form" onSubmit={submitCreditApplication}>
+              <div className="credit-application-section-head">
+                <h2>Company details</h2>
+                <p>Please complete all required fields so we can review the application quickly.</p>
+              </div>
+
+              <div className="credit-application-grid">
+                <label>
+                  Company name
+                  <input
+                    type="text"
+                    value={form.companyName}
+                    onChange={(event) => setForm((current) => ({ ...current, companyName: event.target.value }))}
+                    placeholder="Registered company name"
+                  />
+                </label>
+                <label>
+                  Trading name *
+                  <input
+                    type="text"
+                    value={form.tradingName}
+                    onChange={(event) => setForm((current) => ({ ...current, tradingName: event.target.value }))}
+                    placeholder="Trading name"
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  Address *
+                  <textarea
+                    value={form.address}
+                    onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+                    placeholder="Company address"
+                    required
+                  />
+                </label>
+                <label>
+                  Post code *
+                  <input
+                    type="text"
+                    value={form.postCode}
+                    onChange={(event) => setForm((current) => ({ ...current, postCode: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Telephone *
+                  <input
+                    type="text"
+                    value={form.telephone}
+                    onChange={(event) => setForm((current) => ({ ...current, telephone: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Company reg no
+                  <input
+                    type="text"
+                    value={form.companyRegNo}
+                    onChange={(event) => setForm((current) => ({ ...current, companyRegNo: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  VAT no
+                  <input
+                    type="text"
+                    value={form.vatNo}
+                    onChange={(event) => setForm((current) => ({ ...current, vatNo: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Contact name *
+                  <input
+                    type="text"
+                    value={form.contactName}
+                    onChange={(event) => setForm((current) => ({ ...current, contactName: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Email *
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="credit-application-section-head">
+                <h3>Trade references</h3>
+                <p>Please provide two trade references.</p>
+              </div>
+
+              <div className="credit-application-reference-grid">
+                {form.references.map((reference, index) => (
+                  <section key={`reference-${index}`} className="credit-reference-card">
+                    <h4>Reference {index + 1}</h4>
+                    <label>
+                      Trading name
+                      <input
+                        type="text"
+                        value={reference.tradingName}
+                        onChange={(event) => updateReference(index, "tradingName", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Address
+                      <textarea
+                        value={reference.address}
+                        onChange={(event) => updateReference(index, "address", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Post code
+                      <input
+                        type="text"
+                        value={reference.postCode}
+                        onChange={(event) => updateReference(index, "postCode", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Email
+                      <input
+                        type="email"
+                        value={reference.email}
+                        onChange={(event) => updateReference(index, "email", event.target.value)}
+                      />
+                    </label>
+                  </section>
+                ))}
+              </div>
+
+              <div className="credit-application-section-head">
+                <h3>Declaration</h3>
+                <p>
+                  By submitting this form, you confirm that the information provided is accurate and that your credit
+                  terms are made within 30 days of invoice date.
+                </p>
+              </div>
+
+              <div className="credit-application-grid">
+                <label>
+                  Name *
+                  <input
+                    type="text"
+                    value={form.declarationName}
+                    onChange={(event) => setForm((current) => ({ ...current, declarationName: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Position *
+                  <input
+                    type="text"
+                    value={form.position}
+                    onChange={(event) => setForm((current) => ({ ...current, position: event.target.value }))}
+                    required
+                  />
+                </label>
+                <label className="span-2">
+                  Signed *
+                  <input
+                    type="text"
+                    value={form.signatureName}
+                    onChange={(event) => setForm((current) => ({ ...current, signatureName: event.target.value }))}
+                    placeholder="Type your full name as your signature"
+                    required
+                  />
+                </label>
+              </div>
+
+              <div className="credit-application-supporting">
+                <label className="credit-application-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.acceptedCancellationNotice}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, acceptedCancellationNotice: event.target.checked }))
+                    }
+                    required
+                  />
+                  <span>
+                    I have read and accept the <a href="/branding/cancellation-fee-notice.pdf" target="_blank" rel="noreferrer">cancellation fee notice</a>. *
+                  </span>
+                </label>
+
+                <label>
+                  Company letterhead / supporting document *
+                  <input
+                    type="file"
+                    accept=".pdf,image/png,image/jpeg,image/webp"
+                    onChange={(event) => setSupportingDocument(event.target.files?.[0] || null)}
+                    required
+                  />
+                  <small>Attach a copy of your company letterhead or supporting document.</small>
+                </label>
+              </div>
+
+              {error ? <div className="flash error">{error}</div> : null}
+
+              <div className="credit-application-actions">
+                <button className="primary-button" type="submit" disabled={submitting}>
+                  {submitting ? "Submitting..." : "Submit credit application"}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
@@ -15095,6 +15408,7 @@ export default function App() {
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
+  const isCreditApplicationRoute = pathname.startsWith("/credit-application");
   const isTvInstallsRoute = pathname.startsWith("/tv/installs");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
   const isClientProFormaRoute = pathname.startsWith("/client/pro-forma");
@@ -15671,7 +15985,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -15684,7 +15998,7 @@ export default function App() {
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -17511,6 +17825,10 @@ export default function App() {
       return;
     }
     editJob(job);
+  }
+
+  if (isCreditApplicationRoute) {
+    return <CreditApplicationPage />;
   }
 
   if (!authChecked) {

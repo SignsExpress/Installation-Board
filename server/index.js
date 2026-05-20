@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const webPush = require("web-push");
+const nodemailer = require("nodemailer");
 const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const path = require("node:path");
@@ -48,6 +49,11 @@ const PUSH_VAPID_SUBJECT = String(process.env.PUSH_VAPID_SUBJECT || "mailto:port
 const PUSH_VAPID_PUBLIC_KEY_ENV = String(process.env.PUSH_VAPID_PUBLIC_KEY || "").trim();
 const PUSH_VAPID_PRIVATE_KEY_ENV = String(process.env.PUSH_VAPID_PRIVATE_KEY || "").trim();
 let cachedPushKeys = null;
+const CREDIT_APPLICATION_TO = "accounts.preston@signs-express.co.uk";
+const CREDIT_APPLICATION_CC = [
+  "matt.rutlidge@signs-express.co.uk",
+  "tom.van-boyd@signs-express.co.uk"
+];
 
 const weekdayFormatter = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: TIME_ZONE });
 const longDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -5186,6 +5192,138 @@ function looksLikeEmail(value = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function sanitizeCreditApplicationText(value, maxLength = 400) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeCreditApplicationMultiLine(value, maxLength = 1200) {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line, index, list) => line || (index > 0 && list[index - 1]))
+    .join("\n")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function sanitizeCreditReference(payload = {}) {
+  return {
+    tradingName: sanitizeCreditApplicationText(payload.tradingName, 180),
+    address: sanitizeCreditApplicationMultiLine(payload.address, 800),
+    postCode: sanitizeCreditApplicationText(payload.postCode, 40),
+    email: sanitizeCreditApplicationText(payload.email, 180)
+  };
+}
+
+function sanitizeCreditApplicationPayload(payload = {}) {
+  return {
+    companyName: sanitizeCreditApplicationText(payload.companyName, 180),
+    tradingName: sanitizeCreditApplicationText(payload.tradingName, 180),
+    address: sanitizeCreditApplicationMultiLine(payload.address, 1200),
+    postCode: sanitizeCreditApplicationText(payload.postCode, 40),
+    telephone: sanitizeCreditApplicationText(payload.telephone, 60),
+    companyRegNo: sanitizeCreditApplicationText(payload.companyRegNo, 80),
+    vatNo: sanitizeCreditApplicationText(payload.vatNo, 80),
+    contactName: sanitizeCreditApplicationText(payload.contactName, 140),
+    email: sanitizeCreditApplicationText(payload.email, 180),
+    references: Array.isArray(payload.references)
+      ? payload.references.slice(0, 2).map((entry) => sanitizeCreditReference(entry))
+      : [],
+    declarationName: sanitizeCreditApplicationText(payload.declarationName, 140),
+    position: sanitizeCreditApplicationText(payload.position, 120),
+    signatureName: sanitizeCreditApplicationText(payload.signatureName, 140),
+    acceptedCancellationNotice:
+      payload.acceptedCancellationNotice === true ||
+      String(payload.acceptedCancellationNotice || "").trim().toLowerCase() === "true" ||
+      String(payload.acceptedCancellationNotice || "").trim() === "1",
+    submittedAt: new Date().toISOString()
+  };
+}
+
+function validateCreditApplication(application) {
+  const missing = [];
+  if (!application.tradingName) missing.push("Trading name");
+  if (!application.address) missing.push("Address");
+  if (!application.postCode) missing.push("Post code");
+  if (!application.telephone) missing.push("Telephone");
+  if (!application.contactName) missing.push("Contact name");
+  if (!application.email || !looksLikeEmail(application.email)) missing.push("Valid email");
+  if (!application.declarationName) missing.push("Declaration name");
+  if (!application.position) missing.push("Position");
+  if (!application.signatureName) missing.push("Signature");
+  if (!application.acceptedCancellationNotice) missing.push("Cancellation notice acceptance");
+  return missing;
+}
+
+function buildCreditApplicationPdf(application) {
+  const references = Array.isArray(application.references) ? application.references : [];
+  const lines = [
+    { text: "Company details", bold: true, size: 12, gap: 4 },
+    `Company name: ${sanitizePdfLine(application.companyName || application.tradingName)}`,
+    `Trading name: ${sanitizePdfLine(application.tradingName)}`,
+    `Address: ${sanitizePdfLine(application.address.replace(/\n+/g, ", "))}`,
+    `Post code: ${sanitizePdfLine(application.postCode)}`,
+    `Telephone: ${sanitizePdfLine(application.telephone)}`,
+    `Company reg no: ${sanitizePdfLine(application.companyRegNo)}`,
+    `VAT no: ${sanitizePdfLine(application.vatNo)}`,
+    `Contact name: ${sanitizePdfLine(application.contactName)}`,
+    `Email: ${sanitizePdfLine(application.email)}`,
+    "__GAP__",
+    { text: "Trade references", bold: true, size: 12, gap: 4 }
+  ];
+
+  references.forEach((reference, index) => {
+    lines.push({ text: `Reference ${index + 1}`, bold: true, gap: 2 });
+    lines.push(`Trading name: ${sanitizePdfLine(reference.tradingName)}`);
+    lines.push(`Address: ${sanitizePdfLine(String(reference.address || "").replace(/\n+/g, ", "))}`);
+    lines.push(`Post code: ${sanitizePdfLine(reference.postCode)}`);
+    lines.push(`Email: ${sanitizePdfLine(reference.email)}`);
+    lines.push("__GAP__");
+  });
+
+  lines.push(
+    { text: "Declaration", bold: true, size: 12, gap: 4 },
+    "We make this application to open a credit account on the understanding that payment terms are made within 30 days of invoice date.",
+    `Name: ${sanitizePdfLine(application.declarationName)}`,
+    `Position: ${sanitizePdfLine(application.position)}`,
+    `Signed: ${sanitizePdfLine(application.signatureName)}`,
+    `Accepted cancellation fee notice: ${application.acceptedCancellationNotice ? "Yes" : "No"}`,
+    `Submitted: ${formatDateTimeForPdf(application.submittedAt)}`
+  );
+
+  return buildSimpleTextPdf(`Credit Application - ${application.tradingName || application.companyName || "Customer"}`, lines);
+}
+
+function getCreditApplicationTransportConfig() {
+  const host = String(process.env.SMTP_HOST || "").trim();
+  const user = String(process.env.SMTP_USER || "").trim();
+  const pass = String(process.env.SMTP_PASS || "").trim();
+  if (!host || !user || !pass) return null;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const secure = String(process.env.SMTP_SECURE || "").trim()
+    ? /^(1|true|yes)$/i.test(String(process.env.SMTP_SECURE || "").trim())
+    : port === 465;
+  return {
+    host,
+    port,
+    secure,
+    auth: { user, pass }
+  };
+}
+
+function getCreditApplicationFromAddress() {
+  const configured = String(process.env.SMTP_FROM || "").trim();
+  if (configured) return configured;
+  return `SX Portal <${String(process.env.SMTP_USER || "").trim() || CREDIT_APPLICATION_TO}>`;
+}
+
 function pickBestCoreBridgeEmail(flatRecord) {
   const contactRoleLocatorEmail = pickMatchingValue(flatRecord, (key, value) => {
     const normalizedKey = String(key || "").toLowerCase();
@@ -8346,6 +8484,131 @@ function createServer() {
         clockOut: nextEntry?.clockOut || ""
       }
     });
+  });
+
+  app.post("/api/credit-applications", async (request, response) => {
+    try {
+      const application = sanitizeCreditApplicationPayload(request.body || {});
+      const missing = validateCreditApplication(application);
+      if (missing.length) {
+        response.status(400).json({ error: `Please complete: ${missing.join(", ")}.` });
+        return;
+      }
+
+      const supportingDocumentRaw = request.body?.supportingDocument;
+      const supportingDocument =
+        supportingDocumentRaw && typeof supportingDocumentRaw === "object" && !Array.isArray(supportingDocumentRaw)
+          ? supportingDocumentRaw
+          : null;
+      const supportingDataUrl = String(supportingDocument?.dataUrl || "").trim();
+      const supportingName = sanitizeCreditApplicationText(
+        supportingDocument?.originalName || supportingDocument?.fileName || "supporting-document",
+        180
+      );
+      const supportingDecoded = supportingDataUrl ? decodeDataUrl(supportingDataUrl) : null;
+      if (!supportingDecoded) {
+        response.status(400).json({ error: "Please attach a company letterhead or supporting document." });
+        return;
+      }
+
+      const allowedAttachmentTypes = new Set([
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+        "image/webp"
+      ]);
+      if (!allowedAttachmentTypes.has(String(supportingDecoded.contentType || "").toLowerCase())) {
+        response.status(400).json({ error: "The supporting document must be a PDF, PNG, JPG or WEBP file." });
+        return;
+      }
+
+      const transportConfig = getCreditApplicationTransportConfig();
+      if (!transportConfig) {
+        response.status(500).json({ error: "Email is not configured yet. Please set SMTP details on the server." });
+        return;
+      }
+
+      const pdfBuffer = buildCreditApplicationPdf(application);
+      const safeCompany = String(application.tradingName || application.companyName || "customer")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "customer";
+      const submittedDate = String(application.submittedAt || "").slice(0, 10) || toIsoDate(getTodayInLondon());
+      const pdfFileName = `credit-application-${safeCompany}-${submittedDate}.pdf`;
+
+      const htmlReferences = (application.references || [])
+        .map((reference, index) => {
+          const addressHtml = String(reference.address || "")
+            .split("\n")
+            .filter(Boolean)
+            .map((line) => escapeHtml(line))
+            .join("<br />");
+          return `
+            <div style="margin:12px 0 16px;">
+              <strong>Reference ${index + 1}</strong><br />
+              Trading name: ${escapeHtml(reference.tradingName || "-")}<br />
+              Address: ${addressHtml || "-"}<br />
+              Post code: ${escapeHtml(reference.postCode || "-")}<br />
+              Email: ${escapeHtml(reference.email || "-")}
+            </div>
+          `;
+        })
+        .join("");
+
+      const transporter = nodemailer.createTransport(transportConfig);
+      await transporter.sendMail({
+        from: getCreditApplicationFromAddress(),
+        to: CREDIT_APPLICATION_TO,
+        cc: CREDIT_APPLICATION_CC.join(", "),
+        replyTo: application.email,
+        subject: `Credit application - ${application.tradingName || application.companyName || "Customer"}`,
+        text: [
+          `A new credit application has been submitted for ${application.tradingName || application.companyName || "Customer"}.`,
+          "",
+          `Contact: ${application.contactName}`,
+          `Email: ${application.email}`,
+          `Telephone: ${application.telephone}`,
+          "",
+          "The completed application PDF is attached."
+        ].join("\n"),
+        html: `
+          <div style="font-family:Arial,Helvetica,sans-serif;color:#0f172a;line-height:1.5;">
+            <h2 style="margin:0 0 16px;color:#5f3c74;">New credit application</h2>
+            <p><strong>Trading name:</strong> ${escapeHtml(application.tradingName || "-")}<br />
+            <strong>Company name:</strong> ${escapeHtml(application.companyName || application.tradingName || "-")}<br />
+            <strong>Contact:</strong> ${escapeHtml(application.contactName || "-")}<br />
+            <strong>Email:</strong> ${escapeHtml(application.email || "-")}<br />
+            <strong>Telephone:</strong> ${escapeHtml(application.telephone || "-")}</p>
+            <p><strong>Address:</strong><br />${String(application.address || "")
+              .split("\n")
+              .filter(Boolean)
+              .map((line) => escapeHtml(line))
+              .join("<br />")}</p>
+            <div>${htmlReferences}</div>
+            <p><strong>Cancellation fee notice accepted:</strong> ${application.acceptedCancellationNotice ? "Yes" : "No"}</p>
+            <p>The completed application PDF and supporting document are attached.</p>
+          </div>
+        `,
+        attachments: [
+          {
+            filename: pdfFileName,
+            content: pdfBuffer,
+            contentType: "application/pdf"
+          },
+          {
+            filename: supportingName || `supporting-document${extensionForContentType(supportingDecoded.contentType)}`,
+            content: supportingDecoded.buffer,
+            contentType: supportingDecoded.contentType
+          }
+        ]
+      });
+
+      response.status(201).json({ ok: true });
+    } catch (error) {
+      console.error("Could not submit credit application.", error);
+      response.status(500).json({ error: error.message || "Could not submit the credit application." });
+    }
   });
 
   app.get("/api/auth/users", async (request, response) => {
