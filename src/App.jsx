@@ -2362,6 +2362,14 @@ function getPermissionForApp(user, key) {
       ? user?.role === "host"
         ? "admin"
         : "user"
+      : key === "designBoard"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
+      : key === "filtering"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : key === "vanEstimator"
         ? "none"
       : key === "rams"
@@ -2399,6 +2407,26 @@ function canAccessBoard(user) {
 function canEditBoard(user) {
   if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "board") === "admin";
+}
+
+function canAccessDesignBoard(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "designBoard") !== "none";
+}
+
+function canEditDesignBoard(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "designBoard") === "admin";
+}
+
+function canAccessFiltering(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "filtering") !== "none";
+}
+
+function canEditFiltering(user) {
+  if (user?.canManagePermissions) return true;
+  return getPermissionForApp(user, "filtering") === "admin";
 }
 
 function canAccessInstaller(user) {
@@ -2499,7 +2527,7 @@ function canEditProForma(user) {
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canEditDesignBoard(user) || canEditFiltering(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
   );
 }
 
@@ -2509,6 +2537,14 @@ function getHomePathForUser(user) {
 
 function getBoardPathForUser(user) {
   return canEditBoard(user) ? "/board" : "/client/board";
+}
+
+function getDesignBoardPathForUser(user) {
+  return canEditDesignBoard(user) ? "/design-board" : "/client/design-board";
+}
+
+function getFilteringPathForUser(user) {
+  return canEditFiltering(user) ? "/filtering" : "/client/filtering";
 }
 
 function getProFormaPathForUser(user) {
@@ -2776,6 +2812,8 @@ function MainNavBar({
   }
 
   const boardAllowed = canAccessBoard(currentUser);
+  const designBoardAllowed = canAccessDesignBoard(currentUser);
+  const filteringAllowed = canAccessFiltering(currentUser);
   const attendanceAllowed = canAccessAttendance(currentUser);
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
@@ -2788,6 +2826,8 @@ function MainNavBar({
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
+  const designBoardPath = getDesignBoardPathForUser(currentUser);
+  const filteringPath = getFilteringPathForUser(currentUser);
   const attendancePath = "/attendance";
   const holidaysPath = "/holidays";
   const mileagePath = "/mileage";
@@ -2803,6 +2843,8 @@ function MainNavBar({
   const primaryNavItems = [
     { key: "home", label: "Home", path: homePath, allowed: true },
     { key: "board", label: "Installation Board", path: boardPath, allowed: boardAllowed },
+    { key: "design-board", label: "Design Board", path: designBoardPath, allowed: designBoardAllowed },
+    { key: "filtering", label: "Filtering", path: filteringPath, allowed: filteringAllowed },
     { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
     { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
@@ -3037,6 +3079,8 @@ function PermissionsPanel({
             const isSelf = user.id === currentUser.id;
             const permissionsLocked = Boolean(user.canManagePermissions);
             const boardPermission = getPermissionForApp(user, "board");
+            const designBoardPermission = getPermissionForApp(user, "designBoard");
+            const filteringPermission = getPermissionForApp(user, "filtering");
             const holidaysPermission = getPermissionForApp(user, "holidays");
             const installerPermission = getPermissionForApp(user, "installer");
             const attendancePermission = getPermissionForApp(user, "attendance");
@@ -3160,6 +3204,42 @@ function PermissionsPanel({
                             className={`permission-chip ${boardPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:board`}
                             onClick={() => onChangePermission(user.id, "board", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Design Board</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-designBoard-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${designBoardPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:designBoard`}
+                            onClick={() => onChangePermission(user.id, "designBoard", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Filtering</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-filtering-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${filteringPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:filtering`}
+                            onClick={() => onChangePermission(user.id, "filtering", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -3780,6 +3860,12 @@ function HostLaunchIcon({ type }) {
     board: (
       <svg {...iconProps}><path {...commonProps} d="M4 5h16v14H4z" /><path {...commonProps} d="M8 5v14M4 10h16M4 15h16" /></svg>
     ),
+    design: (
+      <svg {...iconProps}><path {...commonProps} d="M5 18 18.5 4.5a1.8 1.8 0 0 1 2.5 2.5L7.5 20.5 4 21l.5-3.5Z" /><path {...commonProps} d="m14 6 4 4" /></svg>
+    ),
+    filtering: (
+      <svg {...iconProps}><path {...commonProps} d="M4 6h16" /><path {...commonProps} d="M7 12h10" /><path {...commonProps} d="M10 18h4" /></svg>
+    ),
     permissions: (
       <svg {...iconProps}><path {...commonProps} d="M12 3 5.5 6v5.2c0 4.1 2.6 7.8 6.5 9.3 3.9-1.5 6.5-5.2 6.5-9.3V6L12 3Z" /><path {...commonProps} d="m9 12 2 2 4-5" /></svg>
     )
@@ -3824,6 +3910,8 @@ function HostLandingPage({
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const proFormaPath = getProFormaPathForUser(currentUser);
+  const designBoardPath = getDesignBoardPathForUser(currentUser);
+  const filteringPath = getFilteringPathForUser(currentUser);
 
   function goTo(path) {
     window.location.assign(path);
@@ -3876,6 +3964,12 @@ function HostLandingPage({
             {canAccessBoard(currentUser) ? (
               <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
             ) : null}
+            {canAccessDesignBoard(currentUser) ? (
+              <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
+            ) : null}
+            {canAccessFiltering(currentUser) ? (
+              <HostLaunchCard icon="filtering" label="Filtering" description="Approved artwork holding" onClick={() => goTo(filteringPath)} />
+            ) : null}
             {currentUser?.canManagePermissions ? (
               <HostLaunchCard icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} />
             ) : null}
@@ -3923,6 +4017,8 @@ function ClientLandingPage({
   onToggleAero
 }) {
   const proFormaPath = getProFormaPathForUser(currentUser);
+  const designBoardPath = getDesignBoardPathForUser(currentUser);
+  const filteringPath = getFilteringPathForUser(currentUser);
 
   function goTo(path) {
     window.location.assign(path);
@@ -3974,6 +4070,12 @@ function ClientLandingPage({
             ) : null}
             {canAccessBoard(currentUser) ? (
               <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
+            ) : null}
+            {canAccessDesignBoard(currentUser) ? (
+              <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
+            ) : null}
+            {canAccessFiltering(currentUser) ? (
+              <HostLaunchCard icon="filtering" label="Filtering" description="Approved artwork holding" onClick={() => goTo(filteringPath)} />
             ) : null}
           </div>
         </section>
@@ -7578,6 +7680,550 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
               </div>
             </div>
           </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function getDesignBoardEditDraft(card) {
+  return {
+    customerName: card?.customerName || "",
+    description: card?.description || "",
+    contact: card?.contact || "",
+    contactEmail: card?.contactEmail || "",
+    address: card?.address || "",
+    siteAddress: card?.siteAddress || "",
+    billingAddress: card?.billingAddress || "",
+    notes: card?.notes || "",
+    designerNote: card?.designerNote || "",
+    items: Array.isArray(card?.items)
+      ? card.items.map((item, index) => ({
+          id: item.id || `design-item-${index + 1}`,
+          name: item.name || "",
+          description: item.description || "",
+          quantity: item.quantity || ""
+        }))
+      : []
+  };
+}
+
+function getDesignBoardCardClassName(card) {
+  const classNames = ["design-board-card"];
+  if (card?.isAmendments) classNames.push("is-amendments");
+  else classNames.push("is-new-artwork");
+  if (card?.isAwaitingSignOff) classNames.push("is-awaiting");
+  if (card?.isOverdue) classNames.push("is-overdue");
+  if (card?.approvedAt) classNames.push("is-approved");
+  return classNames.join(" ");
+}
+
+function DesignBoardColumn({
+  title,
+  subtitle = "",
+  cards = [],
+  editable = false,
+  droppable = false,
+  onDropCard,
+  onCardAction,
+  onEditCard,
+  onDeleteCard,
+  onDragCardStart
+}) {
+  return (
+    <section
+      className={`design-board-column${droppable ? " is-droppable" : ""}`}
+      onDragOver={droppable ? (event) => event.preventDefault() : undefined}
+      onDrop={droppable ? (event) => {
+        event.preventDefault();
+        const cardId = event.dataTransfer.getData("text/plain");
+        if (cardId) onDropCard?.(cardId);
+      } : undefined}
+    >
+      <header className="design-board-column-head">
+        <div>
+          <h3>{title}</h3>
+          {subtitle ? <p>{subtitle}</p> : null}
+        </div>
+        <span className="design-board-count">{cards.length}</span>
+      </header>
+      <div className="design-board-column-body">
+        {cards.length ? cards.map((card) => (
+          <article
+            key={card.id}
+            className={getDesignBoardCardClassName(card)}
+            draggable={editable && !card.isAwaitingSignOff}
+            onDragStart={editable && !card.isAwaitingSignOff ? (event) => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("text/plain", card.id);
+              onDragCardStart?.(card.id);
+            } : undefined}
+          >
+            <div className="design-board-card-head">
+              <div>
+                <strong>{card.orderReference}</strong>
+                <span>{card.customerName || "Customer not set"}</span>
+              </div>
+              <div className="design-board-card-actions">
+                {editable ? (
+                  <>
+                    {card.isAwaitingSignOff ? (
+                      <>
+                        <button type="button" className="ghost-button" onClick={() => onCardAction?.(card, "amendments")}>Amendments required</button>
+                        <button type="button" className="primary-button" onClick={() => onCardAction?.(card, "approve")}>Approved</button>
+                      </>
+                    ) : (
+                      <button type="button" className="primary-button" onClick={() => onCardAction?.(card, "artwork-complete")}>Artwork complete</button>
+                    )}
+                    <button type="button" className="ghost-button" onClick={() => onEditCard?.(card)}>Edit</button>
+                    <button type="button" className="ghost-button danger" onClick={() => onDeleteCard?.(card)}>Delete</button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="design-board-card-body">
+              <p className="design-board-card-description">{card.description || "No design description added yet."}</p>
+              <dl className="design-board-card-meta">
+                <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
+                {card.contact ? <div><dt>Contact</dt><dd>{card.contact}</dd></div> : null}
+                {card.contactEmail ? <div><dt>Email</dt><dd>{card.contactEmail}</dd></div> : null}
+                {card.scheduledDate ? <div><dt>Planned</dt><dd>{formatProFormaDate(card.scheduledDate)}</dd></div> : null}
+              </dl>
+              {card.designerNote ? <p className="design-board-designer-note">{card.designerNote}</p> : null}
+              {Array.isArray(card.items) && card.items.length ? (
+                <ul className="design-board-items">
+                  {card.items.map((item) => (
+                    <li key={item.id}>
+                      <strong>{item.name || "Item"}</strong>
+                      <span>{item.quantity ? `Qty ${item.quantity}` : ""}</span>
+                      {item.description ? <small>{item.description}</small> : null}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          </article>
+        )) : <div className="design-board-empty">No cards here.</div>}
+      </div>
+    </section>
+  );
+}
+
+function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const [board, setBoard] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [orderReference, setOrderReference] = useState("");
+  const [settingsHours, setSettingsHours] = useState("48");
+  const [savingKey, setSavingKey] = useState("");
+  const [editingCardId, setEditingCardId] = useState("");
+  const [editDraft, setEditDraft] = useState(null);
+  const editable = canEditDesignBoard(currentUser);
+
+  const editingCard = useMemo(
+    () => board?.cards?.find((card) => card.id === editingCardId) || null,
+    [board, editingCardId]
+  );
+
+  async function loadBoard() {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/design-board");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not load the design board.");
+      setBoard(payload);
+      setSettingsHours(String(payload?.settings?.signOffFollowUpHours || 48));
+      setError("");
+    } catch (loadError) {
+      setError(loadError.message || "Could not load the design board.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadBoard();
+  }, []);
+
+  useEffect(() => {
+    if (editingCard) {
+      setEditDraft(getDesignBoardEditDraft(editingCard));
+    } else {
+      setEditDraft(null);
+    }
+  }, [editingCard]);
+
+  async function updateBoardRequest(url, options = {}, nextInfo = "") {
+    try {
+      setSavingKey(url);
+      const response = await fetch(url, options);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not save the design board change.");
+      const nextBoard = payload.board || payload;
+      setBoard(nextBoard);
+      setSettingsHours(String(nextBoard?.settings?.signOffFollowUpHours || settingsHours || 48));
+      if (nextInfo) setInfo(nextInfo);
+      setError("");
+      return payload;
+    } catch (requestError) {
+      setError(requestError.message || "Could not save the design board change.");
+      throw requestError;
+    } finally {
+      setSavingKey("");
+    }
+  }
+
+  async function handlePull(event) {
+    event.preventDefault();
+    const reference = String(orderReference || "").trim();
+    if (!reference) {
+      setError("Enter an ORD or EST reference.");
+      return;
+    }
+    await updateBoardRequest("/api/design-board/pull", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderReference: reference })
+    }, `Pulled ${reference}`);
+    setOrderReference("");
+  }
+
+  async function handleSaveSettings() {
+    await updateBoardRequest("/api/design-board/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signOffFollowUpHours: Number(settingsHours) || 48 })
+    }, "Updated sign-off chase timing");
+  }
+
+  async function patchCard(card, patch, nextInfo = "Updated card") {
+    await updateBoardRequest(`/api/design-board/cards/${card.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch)
+    }, nextInfo);
+  }
+
+  async function moveCard(card, laneType, isoDate = "") {
+    const patch = {};
+    if (laneType === "new") {
+      patch.scheduledDate = "";
+      patch.status = "new";
+    } else if (laneType === "unallocated") {
+      patch.scheduledDate = "";
+    } else if (laneType === "day") {
+      patch.scheduledDate = isoDate;
+      if (card.status === "new") patch.status = "scheduled";
+    } else {
+      return;
+    }
+    const unchanged = String(card.scheduledDate || "") === String(patch.scheduledDate || "")
+      && (!patch.status || String(card.status || "") === String(patch.status || ""));
+    if (!unchanged) {
+      await patchCard(card, patch, "Moved card");
+    }
+  }
+
+  async function handleCardAction(card, action) {
+    if (action === "artwork-complete") {
+      await updateBoardRequest(`/api/design-board/cards/${card.id}/artwork-complete`, { method: "POST" }, "Moved to Awaiting Sign-Off");
+      return;
+    }
+    if (action === "amendments") {
+      await updateBoardRequest(`/api/design-board/cards/${card.id}/amendments`, { method: "POST" }, "Returned for amendments");
+      return;
+    }
+    if (action === "approve") {
+      await updateBoardRequest(`/api/design-board/cards/${card.id}/approve`, { method: "POST" }, "Sent to Filtering");
+    }
+  }
+
+  async function handleDeleteCard(card) {
+    if (!window.confirm(`Delete ${card.orderReference}?`)) return;
+    await updateBoardRequest(`/api/design-board/cards/${card.id}`, { method: "DELETE" }, "Deleted card");
+    if (editingCardId === card.id) setEditingCardId("");
+  }
+
+  async function handleSaveEdit() {
+    if (!editingCard || !editDraft) return;
+    await patchCard(editingCard, { ...editDraft, items: editDraft.items }, "Saved card changes");
+    setEditingCardId("");
+  }
+
+  const lanes = board?.lanes || { newOrders: [], unallocated: [], awaitingSignOff: [], days: {} };
+  const days = board?.days || [];
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page design-board-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="design-board"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+
+        <section className="panel design-board-panel">
+          <div className="design-board-toolbar">
+            <div>
+              <h2>Design Board</h2>
+              <p>Pull artwork jobs, drag them into the week, and move approved work into Filtering.</p>
+            </div>
+            {editable ? (
+              <form className="design-board-toolbar-actions" onSubmit={handlePull}>
+                <input
+                  value={orderReference}
+                  onChange={(event) => setOrderReference(event.target.value)}
+                  placeholder="ORD-3379 or EST-3379"
+                />
+                <button className="primary-button" type="submit" disabled={savingKey === "/api/design-board/pull"}>
+                  {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull order"}
+                </button>
+                <label className="design-board-setting">
+                  <span>Red pulse after (hours)</span>
+                  <input value={settingsHours} onChange={(event) => setSettingsHours(event.target.value)} inputMode="numeric" />
+                </label>
+                <button className="ghost-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
+                  Save setting
+                </button>
+              </form>
+            ) : null}
+          </div>
+
+          {error ? <p className="form-error">{error}</p> : null}
+          {!error && info ? <p className="form-success">{info}</p> : null}
+
+          {loading ? (
+            <div className="design-board-empty">Loading design board...</div>
+          ) : (
+            <div className="design-board-columns">
+              <DesignBoardColumn
+                title="New Orders"
+                subtitle="Newly created design jobs start here."
+                cards={lanes.newOrders}
+                editable={editable}
+                droppable={editable}
+                onDropCard={async (cardId) => {
+                  const card = board?.cards?.find((entry) => entry.id === cardId);
+                  if (card) await moveCard(card, "new");
+                }}
+                onCardAction={handleCardAction}
+                onEditCard={(card) => setEditingCardId(card.id)}
+                onDeleteCard={handleDeleteCard}
+              />
+              <DesignBoardColumn
+                title="Unallocated"
+                subtitle="Past or unscheduled work lands here."
+                cards={lanes.unallocated}
+                editable={editable}
+                droppable={editable}
+                onDropCard={async (cardId) => {
+                  const card = board?.cards?.find((entry) => entry.id === cardId);
+                  if (card) await moveCard(card, "unallocated");
+                }}
+                onCardAction={handleCardAction}
+                onEditCard={(card) => setEditingCardId(card.id)}
+                onDeleteCard={handleDeleteCard}
+              />
+              {days.map((day) => (
+                <DesignBoardColumn
+                  key={day.isoDate}
+                  title={day.label}
+                  subtitle={day.isoDate === board?.today ? "Today" : ""}
+                  cards={lanes.days?.[day.isoDate] || []}
+                  editable={editable}
+                  droppable={editable}
+                  onDropCard={async (cardId) => {
+                    const card = board?.cards?.find((entry) => entry.id === cardId);
+                    if (card) await moveCard(card, "day", day.isoDate);
+                  }}
+                  onCardAction={handleCardAction}
+                  onEditCard={(card) => setEditingCardId(card.id)}
+                  onDeleteCard={handleDeleteCard}
+                />
+              ))}
+              <DesignBoardColumn
+                title="Awaiting Sign-Off"
+                subtitle={`Pulse red after ${board?.settings?.signOffFollowUpHours || 48} hours.`}
+                cards={lanes.awaitingSignOff}
+                editable={editable}
+                onCardAction={handleCardAction}
+                onEditCard={(card) => setEditingCardId(card.id)}
+                onDeleteCard={handleDeleteCard}
+              />
+            </div>
+          )}
+        </section>
+
+        {editable && editingCard && editDraft ? (
+          <div className="modal-backdrop" onClick={() => setEditingCardId("")}>
+            <div className="modal design-board-edit-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>Edit design card</h3>
+                  <p>{editingCard.orderReference}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setEditingCardId("")}>x</button>
+              </div>
+              <div className="design-board-edit-grid">
+                <label>
+                  Customer
+                  <input value={editDraft.customerName} onChange={(event) => setEditDraft((current) => ({ ...current, customerName: event.target.value }))} />
+                </label>
+                <label>
+                  Contact
+                  <input value={editDraft.contact} onChange={(event) => setEditDraft((current) => ({ ...current, contact: event.target.value }))} />
+                </label>
+                <label>
+                  Contact email
+                  <input value={editDraft.contactEmail} onChange={(event) => setEditDraft((current) => ({ ...current, contactEmail: event.target.value }))} />
+                </label>
+                <label className="span-2">
+                  Description
+                  <textarea rows={3} value={editDraft.description} onChange={(event) => setEditDraft((current) => ({ ...current, description: event.target.value }))} />
+                </label>
+                <label className="span-2">
+                  Address
+                  <textarea rows={3} value={editDraft.address} onChange={(event) => setEditDraft((current) => ({ ...current, address: event.target.value }))} />
+                </label>
+                <label className="span-2">
+                  Designer note
+                  <textarea rows={3} value={editDraft.designerNote} onChange={(event) => setEditDraft((current) => ({ ...current, designerNote: event.target.value }))} />
+                </label>
+              </div>
+              <div className="design-board-edit-items">
+                <h4>Individual items</h4>
+                {editDraft.items.map((item, index) => (
+                  <div key={item.id} className="design-board-edit-item">
+                    <input
+                      value={item.name}
+                      onChange={(event) => setEditDraft((current) => ({
+                        ...current,
+                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry)
+                      }))}
+                      placeholder="Item name"
+                    />
+                    <input
+                      value={item.quantity}
+                      onChange={(event) => setEditDraft((current) => ({
+                        ...current,
+                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, quantity: event.target.value } : entry)
+                      }))}
+                      placeholder="Qty"
+                    />
+                    <textarea
+                      rows={2}
+                      value={item.description}
+                      onChange={(event) => setEditDraft((current) => ({
+                        ...current,
+                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, description: event.target.value } : entry)
+                      }))}
+                      placeholder="Item description"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="design-board-edit-actions">
+                <button className="ghost-button" type="button" onClick={() => setEditingCardId("")}>Cancel</button>
+                <button className="primary-button" type="button" onClick={handleSaveEdit}>Save changes</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+  const [cards, setCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadFilteringBoard() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/filtering-board");
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load the filtering board.");
+        if (!ignore) {
+          setCards(Array.isArray(payload.cards) ? payload.cards : []);
+          setError("");
+        }
+      } catch (loadError) {
+        if (!ignore) setError(loadError.message || "Could not load the filtering board.");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+    loadFilteringBoard();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  return (
+    <div className="app-shell social-post-shell">
+      <div className="page social-post-page filtering-board-page">
+        <MainNavBar
+          currentUser={currentUser}
+          active="filtering"
+          onLogout={onLogout}
+          notifications={notifications}
+          aeroEnabled={aeroEnabled}
+          onToggleAero={onToggleAero}
+        />
+        <section className="panel filtering-board-panel">
+          <div className="design-board-toolbar">
+            <div>
+              <h2>Filtering</h2>
+              <p>Approved artwork drops here as a holding area for the next production module.</p>
+            </div>
+          </div>
+          {error ? <p className="form-error">{error}</p> : null}
+          {loading ? (
+            <div className="design-board-empty">Loading filtering cards...</div>
+          ) : cards.length ? (
+            <div className="filtering-board-grid">
+              {cards.map((card) => (
+                <article key={card.id} className={getDesignBoardCardClassName(card)}>
+                  <div className="design-board-card-head">
+                    <div>
+                      <strong>{card.orderReference}</strong>
+                      <span>{card.customerName || "Customer not set"}</span>
+                    </div>
+                    <span className="filtering-approved-pill">Approved</span>
+                  </div>
+                  <div className="design-board-card-body">
+                    <p className="design-board-card-description">{card.description || "No description"}</p>
+                    <dl className="design-board-card-meta">
+                      <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
+                      {card.approvedAt ? <div><dt>Approved</dt><dd>{formatDateTime(card.approvedAt)}</dd></div> : null}
+                    </dl>
+                    {Array.isArray(card.items) && card.items.length ? (
+                      <ul className="design-board-items">
+                        {card.items.map((item) => (
+                          <li key={item.id}>
+                            <strong>{item.name || "Item"}</strong>
+                            <span>{item.quantity ? `Qty ${item.quantity}` : ""}</span>
+                            {item.description ? <small>{item.description}</small> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="design-board-empty">No approved cards in Filtering yet.</div>
+          )}
         </section>
       </div>
     </div>
@@ -15400,6 +16046,8 @@ export default function App() {
   const isClientRamsRoute = pathname.startsWith("/client/rams");
   const isClientRoute = pathname.startsWith("/client");
   const isClientBoardRoute = pathname.startsWith("/client/board");
+  const isClientDesignBoardRoute = pathname.startsWith("/client/design-board");
+  const isClientFilteringRoute = pathname.startsWith("/client/filtering");
   const isInstallerRoute = pathname.startsWith("/installer");
   const isAttendanceRoute = pathname.startsWith("/attendance");
   const isHolidaysRoute = pathname.startsWith("/holidays");
@@ -15417,6 +16065,8 @@ export default function App() {
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isBoardRoute = pathname.startsWith("/board");
+  const isDesignBoardRoute = pathname.startsWith("/design-board");
+  const isFilteringRoute = pathname.startsWith("/filtering");
   const [board, setBoard] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -15504,6 +16154,8 @@ export default function App() {
   const adminPhotoInputRef = useRef(null);
   const openedNotificationJobIdRef = useRef("");
   const boardEditable = canEditBoard(currentUser);
+  const designBoardEditable = canEditDesignBoard(currentUser);
+  const filteringEditable = canEditFiltering(currentUser);
   const installerEditable = canEditInstaller(currentUser);
   const attendanceEditable = canEditAttendance(currentUser);
   const proFormaEditable = canEditProForma(currentUser);
@@ -15520,6 +16172,16 @@ export default function App() {
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
   const showTvInstalls = Boolean(currentUser && canAccessBoard(currentUser) && isTvInstallsRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
+  const showDesignBoard = Boolean(
+    currentUser &&
+      canAccessDesignBoard(currentUser) &&
+      ((designBoardEditable && isDesignBoardRoute) || (!designBoardEditable && isClientDesignBoardRoute))
+  );
+  const showFiltering = Boolean(
+    currentUser &&
+      canAccessFiltering(currentUser) &&
+      ((filteringEditable && isFilteringRoute) || (!filteringEditable && isClientFilteringRoute))
+  );
   const showProForma = Boolean(
     currentUser &&
       canAccessProForma(currentUser) &&
@@ -15535,8 +16197,8 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -15919,6 +16581,8 @@ export default function App() {
     if (!currentUser) return;
     const nextHomePath = getHomePathForUser(currentUser);
     const nextBoardPath = getBoardPathForUser(currentUser);
+    const nextDesignBoardPath = getDesignBoardPathForUser(currentUser);
+    const nextFilteringPath = getFilteringPathForUser(currentUser);
 
     if (isHolidaysRoute && !canAccessHolidays(currentUser)) {
       window.location.replace(nextHomePath);
@@ -15980,12 +16644,22 @@ export default function App() {
       return;
     }
 
-    if (hostShellMode && isClientRoute && !isClientBoardRoute && !isClientRamsRoute && !isClientProFormaRoute) {
+    if ((isDesignBoardRoute || isClientDesignBoardRoute) && !canAccessDesignBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute) {
+    if ((isFilteringRoute || isClientFilteringRoute) && !canAccessFiltering(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
+    if (hostShellMode && isClientRoute && !isClientBoardRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isClientProFormaRoute) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
+    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -15997,8 +16671,18 @@ export default function App() {
 
     if ((isBoardRoute || isClientBoardRoute) && nextBoardPath !== window.location.pathname) {
       window.location.replace(nextBoardPath);
+      return;
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+
+    if ((isDesignBoardRoute || isClientDesignBoardRoute) && nextDesignBoardPath !== window.location.pathname) {
+      window.location.replace(nextDesignBoardPath);
+      return;
+    }
+
+    if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
+      window.location.replace(nextFilteringPath);
+    }
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -18051,6 +18735,30 @@ export default function App() {
   if (showProForma) {
     return (
       <ProFormaPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showDesignBoard) {
+    return (
+      <DesignBoardPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+        aeroEnabled={aeroEnabled}
+        onToggleAero={handleToggleAero}
+      />
+    );
+  }
+
+  if (showFiltering) {
+    return (
+      <FilteringBoardPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
