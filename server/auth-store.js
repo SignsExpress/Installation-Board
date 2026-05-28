@@ -39,6 +39,8 @@ function getDefaultPermissions(role) {
   if (String(role || "").toLowerCase() === "host") {
     return {
       board: "admin",
+      designBoard: "admin",
+      filtering: "admin",
       installer: "admin",
       holidays: "admin",
       attendance: "admin",
@@ -54,6 +56,8 @@ function getDefaultPermissions(role) {
 
   return {
     board: "user",
+    designBoard: "none",
+    filtering: "none",
     installer: "none",
     holidays: "user",
     attendance: "user",
@@ -149,6 +153,8 @@ function normalizePermissions(permissions, role) {
   const defaults = getDefaultPermissions(role);
   return {
     board: normalizePermissionValue(permissions?.board, defaults.board),
+    designBoard: normalizePermissionValue(permissions?.designBoard, defaults.designBoard),
+    filtering: normalizePermissionValue(permissions?.filtering, defaults.filtering),
     installer: normalizePermissionValue(permissions?.installer, defaults.installer),
     holidays: normalizePermissionValue(permissions?.holidays, defaults.holidays),
     attendance: normalizePermissionValue(permissions?.attendance, defaults.attendance),
@@ -172,6 +178,8 @@ function applyOwnerPermissions(user) {
     ...user,
     permissions: {
       board: "admin",
+      designBoard: "admin",
+      filtering: "admin",
       installer: "admin",
       holidays: "admin",
       attendance: "admin",

@@ -16930,6 +16930,8 @@ export default function App() {
 
     const nextPermissions = {
       board: getPermissionForApp(targetUser, "board"),
+      designBoard: getPermissionForApp(targetUser, "designBoard"),
+      filtering: getPermissionForApp(targetUser, "filtering"),
       installer: getPermissionForApp(targetUser, "installer"),
       holidays: getPermissionForApp(targetUser, "holidays"),
       attendance: getPermissionForApp(targetUser, "attendance"),

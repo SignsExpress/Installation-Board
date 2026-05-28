@@ -9081,6 +9081,8 @@ function createServer() {
     try {
         const updatedUser = await updateUserPermissions(request.params.id, {
           board: request.body?.board,
+          designBoard: request.body?.designBoard,
+          filtering: request.body?.filtering,
           installer: request.body?.installer,
           holidays: request.body?.holidays,
           attendance: request.body?.attendance,
