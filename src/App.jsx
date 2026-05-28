@@ -7708,6 +7708,22 @@ function getDesignBoardEditDraft(card) {
   };
 }
 
+async function readJsonResponse(response, fallbackMessage) {
+  const raw = await response.text();
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(raw);
+    } catch (error) {
+      throw new Error(fallbackMessage);
+    }
+  }
+  if (!response.ok) {
+    throw new Error(fallbackMessage);
+  }
+  throw new Error(fallbackMessage);
+}
+
 function getDesignBoardCardClassName(card) {
   const classNames = ["design-board-card"];
   if (card?.isAmendments) classNames.push("is-amendments");
@@ -7831,7 +7847,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     try {
       setLoading(true);
       const response = await fetch("/api/design-board");
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, "Design Board isn't available yet. The server route may not be deployed.");
       if (!response.ok) throw new Error(payload.error || "Could not load the design board.");
       setBoard(payload);
       setSettingsHours(String(payload?.settings?.signOffFollowUpHours || 48));
@@ -7859,7 +7875,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     try {
       setSavingKey(url);
       const response = await fetch(url, options);
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, "Could not save the design board change.");
       if (!response.ok) throw new Error(payload.error || "Could not save the design board change.");
       const nextBoard = payload.board || payload;
       setBoard(nextBoard);
@@ -7971,7 +7987,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
           <div className="design-board-toolbar">
             <div>
               <h2>Design Board</h2>
-              <p>Pull artwork jobs, drag them into the week, and move approved work into Filtering.</p>
+              <p>Pull jobs, schedule artwork into the week, and move approved work into Filtering.</p>
             </div>
             {editable ? (
               <form className="design-board-toolbar-actions" onSubmit={handlePull}>
@@ -7981,14 +7997,14 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   placeholder="ORD-3379 or EST-3379"
                 />
                 <button className="primary-button" type="submit" disabled={savingKey === "/api/design-board/pull"}>
-                  {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull order"}
+                  {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull"}
                 </button>
                 <label className="design-board-setting">
-                  <span>Red pulse after (hours)</span>
+                  <span>Chase after (hrs)</span>
                   <input value={settingsHours} onChange={(event) => setSettingsHours(event.target.value)} inputMode="numeric" />
                 </label>
                 <button className="ghost-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
-                  Save setting
+                  Save
                 </button>
               </form>
             ) : null}

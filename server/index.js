@@ -141,6 +141,15 @@ const MATERIAL_REQUEST_CATEGORY_IDS = new Set(MATERIAL_REQUEST_CATEGORIES.map((c
 function createEmptyBoardStore() {
   return {
     jobs: [],
+    designBoard: {
+      cards: [],
+      settings: {
+        signOffFollowUpHours: 48
+      }
+    },
+    filteringBoard: {
+      cards: []
+    },
     holidays: [],
     holidayRequests: [],
     holidayAllowances: [],
@@ -623,6 +632,26 @@ function canEditProForma(user) {
   return getUserPermission(user, "proForma", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
+function canAccessDesignBoard(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "designBoard", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditDesignBoard(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "designBoard", user?.role === "host" ? "admin" : "none") === "admin";
+}
+
+function canAccessFiltering(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "filtering", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
+function canEditFiltering(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "filtering", user?.role === "host" ? "admin" : "none") === "admin";
+}
+
 function toPublicRamsProfile(user = {}) {
   const safeUser = sanitizeUser(user);
   return {
@@ -1066,6 +1095,30 @@ function requireProFormaAdmin(request, response) {
   return false;
 }
 
+function requireDesignBoardAccess(request, response) {
+  if (canAccessDesignBoard(request.user)) return true;
+  response.status(403).json({ error: "Design Board access required." });
+  return false;
+}
+
+function requireDesignBoardAdmin(request, response) {
+  if (canEditDesignBoard(request.user)) return true;
+  response.status(403).json({ error: "Design Board admin access required." });
+  return false;
+}
+
+function requireFilteringAccess(request, response) {
+  if (canAccessFiltering(request.user)) return true;
+  response.status(403).json({ error: "Filtering access required." });
+  return false;
+}
+
+function requireFilteringAdmin(request, response) {
+  if (canEditFiltering(request.user)) return true;
+  response.status(403).json({ error: "Filtering admin access required." });
+  return false;
+}
+
 function ensureStoreFile() {
   const file = getDataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -1097,6 +1150,8 @@ function mergeHolidaySeed(store) {
   const seed = readHolidaySeed();
       const nextStore = {
         jobs: Array.isArray(store.jobs) ? store.jobs : [],
+        designBoard: sanitizeDesignBoardState(store.designBoard),
+        filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
         holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
         holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
@@ -1204,6 +1259,8 @@ async function readStore() {
     if (Array.isArray(parsed)) {
           const migrated = applyHolidayResetMigration({
             jobs: parsed,
+            designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
+            filteringBoard: { cards: [] },
             holidays: [],
             holidayRequests: [],
             holidayAllowances: [],
@@ -1232,6 +1289,8 @@ async function readStore() {
     }
         const migrated = applyHolidayResetMigration({
           jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+          designBoard: sanitizeDesignBoardState(parsed.designBoard),
+          filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
           holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
           holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
@@ -1283,6 +1342,17 @@ async function writeStore(store) {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
       return String(left.customerName || "").localeCompare(String(right.customerName || ""));
     }),
+    designBoard: {
+      cards: [...sanitizeDesignBoardState(store.designBoard).cards].sort((left, right) =>
+        String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))
+      ),
+      settings: sanitizeDesignBoardSettings(store.designBoard?.settings)
+    },
+    filteringBoard: {
+      cards: [...sanitizeFilteringBoardState(store.filteringBoard).cards].sort((left, right) =>
+        String(right.approvedAt || right.updatedAt || right.createdAt || "").localeCompare(String(left.approvedAt || left.updatedAt || left.createdAt || ""))
+      )
+    },
     holidays: [...store.holidays].sort((left, right) => {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
       return String(left.person || "").localeCompare(String(right.person || ""));
@@ -2901,6 +2971,77 @@ function sanitizeMileageClaim(payload) {
     submittedAt: String(payload?.submittedAt || new Date().toISOString()),
     createdAt: String(payload?.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeDesignBoardSettings(payload = {}) {
+  const signOffFollowUpHours = Number(payload.signOffFollowUpHours);
+  return {
+    signOffFollowUpHours:
+      Number.isFinite(signOffFollowUpHours) && signOffFollowUpHours >= 1 && signOffFollowUpHours <= 720
+        ? Math.round(signOffFollowUpHours)
+        : 48
+  };
+}
+
+function sanitizeDesignBoardLineItem(payload = {}, index = 0) {
+  return {
+    id: String(payload.id || `design-item-${index + 1}`),
+    name: String(payload.name || payload.lineItemName || "").trim(),
+    description: String(payload.description || "").trim(),
+    quantity: String(payload.quantity || "").trim()
+  };
+}
+
+function sanitizeDesignBoardCard(payload = {}) {
+  const status = String(payload.status || "new").trim().toLowerCase();
+  const safeStatus = ["new", "scheduled", "awaiting-sign-off", "amendments"].includes(status)
+    ? status
+    : "new";
+  return {
+    id: String(payload.id || makeId()),
+    coreBridgeOrderId: String(payload.coreBridgeOrderId || "").trim(),
+    orderReference: String(payload.orderReference || "").trim(),
+    customerName: String(payload.customerName || "").trim(),
+    description: String(payload.description || "").trim(),
+    contact: String(payload.contact || "").trim(),
+    contactEmail: String(payload.contactEmail || payload.email || "").trim(),
+    address: String(payload.address || "").trim(),
+    siteAddress: String(payload.siteAddress || "").trim(),
+    billingAddress: String(payload.billingAddress || "").trim(),
+    notes: String(payload.notes || "").trim(),
+    designerNote: String(payload.designerNote || "").trim(),
+    scheduledDate: String(payload.scheduledDate || "").trim(),
+    status: safeStatus,
+    signOffRequestedAt: String(payload.signOffRequestedAt || "").trim(),
+    lastCustomerResponseAt: String(payload.lastCustomerResponseAt || "").trim(),
+    items: Array.isArray(payload.items) ? payload.items.map((item, index) => sanitizeDesignBoardLineItem(item, index)) : [],
+    createdAt: String(payload.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function sanitizeFilteringCard(payload = {}) {
+  return {
+    ...sanitizeDesignBoardCard({
+      ...payload,
+      status: "approved"
+    }),
+    approvedAt: String(payload.approvedAt || new Date().toISOString()),
+    sourceBoardId: String(payload.sourceBoardId || payload.id || "").trim()
+  };
+}
+
+function sanitizeDesignBoardState(payload = {}) {
+  return {
+    cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeDesignBoardCard(card)) : [],
+    settings: sanitizeDesignBoardSettings(payload.settings)
+  };
+}
+
+function sanitizeFilteringBoardState(payload = {}) {
+  return {
+    cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeFilteringCard(card)) : []
   };
 }
 
@@ -7799,6 +7940,123 @@ function buildProFormaPayload(order = {}) {
   };
 }
 
+function buildDesignBoardItems(order = {}) {
+  return extractDescriptionPullLines(order).map((line, index) => ({
+    id: `design-item-${index + 1}`,
+    name: String(line.lineItemName || "").trim() || `Item ${index + 1}`,
+    description: String(line.description || "").trim(),
+    quantity: String(line.quantity || "").trim()
+  }));
+}
+
+function buildDesignBoardCardFromOrder(order = {}) {
+  return sanitizeDesignBoardCard({
+    coreBridgeOrderId: order.id || "",
+    orderReference: order.orderReference || "",
+    customerName: order.customerName || "",
+    description: order.description || "",
+    contact: order.contact || "",
+    contactEmail: order.email || order.contactEmail || "",
+    address: order.address || order.billingAddress || "",
+    siteAddress: order.siteAddress || "",
+    billingAddress: order.billingAddress || order.address || "",
+    notes: order.notes || "",
+    items: buildDesignBoardItems(order),
+    status: "new"
+  });
+}
+
+function getDesignBoardTodayIso() {
+  return getLocalTodayIso();
+}
+
+function buildRollingDesignDays(todayIso = "") {
+  const start = parseIsoDate(todayIso) || parseIsoDate(getDesignBoardTodayIso()) || new Date();
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(start, index);
+    const isoDate = toIsoDate(date);
+    return {
+      key: `day-${isoDate}`,
+      isoDate,
+      label: new Intl.DateTimeFormat("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: TIME_ZONE
+      }).format(date)
+    };
+  });
+}
+
+function isPastDesignDate(isoDate = "", todayIso = "") {
+  return Boolean(isoDate && todayIso && isoDate < todayIso);
+}
+
+function buildDesignBoardPayload(store) {
+  const state = sanitizeDesignBoardState(store.designBoard);
+  const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
+  const today = getDesignBoardTodayIso();
+  const days = buildRollingDesignDays(today);
+  const dayKeys = new Set(days.map((day) => day.isoDate));
+  const signOffHours = Number(state.settings.signOffFollowUpHours || 48);
+  const now = Date.now();
+
+  const lanes = {
+    newOrders: [],
+    unallocated: [],
+    awaitingSignOff: [],
+    days: Object.fromEntries(days.map((day) => [day.isoDate, []]))
+  };
+
+  const cards = state.cards.map((card) => {
+    const scheduledDate = String(card.scheduledDate || "").trim();
+    const signOffRequestedAt = String(card.signOffRequestedAt || "").trim();
+    const signOffRequestedMs = signOffRequestedAt ? new Date(signOffRequestedAt).getTime() : 0;
+    const overdue = card.status === "awaiting-sign-off"
+      && Number.isFinite(signOffRequestedMs)
+      && signOffRequestedMs > 0
+      && now - signOffRequestedMs > signOffHours * 60 * 60 * 1000;
+
+    const nextCard = {
+      ...card,
+      isAmendments: card.status === "amendments",
+      isAwaitingSignOff: card.status === "awaiting-sign-off",
+      isOverdue: overdue
+    };
+
+    if (card.status === "awaiting-sign-off") {
+      lanes.awaitingSignOff.push(nextCard);
+      return nextCard;
+    }
+    if (!scheduledDate && card.status === "new") {
+      lanes.newOrders.push(nextCard);
+      return nextCard;
+    }
+    if (!scheduledDate || isPastDesignDate(scheduledDate, today) || !dayKeys.has(scheduledDate)) {
+      lanes.unallocated.push(nextCard);
+      return nextCard;
+    }
+    lanes.days[scheduledDate].push(nextCard);
+    return nextCard;
+  });
+
+  Object.values(lanes.days).forEach((column) => column.sort((left, right) =>
+    String(left.updatedAt || left.createdAt || "").localeCompare(String(right.updatedAt || right.createdAt || ""))
+  ));
+  lanes.newOrders.sort((left, right) => String(left.createdAt || "").localeCompare(String(right.createdAt || "")));
+  lanes.unallocated.sort((left, right) => String(left.updatedAt || left.createdAt || "").localeCompare(String(right.updatedAt || right.createdAt || "")));
+  lanes.awaitingSignOff.sort((left, right) => String(left.signOffRequestedAt || left.updatedAt || "").localeCompare(String(right.signOffRequestedAt || right.updatedAt || "")));
+
+  return {
+    today,
+    days,
+    settings: state.settings,
+    lanes,
+    cards,
+    filteringCards: filteringState.cards
+  };
+}
+
 function buildSocialPostBrief(order, voice) {
   const descriptionCandidates = getSocialDescriptionCandidates(order);
   const items = extractSocialOrderItems(order);
@@ -9533,6 +9791,179 @@ app.get("/api/corebridge/orders", async (request, response) => {
         detail: error.message
       });
     }
+  });
+
+  app.get("/api/design-board", async (request, response) => {
+    if (!requireDesignBoardAccess(request, response)) return;
+    const store = await readStore();
+    response.json(buildDesignBoardPayload(store));
+  });
+
+  app.patch("/api/design-board/settings", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    state.settings = sanitizeDesignBoardSettings({
+      ...state.settings,
+      ...(request.body || {})
+    });
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.post("/api/design-board/pull", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    try {
+      const orderReference = String(request.body?.orderReference || "").trim();
+      if (!orderReference) {
+        response.status(400).json({ error: "Enter an ORD or EST reference." });
+        return;
+      }
+      const { order } = await fetchSocialPostOrderByReference(orderReference);
+      if (!order) {
+        response.status(404).json({ error: "No CoreBridge order found for that reference." });
+        return;
+      }
+      const store = await readStore();
+      const state = sanitizeDesignBoardState(store.designBoard);
+      const existingIndex = state.cards.findIndex(
+        (card) => String(card.orderReference || "").trim().toLowerCase() === String(order.orderReference || orderReference).trim().toLowerCase()
+      );
+      const nextCard = buildDesignBoardCardFromOrder(order);
+      if (existingIndex >= 0) {
+        nextCard.id = state.cards[existingIndex].id;
+        nextCard.createdAt = state.cards[existingIndex].createdAt || nextCard.createdAt;
+        nextCard.status = state.cards[existingIndex].status || nextCard.status;
+        nextCard.scheduledDate = state.cards[existingIndex].scheduledDate || "";
+        nextCard.signOffRequestedAt = state.cards[existingIndex].signOffRequestedAt || "";
+        nextCard.lastCustomerResponseAt = state.cards[existingIndex].lastCustomerResponseAt || "";
+        nextCard.designerNote = state.cards[existingIndex].designerNote || "";
+        state.cards[existingIndex] = sanitizeDesignBoardCard(nextCard);
+      } else {
+        state.cards.unshift(nextCard);
+      }
+      store.designBoard = state;
+      const savedStore = await writeStore(store);
+      response.json({
+        card: existingIndex >= 0 ? state.cards[existingIndex] : nextCard,
+        board: buildDesignBoardPayload(savedStore)
+      });
+    } catch (error) {
+      response.status(error.statusCode || 500).json({
+        error: error.statusCode === 503 ? "CoreBridge is not configured yet." : "Could not pull the design-board job.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.patch("/api/design-board/cards/:id", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Design card not found." });
+      return;
+    }
+    const existing = state.cards[index];
+    const incoming = request.body || {};
+    const nextCard = sanitizeDesignBoardCard({
+      ...existing,
+      ...incoming,
+      id: existing.id,
+      coreBridgeOrderId: existing.coreBridgeOrderId || incoming.coreBridgeOrderId || "",
+      items: Array.isArray(incoming.items) ? incoming.items : existing.items
+    });
+    state.cards[index] = nextCard;
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json({
+      card: nextCard,
+      board: buildDesignBoardPayload(savedStore)
+    });
+  });
+
+  app.post("/api/design-board/cards/:id/artwork-complete", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Design card not found." });
+      return;
+    }
+    state.cards[index] = sanitizeDesignBoardCard({
+      ...state.cards[index],
+      status: "awaiting-sign-off",
+      signOffRequestedAt: new Date().toISOString()
+    });
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.post("/api/design-board/cards/:id/amendments", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Design card not found." });
+      return;
+    }
+    state.cards[index] = sanitizeDesignBoardCard({
+      ...state.cards[index],
+      status: "amendments",
+      scheduledDate: "",
+      signOffRequestedAt: "",
+      lastCustomerResponseAt: new Date().toISOString()
+    });
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.post("/api/design-board/cards/:id/approve", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
+    const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Design card not found." });
+      return;
+    }
+    const [approvedCard] = state.cards.splice(index, 1);
+    filteringState.cards.unshift(
+      sanitizeFilteringCard({
+        ...approvedCard,
+        approvedAt: new Date().toISOString(),
+        sourceBoardId: approvedCard.id
+      })
+    );
+    store.designBoard = state;
+    store.filteringBoard = filteringState;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.delete("/api/design-board/cards/:id", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    state.cards = state.cards.filter((card) => String(card.id || "") !== String(request.params.id || ""));
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.get("/api/filtering-board", async (request, response) => {
+    if (!requireFilteringAccess(request, response)) return;
+    const store = await readStore();
+    response.json({
+      cards: sanitizeFilteringBoardState(store.filteringBoard).cards
+    });
   });
 
   app.post("/api/jobs", async (request, response) => {
