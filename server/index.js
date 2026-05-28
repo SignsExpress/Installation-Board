@@ -7995,7 +7995,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
 }
 
 function getDesignBoardTodayIso() {
-  return getLocalTodayIso();
+  return toIsoDate(getTodayInLondon());
 }
 
 function buildRollingDesignDays(todayIso = "") {
