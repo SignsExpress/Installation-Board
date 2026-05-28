@@ -7966,6 +7966,34 @@ function buildDesignBoardCardFromOrder(order = {}) {
   });
 }
 
+async function fetchDesignBoardOrderByReference(orderReference = "") {
+  const lookupReferences = getCoreBridgeReferenceVariants(orderReference);
+  const lookupAttempts = [];
+  let lookup = null;
+  let order = null;
+
+  for (const reference of lookupReferences) {
+    try {
+      const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const candidateOrder = (candidateLookup.orders || [])[0];
+      lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
+      if (candidateOrder) {
+        lookup = candidateLookup;
+        order = candidateOrder;
+        break;
+      }
+    } catch (lookupError) {
+      lookupAttempts.push({ reference, found: false, error: lookupError.message || "Lookup failed" });
+    }
+  }
+
+  return {
+    lookup,
+    order,
+    lookupAttempts
+  };
+}
+
 function getDesignBoardTodayIso() {
   return getLocalTodayIso();
 }
@@ -9795,21 +9823,35 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
   app.get("/api/design-board", async (request, response) => {
     if (!requireDesignBoardAccess(request, response)) return;
-    const store = await readStore();
-    response.json(buildDesignBoardPayload(store));
+    try {
+      const store = await readStore();
+      response.json(buildDesignBoardPayload(store));
+    } catch (error) {
+      response.status(500).json({
+        error: "Could not load the Design Board.",
+        detail: error.message
+      });
+    }
   });
 
   app.patch("/api/design-board/settings", async (request, response) => {
     if (!requireDesignBoardAdmin(request, response)) return;
-    const store = await readStore();
-    const state = sanitizeDesignBoardState(store.designBoard);
-    state.settings = sanitizeDesignBoardSettings({
-      ...state.settings,
-      ...(request.body || {})
-    });
-    store.designBoard = state;
-    const savedStore = await writeStore(store);
-    response.json(buildDesignBoardPayload(savedStore));
+    try {
+      const store = await readStore();
+      const state = sanitizeDesignBoardState(store.designBoard);
+      state.settings = sanitizeDesignBoardSettings({
+        ...state.settings,
+        ...(request.body || {})
+      });
+      store.designBoard = state;
+      const savedStore = await writeStore(store);
+      response.json(buildDesignBoardPayload(savedStore));
+    } catch (error) {
+      response.status(500).json({
+        error: "Could not save the Design Board settings.",
+        detail: error.message
+      });
+    }
   });
 
   app.post("/api/design-board/pull", async (request, response) => {
@@ -9820,7 +9862,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         response.status(400).json({ error: "Enter an ORD or EST reference." });
         return;
       }
-      const { order } = await fetchSocialPostOrderByReference(orderReference);
+      const { order } = await fetchDesignBoardOrderByReference(orderReference);
       if (!order) {
         response.status(404).json({ error: "No CoreBridge order found for that reference." });
         return;
@@ -9960,10 +10002,17 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
   app.get("/api/filtering-board", async (request, response) => {
     if (!requireFilteringAccess(request, response)) return;
-    const store = await readStore();
-    response.json({
-      cards: sanitizeFilteringBoardState(store.filteringBoard).cards
-    });
+    try {
+      const store = await readStore();
+      response.json({
+        cards: sanitizeFilteringBoardState(store.filteringBoard).cards
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: "Could not load Filtering.",
+        detail: error.message
+      });
+    }
   });
 
   app.post("/api/jobs", async (request, response) => {
