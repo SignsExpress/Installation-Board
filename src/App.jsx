@@ -2777,10 +2777,22 @@ function getNotificationCategory(notification) {
 }
 
 function buildBoardUrl(startIso = "", endIso = "") {
+  const params = new URLSearchParams();
   if (startIso && endIso) {
-    return `/api/board?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
+    params.set("start", startIso);
+    params.set("end", endIso);
   }
-  return "/api/board";
+  const query = params.toString();
+  return query ? `/api/board?${query}` : "/api/board";
+}
+
+function buildBoardDataUrl(startIso = "", endIso = "") {
+  const params = new URLSearchParams({ include: "data" });
+  if (startIso && endIso) {
+    params.set("start", startIso);
+    params.set("end", endIso);
+  }
+  return `/api/board?${params.toString()}`;
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -16394,24 +16406,16 @@ export default function App() {
     async function loadBoard() {
       try {
         setLoading(true);
-        const [boardResponse, jobsResponse, holidaysResponse] = await Promise.all([
-          fetch(buildBoardUrl(boardRange.startIso, boardRange.endIso)),
-          fetch("/api/jobs"),
-          fetch("/api/holidays")
-        ]);
-        if (!boardResponse.ok || !jobsResponse.ok || !holidaysResponse.ok) {
+        const response = await fetch(buildBoardDataUrl(boardRange.startIso, boardRange.endIso));
+        if (!response.ok) {
           throw new Error("Could not load the installation board.");
         }
 
-        const [boardData, jobsData, holidaysData] = await Promise.all([
-          boardResponse.json(),
-          jobsResponse.json(),
-          holidaysResponse.json()
-        ]);
+        const payload = await response.json();
         if (!active) return;
-        setBoard(boardData);
-        setJobs(Array.isArray(jobsData) ? jobsData : []);
-        setHolidays(Array.isArray(holidaysData) ? holidaysData : []);
+        setBoard(payload.board || null);
+        setJobs(Array.isArray(payload.jobs) ? payload.jobs : []);
+        setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
       } catch (error) {
         console.error(error);
         if (active) setMessage(createMessage("Could not load the shared board.", "error"));

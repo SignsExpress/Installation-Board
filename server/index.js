@@ -9233,6 +9233,7 @@ function createServer() {
     if (!requireBoardAccess(request, response)) return;
     const mode = String(request.query.mode || "").trim().toLowerCase();
     const monthId = String(request.query.month || "").trim();
+    const includeData = String(request.query.include || "").trim().toLowerCase() === "data";
     const start = parseIsoDate(String(request.query.start || "").trim());
     const end = parseIsoDate(String(request.query.end || "").trim());
     const payload = await getBoardPayload({
@@ -9241,6 +9242,14 @@ function createServer() {
       mode: mode === "month" ? "month" : "rolling",
       monthId
     });
+    if (includeData) {
+      response.json({
+        board: payload.board,
+        jobs: toPublicJobs(payload.jobs),
+        holidays: payload.holidays
+      });
+      return;
+    }
     response.json(payload.board);
   });
 
