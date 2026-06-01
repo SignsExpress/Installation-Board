@@ -8039,6 +8039,62 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
   };
 }
 
+function needsDesignBoardCoreBridgeRefresh(card = {}) {
+  if (!String(card.orderReference || "").trim()) return false;
+  if (!Number(card.jobTotalExVat || 0)) return true;
+  const items = Array.isArray(card.items) ? card.items : [];
+  if (!items.length) return true;
+  return items.some((item) => !Number(item.lineTotal || 0) || !String(item.jobType || "").trim());
+}
+
+async function refreshDesignBoardCardDetails(card = {}) {
+  const { order } = await fetchDesignBoardOrderByReference(card.orderReference);
+  if (!order) return sanitizeDesignBoardCard(card);
+  const refreshed = buildDesignBoardCardFromOrder(order);
+  return sanitizeDesignBoardCard({
+    ...card,
+    customerName: card.customerName || refreshed.customerName,
+    description: card.description || refreshed.description,
+    contact: card.contact || refreshed.contact,
+    number: card.number || refreshed.number,
+    contactEmail: card.contactEmail || refreshed.contactEmail,
+    address: card.address || refreshed.address,
+    siteAddress: card.siteAddress || refreshed.siteAddress,
+    billingAddress: card.billingAddress || refreshed.billingAddress,
+    notes: card.notes || refreshed.notes,
+    items: refreshed.items,
+    jobTotalExVat: refreshed.jobTotalExVat,
+    updatedAt: card.updatedAt || card.createdAt || new Date().toISOString()
+  });
+}
+
+async function backfillDesignBoardDetails(store) {
+  const state = sanitizeDesignBoardState(store.designBoard);
+  const indexes = state.cards
+    .map((card, index) => ({ card, index }))
+    .filter(({ card }) => needsDesignBoardCoreBridgeRefresh(card))
+    .slice(0, 12);
+
+  if (!indexes.length) return store;
+
+  let changed = false;
+  for (const { card, index } of indexes) {
+    try {
+      const refreshed = await refreshDesignBoardCardDetails(card);
+      if (JSON.stringify(refreshed.items) !== JSON.stringify(card.items) || Number(refreshed.jobTotalExVat || 0) !== Number(card.jobTotalExVat || 0)) {
+        state.cards[index] = refreshed;
+        changed = true;
+      }
+    } catch (error) {
+      console.error(`Could not refresh Design Board card ${card.orderReference}.`, error.message || error);
+    }
+  }
+
+  if (!changed) return store;
+  store.designBoard = state;
+  return writeStore(store);
+}
+
 function getDesignBoardTodayIso() {
   return toIsoDate(getTodayInLondon());
 }
@@ -8083,7 +8139,7 @@ function buildDesignBoardPayload(store) {
 
   const cards = state.cards.map((card) => {
     const scheduledDate = String(card.scheduledDate || "").trim();
-    const signOffBaseAt = String(card.signOffRequestedAt || card.createdAt || card.updatedAt || "").trim();
+    const signOffBaseAt = String(card.lastChasedAt || card.signOffRequestedAt || card.createdAt || card.updatedAt || "").trim();
     const signOffRequestedMs = signOffBaseAt ? new Date(signOffBaseAt).getTime() : 0;
     const itemTotal = Array.isArray(card.items)
       ? Math.round(card.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100
@@ -9885,7 +9941,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.get("/api/design-board", async (request, response) => {
     if (!requireDesignBoardAccess(request, response)) return;
     try {
-      const store = await readStore();
+      const store = await backfillDesignBoardDetails(await readStore());
       response.json(buildDesignBoardPayload(store));
     } catch (error) {
       response.status(500).json({
