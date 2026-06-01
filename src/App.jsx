@@ -7704,6 +7704,7 @@ function getDesignBoardEditDraft(card) {
     customerName: card?.customerName || "",
     description: card?.description || "",
     contact: card?.contact || "",
+    number: card?.number || "",
     contactEmail: card?.contactEmail || "",
     address: card?.address || "",
     siteAddress: card?.siteAddress || "",
@@ -7739,6 +7740,7 @@ async function readJsonResponse(response, fallbackMessage) {
 
 function getDesignBoardCardClassName(card) {
   const classNames = ["design-board-card"];
+  if (card?.isPriority) classNames.push("is-priority");
   if (card?.isAmendments) classNames.push("is-amendments");
   else classNames.push("is-new-artwork");
   if (card?.isAwaitingSignOff) classNames.push("is-awaiting");
@@ -7757,6 +7759,10 @@ function DesignBoardColumn({
   onCardAction,
   onEditCard,
   onDeleteCard,
+  onTogglePriority,
+  expandedCardId = "",
+  onToggleCard,
+  draggingCardId = "",
   onDragCardStart
 }) {
   return (
@@ -7780,13 +7786,15 @@ function DesignBoardColumn({
         {cards.length ? cards.map((card) => (
           <article
             key={card.id}
-            className={getDesignBoardCardClassName(card)}
+            className={`${getDesignBoardCardClassName(card)} ${draggingCardId === card.id ? "is-dragging" : ""}`.trim()}
             draggable={editable && !card.isAwaitingSignOff}
+            onClick={() => onToggleCard?.(card)}
             onDragStart={editable && !card.isAwaitingSignOff ? (event) => {
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", card.id);
               onDragCardStart?.(card.id);
             } : undefined}
+            onDragEnd={editable && !card.isAwaitingSignOff ? () => onDragCardStart?.("") : undefined}
           >
             <div className="design-board-card-head">
               <div>
@@ -7798,14 +7806,17 @@ function DesignBoardColumn({
                   <>
                     {card.isAwaitingSignOff ? (
                       <>
-                        <button type="button" className="ghost-button" onClick={() => onCardAction?.(card, "amendments")}>Amendments required</button>
-                        <button type="button" className="primary-button" onClick={() => onCardAction?.(card, "approve")}>Approved</button>
+                        <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "amendments"); }}>Amendments required</button>
+                        <button type="button" className="primary-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "approve"); }}>Approved</button>
                       </>
                     ) : (
-                      <button type="button" className="primary-button" onClick={() => onCardAction?.(card, "artwork-complete")}>Artwork complete</button>
+                      <button type="button" className="primary-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "artwork-complete"); }}>Artwork complete</button>
                     )}
-                    <button type="button" className="ghost-button" onClick={() => onEditCard?.(card)}>Edit</button>
-                    <button type="button" className="ghost-button danger" onClick={() => onDeleteCard?.(card)}>Delete</button>
+                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onTogglePriority?.(card); }}>
+                      {card.isPriority ? "Priority on" : "Priority"}
+                    </button>
+                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onEditCard?.(card); }}>Edit</button>
+                    <button type="button" className="ghost-button danger" onClick={(event) => { event.stopPropagation(); onDeleteCard?.(card); }}>Delete</button>
                   </>
                 ) : null}
               </div>
@@ -7815,12 +7826,12 @@ function DesignBoardColumn({
               <p className="design-board-card-description">{card.description || "No design description added yet."}</p>
               <dl className="design-board-card-meta">
                 <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
-                {card.contact ? <div><dt>Contact</dt><dd>{card.contact}</dd></div> : null}
+                {card.contact || card.number ? <div><dt>Contact</dt><dd>{[card.contact, card.number].filter(Boolean).join(" - ")}</dd></div> : null}
                 {card.contactEmail ? <div><dt>Email</dt><dd>{card.contactEmail}</dd></div> : null}
-                {card.scheduledDate ? <div><dt>Planned</dt><dd>{formatProFormaDate(card.scheduledDate)}</dd></div> : null}
+                {card.createdAt ? <div><dt>Date Added</dt><dd>{formatProFormaDate(card.createdAt)}</dd></div> : null}
               </dl>
               {card.designerNote ? <p className="design-board-designer-note">{card.designerNote}</p> : null}
-              {Array.isArray(card.items) && card.items.length ? (
+              {Array.isArray(card.items) && card.items.length && expandedCardId === card.id ? (
                 <ul className="design-board-items">
                   {card.items.map((item) => (
                     <li key={item.id}>
@@ -7830,6 +7841,8 @@ function DesignBoardColumn({
                     </li>
                   ))}
                 </ul>
+              ) : Array.isArray(card.items) && card.items.length ? (
+                <p className="design-board-card-more">Click card to view {card.items.length} item{card.items.length === 1 ? "" : "s"}.</p>
               ) : null}
             </div>
           </article>
@@ -7849,6 +7862,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
+  const [expandedDesignCardId, setExpandedDesignCardId] = useState("");
+  const [draggingDesignCardId, setDraggingDesignCardId] = useState("");
   const [editDraft, setEditDraft] = useState(null);
   const editable = canEditDesignBoard(currentUser);
 
@@ -7977,6 +7992,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     if (editingCardId === card.id) setEditingCardId("");
   }
 
+  async function handleTogglePriority(card) {
+    await patchCard(card, { isPriority: !card.isPriority }, card.isPriority ? "Removed priority" : "Marked as priority");
+  }
+
   async function handleSaveEdit() {
     if (!editingCard || !editDraft) return;
     await patchCard(editingCard, { ...editDraft, items: editDraft.items }, "Saved card changes");
@@ -8041,6 +8060,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onCardAction={handleCardAction}
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
+                onTogglePriority={handleTogglePriority}
+                expandedCardId={expandedDesignCardId}
+                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                draggingCardId={draggingDesignCardId}
+                onDragCardStart={setDraggingDesignCardId}
               />
               <DesignBoardColumn
                 title="Unallocated"
@@ -8055,6 +8079,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onCardAction={handleCardAction}
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
+                onTogglePriority={handleTogglePriority}
+                expandedCardId={expandedDesignCardId}
+                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                draggingCardId={draggingDesignCardId}
+                onDragCardStart={setDraggingDesignCardId}
               />
               {days.map((day) => (
                 <DesignBoardColumn
@@ -8071,6 +8100,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   onCardAction={handleCardAction}
                   onEditCard={(card) => setEditingCardId(card.id)}
                   onDeleteCard={handleDeleteCard}
+                  onTogglePriority={handleTogglePriority}
+                  expandedCardId={expandedDesignCardId}
+                  onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                  draggingCardId={draggingDesignCardId}
+                  onDragCardStart={setDraggingDesignCardId}
                 />
               ))}
               <DesignBoardColumn
@@ -8081,6 +8115,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onCardAction={handleCardAction}
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
+                onTogglePriority={handleTogglePriority}
+                expandedCardId={expandedDesignCardId}
+                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                draggingCardId={draggingDesignCardId}
+                onDragCardStart={setDraggingDesignCardId}
               />
             </div>
           )}
@@ -8131,6 +8170,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 <label>
                   Contact
                   <input value={editDraft.contact} onChange={(event) => setEditDraft((current) => ({ ...current, contact: event.target.value }))} />
+                </label>
+                <label>
+                  Contact number
+                  <input value={editDraft.number} onChange={(event) => setEditDraft((current) => ({ ...current, number: event.target.value }))} />
                 </label>
                 <label>
                   Contact email

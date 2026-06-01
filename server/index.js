@@ -3005,6 +3005,7 @@ function sanitizeDesignBoardCard(payload = {}) {
     customerName: String(payload.customerName || "").trim(),
     description: String(payload.description || "").trim(),
     contact: String(payload.contact || "").trim(),
+    number: String(payload.number || payload.contactNumber || "").trim(),
     contactEmail: String(payload.contactEmail || payload.email || "").trim(),
     address: String(payload.address || "").trim(),
     siteAddress: String(payload.siteAddress || "").trim(),
@@ -3015,6 +3016,10 @@ function sanitizeDesignBoardCard(payload = {}) {
     status: safeStatus,
     signOffRequestedAt: String(payload.signOffRequestedAt || "").trim(),
     lastCustomerResponseAt: String(payload.lastCustomerResponseAt || "").trim(),
+    isPriority:
+      payload.isPriority === true ||
+      String(payload.isPriority || "").trim().toLowerCase() === "true" ||
+      String(payload.isPriority || "").trim() === "1",
     items: Array.isArray(payload.items) ? payload.items.map((item, index) => sanitizeDesignBoardLineItem(item, index)) : [],
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
@@ -7956,6 +7961,7 @@ function buildDesignBoardCardFromOrder(order = {}) {
     customerName: order.customerName || "",
     description: order.description || "",
     contact: order.contact || "",
+    number: order.number || "",
     contactEmail: order.email || order.contactEmail || "",
     address: order.address || order.billingAddress || "",
     siteAddress: order.siteAddress || "",
@@ -9892,6 +9898,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         nextCard.signOffRequestedAt = state.cards[existingIndex].signOffRequestedAt || "";
         nextCard.lastCustomerResponseAt = state.cards[existingIndex].lastCustomerResponseAt || "";
         nextCard.designerNote = state.cards[existingIndex].designerNote || "";
+        nextCard.isPriority = state.cards[existingIndex].isPriority || false;
         state.cards[existingIndex] = sanitizeDesignBoardCard(nextCard);
       } else {
         state.cards.unshift(nextCard);
