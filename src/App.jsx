@@ -7846,6 +7846,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [info, setInfo] = useState("");
   const [orderReference, setOrderReference] = useState("");
   const [settingsHours, setSettingsHours] = useState("48");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
   const [editDraft, setEditDraft] = useState(null);
@@ -7925,6 +7926,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signOffFollowUpHours: Number(settingsHours) || 48 })
     }, "Updated sign-off chase timing");
+    setSettingsOpen(false);
   }
 
   async function patchCard(card, patch, nextInfo = "Updated card") {
@@ -8012,12 +8014,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 <button className="primary-button" type="submit" disabled={savingKey === "/api/design-board/pull"}>
                   {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull"}
                 </button>
-                <label className="design-board-setting">
-                  <span>Chase after (hrs)</span>
-                  <input value={settingsHours} onChange={(event) => setSettingsHours(event.target.value)} inputMode="numeric" />
-                </label>
-                <button className="ghost-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
-                  Save
+                <button className="ghost-button" type="button" onClick={() => setSettingsOpen(true)}>
+                  Settings
                 </button>
               </form>
             ) : null}
@@ -8077,7 +8075,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
               ))}
               <DesignBoardColumn
                 title="Awaiting Sign-Off"
-                subtitle={`Pulse red after ${board?.settings?.signOffFollowUpHours || 48} hours.`}
+                subtitle="Cards pulse red when follow-up is due."
                 cards={lanes.awaitingSignOff}
                 editable={editable}
                 onCardAction={handleCardAction}
@@ -8087,6 +8085,33 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
             </div>
           )}
         </section>
+
+        {editable && settingsOpen ? (
+          <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+            <div className="modal design-board-settings-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>Design Board Settings</h3>
+                  <p>Control when awaiting sign-off cards start pulsing red.</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)}>x</button>
+              </div>
+              <label className="design-board-setting design-board-setting-modal-field">
+                <span>Pulse after</span>
+                <div>
+                  <input value={settingsHours} onChange={(event) => setSettingsHours(event.target.value)} inputMode="numeric" />
+                  <span>hours</span>
+                </div>
+              </label>
+              <div className="design-board-edit-actions">
+                <button className="ghost-button" type="button" onClick={() => setSettingsOpen(false)}>Cancel</button>
+                <button className="primary-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
+                  {savingKey === "/api/design-board/settings" ? "Saving..." : "Save settings"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {editable && editingCard && editDraft ? (
           <div className="modal-backdrop" onClick={() => setEditingCardId("")}>

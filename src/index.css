@@ -6908,21 +6908,19 @@ button {
 
 .design-board-columns {
   display: grid;
-  grid-template-columns: repeat(11, minmax(190px, 190px));
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   align-items: start;
-  overflow-x: auto;
   padding-bottom: 10px;
 }
 
 .design-board-column {
-  min-height: 260px;
   display: grid;
-  grid-template-rows: auto 1fr;
-  gap: 8px;
+  grid-template-columns: minmax(170px, 220px) minmax(0, 1fr);
+  gap: 12px;
   padding: 10px;
   border: 1px solid #d9e0eb;
-  border-radius: 14px;
+  border-radius: 10px;
   background: #f8fbff;
 }
 
@@ -6931,7 +6929,9 @@ button {
   justify-content: space-between;
   gap: 8px;
   align-items: start;
-  padding-bottom: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #edf3fb;
 }
 
 .design-board-column-head h3 {
@@ -6962,6 +6962,7 @@ button {
 .design-board-column-body {
   display: grid;
   gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   align-content: start;
 }
 
@@ -7126,6 +7127,24 @@ button {
   width: min(1000px, 92vw);
 }
 
+.design-board-settings-modal {
+  width: min(460px, 92vw);
+}
+
+.design-board-setting-modal-field {
+  margin-top: 12px;
+}
+
+.design-board-setting-modal-field > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.design-board-setting-modal-field input {
+  width: 110px;
+}
+
 .design-board-edit-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7162,6 +7181,25 @@ button {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+
+@media (max-width: 900px) {
+  .design-board-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .design-board-toolbar-actions {
+    justify-content: flex-start;
+  }
+
+  .design-board-column {
+    grid-template-columns: 1fr;
+  }
+
+  .design-board-column-body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .filtering-board-grid {
