@@ -206,6 +206,7 @@ const RAMS_DEFAULT_QUESTIONS = {
   emergency: "Follow site emergency arrangements and report incidents to the site contact and Signs Express.",
   notes: ""
 };
+const CUSTOM_FIRST_AID_FACILITY_VALUE = "__custom_first_aid_facility__";
 
 const RAMS_PPE_ITEMS = [
   {
@@ -9602,6 +9603,7 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
   const [hospitalOptions, setHospitalOptions] = useState([]);
   const [hospitalLookupStatus, setHospitalLookupStatus] = useState("");
   const [loadingHospitals, setLoadingHospitals] = useState(false);
+  const [customFirstAidFacilityMode, setCustomFirstAidFacilityMode] = useState(false);
   const [questions, setQuestions] = useState(RAMS_DEFAULT_QUESTIONS);
   const [ramsLogic, setRamsLogic] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
   const [ramsLogicDraft, setRamsLogicDraft] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
@@ -9704,6 +9706,15 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
     () => jobs.find((job) => String(job.id || "") === String(questions.jobId || "")) || null,
     [jobs, questions.jobId]
   );
+  const hospitalOptionLabels = useMemo(
+    () => new Set(hospitalOptions.map((hospital) => String(hospital.label || "").trim()).filter(Boolean)),
+    [hospitalOptions]
+  );
+  const firstAidFacilityValue = String(questions.firstAidFacility || "").trim();
+  const firstAidFacilitySelectValue =
+    customFirstAidFacilityMode || (firstAidFacilityValue && !hospitalOptionLabels.has(firstAidFacilityValue))
+      ? CUSTOM_FIRST_AID_FACILITY_VALUE
+      : firstAidFacilityValue;
 
   useEffect(() => {
     let active = true;
@@ -10801,17 +10812,33 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
                       <label>
                         First Aid Facilities
                         <select
-                          value={questions.firstAidFacility || ""}
-                          onChange={(event) => updateQuestion("firstAidFacility", event.target.value)}
+                          value={firstAidFacilitySelectValue}
+                          onChange={(event) => {
+                            const nextValue = event.target.value;
+                            if (nextValue === CUSTOM_FIRST_AID_FACILITY_VALUE) {
+                              setCustomFirstAidFacilityMode(true);
+                              if (hospitalOptionLabels.has(firstAidFacilityValue)) {
+                                updateQuestion("firstAidFacility", "");
+                              }
+                              return;
+                            }
+                            setCustomFirstAidFacilityMode(false);
+                            updateQuestion("firstAidFacility", nextValue);
+                          }}
                         >
                           <option value="">{loadingHospitals ? "Loading nearest hospitals..." : "Select nearest hospital"}</option>
                           {hospitalOptions.map((hospital) => (
                             <option key={hospital.id} value={hospital.label}>{hospital.label}</option>
                           ))}
-                          {questions.firstAidFacility && !hospitalOptions.some((hospital) => hospital.label === questions.firstAidFacility) ? (
-                            <option value={questions.firstAidFacility}>{questions.firstAidFacility}</option>
-                          ) : null}
+                          <option value={CUSTOM_FIRST_AID_FACILITY_VALUE}>Custom hospital / facility</option>
                         </select>
+                        {firstAidFacilitySelectValue === CUSTOM_FIRST_AID_FACILITY_VALUE ? (
+                          <input
+                            value={firstAidFacilityValue}
+                            onChange={(event) => updateQuestion("firstAidFacility", event.target.value)}
+                            placeholder="Type hospital or first aid facility"
+                          />
+                        ) : null}
                         {hospitalLookupStatus ? <small>{hospitalLookupStatus}</small> : null}
                       </label>
                       <label>
