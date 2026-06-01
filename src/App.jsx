@@ -7715,8 +7715,10 @@ function getDesignBoardEditDraft(card) {
       ? card.items.map((item, index) => ({
           id: item.id || `design-item-${index + 1}`,
           name: item.name || "",
+          jobType: item.jobType || "",
           description: item.description || "",
-          quantity: item.quantity || ""
+          quantity: item.quantity || "",
+          lineTotal: item.lineTotal || 0
         }))
       : []
   };
@@ -7736,6 +7738,24 @@ async function readJsonResponse(response, fallbackMessage) {
     throw new Error(fallbackMessage);
   }
   throw new Error(fallbackMessage);
+}
+
+function formatDesignBoardElapsed(value) {
+  const timestamp = value ? new Date(value).getTime() : 0;
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return "-";
+  const diffMs = Math.max(0, Date.now() - timestamp);
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (hours < 24) return `${hours || 0}h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+function formatDesignBoardChaseMethod(value) {
+  if (value === "phone") return "phone";
+  if (value === "email") return "email";
+  if (value === "phone-email") return "phone + email";
+  return "";
 }
 
 function getDesignBoardCardClassName(card) {
@@ -7760,6 +7780,7 @@ function DesignBoardColumn({
   onEditCard,
   onDeleteCard,
   onTogglePriority,
+  onChaseCard,
   expandedCardId = "",
   onToggleCard,
   draggingCardId = "",
@@ -7796,10 +7817,19 @@ function DesignBoardColumn({
             } : undefined}
             onDragEnd={editable && !card.isAwaitingSignOff ? () => onDragCardStart?.("") : undefined}
           >
+            <div className="design-board-card-status-bar">
+              <span>Added {formatDesignBoardElapsed(card.createdAt)}</span>
+              <span>Amend {formatDesignBoardElapsed(card.lastAmendmentAt || card.lastCustomerResponseAt)}</span>
+              <span>
+                Chased {formatDesignBoardElapsed(card.lastChasedAt)}
+                {card.lastChaseMethod ? ` (${formatDesignBoardChaseMethod(card.lastChaseMethod)})` : ""}
+              </span>
+            </div>
             <div className="design-board-card-head">
               <div>
                 <strong>{card.orderReference}</strong>
                 <span>{card.customerName || "Customer not set"}</span>
+                {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
               </div>
               <div className="design-board-card-actions">
                 {editable ? (
@@ -7815,6 +7845,7 @@ function DesignBoardColumn({
                     <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onTogglePriority?.(card); }}>
                       {card.isPriority ? "Priority on" : "Priority"}
                     </button>
+                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onChaseCard?.(card); }}>Chased</button>
                     <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onEditCard?.(card); }}>Edit</button>
                     <button type="button" className="ghost-button danger" onClick={(event) => { event.stopPropagation(); onDeleteCard?.(card); }}>Delete</button>
                   </>
@@ -7824,6 +7855,7 @@ function DesignBoardColumn({
 
             <div className="design-board-card-body">
               <p className="design-board-card-description">{card.description || "No design description added yet."}</p>
+              {card.jobTotalExVat ? <p className="design-board-card-total">Net total: {formatProFormaMoney(card.jobTotalExVat)}</p> : null}
               <dl className="design-board-card-meta">
                 <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
                 {card.contact || card.number ? <div><dt>Contact</dt><dd>{[card.contact, card.number].filter(Boolean).join(" - ")}</dd></div> : null}
@@ -7836,7 +7868,9 @@ function DesignBoardColumn({
                   {card.items.map((item) => (
                     <li key={item.id}>
                       <strong>{item.name || "Item"}</strong>
+                      {item.jobType ? <span>Category - {item.jobType}</span> : null}
                       <span>{item.quantity ? `Qty ${item.quantity}` : ""}</span>
+                      {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
                       {item.description ? <small>{item.description}</small> : null}
                     </li>
                   ))}
@@ -7862,6 +7896,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
+  const [chasingCardId, setChasingCardId] = useState("");
   const [expandedDesignCardId, setExpandedDesignCardId] = useState("");
   const [draggingDesignCardId, setDraggingDesignCardId] = useState("");
   const [editDraft, setEditDraft] = useState(null);
@@ -7870,6 +7905,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const editingCard = useMemo(
     () => board?.cards?.find((card) => card.id === editingCardId) || null,
     [board, editingCardId]
+  );
+  const chasingCard = useMemo(
+    () => board?.cards?.find((card) => card.id === chasingCardId) || null,
+    [board, chasingCardId]
   );
 
   async function loadBoard() {
@@ -7996,6 +8035,16 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     await patchCard(card, { isPriority: !card.isPriority }, card.isPriority ? "Removed priority" : "Marked as priority");
   }
 
+  async function handleChased(method) {
+    if (!chasingCard) return;
+    await updateBoardRequest(`/api/design-board/cards/${chasingCard.id}/chased`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ method })
+    }, "Updated chase details");
+    setChasingCardId("");
+  }
+
   async function handleSaveEdit() {
     if (!editingCard || !editDraft) return;
     await patchCard(editingCard, { ...editDraft, items: editDraft.items }, "Saved card changes");
@@ -8061,6 +8110,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
+                onChaseCard={(card) => setChasingCardId(card.id)}
                 expandedCardId={expandedDesignCardId}
                 onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
                 draggingCardId={draggingDesignCardId}
@@ -8080,6 +8130,22 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
+                onChaseCard={(card) => setChasingCardId(card.id)}
+                expandedCardId={expandedDesignCardId}
+                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                draggingCardId={draggingDesignCardId}
+                onDragCardStart={setDraggingDesignCardId}
+              />
+              <DesignBoardColumn
+                title="Awaiting Sign-Off"
+                subtitle="Cards pulse red when follow-up is due."
+                cards={lanes.awaitingSignOff}
+                editable={editable}
+                onCardAction={handleCardAction}
+                onEditCard={(card) => setEditingCardId(card.id)}
+                onDeleteCard={handleDeleteCard}
+                onTogglePriority={handleTogglePriority}
+                onChaseCard={(card) => setChasingCardId(card.id)}
                 expandedCardId={expandedDesignCardId}
                 onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
                 draggingCardId={draggingDesignCardId}
@@ -8101,26 +8167,13 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   onEditCard={(card) => setEditingCardId(card.id)}
                   onDeleteCard={handleDeleteCard}
                   onTogglePriority={handleTogglePriority}
+                  onChaseCard={(card) => setChasingCardId(card.id)}
                   expandedCardId={expandedDesignCardId}
                   onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
                   draggingCardId={draggingDesignCardId}
                   onDragCardStart={setDraggingDesignCardId}
                 />
               ))}
-              <DesignBoardColumn
-                title="Awaiting Sign-Off"
-                subtitle="Cards pulse red when follow-up is due."
-                cards={lanes.awaitingSignOff}
-                editable={editable}
-                onCardAction={handleCardAction}
-                onEditCard={(card) => setEditingCardId(card.id)}
-                onDeleteCard={handleDeleteCard}
-                onTogglePriority={handleTogglePriority}
-                expandedCardId={expandedDesignCardId}
-                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
-                draggingCardId={draggingDesignCardId}
-                onDragCardStart={setDraggingDesignCardId}
-              />
             </div>
           )}
         </section>
@@ -8147,6 +8200,25 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 <button className="primary-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
                   {savingKey === "/api/design-board/settings" ? "Saving..." : "Save settings"}
                 </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {editable && chasingCard ? (
+          <div className="modal-backdrop" onClick={() => setChasingCardId("")}>
+            <div className="modal design-board-settings-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>How was it chased?</h3>
+                  <p>{chasingCard.orderReference} - {chasingCard.customerName || "Customer"}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setChasingCardId("")}>x</button>
+              </div>
+              <div className="design-board-chase-options">
+                <button className="ghost-button" type="button" onClick={() => handleChased("phone")}>Phone call</button>
+                <button className="ghost-button" type="button" onClick={() => handleChased("email")}>Email</button>
+                <button className="primary-button" type="button" onClick={() => handleChased("phone-email")}>Phone call and email</button>
               </div>
             </div>
           </div>
@@ -8211,6 +8283,14 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                         items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, quantity: event.target.value } : entry)
                       }))}
                       placeholder="Qty"
+                    />
+                    <input
+                      value={item.jobType}
+                      onChange={(event) => setEditDraft((current) => ({
+                        ...current,
+                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, jobType: event.target.value } : entry)
+                      }))}
+                      placeholder="Category"
                     />
                     <textarea
                       rows={2}

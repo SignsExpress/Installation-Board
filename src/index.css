@@ -7027,6 +7027,24 @@ button {
   align-items: start;
 }
 
+.design-board-card-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.design-board-card-status-bar span {
+  display: inline-flex;
+  min-height: 20px;
+  align-items: center;
+  border-radius: 999px;
+  background: #edf3fb;
+  color: #32425b;
+  padding: 0 7px;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
 .design-board-card-head strong {
   display: block;
   font-size: 0.79rem;
@@ -7065,6 +7083,13 @@ button {
   font-size: 0.72rem;
   line-height: 1.35;
   color: #0f172a;
+}
+
+.design-board-card-total {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 .design-board-card-meta {
@@ -7171,6 +7196,13 @@ button {
   width: 110px;
 }
 
+.design-board-chase-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
 .design-board-edit-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -7197,7 +7229,7 @@ button {
 
 .design-board-edit-item {
   display: grid;
-  grid-template-columns: minmax(180px, 1.2fr) 90px minmax(0, 2fr);
+  grid-template-columns: minmax(160px, 1.1fr) 80px minmax(120px, 0.8fr) minmax(0, 2fr);
   gap: 10px;
   align-items: start;
 }

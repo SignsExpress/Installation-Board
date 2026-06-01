@@ -2988,8 +2988,10 @@ function sanitizeDesignBoardLineItem(payload = {}, index = 0) {
   return {
     id: String(payload.id || `design-item-${index + 1}`),
     name: String(payload.name || payload.lineItemName || "").trim(),
+    jobType: String(payload.jobType || payload.category || "").trim(),
     description: String(payload.description || "").trim(),
-    quantity: String(payload.quantity || "").trim()
+    quantity: String(payload.quantity || "").trim(),
+    lineTotal: Number.isFinite(Number(payload.lineTotal)) ? Math.round(Number(payload.lineTotal) * 100) / 100 : 0
   };
 }
 
@@ -3016,13 +3018,17 @@ function sanitizeDesignBoardCard(payload = {}) {
     status: safeStatus,
     signOffRequestedAt: String(payload.signOffRequestedAt || "").trim(),
     lastCustomerResponseAt: String(payload.lastCustomerResponseAt || "").trim(),
+    lastAmendmentAt: String(payload.lastAmendmentAt || payload.lastCustomerResponseAt || "").trim(),
+    lastChasedAt: String(payload.lastChasedAt || "").trim(),
+    lastChaseMethod: String(payload.lastChaseMethod || "").trim(),
+    jobTotalExVat: Number.isFinite(Number(payload.jobTotalExVat)) ? Math.round(Number(payload.jobTotalExVat) * 100) / 100 : 0,
     isPriority:
       payload.isPriority === true ||
       String(payload.isPriority || "").trim().toLowerCase() === "true" ||
       String(payload.isPriority || "").trim() === "1",
     items: Array.isArray(payload.items) ? payload.items.map((item, index) => sanitizeDesignBoardLineItem(item, index)) : [],
     createdAt: String(payload.createdAt || new Date().toISOString()),
-    updatedAt: new Date().toISOString()
+    updatedAt: String(payload.updatedAt || payload.createdAt || new Date().toISOString())
   };
 }
 
@@ -7573,6 +7579,8 @@ function extractProFormaLineItems(order = {}) {
       index,
       name: "",
       nameScore: -1,
+      category: "",
+      categoryScore: -1,
       quantity: "",
       quantityScore: -1,
       description: "",
@@ -7644,6 +7652,14 @@ function extractProFormaLineItems(order = {}) {
       if (textValue && nextScore > group.nameScore) {
         group.name = textValue;
         group.nameScore = nextScore;
+      }
+    }
+
+    if (/category/i.test(leaf) && textValue && !isNestedComponentField) {
+      const nextScore = /category$/i.test(leaf) ? 70 : 35;
+      if (nextScore > group.categoryScore) {
+        group.category = textValue;
+        group.categoryScore = nextScore;
       }
     }
 
@@ -7884,6 +7900,7 @@ function extractProFormaLineItems(order = {}) {
       id: item.id,
       sortIndex: item.sortIndex,
       name: item.name,
+      category: item.group.category || "",
       description: item.description,
       quantity: item.quantity,
       unitPrice: finalUnitPrice,
@@ -7946,15 +7963,36 @@ function buildProFormaPayload(order = {}) {
 }
 
 function buildDesignBoardItems(order = {}) {
-  return extractDescriptionPullLines(order).map((line, index) => ({
-    id: `design-item-${index + 1}`,
-    name: String(line.lineItemName || "").trim() || `Item ${index + 1}`,
-    description: String(line.description || "").trim(),
-    quantity: String(line.quantity || "").trim()
-  }));
+  const proFormaLines = extractProFormaLineItems(order);
+  const descriptionLines = extractDescriptionPullLines(order);
+  const lines = proFormaLines.length ? proFormaLines : descriptionLines;
+  return lines.map((line, index) => {
+    const rawName = String(line.name || line.lineItemName || "").trim();
+    const description = String(line.description || line.customerDescription || "").trim();
+    const name = /sourced goods cost|^misc$/i.test(rawName)
+      ? /install/i.test(description)
+        ? "Installation"
+        : `Item ${index + 1}`
+      : /sourced goods cost/i.test(rawName)
+      ? `Item ${index + 1}`
+      : /install labour|installation labour/i.test(rawName)
+        ? "Installation"
+        : rawName || `Item ${index + 1}`;
+    return {
+      id: `design-item-${index + 1}`,
+      name,
+      jobType: String(line.jobType || line.category || "").trim() || "Misc",
+      description,
+      quantity: String(line.quantity || "").trim(),
+      lineTotal: Number.isFinite(Number(line.lineTotal)) ? Math.round(Number(line.lineTotal) * 100) / 100 : 0
+    };
+  });
 }
 
 function buildDesignBoardCardFromOrder(order = {}) {
+  const lineItems = extractProFormaLineItems(order);
+  const rawSubtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
+  const totals = extractProFormaTotals(order, rawSubtotal, pickProFormaVatRate(order));
   return sanitizeDesignBoardCard({
     coreBridgeOrderId: order.id || "",
     orderReference: order.orderReference || "",
@@ -7968,6 +8006,7 @@ function buildDesignBoardCardFromOrder(order = {}) {
     billingAddress: order.billingAddress || order.address || "",
     notes: order.notes || "",
     items: buildDesignBoardItems(order),
+    jobTotalExVat: totals.preTaxTotal || totals.subtotal || rawSubtotal || 0,
     status: "new"
   });
 }
@@ -8044,8 +8083,11 @@ function buildDesignBoardPayload(store) {
 
   const cards = state.cards.map((card) => {
     const scheduledDate = String(card.scheduledDate || "").trim();
-    const signOffRequestedAt = String(card.signOffRequestedAt || "").trim();
-    const signOffRequestedMs = signOffRequestedAt ? new Date(signOffRequestedAt).getTime() : 0;
+    const signOffBaseAt = String(card.signOffRequestedAt || card.createdAt || card.updatedAt || "").trim();
+    const signOffRequestedMs = signOffBaseAt ? new Date(signOffBaseAt).getTime() : 0;
+    const itemTotal = Array.isArray(card.items)
+      ? Math.round(card.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100
+      : 0;
     const overdue = card.status === "awaiting-sign-off"
       && Number.isFinite(signOffRequestedMs)
       && signOffRequestedMs > 0
@@ -8055,7 +8097,9 @@ function buildDesignBoardPayload(store) {
       ...card,
       isAmendments: card.status === "amendments",
       isAwaitingSignOff: card.status === "awaiting-sign-off",
-      isOverdue: overdue
+      isOverdue: overdue,
+      signOffAgeBaseAt: signOffBaseAt,
+      jobTotalExVat: card.jobTotalExVat || itemTotal || 0
     };
 
     if (card.status === "awaiting-sign-off") {
@@ -9897,6 +9941,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
         nextCard.scheduledDate = state.cards[existingIndex].scheduledDate || "";
         nextCard.signOffRequestedAt = state.cards[existingIndex].signOffRequestedAt || "";
         nextCard.lastCustomerResponseAt = state.cards[existingIndex].lastCustomerResponseAt || "";
+        nextCard.lastAmendmentAt = state.cards[existingIndex].lastAmendmentAt || "";
+        nextCard.lastChasedAt = state.cards[existingIndex].lastChasedAt || "";
+        nextCard.lastChaseMethod = state.cards[existingIndex].lastChaseMethod || "";
         nextCard.designerNote = state.cards[existingIndex].designerNote || "";
         nextCard.isPriority = state.cards[existingIndex].isPriority || false;
         state.cards[existingIndex] = sanitizeDesignBoardCard(nextCard);
@@ -9933,7 +9980,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
       ...incoming,
       id: existing.id,
       coreBridgeOrderId: existing.coreBridgeOrderId || incoming.coreBridgeOrderId || "",
-      items: Array.isArray(incoming.items) ? incoming.items : existing.items
+      items: Array.isArray(incoming.items) ? incoming.items : existing.items,
+      updatedAt: new Date().toISOString()
     });
     state.cards[index] = nextCard;
     store.designBoard = state;
@@ -9956,7 +10004,34 @@ app.get("/api/corebridge/orders", async (request, response) => {
     state.cards[index] = sanitizeDesignBoardCard({
       ...state.cards[index],
       status: "awaiting-sign-off",
-      signOffRequestedAt: new Date().toISOString()
+      signOffRequestedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    store.designBoard = state;
+    const savedStore = await writeStore(store);
+    response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.post("/api/design-board/cards/:id/chased", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const state = sanitizeDesignBoardState(store.designBoard);
+    const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+    if (index === -1) {
+      response.status(404).json({ error: "Design card not found." });
+      return;
+    }
+    const method = String(request.body?.method || "").trim().toLowerCase();
+    const safeMethod = ["phone", "email", "phone-email"].includes(method) ? method : "";
+    if (!safeMethod) {
+      response.status(400).json({ error: "Choose how the customer was chased." });
+      return;
+    }
+    state.cards[index] = sanitizeDesignBoardCard({
+      ...state.cards[index],
+      lastChasedAt: new Date().toISOString(),
+      lastChaseMethod: safeMethod,
+      updatedAt: new Date().toISOString()
     });
     store.designBoard = state;
     const savedStore = await writeStore(store);
@@ -9977,7 +10052,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
       status: "amendments",
       scheduledDate: "",
       signOffRequestedAt: "",
-      lastCustomerResponseAt: new Date().toISOString()
+      lastCustomerResponseAt: new Date().toISOString(),
+      lastAmendmentAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
     store.designBoard = state;
     const savedStore = await writeStore(store);
