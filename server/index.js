@@ -9941,7 +9941,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.get("/api/design-board", async (request, response) => {
     if (!requireDesignBoardAccess(request, response)) return;
     try {
-      const store = await backfillDesignBoardDetails(await readStore());
+      const store = await readStore();
       response.json(buildDesignBoardPayload(store));
     } catch (error) {
       response.status(500).json({
