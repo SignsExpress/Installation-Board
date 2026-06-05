@@ -2990,7 +2990,7 @@ function sanitizeDesignBoardLineItem(payload = {}, index = 0) {
   return {
     id: String(payload.id || `design-item-${index + 1}`),
     name: normalizeDesignBoardItemName(rawName, description, index),
-    jobType: normalizeDesignBoardJobType(payload.jobType || payload.category || rawName, rawName, description),
+    jobType: String(payload.jobType || payload.category || "").trim(),
     description,
     quantity: String(payload.quantity || "").trim(),
     lineTotal: Number.isFinite(Number(payload.lineTotal)) ? Math.round(Number(payload.lineTotal) * 100) / 100 : 0
@@ -3003,23 +3003,7 @@ function isCoreBridgeCategoryCode(value = "") {
 
 function normalizeDesignBoardItemName(value = "", description = "", index = 0) {
   const raw = String(value || "").trim();
-  if (/install labour|installation labour/i.test(raw)) return "Installation";
-  if (/sourced goods cost|^misc$/i.test(raw)) return /install/i.test(description) ? "Installation" : `Item ${index + 1}`;
-  if (isCoreBridgeCategoryCode(raw)) return /install|attend site|all works/i.test(description) ? "Installation" : `Item ${index + 1}`;
   return raw || `Item ${index + 1}`;
-}
-
-function normalizeDesignBoardJobType(value = "", itemName = "", description = "") {
-  const raw = String(value || "").trim();
-  const normalized = raw.toLowerCase();
-  if (normalized === "1180") return "Misc";
-  if (normalized === "1179") return "Delivery & Installation";
-  if (normalized === "1188") return "Delivery & Installation";
-  if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
-  if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
-  if (/install|attend site|all works/i.test(String(description || ""))) return "Delivery & Installation";
-  if (/^misc$/i.test(raw)) return "Misc";
-  return raw || "Misc";
 }
 
 function sanitizeDesignBoardCard(payload = {}) {
@@ -7154,11 +7138,7 @@ function extractDescriptionPullLines(order = {}) {
   }
 
   function scoreNameField(leaf) {
-    if (/lineitemname/i.test(leaf)) return 70;
-    if (/itemname|productname/i.test(leaf)) return 45;
-    if (/(^|\.|_)name$/i.test(leaf)) return 25;
-    if (/title/i.test(leaf)) return 20;
-    return 0;
+    return scoreCoreBridgeLineItemNameField(leaf);
   }
 
   function scoreQuantityField(leaf) {
@@ -7197,11 +7177,12 @@ function extractDescriptionPullLines(order = {}) {
       }
     }
 
+    const nameFieldScore = scoreNameField(leaf);
     if (
-      /(lineitemname|itemname|productname|name|title)/i.test(leaf) &&
-      !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
+      nameFieldScore > 0 &&
+      !/(category|vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
     ) {
-      const nextScore = scoreNameField(leaf);
+      const nextScore = nameFieldScore;
       if (nextScore > group.nameScore && !isCoreBridgeCategoryCode(value) && !isGenericProFormaName(value)) {
         group.name = value;
         group.nameScore = nextScore;
@@ -7376,6 +7357,35 @@ function isGenericProFormaName(value = "") {
   const text = String(value || "").trim();
   if (!text) return true;
   return /^(item\s*\d+|line item\s*\d+|panel with vinyl print to surface\.?|stand-?offs?,? screw covers?,? hanging kits? ?&? holes?|category|graphics)$/i.test(text);
+}
+
+function normalizeCoreBridgeFieldName(value = "") {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function scoreCoreBridgeLineItemNameField(leaf = "") {
+  const compact = normalizeCoreBridgeFieldName(leaf);
+  if (compact.endsWith("lineitemname")) return 160;
+  if (compact.endsWith("orderitemname")) return 130;
+  if (compact.endsWith("itemname")) return 120;
+  if (compact.endsWith("productname")) return 90;
+  if (compact.endsWith("name")) return 45;
+  if (compact.endsWith("title")) return 35;
+  return 0;
+}
+
+function scoreCoreBridgeLineItemCategoryField(leaf = "", value = "") {
+  const compact = normalizeCoreBridgeFieldName(leaf);
+  const text = String(value || "").trim();
+  let score = 0;
+  if (compact.endsWith("categoryname")) score = 160;
+  else if (compact.endsWith("lineitemcategory")) score = 145;
+  else if (compact.endsWith("orderitemcategory")) score = 135;
+  else if (compact.endsWith("itemcategory")) score = 125;
+  else if (compact.endsWith("category")) score = 115;
+  else if (compact.includes("category")) score = 70;
+  if (isCoreBridgeCategoryCode(text)) score -= 80;
+  return score;
 }
 
 function isGenericProFormaDescription(value = "") {
@@ -7670,12 +7680,13 @@ function extractProFormaLineItems(order = {}) {
 
     const isNestedComponentField = /(^|\.)(components?|childcomponents?)\./i.test(leaf);
 
+    const nameFieldScore = scoreCoreBridgeLineItemNameField(leaf);
     if (
-      /(lineitemname|itemname|productname|name|title)/i.test(leaf) &&
+      nameFieldScore > 0 &&
       !/(category|vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
       && !isNestedComponentField
     ) {
-      const nextScore = /^orderitem\.name$/i.test(leaf) ? 85 : /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : /title/i.test(leaf) ? 35 : 20;
+      const nextScore = nameFieldScore;
       if (textValue && nextScore > group.nameScore && !isCoreBridgeCategoryCode(textValue) && !isGenericProFormaName(textValue)) {
         group.name = textValue;
         group.nameScore = nextScore;
@@ -7696,8 +7707,9 @@ function extractProFormaLineItems(order = {}) {
       group.nameScore = 30;
     }
 
-    if (/category/i.test(leaf) && textValue && !isNestedComponentField) {
-      const nextScore = /category$/i.test(leaf) ? 70 : 35;
+    const categoryFieldScore = scoreCoreBridgeLineItemCategoryField(leaf, textValue);
+    if (categoryFieldScore > 0 && textValue && !isNestedComponentField) {
+      const nextScore = categoryFieldScore;
       if (nextScore > group.categoryScore) {
         group.category = textValue;
         group.categoryScore = nextScore;
@@ -8014,7 +8026,7 @@ function buildDesignBoardItems(order = {}) {
     return {
       id: `design-item-${index + 1}`,
       name,
-      jobType: normalizeDesignBoardJobType(line.jobType || line.category || rawName, name, description),
+      jobType: String(line.jobType || line.category || "").trim(),
       description,
       quantity: String(line.quantity || "").trim(),
       lineTotal: Number.isFinite(Number(line.lineTotal)) ? Math.round(Number(line.lineTotal) * 100) / 100 : 0

@@ -7758,29 +7758,13 @@ function formatDesignBoardChaseMethod(value) {
   return "";
 }
 
-function isCoreBridgeCategoryCode(value = "") {
-  return /^\d{3,5}$/.test(String(value || "").trim());
-}
-
 function formatDesignBoardItemName(value = "", description = "", index = 0) {
   const raw = String(value || "").trim();
-  if (/install labour|installation labour/i.test(raw)) return "Installation";
-  if (/sourced goods cost|^misc$/i.test(raw)) return /install/i.test(description) ? "Installation" : `Item ${index + 1}`;
-  if (isCoreBridgeCategoryCode(raw)) return /install|attend site|all works/i.test(description) ? "Installation" : `Item ${index + 1}`;
   return raw || `Item ${index + 1}`;
 }
 
 function formatDesignBoardJobType(value = "", itemName = "", description = "") {
-  const raw = String(value || "").trim();
-  const normalized = raw.toLowerCase();
-  if (normalized === "1180") return "Misc";
-  if (normalized === "1179") return "Delivery & Installation";
-  if (normalized === "1188") return "Delivery & Installation";
-  if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
-  if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
-  if (/install|attend site|all works/i.test(String(description || ""))) return "Delivery & Installation";
-  if (/^misc$/i.test(raw)) return "Misc";
-  return raw || "Misc";
+  return String(value || "").trim();
 }
 
 function buildDesignBoardCopyText(card = {}) {
