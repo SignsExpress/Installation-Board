@@ -7157,7 +7157,7 @@ function extractDescriptionPullLines(order = {}) {
     if (/lineitemname/i.test(leaf)) return 70;
     if (/itemname|productname/i.test(leaf)) return 45;
     if (/(^|\.|_)name$/i.test(leaf)) return 25;
-    if (/title|category/i.test(leaf)) return 10;
+    if (/title/i.test(leaf)) return 20;
     return 0;
   }
 
@@ -7198,11 +7198,11 @@ function extractDescriptionPullLines(order = {}) {
     }
 
     if (
-      /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
+      /(lineitemname|itemname|productname|name|title)/i.test(leaf) &&
       !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
     ) {
       const nextScore = scoreNameField(leaf);
-      if (nextScore > group.nameScore) {
+      if (nextScore > group.nameScore && !isCoreBridgeCategoryCode(value) && !isGenericProFormaName(value)) {
         group.name = value;
         group.nameScore = nextScore;
       }
@@ -7671,15 +7671,29 @@ function extractProFormaLineItems(order = {}) {
     const isNestedComponentField = /(^|\.)(components?|childcomponents?)\./i.test(leaf);
 
     if (
-      /(lineitemname|itemname|productname|name|title|category)/i.test(leaf) &&
-      !/(vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
+      /(lineitemname|itemname|productname|name|title)/i.test(leaf) &&
+      !/(category|vat|tax|price|cost|amount|total|subtotal|balance)/i.test(leaf)
       && !isNestedComponentField
     ) {
-      const nextScore = /^orderitem\.name$/i.test(leaf) ? 85 : /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : 20;
-      if (textValue && nextScore > group.nameScore) {
+      const nextScore = /^orderitem\.name$/i.test(leaf) ? 85 : /lineitemname/i.test(leaf) ? 70 : /itemname|productname/i.test(leaf) ? 45 : /title/i.test(leaf) ? 35 : 20;
+      if (textValue && nextScore > group.nameScore && !isCoreBridgeCategoryCode(textValue) && !isGenericProFormaName(textValue)) {
         group.name = textValue;
         group.nameScore = nextScore;
       }
+    }
+
+    if (
+      !group.name &&
+      /(lineitemdescription|itemdescription|productdescription|^orderitem\.description$)/i.test(leaf) &&
+      textValue &&
+      textValue.length <= 90 &&
+      !isGenericProFormaDescription(textValue) &&
+      !isGenericProFormaName(textValue) &&
+      !isCoreBridgeCategoryCode(textValue) &&
+      !isNestedComponentField
+    ) {
+      group.name = textValue;
+      group.nameScore = 30;
     }
 
     if (/category/i.test(leaf) && textValue && !isNestedComponentField) {
