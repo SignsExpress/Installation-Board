@@ -4391,7 +4391,7 @@ async function getAttendancePayload(forUser, monthId = "") {
         }, 0);
         return sum + claimMiles;
       }, 0);
-    mileagePoundsByPersonKey.set(personKey, Math.round(totalMiles * 45) / 100);
+    mileagePoundsByPersonKey.set(personKey, Math.round(totalMiles * 55) / 100);
   });
 
   const rows = enumerateIsoDates(startIso, endIso).map((isoDate) => {

@@ -13453,7 +13453,7 @@ function AttendancePage({
                   <li>Half-day holidays use the worked half of the day only when measuring overtime and deductions.</li>
                   <li>The final net total is rounded to payroll blocks of 30 minutes: 20 minutes or below rounds down, 25 minutes or above rounds up.</li>
                   <li>Sick days are tracked separately and do not reduce overtime totals.</li>
-                  <li>Mileage shows the month value from the mileage module at £0.45 per mile.</li>
+                  <li>Mileage shows the month value from the mileage module at £0.55 per mile.</li>
                 </ul>
               </div>
             </section>
@@ -13653,7 +13653,7 @@ function AttendancePage({
                     <li>Half-day holidays use the worked half of the day only when measuring overtime and deductions.</li>
                     <li>The final net total is rounded to payroll blocks of 30 minutes: 20 minutes or below rounds down, 25 minutes or above rounds up.</li>
                     <li>Sick days are tracked separately and do not reduce overtime totals.</li>
-                    <li>Mileage shows the month value from the mileage module at £0.45 per mile.</li>
+                    <li>Mileage shows the month value from the mileage module at £0.55 per mile.</li>
                   </ul>
                 </div>
               </section>
