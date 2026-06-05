@@ -7152,11 +7152,11 @@ function extractDescriptionPullLines(order = {}) {
     const key = String(field.key || "");
     const lowerKey = key.toLowerCase();
     const value = normalizeSocialText(field.value);
-    const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+    const match = matchCoreBridgeLineItemField(lowerKey);
     if (!match || !value) return;
 
-    const group = groups.get(match[1]) || {
-      index: Number(match[1]),
+    const group = groups.get(match.indexKey) || {
+      index: match.index,
       name: "",
       nameScore: -1,
       quantity: "",
@@ -7164,7 +7164,7 @@ function extractDescriptionPullLines(order = {}) {
       description: "",
       descriptionScore: -1
     };
-    const leaf = match[2];
+    const leaf = match.leaf;
 
     if (
       /(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf) &&
@@ -7197,7 +7197,7 @@ function extractDescriptionPullLines(order = {}) {
       }
     }
 
-    groups.set(match[1], group);
+    groups.set(match.indexKey, group);
   });
 
   const lines = [...groups.values()]
@@ -7386,6 +7386,22 @@ function scoreCoreBridgeLineItemCategoryField(leaf = "", value = "") {
   else if (compact.includes("category")) score = 70;
   if (isCoreBridgeCategoryCode(text)) score -= 80;
   return score;
+}
+
+function matchCoreBridgeLineItemField(key = "") {
+  const parts = String(key || "").toLowerCase().split(".").filter(Boolean);
+  const itemAnchorPattern = /^(?:items?|lineitems?|estimateitems?|orderitems?|orderdestinationitems?)$/i;
+  for (let anchorIndex = 0; anchorIndex < parts.length; anchorIndex += 1) {
+    if (!itemAnchorPattern.test(parts[anchorIndex])) continue;
+    const itemIndex = parts.findIndex((part, index) => index > anchorIndex && /^\d+$/.test(part));
+    if (itemIndex === -1 || itemIndex >= parts.length - 1) continue;
+    return {
+      indexKey: parts[itemIndex],
+      index: Number(parts[itemIndex]),
+      leaf: parts.slice(itemIndex + 1).join(".")
+    };
+  }
+  return null;
 }
 
 function isGenericProFormaDescription(value = "") {
@@ -7606,13 +7622,13 @@ function extractProFormaLineItems(order = {}) {
   fields.forEach((field) => {
     const key = String(field.key || "");
     const lowerKey = key.toLowerCase();
-    const match = lowerKey.match(/(?:items?|orderdestinationitems?|estimateitems?|lineitems?)\.(\d+)\.(.+)$/i);
+    const match = matchCoreBridgeLineItemField(lowerKey);
     if (!match) return;
-    const leaf = match[2];
+    const leaf = match.leaf;
 
-    const index = Number(match[1]);
+    const index = match.index;
     const textValue = normalizeSocialText(field.value);
-    const group = groups.get(match[1]) || {
+    const group = groups.get(match.indexKey) || {
       index,
       name: "",
       nameScore: -1,
@@ -7674,7 +7690,7 @@ function extractProFormaLineItems(order = {}) {
           }
         }
       });
-      groups.set(match[1], group);
+      groups.set(match.indexKey, group);
       return;
     }
 
@@ -7800,7 +7816,7 @@ function extractProFormaLineItems(order = {}) {
       });
     }
 
-    groups.set(match[1], group);
+    groups.set(match.indexKey, group);
   });
 
   const preparedGroups = [...groups.values()]
