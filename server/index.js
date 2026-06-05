@@ -41,6 +41,7 @@ const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
 const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
 const DEFAULT_COREBRIDGE_ESTIMATE_PATH = "/core/api/estimate";
 const DEFAULT_COREBRIDGE_MATERIAL_PATH = "/core/api/material";
+const coreBridgeLineItemCategoryCache = new Map();
 const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
@@ -4679,6 +4680,21 @@ function getCoreBridgeMaterialPathVariants(config) {
     .filter((value, index, items) => items.indexOf(value) === index);
 }
 
+function getCoreBridgeLineItemCategoryPathVariants() {
+  return [
+    "/core/api/lineitemcategory/simplelist",
+    "/core/api/orderitemcategory/simplelist",
+    "/core/api/estimateitemcategory/simplelist",
+    "/core/api/itemcategory/simplelist",
+    "/core/api/category/simplelist",
+    "/api/lineitemcategory/simplelist",
+    "/api/orderitemcategory/simplelist",
+    "/api/estimateitemcategory/simplelist",
+    "/api/itemcategory/simplelist",
+    "/api/category/simplelist"
+  ];
+}
+
 function buildCoreBridgeMaterialRequestPlans(config, pathValue, query = "", take = 200) {
   const baseParams = [
     { take },
@@ -6427,6 +6443,104 @@ function normalizeCoreBridgeMaterial(record, index = 0) {
   };
 }
 
+function normalizeCoreBridgeLineItemCategory(record, index = 0) {
+  const flat = flattenRecord(record);
+  const id = String(
+    pickFirst(flat, [
+      "id",
+      "categoryid",
+      "lineitemcategoryid",
+      "orderitemcategoryid",
+      "estimateitemcategoryid",
+      "itemcategoryid",
+      "enumcategory.id",
+      "category.id"
+    ]) || record?.ID || record?.Id || record?.id || ""
+  ).trim();
+  const name = String(
+    pickFirst(flat, [
+      "name",
+      "categoryname",
+      "lineitemcategoryname",
+      "orderitemcategoryname",
+      "estimateitemcategoryname",
+      "itemcategoryname",
+      "displayname",
+      "label",
+      "description",
+      "enumcategory.name",
+      "category.name"
+    ]) || record?.Name || record?.name || ""
+  ).trim();
+  return {
+    id,
+    name,
+    raw: record
+  };
+}
+
+async function fetchCoreBridgeLineItemCategoryNames(categoryIds = []) {
+  const requestedIds = [...new Set(categoryIds.map((id) => String(id || "").trim()).filter(Boolean))];
+  const result = new Map();
+  const missingIds = requestedIds.filter((id) => {
+    if (coreBridgeLineItemCategoryCache.has(id)) {
+      const cachedName = coreBridgeLineItemCategoryCache.get(id);
+      if (cachedName) result.set(id, cachedName);
+      return false;
+    }
+    return true;
+  });
+  if (!missingIds.length) return result;
+
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) return result;
+
+  const paths = getCoreBridgeLineItemCategoryPathVariants();
+  const requestPlans = paths.flatMap((pathValue) => [
+    buildCoreBridgeCollectionUrl(config, pathValue, { take: 500, sortBy: "name" }),
+    ...missingIds.flatMap((id) => [
+      buildCoreBridgeCollectionUrl(config, pathValue, { take: 50, id }),
+      buildCoreBridgeCollectionUrl(config, pathValue, { take: 50, categoryId: id }),
+      buildCoreBridgeCollectionUrl(config, pathValue, { take: 50, search: id })
+    ])
+  ]).filter((value, index, items) => items.indexOf(value) === index);
+
+  for (const requestUrl of requestPlans) {
+    try {
+      const response = await fetch(requestUrl, {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+          Accept: "application/json"
+        }
+      });
+      if (!response.ok) continue;
+      const rawBody = await response.text();
+      let body;
+      try {
+        body = JSON.parse(rawBody);
+      } catch (error) {
+        continue;
+      }
+      extractCoreBridgeRecords(body)
+        .map((record, index) => normalizeCoreBridgeLineItemCategory(record, index))
+        .forEach((category) => {
+          if (!category.id || !category.name || !missingIds.includes(String(category.id))) return;
+          coreBridgeLineItemCategoryCache.set(String(category.id), category.name);
+          result.set(String(category.id), category.name);
+        });
+      if (missingIds.every((id) => result.has(id))) break;
+    } catch (error) {
+      // Category names are helpful but should never block pulling a design card.
+    }
+  }
+
+  missingIds.forEach((id) => {
+    if (!result.has(id)) coreBridgeLineItemCategoryCache.set(id, "");
+  });
+  return result;
+}
+
 async function fetchCoreBridgeMaterials(searchTerm = "") {
   const config = getCoreBridgeConfig();
   if (!config.token || !config.subscriptionKey) {
@@ -7984,6 +8098,7 @@ function extractProFormaLineItems(order = {}) {
         sortIndex: group.index,
         name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || ('Line Item ' + (group.index + 1))),
         category: group.category || categoryNameById.get(String(group.categoryId || "")) || "",
+        categoryId: String(group.categoryId || "").trim(),
         description: group.description || '',
         quantity: String(group.quantity || normalizedQuantity || 1),
         normalizedQuantity,
@@ -8035,6 +8150,7 @@ function extractProFormaLineItems(order = {}) {
       sortIndex: item.sortIndex,
       name: item.name,
       category: item.category || "",
+      categoryId: item.categoryId || "",
       description: item.description,
       quantity: item.quantity,
       unitPrice: finalUnitPrice,
@@ -8096,18 +8212,24 @@ function buildProFormaPayload(order = {}) {
   };
 }
 
-function buildDesignBoardItems(order = {}) {
+async function buildDesignBoardItems(order = {}) {
   const proFormaLines = extractProFormaLineItems(order);
   const descriptionLines = extractDescriptionPullLines(order);
   const lines = proFormaLines.length ? proFormaLines : descriptionLines;
+  const categoryIds = lines
+    .filter((line) => !String(line.category || line.jobType || "").trim())
+    .map((line) => line.categoryId)
+    .filter(Boolean);
+  const categoryNameById = await fetchCoreBridgeLineItemCategoryNames(categoryIds);
   return lines.map((line, index) => {
     const rawName = String(line.name || line.lineItemName || "").trim();
     const description = String(line.description || line.customerDescription || "").trim();
     const name = normalizeDesignBoardItemName(rawName, description, index);
+    const categoryName = String(line.jobType || line.category || categoryNameById.get(String(line.categoryId || "")) || "").trim();
     return {
       id: `design-item-${index + 1}`,
       name,
-      jobType: String(line.jobType || line.category || "").trim(),
+      jobType: categoryName,
       description,
       quantity: String(line.quantity || "").trim(),
       lineTotal: Number.isFinite(Number(line.lineTotal)) ? Math.round(Number(line.lineTotal) * 100) / 100 : 0
@@ -8115,7 +8237,7 @@ function buildDesignBoardItems(order = {}) {
   });
 }
 
-function buildDesignBoardCardFromOrder(order = {}) {
+async function buildDesignBoardCardFromOrder(order = {}) {
   const lineItems = extractProFormaLineItems(order);
   const rawSubtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
   const totals = extractProFormaTotals(order, rawSubtotal, pickProFormaVatRate(order));
@@ -8131,7 +8253,7 @@ function buildDesignBoardCardFromOrder(order = {}) {
     siteAddress: order.siteAddress || "",
     billingAddress: order.billingAddress || order.address || "",
     notes: order.notes || "",
-    items: buildDesignBoardItems(order),
+    items: await buildDesignBoardItems(order),
     jobTotalExVat: totals.preTaxTotal || totals.subtotal || rawSubtotal || 0,
     status: "new"
   });
@@ -8176,7 +8298,7 @@ function needsDesignBoardCoreBridgeRefresh(card = {}) {
 async function refreshDesignBoardCardDetails(card = {}) {
   const { order } = await fetchDesignBoardOrderByReference(card.orderReference);
   if (!order) return sanitizeDesignBoardCard(card);
-  const refreshed = buildDesignBoardCardFromOrder(order);
+  const refreshed = await buildDesignBoardCardFromOrder(order);
   return sanitizeDesignBoardCard({
     ...card,
     customerName: card.customerName || refreshed.customerName,
@@ -10123,7 +10245,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const existingIndex = state.cards.findIndex(
         (card) => String(card.orderReference || "").trim().toLowerCase() === String(order.orderReference || orderReference).trim().toLowerCase()
       );
-      const nextCard = buildDesignBoardCardFromOrder(order);
+      const nextCard = await buildDesignBoardCardFromOrder(order);
       if (existingIndex >= 0) {
         nextCard.id = state.cards[existingIndex].id;
         nextCard.createdAt = state.cards[existingIndex].createdAt || nextCard.createdAt;
