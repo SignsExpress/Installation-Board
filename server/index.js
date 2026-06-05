@@ -7743,7 +7743,7 @@ function extractProFormaLineItems(order = {}) {
     }
 
     const categoryFieldScore = scoreCoreBridgeLineItemCategoryField(leaf, textValue);
-    if (categoryFieldScore > 0 && textValue && !isNestedComponentField) {
+    if (categoryFieldScore > 0 && textValue && !isCoreBridgeCategoryCode(textValue)) {
       const nextScore = categoryFieldScore;
       if (nextScore > group.categoryScore) {
         group.category = textValue;
