@@ -7363,25 +7363,41 @@ function normalizeCoreBridgeFieldName(value = "") {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function normalizeCoreBridgeScoredFieldName(value = "") {
+  let compact = normalizeCoreBridgeFieldName(value);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const suffix of ["displayvalue", "displaytext", "value", "text", "label"]) {
+      if (compact.endsWith(suffix) && compact.length > suffix.length) {
+        compact = compact.slice(0, -suffix.length);
+        changed = true;
+        break;
+      }
+    }
+  }
+  return compact;
+}
+
 function scoreCoreBridgeLineItemNameField(leaf = "") {
-  const compact = normalizeCoreBridgeFieldName(leaf);
-  if (compact.endsWith("lineitemname")) return 160;
-  if (compact.endsWith("orderitemname")) return 130;
-  if (compact.endsWith("itemname")) return 120;
-  if (compact.endsWith("productname")) return 90;
+  const compact = normalizeCoreBridgeScoredFieldName(leaf);
+  if (compact.includes("lineitemname")) return 180;
+  if (compact.includes("orderitemname")) return 150;
+  if (compact.includes("itemname")) return 135;
+  if (compact.includes("productname")) return 100;
   if (compact.endsWith("name")) return 45;
   if (compact.endsWith("title")) return 35;
   return 0;
 }
 
 function scoreCoreBridgeLineItemCategoryField(leaf = "", value = "") {
-  const compact = normalizeCoreBridgeFieldName(leaf);
+  const compact = normalizeCoreBridgeScoredFieldName(leaf);
   const text = String(value || "").trim();
   let score = 0;
-  if (compact.endsWith("categoryname")) score = 160;
-  else if (compact.endsWith("lineitemcategory")) score = 145;
-  else if (compact.endsWith("orderitemcategory")) score = 135;
-  else if (compact.endsWith("itemcategory")) score = 125;
+  if (compact.includes("categoryname")) score = 180;
+  else if (compact.includes("lineitemcategory")) score = 155;
+  else if (compact.includes("orderitemcategory")) score = 145;
+  else if (compact.includes("itemcategory")) score = 135;
   else if (compact.endsWith("category")) score = 115;
   else if (compact.includes("category")) score = 70;
   if (isCoreBridgeCategoryCode(text)) score -= 80;
@@ -7390,9 +7406,12 @@ function scoreCoreBridgeLineItemCategoryField(leaf = "", value = "") {
 
 function matchCoreBridgeLineItemField(key = "") {
   const parts = String(key || "").toLowerCase().split(".").filter(Boolean);
-  const itemAnchorPattern = /^(?:items?|lineitems?|estimateitems?|orderitems?|orderdestinationitems?)$/i;
   for (let anchorIndex = 0; anchorIndex < parts.length; anchorIndex += 1) {
-    if (!itemAnchorPattern.test(parts[anchorIndex])) continue;
+    const anchor = normalizeCoreBridgeFieldName(parts[anchorIndex]);
+    const isItemAnchor = ["item", "items", "lineitem", "lineitems", "estimateitem", "estimateitems", "orderitem", "orderitems", "orderdestinationitem", "orderdestinationitems"].some((suffix) =>
+      anchor === suffix || anchor.endsWith(suffix)
+    );
+    if (!isItemAnchor) continue;
     const itemIndex = parts.findIndex((part, index) => index > anchorIndex && /^\d+$/.test(part));
     if (itemIndex === -1 || itemIndex >= parts.length - 1) continue;
     return {
