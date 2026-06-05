@@ -7395,11 +7395,13 @@ function scoreCoreBridgeLineItemCategoryField(leaf = "", value = "") {
   const text = String(value || "").trim();
   let score = 0;
   if (compact.includes("categoryname")) score = 180;
+  else if (compact.includes("categoriesname")) score = 180;
   else if (compact.includes("lineitemcategory")) score = 155;
   else if (compact.includes("orderitemcategory")) score = 145;
   else if (compact.includes("itemcategory")) score = 135;
   else if (compact.endsWith("category")) score = 115;
-  else if (compact.includes("category")) score = 70;
+  else if (compact.endsWith("categories")) score = 115;
+  else if (compact.includes("category") || compact.includes("categories")) score = 70;
   if (isCoreBridgeCategoryCode(text)) score -= 80;
   return score;
 }
@@ -7421,6 +7423,45 @@ function matchCoreBridgeLineItemField(key = "") {
     };
   }
   return null;
+}
+
+function getCoreBridgeFieldParentKey(key = "") {
+  const parts = String(key || "").toLowerCase().split(".").filter(Boolean);
+  if (parts.length <= 1) return "";
+  return parts.slice(0, -1).join(".");
+}
+
+function buildCoreBridgeCategoryNameLookup(fields = []) {
+  const groups = new Map();
+
+  fields.forEach((field) => {
+    const key = String(field.key || "").toLowerCase();
+    const value = normalizeSocialText(field.value);
+    if (!key.includes("categor") || !value) return;
+
+    const compactKey = normalizeCoreBridgeScoredFieldName(key);
+    const parentKey = getCoreBridgeFieldParentKey(key);
+    if (!parentKey) return;
+
+    const group = groups.get(parentKey) || { id: "", name: "", nameScore: -1 };
+    if (/(?:category)?id$/.test(compactKey) && isCoreBridgeCategoryCode(value)) {
+      group.id = value;
+    }
+
+    const nameScore = scoreCoreBridgeLineItemCategoryField(key, value);
+    if (nameScore > group.nameScore && !isCoreBridgeCategoryCode(value)) {
+      group.name = value;
+      group.nameScore = nameScore;
+    }
+
+    groups.set(parentKey, group);
+  });
+
+  const lookup = new Map();
+  groups.forEach((group) => {
+    if (group.id && group.name) lookup.set(String(group.id), group.name);
+  });
+  return lookup;
 }
 
 function isGenericProFormaDescription(value = "") {
@@ -7637,6 +7678,7 @@ function extractProFormaLineItems(order = {}) {
   const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
   const groups = new Map();
   const targetSubtotal = getProFormaTargetSubtotal(order);
+  const categoryNameById = buildCoreBridgeCategoryNameLookup(fields);
 
   fields.forEach((field) => {
     const key = String(field.key || "");
@@ -7652,6 +7694,7 @@ function extractProFormaLineItems(order = {}) {
       name: "",
       nameScore: -1,
       category: "",
+      categoryId: "",
       categoryScore: -1,
       quantity: "",
       quantityScore: -1,
@@ -7743,7 +7786,9 @@ function extractProFormaLineItems(order = {}) {
     }
 
     const categoryFieldScore = scoreCoreBridgeLineItemCategoryField(leaf, textValue);
-    if (categoryFieldScore > 0 && textValue && !isCoreBridgeCategoryCode(textValue)) {
+    if (categoryFieldScore > 0 && textValue && isCoreBridgeCategoryCode(textValue)) {
+      group.categoryId = textValue;
+    } else if (categoryFieldScore > 0 && textValue) {
       const nextScore = categoryFieldScore;
       if (nextScore > group.categoryScore) {
         group.category = textValue;
@@ -7938,6 +7983,7 @@ function extractProFormaLineItems(order = {}) {
         id: 'pro-forma-line-' + (group.index + 1),
         sortIndex: group.index,
         name: !isGenericProFormaName(group.name) ? group.name : (group.description || group.name || ('Line Item ' + (group.index + 1))),
+        category: group.category || categoryNameById.get(String(group.categoryId || "")) || "",
         description: group.description || '',
         quantity: String(group.quantity || normalizedQuantity || 1),
         normalizedQuantity,
@@ -7988,7 +8034,7 @@ function extractProFormaLineItems(order = {}) {
       id: item.id,
       sortIndex: item.sortIndex,
       name: item.name,
-      category: item.group.category || "",
+      category: item.category || "",
       description: item.description,
       quantity: item.quantity,
       unitPrice: finalUnitPrice,
