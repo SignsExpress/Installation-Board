@@ -7758,13 +7758,27 @@ function formatDesignBoardChaseMethod(value) {
   return "";
 }
 
-function formatDesignBoardJobType(value = "", itemName = "") {
+function isCoreBridgeCategoryCode(value = "") {
+  return /^\d{3,5}$/.test(String(value || "").trim());
+}
+
+function formatDesignBoardItemName(value = "", description = "", index = 0) {
+  const raw = String(value || "").trim();
+  if (/install labour|installation labour/i.test(raw)) return "Installation";
+  if (/sourced goods cost|^misc$/i.test(raw)) return /install/i.test(description) ? "Installation" : `Item ${index + 1}`;
+  if (isCoreBridgeCategoryCode(raw)) return /install|attend site|all works/i.test(description) ? "Installation" : `Item ${index + 1}`;
+  return raw || `Item ${index + 1}`;
+}
+
+function formatDesignBoardJobType(value = "", itemName = "", description = "") {
   const raw = String(value || "").trim();
   const normalized = raw.toLowerCase();
   if (normalized === "1180") return "Misc";
   if (normalized === "1179") return "Delivery & Installation";
+  if (normalized === "1188") return "Delivery & Installation";
   if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
   if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
+  if (/install|attend site|all works/i.test(String(description || ""))) return "Delivery & Installation";
   if (/^misc$/i.test(raw)) return "Misc";
   return raw || "Misc";
 }
@@ -7785,8 +7799,9 @@ function buildDesignBoardCopyText(card = {}) {
     lines.push("Items:");
     card.items.forEach((item, index) => {
       lines.push("");
-      lines.push(`${index + 1}. ${item.name || `Item ${index + 1}`}`);
-      lines.push(`Category: ${formatDesignBoardJobType(item.jobType, item.name)}`);
+      const itemName = formatDesignBoardItemName(item.name, item.description, index);
+      lines.push(`${index + 1}. ${itemName}`);
+      lines.push(`Category: ${formatDesignBoardJobType(item.jobType, itemName, item.description)}`);
       if (item.quantity) lines.push(`Qty: ${item.quantity}`);
       if (item.lineTotal) lines.push(`Line total: ${formatProFormaMoney(item.lineTotal)}`);
       if (item.description) lines.push(item.description);
@@ -8283,15 +8298,18 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   </dl>
                   {Array.isArray(detailCard.items) && detailCard.items.length ? (
                     <ul className="design-board-items design-board-detail-items">
-                      {detailCard.items.map((item) => (
-                        <li key={item.id}>
-                          <strong>{item.name || "Item"}</strong>
-                          <span>Category - {formatDesignBoardJobType(item.jobType, item.name)}</span>
-                          {item.quantity ? <span>Qty {item.quantity}</span> : null}
-                          {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
-                          {item.description ? <small>{item.description}</small> : null}
-                        </li>
-                      ))}
+                      {detailCard.items.map((item, index) => {
+                        const itemName = formatDesignBoardItemName(item.name, item.description, index);
+                        return (
+                          <li key={item.id}>
+                            <strong>{itemName}</strong>
+                            <span>Category - {formatDesignBoardJobType(item.jobType, itemName, item.description)}</span>
+                            {item.quantity ? <span>Qty {item.quantity}</span> : null}
+                            {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
+                            {item.description ? <small>{item.description}</small> : null}
+                          </li>
+                        );
+                      })}
                     </ul>
                   ) : null}
                 </section>

@@ -2985,23 +2985,39 @@ function sanitizeDesignBoardSettings(payload = {}) {
 }
 
 function sanitizeDesignBoardLineItem(payload = {}, index = 0) {
+  const rawName = String(payload.name || payload.lineItemName || "").trim();
+  const description = String(payload.description || "").trim();
   return {
     id: String(payload.id || `design-item-${index + 1}`),
-    name: String(payload.name || payload.lineItemName || "").trim(),
-    jobType: normalizeDesignBoardJobType(payload.jobType || payload.category, payload.name || payload.lineItemName || ""),
-    description: String(payload.description || "").trim(),
+    name: normalizeDesignBoardItemName(rawName, description, index),
+    jobType: normalizeDesignBoardJobType(payload.jobType || payload.category || rawName, rawName, description),
+    description,
     quantity: String(payload.quantity || "").trim(),
     lineTotal: Number.isFinite(Number(payload.lineTotal)) ? Math.round(Number(payload.lineTotal) * 100) / 100 : 0
   };
 }
 
-function normalizeDesignBoardJobType(value = "", itemName = "") {
+function isCoreBridgeCategoryCode(value = "") {
+  return /^\d{3,5}$/.test(String(value || "").trim());
+}
+
+function normalizeDesignBoardItemName(value = "", description = "", index = 0) {
+  const raw = String(value || "").trim();
+  if (/install labour|installation labour/i.test(raw)) return "Installation";
+  if (/sourced goods cost|^misc$/i.test(raw)) return /install/i.test(description) ? "Installation" : `Item ${index + 1}`;
+  if (isCoreBridgeCategoryCode(raw)) return /install|attend site|all works/i.test(description) ? "Installation" : `Item ${index + 1}`;
+  return raw || `Item ${index + 1}`;
+}
+
+function normalizeDesignBoardJobType(value = "", itemName = "", description = "") {
   const raw = String(value || "").trim();
   const normalized = raw.toLowerCase();
   if (normalized === "1180") return "Misc";
   if (normalized === "1179") return "Delivery & Installation";
+  if (normalized === "1188") return "Delivery & Installation";
   if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
   if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
+  if (/install|attend site|all works/i.test(String(description || ""))) return "Delivery & Installation";
   if (/^misc$/i.test(raw)) return "Misc";
   return raw || "Misc";
 }
@@ -7980,19 +7996,11 @@ function buildDesignBoardItems(order = {}) {
   return lines.map((line, index) => {
     const rawName = String(line.name || line.lineItemName || "").trim();
     const description = String(line.description || line.customerDescription || "").trim();
-    const name = /sourced goods cost|^misc$/i.test(rawName)
-      ? /install/i.test(description)
-        ? "Installation"
-        : `Item ${index + 1}`
-      : /sourced goods cost/i.test(rawName)
-      ? `Item ${index + 1}`
-      : /install labour|installation labour/i.test(rawName)
-        ? "Installation"
-        : rawName || `Item ${index + 1}`;
+    const name = normalizeDesignBoardItemName(rawName, description, index);
     return {
       id: `design-item-${index + 1}`,
       name,
-      jobType: normalizeDesignBoardJobType(line.jobType || line.category, name),
+      jobType: normalizeDesignBoardJobType(line.jobType || line.category || rawName, name, description),
       description,
       quantity: String(line.quantity || "").trim(),
       lineTotal: Number.isFinite(Number(line.lineTotal)) ? Math.round(Number(line.lineTotal) * 100) / 100 : 0
