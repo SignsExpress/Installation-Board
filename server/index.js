@@ -8150,22 +8150,30 @@ function buildDesignBoardPayload(store) {
 
   const cards = state.cards.map((card) => {
     const scheduledDate = String(card.scheduledDate || "").trim();
-    const signOffBaseAt = String(card.lastChasedAt || card.signOffRequestedAt || card.createdAt || card.updatedAt || "").trim();
-    const signOffRequestedMs = signOffBaseAt ? new Date(signOffBaseAt).getTime() : 0;
+    const activityBaseAt = String(
+      card.lastChasedAt ||
+      card.lastAmendmentAt ||
+      card.lastCustomerResponseAt ||
+      card.signOffRequestedAt ||
+      card.updatedAt ||
+      card.createdAt ||
+      ""
+    ).trim();
+    const activityBaseMs = activityBaseAt ? new Date(activityBaseAt).getTime() : 0;
     const itemTotal = Array.isArray(card.items)
       ? Math.round(card.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100
       : 0;
-    const overdue = card.status === "awaiting-sign-off"
-      && Number.isFinite(signOffRequestedMs)
-      && signOffRequestedMs > 0
-      && now - signOffRequestedMs > signOffHours * 60 * 60 * 1000;
+    const overdue = card.status !== "approved"
+      && Number.isFinite(activityBaseMs)
+      && activityBaseMs > 0
+      && now - activityBaseMs > signOffHours * 60 * 60 * 1000;
 
     const nextCard = {
       ...card,
       isAmendments: card.status === "amendments",
       isAwaitingSignOff: card.status === "awaiting-sign-off",
       isOverdue: overdue,
-      signOffAgeBaseAt: signOffBaseAt,
+      signOffAgeBaseAt: activityBaseAt,
       jobTotalExVat: card.jobTotalExVat || itemTotal || 0
     };
 
