@@ -2988,11 +2988,22 @@ function sanitizeDesignBoardLineItem(payload = {}, index = 0) {
   return {
     id: String(payload.id || `design-item-${index + 1}`),
     name: String(payload.name || payload.lineItemName || "").trim(),
-    jobType: String(payload.jobType || payload.category || "").trim(),
+    jobType: normalizeDesignBoardJobType(payload.jobType || payload.category, payload.name || payload.lineItemName || ""),
     description: String(payload.description || "").trim(),
     quantity: String(payload.quantity || "").trim(),
     lineTotal: Number.isFinite(Number(payload.lineTotal)) ? Math.round(Number(payload.lineTotal) * 100) / 100 : 0
   };
+}
+
+function normalizeDesignBoardJobType(value = "", itemName = "") {
+  const raw = String(value || "").trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === "1180") return "Misc";
+  if (normalized === "1179") return "Delivery & Installation";
+  if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
+  if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
+  if (/^misc$/i.test(raw)) return "Misc";
+  return raw || "Misc";
 }
 
 function sanitizeDesignBoardCard(payload = {}) {
@@ -7981,7 +7992,7 @@ function buildDesignBoardItems(order = {}) {
     return {
       id: `design-item-${index + 1}`,
       name,
-      jobType: String(line.jobType || line.category || "").trim() || "Misc",
+      jobType: normalizeDesignBoardJobType(line.jobType || line.category, name),
       description,
       quantity: String(line.quantity || "").trim(),
       lineTotal: Number.isFinite(Number(line.lineTotal)) ? Math.round(Number(line.lineTotal) * 100) / 100 : 0

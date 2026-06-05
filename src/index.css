@@ -7182,6 +7182,48 @@ button {
   width: min(460px, 92vw);
 }
 
+.design-board-detail-modal {
+  width: min(1100px, 94vw);
+}
+
+.design-board-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.design-board-detail-grid h4 {
+  margin: 0 0 10px;
+}
+
+.design-board-detail-items {
+  margin-top: 12px;
+}
+
+.design-board-copy-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.design-board-copy-head h4 {
+  margin: 0;
+}
+
+.design-board-detail-grid textarea {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  font: 0.78rem/1.45 "FARICYNEW", Arial, sans-serif;
+  color: #0f172a;
+  resize: vertical;
+}
+
 .design-board-setting-modal-field {
   margin-top: 12px;
 }
@@ -7256,6 +7298,10 @@ button {
   }
 
   .design-board-column-body {
+    grid-template-columns: 1fr;
+  }
+
+  .design-board-detail-grid {
     grid-template-columns: 1fr;
   }
 }

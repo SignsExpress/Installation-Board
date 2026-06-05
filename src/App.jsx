@@ -7758,6 +7758,44 @@ function formatDesignBoardChaseMethod(value) {
   return "";
 }
 
+function formatDesignBoardJobType(value = "", itemName = "") {
+  const raw = String(value || "").trim();
+  const normalized = raw.toLowerCase();
+  if (normalized === "1180") return "Misc";
+  if (normalized === "1179") return "Delivery & Installation";
+  if (/delivery\s*&?\s*installation|install/i.test(raw)) return "Delivery & Installation";
+  if (/installation/i.test(String(itemName || ""))) return "Delivery & Installation";
+  if (/^misc$/i.test(raw)) return "Misc";
+  return raw || "Misc";
+}
+
+function buildDesignBoardCopyText(card = {}) {
+  const lines = [
+    `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
+    card.description || "",
+    card.jobTotalExVat ? `Net total: ${formatProFormaMoney(card.jobTotalExVat)}` : "",
+    [card.contact, card.number].filter(Boolean).length ? `Contact: ${[card.contact, card.number].filter(Boolean).join(" - ")}` : "",
+    card.contactEmail ? `Email: ${card.contactEmail}` : "",
+    card.address || card.siteAddress ? `Address: ${card.address || card.siteAddress}` : "",
+    card.createdAt ? `Date added: ${formatProFormaDate(card.createdAt)}` : "",
+    ""
+  ].filter((line, index, list) => line || index === list.length - 1);
+
+  if (Array.isArray(card.items) && card.items.length) {
+    lines.push("Items:");
+    card.items.forEach((item, index) => {
+      lines.push("");
+      lines.push(`${index + 1}. ${item.name || `Item ${index + 1}`}`);
+      lines.push(`Category: ${formatDesignBoardJobType(item.jobType, item.name)}`);
+      if (item.quantity) lines.push(`Qty: ${item.quantity}`);
+      if (item.lineTotal) lines.push(`Line total: ${formatProFormaMoney(item.lineTotal)}`);
+      if (item.description) lines.push(item.description);
+    });
+  }
+
+  return lines.filter((line, index, list) => line || (list[index - 1] && list[index + 1])).join("\n").trim();
+}
+
 function getDesignBoardCardClassName(card) {
   const classNames = ["design-board-card"];
   if (card?.isPriority) classNames.push("is-priority");
@@ -7781,7 +7819,6 @@ function DesignBoardColumn({
   onDeleteCard,
   onTogglePriority,
   onChaseCard,
-  expandedCardId = "",
   onToggleCard,
   draggingCardId = "",
   onDragCardStart
@@ -7863,20 +7900,8 @@ function DesignBoardColumn({
                 {card.createdAt ? <div><dt>Date Added</dt><dd>{formatProFormaDate(card.createdAt)}</dd></div> : null}
               </dl>
               {card.designerNote ? <p className="design-board-designer-note">{card.designerNote}</p> : null}
-              {Array.isArray(card.items) && card.items.length && expandedCardId === card.id ? (
-                <ul className="design-board-items">
-                  {card.items.map((item) => (
-                    <li key={item.id}>
-                      <strong>{item.name || "Item"}</strong>
-                      {item.jobType ? <span>Category - {item.jobType}</span> : null}
-                      <span>{item.quantity ? `Qty ${item.quantity}` : ""}</span>
-                      {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
-                      {item.description ? <small>{item.description}</small> : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : Array.isArray(card.items) && card.items.length ? (
-                <p className="design-board-card-more">Click card to view {card.items.length} item{card.items.length === 1 ? "" : "s"}.</p>
+              {Array.isArray(card.items) && card.items.length ? (
+                <p className="design-board-card-more">Click card to view and copy {card.items.length} item{card.items.length === 1 ? "" : "s"}.</p>
               ) : null}
             </div>
           </article>
@@ -7897,7 +7922,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
   const [chasingCardId, setChasingCardId] = useState("");
-  const [expandedDesignCardId, setExpandedDesignCardId] = useState("");
+  const [detailCardId, setDetailCardId] = useState("");
+  const [detailCopyStatus, setDetailCopyStatus] = useState("");
   const [draggingDesignCardId, setDraggingDesignCardId] = useState("");
   const [editDraft, setEditDraft] = useState(null);
   const editable = canEditDesignBoard(currentUser);
@@ -7910,6 +7936,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     () => board?.cards?.find((card) => card.id === chasingCardId) || null,
     [board, chasingCardId]
   );
+  const detailCard = useMemo(
+    () => board?.cards?.find((card) => card.id === detailCardId) || null,
+    [board, detailCardId]
+  );
+  const detailCopyText = useMemo(() => buildDesignBoardCopyText(detailCard || {}), [detailCard]);
 
   async function loadBoard() {
     try {
@@ -8045,6 +8076,16 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     setChasingCardId("");
   }
 
+  async function copyDesignCardDetails() {
+    if (!detailCopyText) return;
+    try {
+      await navigator.clipboard.writeText(detailCopyText);
+      setDetailCopyStatus("Copied");
+    } catch (copyError) {
+      setDetailCopyStatus("Select the text and press Ctrl+C");
+    }
+  }
+
   async function handleSaveEdit() {
     if (!editingCard || !editDraft) return;
     await patchCard(editingCard, { ...editDraft, items: editDraft.items }, "Saved card changes");
@@ -8111,8 +8152,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
-                expandedCardId={expandedDesignCardId}
-                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
@@ -8131,8 +8171,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
-                expandedCardId={expandedDesignCardId}
-                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
@@ -8146,8 +8185,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
-                expandedCardId={expandedDesignCardId}
-                onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
@@ -8168,8 +8206,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   onDeleteCard={handleDeleteCard}
                   onTogglePriority={handleTogglePriority}
                   onChaseCard={(card) => setChasingCardId(card.id)}
-                  expandedCardId={expandedDesignCardId}
-                  onToggleCard={(card) => setExpandedDesignCardId((current) => current === card.id ? "" : card.id)}
+                  onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                   draggingCardId={draggingDesignCardId}
                   onDragCardStart={setDraggingDesignCardId}
                 />
@@ -8219,6 +8256,53 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 <button className="ghost-button" type="button" onClick={() => handleChased("phone")}>Phone call</button>
                 <button className="ghost-button" type="button" onClick={() => handleChased("email")}>Email</button>
                 <button className="primary-button" type="button" onClick={() => handleChased("phone-email")}>Phone call and email</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {detailCard ? (
+          <div className="modal-backdrop" onClick={() => setDetailCardId("")}>
+            <div className="modal design-board-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>{detailCard.orderReference}</h3>
+                  <p>{detailCard.customerName || "Customer not set"}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setDetailCardId("")}>x</button>
+              </div>
+              <div className="design-board-detail-grid">
+                <section>
+                  <h4>Job Details</h4>
+                  <dl className="design-board-card-meta">
+                    {detailCard.jobTotalExVat ? <div><dt>Net total</dt><dd>{formatProFormaMoney(detailCard.jobTotalExVat)}</dd></div> : null}
+                    <div><dt>Contact</dt><dd>{[detailCard.contact, detailCard.number].filter(Boolean).join(" - ") || "No contact"}</dd></div>
+                    {detailCard.contactEmail ? <div><dt>Email</dt><dd>{detailCard.contactEmail}</dd></div> : null}
+                    <div><dt>Address</dt><dd>{detailCard.address || detailCard.siteAddress || "No address"}</dd></div>
+                    {detailCard.createdAt ? <div><dt>Date added</dt><dd>{formatProFormaDate(detailCard.createdAt)}</dd></div> : null}
+                  </dl>
+                  {Array.isArray(detailCard.items) && detailCard.items.length ? (
+                    <ul className="design-board-items design-board-detail-items">
+                      {detailCard.items.map((item) => (
+                        <li key={item.id}>
+                          <strong>{item.name || "Item"}</strong>
+                          <span>Category - {formatDesignBoardJobType(item.jobType, item.name)}</span>
+                          {item.quantity ? <span>Qty {item.quantity}</span> : null}
+                          {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
+                          {item.description ? <small>{item.description}</small> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </section>
+                <section>
+                  <div className="design-board-copy-head">
+                    <h4>Copy Text</h4>
+                    <button className="ghost-button" type="button" onClick={copyDesignCardDetails}>Copy</button>
+                  </div>
+                  <textarea readOnly value={detailCopyText} rows={18} onFocus={(event) => event.target.select()} />
+                  {detailCopyStatus ? <p className="form-success">{detailCopyStatus}</p> : null}
+                </section>
               </div>
             </div>
           </div>
