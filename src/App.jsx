@@ -7875,10 +7875,19 @@ function DesignBoardColumn({
               </span>
             </div>
             <div className="design-board-card-head">
-              <div>
-                <strong>{card.orderReference}</strong>
-                <span>{card.customerName || "Customer not set"}</span>
-                {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
+              <div className="design-board-card-identity">
+                <div className="design-board-card-avatar" title={card.uploadedByName ? `Uploaded by ${card.uploadedByName}` : "Uploader not recorded"}>
+                  {card.uploadedByPhotoDataUrl ? (
+                    <img src={card.uploadedByPhotoDataUrl} alt="" />
+                  ) : (
+                    <span>{getInitials(card.uploadedByName || card.customerName || card.orderReference)}</span>
+                  )}
+                </div>
+                <div className="design-board-card-identity-copy">
+                  <strong>{card.orderReference}</strong>
+                  <span>{card.customerName || "Customer not set"}</span>
+                  {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
+                </div>
               </div>
               {card.createdAt ? (
                 <div className="design-board-card-date">
@@ -8198,15 +8207,18 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
             </div>
             {editable ? (
               <form className="design-board-toolbar-actions" onSubmit={handlePull}>
-                <input
-                  value={orderReference}
-                  onChange={(event) => setOrderReference(event.target.value)}
-                  placeholder="ORD-3379 or EST-3379"
-                />
-                <button className="primary-button" type="submit" disabled={savingKey === "/api/design-board/pull"}>
-                  {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull"}
-                </button>
-                <button className="ghost-button" type="button" onClick={() => setSettingsOpen(true)}>
+                <div className="design-board-pull-group">
+                  <input
+                    value={orderReference}
+                    onChange={(event) => setOrderReference(event.target.value)}
+                    placeholder="Pull ORD or EST reference"
+                    aria-label="Order or estimate reference"
+                  />
+                  <button type="submit" disabled={savingKey === "/api/design-board/pull"}>
+                    {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull"}
+                  </button>
+                </div>
+                <button className="design-board-settings-button" type="button" onClick={() => setSettingsOpen(true)}>
                   Settings
                 </button>
               </form>
@@ -8214,7 +8226,6 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
           </div>
 
           {error ? <p className="form-error">{error}</p> : null}
-          {!error && info ? <p className="form-success">{info}</p> : null}
 
           {loading ? (
             <div className="design-board-empty">Loading design board...</div>

@@ -3032,6 +3032,9 @@ function sanitizeDesignBoardCard(payload = {}) {
     billingAddress: String(payload.billingAddress || "").trim(),
     notes: String(payload.notes || "").trim(),
     designerNote: String(payload.designerNote || "").trim(),
+    uploadedByUserId: String(payload.uploadedByUserId || "").trim(),
+    uploadedByName: String(payload.uploadedByName || "").trim(),
+    uploadedByPhotoDataUrl: String(payload.uploadedByPhotoDataUrl || "").trim(),
     scheduledDate: String(payload.scheduledDate || "").trim(),
     status: safeStatus,
     signOffRequestedAt: String(payload.signOffRequestedAt || "").trim(),
@@ -10293,6 +10296,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
       if (existingIndex >= 0) {
         nextCard.id = state.cards[existingIndex].id;
         nextCard.createdAt = state.cards[existingIndex].createdAt || nextCard.createdAt;
+        nextCard.uploadedByUserId = state.cards[existingIndex].uploadedByUserId || request.user?.id || "";
+        nextCard.uploadedByName = state.cards[existingIndex].uploadedByName || request.user?.displayName || "";
+        nextCard.uploadedByPhotoDataUrl = state.cards[existingIndex].uploadedByPhotoDataUrl || request.user?.photoDataUrl || "";
         nextCard.status = state.cards[existingIndex].status || nextCard.status;
         nextCard.scheduledDate = state.cards[existingIndex].scheduledDate || "";
         nextCard.signOffRequestedAt = state.cards[existingIndex].signOffRequestedAt || "";
@@ -10304,6 +10310,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
         nextCard.isPriority = state.cards[existingIndex].isPriority || false;
         state.cards[existingIndex] = sanitizeDesignBoardCard(nextCard);
       } else {
+        nextCard.uploadedByUserId = request.user?.id || "";
+        nextCard.uploadedByName = request.user?.displayName || "";
+        nextCard.uploadedByPhotoDataUrl = request.user?.photoDataUrl || "";
         state.cards.unshift(nextCard);
       }
       store.designBoard = state;
