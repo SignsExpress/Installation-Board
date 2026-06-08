@@ -949,7 +949,7 @@ const VEHICLE_TEMPLATE_OPTIONS = [
     tyreReferenceSelector: "g[id='_x37_40.98mm'] path",
     tyreReferenceDiameterMm: 740.98,
     artworkScale: 0.1,
-    viewBox: { x: 0, y: 0, width: 2668.62, height: 1873.41 },
+    viewBox: { x: 0, y: -120, width: 2668.62, height: 2113.41 },
     pricingDefaultsVersion: 1
   }
 ];
