@@ -7942,6 +7942,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [info, setInfo] = useState("");
   const [orderReference, setOrderReference] = useState("");
   const [settingsHours, setSettingsHours] = useState("48");
+  const [approvalTargets, setApprovalTargets] = useState({ today: "2500", week: "12500", month: "50000" });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
@@ -7980,6 +7981,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
       if (!response.ok) throw new Error(payload.error || "Could not load the design board.");
       setBoard(payload);
       setSettingsHours(String(payload?.settings?.signOffFollowUpHours || 48));
+      setApprovalTargets({
+        today: String(payload?.settings?.dailyApprovalTarget ?? 2500),
+        week: String(payload?.settings?.weeklyApprovalTarget ?? 12500),
+        month: String(payload?.settings?.monthlyApprovalTarget ?? 50000)
+      });
       setError("");
     } catch (loadError) {
       setError(loadError.message || "Could not load the design board.");
@@ -8009,6 +8015,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
       const nextBoard = payload.board || payload;
       setBoard(nextBoard);
       setSettingsHours(String(nextBoard?.settings?.signOffFollowUpHours || settingsHours || 48));
+      setApprovalTargets({
+        today: String(nextBoard?.settings?.dailyApprovalTarget ?? approvalTargets.today),
+        week: String(nextBoard?.settings?.weeklyApprovalTarget ?? approvalTargets.week),
+        month: String(nextBoard?.settings?.monthlyApprovalTarget ?? approvalTargets.month)
+      });
       if (nextInfo) setInfo(nextInfo);
       setError("");
       return payload;
@@ -8039,7 +8050,12 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     await updateBoardRequest("/api/design-board/settings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ signOffFollowUpHours: Number(settingsHours) || 48 })
+      body: JSON.stringify({
+        signOffFollowUpHours: Number(settingsHours) || 48,
+        dailyApprovalTarget: Number(approvalTargets.today) || 0,
+        weeklyApprovalTarget: Number(approvalTargets.week) || 0,
+        monthlyApprovalTarget: Number(approvalTargets.month) || 0
+      })
     }, "Updated sign-off chase timing");
     setSettingsOpen(false);
   }
@@ -8140,6 +8156,12 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
 
   const lanes = board?.lanes || { newOrders: [], unallocated: [], awaitingSignOff: [], orderWithSalesperson: [], days: {} };
   const days = board?.days || [];
+  const approvalSummary = board?.approvalSummary || { today: 0, week: 0, month: 0, targets: { today: 0, week: 0, month: 0 } };
+  const approvalPeriods = [
+    { key: "today", label: "Approved today" },
+    { key: "week", label: "Approved this week" },
+    { key: "month", label: "Approved this month" }
+  ];
 
   return (
     <div className="app-shell social-post-shell">
@@ -8155,9 +8177,24 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
 
         <section className="panel design-board-panel">
           <div className="design-board-toolbar">
-            <div>
-              <h2>Design Board</h2>
-              <p>Pull jobs, schedule artwork into the week, and move approved work into Filtering.</p>
+            <div className="design-board-performance">
+              {approvalPeriods.map((period) => {
+                const value = Number(approvalSummary[period.key] || 0);
+                const target = Number(approvalSummary.targets?.[period.key] || 0);
+                const progress = target > 0 ? Math.min((value / target) * 100, 100) : 0;
+                return (
+                  <div key={period.key} className="design-board-performance-item">
+                    <div className="design-board-performance-head">
+                      <span>{period.label}</span>
+                      <strong>{formatProFormaMoney(value)}</strong>
+                    </div>
+                    <div className="design-board-progress-track">
+                      <span style={{ width: `${progress}%` }} />
+                    </div>
+                    <small>{target > 0 ? `${Math.round(progress)}% of ${formatProFormaMoney(target)}` : "No target set"}</small>
+                  </div>
+                );
+              })}
             </div>
             {editable ? (
               <form className="design-board-toolbar-actions" onSubmit={handlePull}>
@@ -8290,12 +8327,32 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
               <div className="modal-head">
                 <div>
                   <h3>Design Board Settings</h3>
-                  <p>Control when awaiting sign-off cards start pulsing red.</p>
+                  <p>Set approval targets and follow-up timing.</p>
                 </div>
                 <button className="icon-button" type="button" onClick={() => setSettingsOpen(false)}>x</button>
               </div>
+              <div className="design-board-target-settings">
+                {[
+                  { key: "today", label: "Daily target" },
+                  { key: "week", label: "Weekly target" },
+                  { key: "month", label: "Monthly target" }
+                ].map((target) => (
+                  <label key={target.key}>
+                    <span>{target.label}</span>
+                    <div>
+                      <span>£</span>
+                      <input
+                        value={approvalTargets[target.key]}
+                        onChange={(event) => setApprovalTargets((current) => ({ ...current, [target.key]: event.target.value }))}
+                        inputMode="decimal"
+                      />
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <div className="design-board-settings-divider" />
               <label className="design-board-setting design-board-setting-modal-field">
-                <span>Pulse after</span>
+                <span>Pulse awaiting sign-off cards after</span>
                 <div>
                   <input value={settingsHours} onChange={(event) => setSettingsHours(event.target.value)} inputMode="numeric" />
                   <span>hours</span>

@@ -2977,11 +2977,17 @@ function sanitizeMileageClaim(payload) {
 
 function sanitizeDesignBoardSettings(payload = {}) {
   const signOffFollowUpHours = Number(payload.signOffFollowUpHours);
+  const dailyApprovalTarget = Number(payload.dailyApprovalTarget);
+  const weeklyApprovalTarget = Number(payload.weeklyApprovalTarget);
+  const monthlyApprovalTarget = Number(payload.monthlyApprovalTarget);
   return {
     signOffFollowUpHours:
       Number.isFinite(signOffFollowUpHours) && signOffFollowUpHours >= 1 && signOffFollowUpHours <= 720
         ? Math.round(signOffFollowUpHours)
-        : 48
+        : 48,
+    dailyApprovalTarget: Number.isFinite(dailyApprovalTarget) && dailyApprovalTarget >= 0 ? Math.round(dailyApprovalTarget * 100) / 100 : 2500,
+    weeklyApprovalTarget: Number.isFinite(weeklyApprovalTarget) && weeklyApprovalTarget >= 0 ? Math.round(weeklyApprovalTarget * 100) / 100 : 12500,
+    monthlyApprovalTarget: Number.isFinite(monthlyApprovalTarget) && monthlyApprovalTarget >= 0 ? Math.round(monthlyApprovalTarget * 100) / 100 : 50000
   };
 }
 
@@ -8369,6 +8375,37 @@ function isPastDesignDate(isoDate = "", todayIso = "") {
   return Boolean(isoDate && todayIso && isoDate < todayIso);
 }
 
+function buildDesignBoardApprovalSummary(filteringCards = [], settings = {}) {
+  const today = getDesignBoardTodayIso();
+  const todayDate = parseIsoDate(today);
+  const weekday = todayDate?.getUTCDay() || 0;
+  const weekStart = toIsoDate(addDays(todayDate, -(weekday === 0 ? 6 : weekday - 1)));
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const totals = { today: 0, week: 0, month: 0 };
+
+  filteringCards.forEach((card) => {
+    const approvedDate = new Date(card.approvedAt || "");
+    if (!Number.isFinite(approvedDate.getTime())) return;
+    const approvedIso = toIsoDate(approvedDate);
+    if (!approvedIso) return;
+    const value = Number(card.jobTotalExVat || 0);
+    if (approvedIso === today) totals.today += value;
+    if (approvedIso >= weekStart && approvedIso <= today) totals.week += value;
+    if (approvedIso >= monthStart && approvedIso <= today) totals.month += value;
+  });
+
+  return {
+    today: Math.round(totals.today * 100) / 100,
+    week: Math.round(totals.week * 100) / 100,
+    month: Math.round(totals.month * 100) / 100,
+    targets: {
+      today: Number(settings.dailyApprovalTarget || 0),
+      week: Number(settings.weeklyApprovalTarget || 0),
+      month: Number(settings.monthlyApprovalTarget || 0)
+    }
+  };
+}
+
 function buildDesignBoardPayload(store) {
   const state = sanitizeDesignBoardState(store.designBoard);
   const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
@@ -8447,6 +8484,7 @@ function buildDesignBoardPayload(store) {
     today,
     days,
     settings: state.settings,
+    approvalSummary: buildDesignBoardApprovalSummary(filteringState.cards, state.settings),
     lanes,
     cards,
     filteringCards: filteringState.cards
