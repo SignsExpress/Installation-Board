@@ -6982,11 +6982,28 @@ button {
 }
 
 .design-board-pull-group button {
-  min-width: 78px;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 32px;
+  min-height: 32px;
   padding: 0 14px;
   border: 1px solid #67428b;
   background: #67428b;
   color: #fff;
+  line-height: 1;
+}
+
+.design-board-pull-group .button-spinner-label {
+  height: 100%;
+  gap: 6px;
+  line-height: 1;
+}
+
+.design-board-pull-group .button-spinner {
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
 }
 
 .design-board-settings-button {
