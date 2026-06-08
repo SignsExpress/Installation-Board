@@ -6861,7 +6861,8 @@ button {
   padding: 14px;
 }
 
-.design-board-panel {
+.design-board-panel,
+.filtering-board-panel {
   margin-top: 14px;
 }
 

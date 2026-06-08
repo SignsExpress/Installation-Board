@@ -7779,7 +7779,7 @@ function formatDesignBoardJobType(value = "", itemName = "", description = "") {
   return String(value || "").trim();
 }
 
-function buildDesignBoardCopyText(card = {}) {
+function buildDesignBoardCopyText(card = {}, { dateField = "createdAt", dateLabel = "Date added" } = {}) {
   const lines = [
     `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
     card.description || "",
@@ -7787,7 +7787,7 @@ function buildDesignBoardCopyText(card = {}) {
     [card.contact, card.number].filter(Boolean).length ? `Contact: ${[card.contact, card.number].filter(Boolean).join(" - ")}` : "",
     card.contactEmail ? `Email: ${card.contactEmail}` : "",
     card.address || card.siteAddress ? `Address: ${card.address || card.siteAddress}` : "",
-    card.createdAt ? `Date added: ${formatProFormaDate(card.createdAt)}` : "",
+    card[dateField] ? `${dateLabel}: ${formatProFormaDate(card[dateField])}` : "",
     ""
   ].filter((line, index, list) => line || index === list.length - 1);
 
@@ -7832,6 +7832,9 @@ function DesignBoardColumn({
   onChaseCard,
   onNoteCard,
   onToggleCard,
+  showStatusBar = true,
+  cardDateField = "createdAt",
+  cardDateLabel = "Date Added",
   draggingCardId = "",
   onDragCardStart
 }) {
@@ -7866,14 +7869,16 @@ function DesignBoardColumn({
             } : undefined}
             onDragEnd={editable && !card.isAwaitingSignOff ? () => onDragCardStart?.("") : undefined}
           >
-            <div className="design-board-card-status-bar">
-              <span>Added {formatDesignBoardElapsed(card.createdAt)}</span>
-              <span>Amend {formatDesignBoardElapsed(card.lastAmendmentAt || card.lastCustomerResponseAt)}</span>
-              <span>
-                Chased {formatDesignBoardElapsed(card.lastChasedAt)}
-                {card.lastChaseMethod ? ` (${formatDesignBoardChaseMethod(card.lastChaseMethod)})` : ""}
-              </span>
-            </div>
+            {showStatusBar ? (
+              <div className="design-board-card-status-bar">
+                <span>Added {formatDesignBoardElapsed(card.createdAt)}</span>
+                <span>Amend {formatDesignBoardElapsed(card.lastAmendmentAt || card.lastCustomerResponseAt)}</span>
+                <span>
+                  Chased {formatDesignBoardElapsed(card.lastChasedAt)}
+                  {card.lastChaseMethod ? ` (${formatDesignBoardChaseMethod(card.lastChaseMethod)})` : ""}
+                </span>
+              </div>
+            ) : null}
             <div className="design-board-card-head">
               <div className="design-board-card-identity">
                 <div className="design-board-card-avatar" title={card.uploadedByName ? `Uploaded by ${card.uploadedByName}` : "Uploader not recorded"}>
@@ -7889,10 +7894,10 @@ function DesignBoardColumn({
                   {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
                 </div>
               </div>
-              {card.createdAt ? (
+              {card[cardDateField] ? (
                 <div className="design-board-card-date">
-                  <span>Date Added</span>
-                  <strong>{formatProFormaDate(card.createdAt)}</strong>
+                  <span>{cardDateLabel}</span>
+                  <strong>{formatProFormaDate(card[cardDateField])}</strong>
                 </div>
               ) : null}
             </div>
@@ -8575,6 +8580,19 @@ function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled,
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [detailCardId, setDetailCardId] = useState("");
+  const [detailCopyStatus, setDetailCopyStatus] = useState("");
+  const detailCard = cards.find((card) => card.id === detailCardId) || null;
+  const detailCopyText = buildDesignBoardCopyText(detailCard || {}, { dateField: "approvedAt", dateLabel: "Date approved" });
+
+  async function copyFilteringCardDetails() {
+    try {
+      await navigator.clipboard.writeText(detailCopyText);
+      setDetailCopyStatus("Copied");
+    } catch {
+      setDetailCopyStatus("Select the text and press Ctrl+C");
+    }
+  }
 
   useEffect(() => {
     let ignore = false;
@@ -8612,51 +8630,76 @@ function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled,
           onToggleAero={onToggleAero}
         />
         <section className="panel filtering-board-panel">
-          <div className="design-board-toolbar">
-            <div>
-              <h2>Filtering</h2>
-              <p>Approved artwork drops here as a holding area for the next production module.</p>
-            </div>
-          </div>
           {error ? <p className="form-error">{error}</p> : null}
           {loading ? (
             <div className="design-board-empty">Loading filtering cards...</div>
-          ) : cards.length ? (
-            <div className="filtering-board-grid">
-              {cards.map((card) => (
-                <article key={card.id} className={getDesignBoardCardClassName(card)}>
-                  <div className="design-board-card-head">
-                    <div>
-                      <strong>{card.orderReference}</strong>
-                      <span>{card.customerName || "Customer not set"}</span>
-                    </div>
-                    <span className="filtering-approved-pill">Approved</span>
-                  </div>
-                  <div className="design-board-card-body">
-                    <p className="design-board-card-description">{card.description || "No description"}</p>
-                    <dl className="design-board-card-meta">
-                      <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
-                      {card.approvedAt ? <div><dt>Approved</dt><dd>{formatDateTime(card.approvedAt)}</dd></div> : null}
-                    </dl>
-                    {Array.isArray(card.items) && card.items.length ? (
-                      <ul className="design-board-items">
-                        {card.items.map((item) => (
-                          <li key={item.id}>
-                            <strong>{item.name || "Item"}</strong>
-                            <span>{item.quantity ? `Qty ${item.quantity}` : ""}</span>
-                            {item.description ? <small>{item.description}</small> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
           ) : (
-            <div className="design-board-empty">No approved cards in Filtering yet.</div>
+            <div className="design-board-columns">
+              <DesignBoardColumn
+                title="Approved Jobs"
+                subtitle="Artwork approved and ready for filtering."
+                cards={cards}
+                showStatusBar={false}
+                cardDateField="approvedAt"
+                cardDateLabel="Date Approved"
+                onToggleCard={(card) => {
+                  setDetailCardId(card.id);
+                  setDetailCopyStatus("");
+                }}
+              />
+            </div>
           )}
         </section>
+
+        {detailCard ? (
+          <div className="modal-backdrop" onClick={() => setDetailCardId("")}>
+            <div className="modal design-board-detail-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>{detailCard.orderReference}</h3>
+                  <p>{detailCard.customerName || "Customer not set"}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setDetailCardId("")}>x</button>
+              </div>
+              <div className="design-board-detail-grid">
+                <section>
+                  <h4>Job Details</h4>
+                  <dl className="design-board-card-meta">
+                    {detailCard.jobTotalExVat ? <div><dt>Net total</dt><dd>{formatProFormaMoney(detailCard.jobTotalExVat)}</dd></div> : null}
+                    <div><dt>Contact</dt><dd>{[detailCard.contact, detailCard.number].filter(Boolean).join(" - ") || "No contact"}</dd></div>
+                    {detailCard.contactEmail ? <div><dt>Email</dt><dd>{detailCard.contactEmail}</dd></div> : null}
+                    <div><dt>Address</dt><dd>{detailCard.address || detailCard.siteAddress || "No address"}</dd></div>
+                    {detailCard.approvedAt ? <div><dt>Date approved</dt><dd>{formatDateTime(detailCard.approvedAt)}</dd></div> : null}
+                  </dl>
+                  {Array.isArray(detailCard.items) && detailCard.items.length ? (
+                    <ul className="design-board-items design-board-detail-items">
+                      {detailCard.items.map((item, index) => {
+                        const itemName = formatDesignBoardItemName(item.name, item.description, index);
+                        return (
+                          <li key={item.id}>
+                            <strong>{itemName}</strong>
+                            <span>Category - {formatDesignBoardJobType(item.jobType, itemName, item.description)}</span>
+                            {item.quantity ? <span>Qty {item.quantity}</span> : null}
+                            {item.lineTotal ? <span>{formatProFormaMoney(item.lineTotal)}</span> : null}
+                            {item.description ? <small>{item.description}</small> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                </section>
+                <section>
+                  <div className="design-board-copy-head">
+                    <h4>Copy Text</h4>
+                    <button className="ghost-button" type="button" onClick={copyFilteringCardDetails}>Copy</button>
+                  </div>
+                  <textarea readOnly value={detailCopyText} rows={18} onFocus={(event) => event.target.select()} />
+                  {detailCopyStatus ? <p className="form-success">{detailCopyStatus}</p> : null}
+                </section>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
