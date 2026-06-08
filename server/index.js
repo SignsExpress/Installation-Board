@@ -3009,7 +3009,7 @@ function normalizeDesignBoardItemName(value = "", description = "", index = 0) {
 
 function sanitizeDesignBoardCard(payload = {}) {
   const status = String(payload.status || "new").trim().toLowerCase();
-  const safeStatus = ["new", "scheduled", "awaiting-sign-off", "amendments"].includes(status)
+  const safeStatus = ["new", "scheduled", "awaiting-sign-off", "amendments", "order-with-salesperson"].includes(status)
     ? status
     : "new";
   return {
@@ -8382,6 +8382,7 @@ function buildDesignBoardPayload(store) {
     newOrders: [],
     unallocated: [],
     awaitingSignOff: [],
+    orderWithSalesperson: [],
     days: Object.fromEntries(days.map((day) => [day.isoDate, []]))
   };
 
@@ -8418,6 +8419,10 @@ function buildDesignBoardPayload(store) {
       lanes.awaitingSignOff.push(nextCard);
       return nextCard;
     }
+    if (card.status === "order-with-salesperson") {
+      lanes.orderWithSalesperson.push(nextCard);
+      return nextCard;
+    }
     if (!scheduledDate && card.status === "new") {
       lanes.newOrders.push(nextCard);
       return nextCard;
@@ -8436,6 +8441,7 @@ function buildDesignBoardPayload(store) {
   lanes.newOrders.sort((left, right) => String(left.createdAt || "").localeCompare(String(right.createdAt || "")));
   lanes.unallocated.sort((left, right) => String(left.updatedAt || left.createdAt || "").localeCompare(String(right.updatedAt || right.createdAt || "")));
   lanes.awaitingSignOff.sort((left, right) => String(left.signOffRequestedAt || left.updatedAt || "").localeCompare(String(right.signOffRequestedAt || right.updatedAt || "")));
+  lanes.orderWithSalesperson.sort((left, right) => String(left.updatedAt || left.createdAt || "").localeCompare(String(right.updatedAt || right.createdAt || "")));
 
   return {
     today,

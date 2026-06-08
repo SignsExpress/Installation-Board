@@ -8040,9 +8040,13 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
       patch.status = "new";
     } else if (laneType === "unallocated") {
       patch.scheduledDate = "";
+      if (card.status === "order-with-salesperson") patch.status = "scheduled";
+    } else if (laneType === "order-with-salesperson") {
+      patch.scheduledDate = "";
+      patch.status = "order-with-salesperson";
     } else if (laneType === "day") {
       patch.scheduledDate = isoDate;
-      if (card.status === "new") patch.status = "scheduled";
+      if (card.status === "new" || card.status === "order-with-salesperson") patch.status = "scheduled";
     } else {
       return;
     }
@@ -8103,7 +8107,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     setEditingCardId("");
   }
 
-  const lanes = board?.lanes || { newOrders: [], unallocated: [], awaitingSignOff: [], days: {} };
+  const lanes = board?.lanes || { newOrders: [], unallocated: [], awaitingSignOff: [], orderWithSalesperson: [], days: {} };
   const days = board?.days || [];
 
   return (
@@ -8222,6 +8226,24 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   onDragCardStart={setDraggingDesignCardId}
                 />
               ))}
+              <DesignBoardColumn
+                title="Order with Salesperson"
+                cards={lanes.orderWithSalesperson}
+                editable={editable}
+                droppable={editable}
+                onDropCard={async (cardId) => {
+                  const card = board?.cards?.find((entry) => entry.id === cardId);
+                  if (card) await moveCard(card, "order-with-salesperson");
+                }}
+                onCardAction={handleCardAction}
+                onEditCard={(card) => setEditingCardId(card.id)}
+                onDeleteCard={handleDeleteCard}
+                onTogglePriority={handleTogglePriority}
+                onChaseCard={(card) => setChasingCardId(card.id)}
+                onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
+                draggingCardId={draggingDesignCardId}
+                onDragCardStart={setDraggingDesignCardId}
+              />
             </div>
           )}
         </section>
