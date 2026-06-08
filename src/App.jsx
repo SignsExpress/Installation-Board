@@ -939,6 +939,18 @@ const VEHICLE_TEMPLATE_OPTIONS = [
       minPartialWrapPrice: 1050,
       minFullWrapPrice: 2500
     }
+  },
+  {
+    id: "luton-van-vauxhall-movano",
+    sizeName: "Luton Van",
+    exampleName: "Vauxhall Movano Luton",
+    src: "/vans/vauxhall-movano-luton.svg",
+    scaleFactor: 740.98 / 210.06,
+    tyreReferenceSelector: "g[id='_x37_40.98mm'] path",
+    tyreReferenceDiameterMm: 740.98,
+    artworkScale: 0.1,
+    viewBox: { x: 0, y: 0, width: 2668.62, height: 1873.41 },
+    pricingDefaultsVersion: 1
   }
 ];
 
