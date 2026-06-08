@@ -7830,6 +7830,7 @@ function DesignBoardColumn({
   onDeleteCard,
   onTogglePriority,
   onChaseCard,
+  onNoteCard,
   onToggleCard,
   draggingCardId = "",
   onDragCardStart
@@ -7894,6 +7895,9 @@ function DesignBoardColumn({
                       {card.isPriority ? "Priority on" : "Priority"}
                     </button>
                     <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onChaseCard?.(card); }}>Chased</button>
+                    <button type="button" className={`ghost-button ${card.designerNote ? "has-note" : ""}`} onClick={(event) => { event.stopPropagation(); onNoteCard?.(card); }}>
+                      {card.designerNote ? "Note added" : "Note"}
+                    </button>
                     <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onEditCard?.(card); }}>Edit</button>
                     <button type="button" className="ghost-button danger" onClick={(event) => { event.stopPropagation(); onDeleteCard?.(card); }}>Delete</button>
                   </>
@@ -7933,6 +7937,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
   const [chasingCardId, setChasingCardId] = useState("");
+  const [notingCardId, setNotingCardId] = useState("");
+  const [noteDraft, setNoteDraft] = useState("");
   const [detailCardId, setDetailCardId] = useState("");
   const [detailCopyStatus, setDetailCopyStatus] = useState("");
   const [draggingDesignCardId, setDraggingDesignCardId] = useState("");
@@ -7946,6 +7952,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const chasingCard = useMemo(
     () => board?.cards?.find((card) => card.id === chasingCardId) || null,
     [board, chasingCardId]
+  );
+  const notingCard = useMemo(
+    () => board?.cards?.find((card) => card.id === notingCardId) || null,
+    [board, notingCardId]
   );
   const detailCard = useMemo(
     () => board?.cards?.find((card) => card.id === detailCardId) || null,
@@ -8091,6 +8101,18 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
     setChasingCardId("");
   }
 
+  function openCardNote(card) {
+    setNotingCardId(card.id);
+    setNoteDraft(card.designerNote || "");
+  }
+
+  async function handleSaveNote() {
+    if (!notingCard) return;
+    await patchCard(notingCard, { designerNote: noteDraft.trim() }, noteDraft.trim() ? "Saved card note" : "Removed card note");
+    setNotingCardId("");
+    setNoteDraft("");
+  }
+
   async function copyDesignCardDetails() {
     if (!detailCopyText) return;
     try {
@@ -8167,6 +8189,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
@@ -8186,6 +8209,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
@@ -8200,6 +8224,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
@@ -8221,6 +8246,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                   onDeleteCard={handleDeleteCard}
                   onTogglePriority={handleTogglePriority}
                   onChaseCard={(card) => setChasingCardId(card.id)}
+                  onNoteCard={openCardNote}
                   onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                   draggingCardId={draggingDesignCardId}
                   onDragCardStart={setDraggingDesignCardId}
@@ -8240,6 +8266,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
                 onDragCardStart={setDraggingDesignCardId}
@@ -8289,6 +8316,35 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                 <button className="ghost-button" type="button" onClick={() => handleChased("phone")}>Phone call</button>
                 <button className="ghost-button" type="button" onClick={() => handleChased("email")}>Email</button>
                 <button className="primary-button" type="button" onClick={() => handleChased("phone-email")}>Phone call and email</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {editable && notingCard ? (
+          <div className="modal-backdrop" onClick={() => setNotingCardId("")}>
+            <div className="modal design-board-note-modal" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>Card note</h3>
+                  <p>{notingCard.orderReference} - {notingCard.customerName || "Customer"}</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setNotingCardId("")}>x</button>
+              </div>
+              <label className="design-board-note-field">
+                <span>Note shown on the card in red</span>
+                <textarea
+                  rows={4}
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  placeholder="Add a note..."
+                  autoFocus
+                />
+              </label>
+              <div className="design-board-edit-actions">
+                <button className="ghost-button" type="button" onClick={() => { setNoteDraft(""); }}>Clear</button>
+                <button className="ghost-button" type="button" onClick={() => setNotingCardId("")}>Cancel</button>
+                <button className="primary-button" type="button" onClick={handleSaveNote}>Save note</button>
               </div>
             </div>
           </div>

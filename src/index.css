@@ -6968,13 +6968,20 @@ button {
 
 .design-board-card {
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 12px;
-  border: 1px solid #d8e2ef;
-  border-top: 4px solid #68b984;
+  gap: 10px;
+  padding: 11px;
+  border-radius: 8px;
+  border: 1px solid #d7e0ec;
+  border-top: 3px solid #58b47a;
   background: #ffffff;
-  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 4px 12px rgba(31, 41, 55, 0.06);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.design-board-card:hover {
+  border-color: #bdcadb;
+  box-shadow: 0 9px 22px rgba(31, 41, 55, 0.1);
+  transform: translateY(-1px);
 }
 
 .design-board-card.is-amendments {
@@ -7025,8 +7032,10 @@ button {
 .design-board-card-head {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   align-items: start;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #edf1f6;
 }
 
 .design-board-card-status-bar {
@@ -7040,17 +7049,18 @@ button {
   min-height: 20px;
   align-items: center;
   border-radius: 999px;
-  background: #edf3fb;
-  color: #32425b;
+  background: #f1f5f9;
+  color: #536276;
   padding: 0 7px;
-  font-size: 0.62rem;
-  font-weight: 800;
+  font-size: 0.61rem;
+  font-weight: 700;
 }
 
 .design-board-card-head strong {
   display: block;
-  font-size: 0.79rem;
+  font-size: 0.84rem;
   line-height: 1.2;
+  color: #172033;
 }
 
 .design-board-card-head span {
@@ -7071,8 +7081,24 @@ button {
 .design-board-card-actions .primary-button {
   min-height: 24px;
   padding: 0 8px;
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   border-radius: 999px;
+  box-shadow: none;
+}
+
+.design-board-card-actions .ghost-button {
+  background: #ffffff;
+  border-color: #ccd7e5;
+}
+
+.design-board-card-actions .ghost-button:hover {
+  background: #f5f8fc;
+}
+
+.design-board-card-actions .ghost-button.has-note {
+  color: #b42318;
+  border-color: #f0b4ae;
+  background: #fff5f4;
 }
 
 .design-board-card-body {
@@ -7082,9 +7108,10 @@ button {
 
 .design-board-card-description {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   line-height: 1.35;
-  color: #0f172a;
+  color: #182235;
+  font-weight: 650;
 }
 
 .design-board-card-total {
@@ -7121,11 +7148,38 @@ button {
 
 .design-board-designer-note {
   margin: 0;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: rgba(109, 70, 137, 0.08);
-  font-size: 0.68rem;
-  color: #5f3c82;
+  padding: 7px 8px;
+  border: 1px solid #f3b5af;
+  border-left: 3px solid #d92d20;
+  border-radius: 6px;
+  background: #fff5f4;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  font-weight: 750;
+  color: #b42318;
+}
+
+.design-board-note-modal {
+  width: min(520px, calc(100vw - 28px));
+}
+
+.design-board-note-field {
+  display: grid;
+  gap: 6px;
+}
+
+.design-board-note-field span {
+  font-size: 0.72rem;
+  font-weight: 750;
+  color: #b42318;
+}
+
+.design-board-note-field textarea {
+  width: 100%;
+  resize: vertical;
+  border-color: #efb4ae;
+  background: #fffafa;
+  color: #8f1d16;
 }
 
 .design-board-items {
@@ -7159,9 +7213,9 @@ button {
 .design-board-card-more {
   margin: 0;
   padding: 7px 8px;
-  border-radius: 9px;
-  background: rgba(237, 243, 251, 0.9);
-  color: #64748b;
+  border-radius: 6px;
+  background: #f2f5f9;
+  color: #59687c;
   font-size: 0.68rem;
   font-weight: 700;
 }
