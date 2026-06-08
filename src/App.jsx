@@ -8215,7 +8215,9 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
                     aria-label="Order or estimate reference"
                   />
                   <button type="submit" disabled={savingKey === "/api/design-board/pull"}>
-                    {savingKey === "/api/design-board/pull" ? "Pulling..." : "Pull"}
+                    {savingKey === "/api/design-board/pull" ? (
+                      <span className="button-spinner-label"><span className="button-spinner" />Pulling...</span>
+                    ) : "Pull"}
                   </button>
                 </div>
                 <button className="design-board-settings-button" type="button" onClick={() => setSettingsOpen(true)}>

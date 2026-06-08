@@ -6982,6 +6982,7 @@ button {
 }
 
 .design-board-pull-group button {
+  min-width: 78px;
   padding: 0 14px;
   border: 1px solid #67428b;
   background: #67428b;
