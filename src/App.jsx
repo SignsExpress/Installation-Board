@@ -7880,29 +7880,6 @@ function DesignBoardColumn({
                 <span>{card.customerName || "Customer not set"}</span>
                 {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
               </div>
-              <div className="design-board-card-actions">
-                {editable ? (
-                  <>
-                    {card.isAwaitingSignOff ? (
-                      <>
-                        <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "amendments"); }}>Amendments required</button>
-                        <button type="button" className="primary-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "approve"); }}>Approved</button>
-                      </>
-                    ) : (
-                      <button type="button" className="primary-button" onClick={(event) => { event.stopPropagation(); onCardAction?.(card, "artwork-complete"); }}>Artwork complete</button>
-                    )}
-                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onTogglePriority?.(card); }}>
-                      {card.isPriority ? "Priority on" : "Priority"}
-                    </button>
-                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onChaseCard?.(card); }}>Chased</button>
-                    <button type="button" className={`ghost-button ${card.designerNote ? "has-note" : ""}`} onClick={(event) => { event.stopPropagation(); onNoteCard?.(card); }}>
-                      {card.designerNote ? "Note added" : "Note"}
-                    </button>
-                    <button type="button" className="ghost-button" onClick={(event) => { event.stopPropagation(); onEditCard?.(card); }}>Edit</button>
-                    <button type="button" className="ghost-button danger" onClick={(event) => { event.stopPropagation(); onDeleteCard?.(card); }}>Delete</button>
-                  </>
-                ) : null}
-              </div>
             </div>
 
             <div className="design-board-card-body">
@@ -7919,6 +7896,34 @@ function DesignBoardColumn({
                 <p className="design-board-card-more">Click card to view and copy {card.items.length} item{card.items.length === 1 ? "" : "s"}.</p>
               ) : null}
             </div>
+            {editable ? (
+              <div className="design-board-card-footer" onClick={(event) => event.stopPropagation()}>
+                <div className="design-board-card-workflow">
+                  {card.isAwaitingSignOff ? (
+                    <>
+                      <button type="button" className="design-board-action-secondary" onClick={() => onCardAction?.(card, "amendments")}>Amendments required</button>
+                      <button type="button" className="design-board-action-primary" onClick={() => onCardAction?.(card, "approve")}>Approved</button>
+                    </>
+                  ) : (
+                    <button type="button" className="design-board-action-primary" onClick={() => onCardAction?.(card, "artwork-complete")}>Artwork complete</button>
+                  )}
+                </div>
+                <div className="design-board-card-tools">
+                  <button type="button" className="design-board-tool-button" onClick={() => onChaseCard?.(card)}>Chased</button>
+                  <button type="button" className={`design-board-tool-button ${card.designerNote ? "has-note" : ""}`} onClick={() => onNoteCard?.(card)}>
+                    {card.designerNote ? "Note added" : "Add note"}
+                  </button>
+                  <details className="design-board-more-menu">
+                    <summary>More</summary>
+                    <div className="design-board-more-popover">
+                      <button type="button" onClick={() => onTogglePriority?.(card)}>{card.isPriority ? "Remove priority" : "Mark as priority"}</button>
+                      <button type="button" onClick={() => onEditCard?.(card)}>Edit card</button>
+                      <button type="button" className="danger" onClick={() => onDeleteCard?.(card)}>Delete card</button>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            ) : null}
           </article>
         )) : <div className="design-board-empty">No cards here.</div>}
       </div>

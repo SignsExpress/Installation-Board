@@ -7041,19 +7041,25 @@ button {
 .design-board-card-status-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 5px 10px;
+  padding-bottom: 1px;
 }
 
 .design-board-card-status-bar span {
   display: inline-flex;
-  min-height: 20px;
   align-items: center;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #536276;
-  padding: 0 7px;
+  color: #6b7789;
   font-size: 0.61rem;
   font-weight: 700;
+}
+
+.design-board-card-status-bar span:not(:last-child)::after {
+  content: "";
+  width: 3px;
+  height: 3px;
+  margin-left: 10px;
+  border-radius: 50%;
+  background: #bdc7d5;
 }
 
 .design-board-card-head strong {
@@ -7070,40 +7076,9 @@ button {
   color: #475569;
 }
 
-.design-board-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: flex-end;
-}
-
-.design-board-card-actions .ghost-button,
-.design-board-card-actions .primary-button {
-  min-height: 24px;
-  padding: 0 8px;
-  font-size: 0.64rem;
-  border-radius: 999px;
-  box-shadow: none;
-}
-
-.design-board-card-actions .ghost-button {
-  background: #ffffff;
-  border-color: #ccd7e5;
-}
-
-.design-board-card-actions .ghost-button:hover {
-  background: #f5f8fc;
-}
-
-.design-board-card-actions .ghost-button.has-note {
-  color: #b42318;
-  border-color: #f0b4ae;
-  background: #fff5f4;
-}
-
 .design-board-card-body {
   display: grid;
-  gap: 6px;
+  gap: 8px;
 }
 
 .design-board-card-description {
@@ -7124,7 +7099,8 @@ button {
 .design-board-card-meta {
   margin: 0;
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  padding-top: 2px;
 }
 
 .design-board-card-meta div {
@@ -7142,8 +7118,124 @@ button {
 
 .design-board-card-meta dd {
   margin: 0;
-  font-size: 0.69rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
   color: #0f172a;
+}
+
+.design-board-card-footer {
+  display: grid;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid #edf1f6;
+}
+
+.design-board-card-workflow,
+.design-board-card-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.design-board-card-workflow {
+  justify-content: flex-start;
+}
+
+.design-board-card-tools {
+  justify-content: flex-end;
+}
+
+.design-board-action-primary,
+.design-board-action-secondary,
+.design-board-tool-button,
+.design-board-more-menu summary {
+  min-height: 27px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 9px;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.design-board-action-primary {
+  color: #ffffff;
+  background: #65418a;
+}
+
+.design-board-action-primary:hover {
+  background: #533471;
+}
+
+.design-board-action-secondary {
+  color: #5c3a7e;
+  background: #f0eafa;
+}
+
+.design-board-tool-button,
+.design-board-more-menu summary {
+  color: #536276;
+  background: transparent;
+}
+
+.design-board-tool-button:hover,
+.design-board-more-menu summary:hover {
+  color: #172033;
+  background: #f2f5f9;
+}
+
+.design-board-tool-button.has-note {
+  color: #b42318;
+}
+
+.design-board-more-menu {
+  position: relative;
+}
+
+.design-board-more-menu summary {
+  display: inline-flex;
+  align-items: center;
+  list-style: none;
+}
+
+.design-board-more-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.design-board-more-popover {
+  position: absolute;
+  z-index: 8;
+  right: 0;
+  bottom: calc(100% + 5px);
+  display: grid;
+  min-width: 145px;
+  padding: 5px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(31, 41, 55, 0.16);
+}
+
+.design-board-more-popover button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 8px;
+  background: transparent;
+  color: #334155;
+  text-align: left;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.design-board-more-popover button:hover {
+  background: #f2f5f9;
+}
+
+.design-board-more-popover button.danger {
+  color: #c5221f;
 }
 
 .design-board-designer-note {
@@ -7212,12 +7304,10 @@ button {
 
 .design-board-card-more {
   margin: 0;
-  padding: 7px 8px;
-  border-radius: 6px;
-  background: #f2f5f9;
-  color: #59687c;
-  font-size: 0.68rem;
-  font-weight: 700;
+  padding-top: 3px;
+  color: #718096;
+  font-size: 0.65rem;
+  font-weight: 650;
 }
 
 .design-board-empty {
