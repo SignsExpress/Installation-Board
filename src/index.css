@@ -7076,6 +7076,30 @@ button {
   color: #475569;
 }
 
+.design-board-card-date {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+}
+
+.design-board-card-date span {
+  margin: 0;
+  color: #7a8798;
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.design-board-card-date strong {
+  color: #475569;
+  font-size: 0.66rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
 .design-board-card-body {
   display: grid;
   gap: 8px;

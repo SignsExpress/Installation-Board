@@ -7880,6 +7880,12 @@ function DesignBoardColumn({
                 <span>{card.customerName || "Customer not set"}</span>
                 {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
               </div>
+              {card.createdAt ? (
+                <div className="design-board-card-date">
+                  <span>Date Added</span>
+                  <strong>{formatProFormaDate(card.createdAt)}</strong>
+                </div>
+              ) : null}
             </div>
 
             <div className="design-board-card-body">
@@ -7887,9 +7893,7 @@ function DesignBoardColumn({
               {card.jobTotalExVat ? <p className="design-board-card-total">Net total: {formatProFormaMoney(card.jobTotalExVat)}</p> : null}
               <dl className="design-board-card-meta">
                 <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
-                {card.contact || card.number ? <div><dt>Contact</dt><dd>{[card.contact, card.number].filter(Boolean).join(" - ")}</dd></div> : null}
                 {card.contactEmail ? <div><dt>Email</dt><dd>{card.contactEmail}</dd></div> : null}
-                {card.createdAt ? <div><dt>Date Added</dt><dd>{formatProFormaDate(card.createdAt)}</dd></div> : null}
               </dl>
               {card.designerNote ? <p className="design-board-designer-note">{card.designerNote}</p> : null}
               {Array.isArray(card.items) && card.items.length ? (
