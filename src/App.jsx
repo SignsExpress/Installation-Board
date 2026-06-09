@@ -7967,6 +7967,9 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   const [detailCopyStatus, setDetailCopyStatus] = useState("");
   const [draggingDesignCardId, setDraggingDesignCardId] = useState("");
   const [editDraft, setEditDraft] = useState(null);
+  const designBoardPageRef = useRef(null);
+  const designBoardScrollFrameRef = useRef(0);
+  const designBoardScrollSpeedRef = useRef(0);
   const editable = canEditDesignBoard(currentUser);
 
   const editingCard = useMemo(
@@ -8019,6 +8022,66 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
       setEditDraft(null);
     }
   }, [editingCard]);
+
+  useEffect(() => {
+    if (draggingDesignCardId) return undefined;
+    designBoardScrollSpeedRef.current = 0;
+    if (designBoardScrollFrameRef.current) {
+      cancelAnimationFrame(designBoardScrollFrameRef.current);
+      designBoardScrollFrameRef.current = 0;
+    }
+    return undefined;
+  }, [draggingDesignCardId]);
+
+  useEffect(() => () => {
+    if (designBoardScrollFrameRef.current) cancelAnimationFrame(designBoardScrollFrameRef.current);
+  }, []);
+
+  function getDesignBoardScrollTarget() {
+    const page = designBoardPageRef.current;
+    if (page && page.scrollHeight > page.clientHeight + 2) return page;
+    return document.scrollingElement || document.documentElement;
+  }
+
+  function runDesignBoardAutoScroll() {
+    const page = getDesignBoardScrollTarget();
+    const speed = designBoardScrollSpeedRef.current;
+    if (!page || !speed) {
+      designBoardScrollFrameRef.current = 0;
+      return;
+    }
+    const previousScrollTop = page.scrollTop;
+    page.scrollTop += speed;
+    if (page.scrollTop === previousScrollTop) {
+      designBoardScrollFrameRef.current = 0;
+      return;
+    }
+    designBoardScrollFrameRef.current = requestAnimationFrame(runDesignBoardAutoScroll);
+  }
+
+  function handleDesignBoardDragOver(event) {
+    if (!draggingDesignCardId || !designBoardPageRef.current) return;
+    const page = getDesignBoardScrollTarget();
+    const boardPage = designBoardPageRef.current;
+    const bounds = page === boardPage
+      ? boardPage.getBoundingClientRect()
+      : { top: 0, bottom: window.innerHeight, height: window.innerHeight };
+    const edgeSize = Math.min(150, bounds.height * 0.22);
+    const topDistance = event.clientY - bounds.top;
+    const bottomDistance = bounds.bottom - event.clientY;
+    let speed = 0;
+
+    if (topDistance < edgeSize) {
+      speed = -Math.ceil(22 * (1 - Math.max(0, topDistance) / edgeSize));
+    } else if (bottomDistance < edgeSize) {
+      speed = Math.ceil(22 * (1 - Math.max(0, bottomDistance) / edgeSize));
+    }
+
+    designBoardScrollSpeedRef.current = speed;
+    if (speed && !designBoardScrollFrameRef.current) {
+      designBoardScrollFrameRef.current = requestAnimationFrame(runDesignBoardAutoScroll);
+    }
+  }
 
   async function updateBoardRequest(url, options = {}, nextInfo = "") {
     try {
@@ -8179,7 +8242,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
 
   return (
     <div className="app-shell social-post-shell">
-      <div className="page social-post-page design-board-page">
+      <div
+        ref={designBoardPageRef}
+        className="page social-post-page design-board-page"
+        onDragOver={handleDesignBoardDragOver}
+      >
         <MainNavBar
           currentUser={currentUser}
           active="design-board"
