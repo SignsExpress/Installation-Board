@@ -2321,6 +2321,56 @@ function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
   };
 }
 
+function getMorningMeetingItemSummary(item = {}) {
+  const reference = String(item.orderReference || "No reference").trim();
+  const customer = String(item.customerName || "Unnamed customer").trim();
+  const description = String(item.description || "No description added").trim();
+  const value = Number(item.jobTotalExVat || 0);
+  return `${reference} - ${customer}: ${description}${value > 0 ? ` (£${value.toLocaleString("en-GB", { maximumFractionDigits: 0 })})` : ""}`;
+}
+
+function buildMorningMeetingEmail(payload, notes, senderName) {
+  const sections = [
+    ["Yesterday's jobs", payload.yesterdayJobs],
+    ["Today's jobs", payload.todayJobs],
+    ["Artwork approved yesterday", payload.approvedYesterday]
+  ];
+  const textSections = sections.map(([title, items]) => [
+    title,
+    ...(items.length ? items.map((item) => `- ${getMorningMeetingItemSummary(item)}`) : ["- Nothing to discuss"])
+  ].join("\n"));
+  const htmlSections = sections.map(([title, items]) => `
+    <h2 style="margin:24px 0 8px;color:#4f2f72;font-size:18px;">${escapeHtml(title)}</h2>
+    ${items.length
+      ? `<ul style="margin:0;padding-left:20px;">${items.map((item) => `<li style="margin:0 0 8px;">${escapeHtml(getMorningMeetingItemSummary(item))}</li>`).join("")}</ul>`
+      : '<p style="margin:0;color:#667085;">Nothing to discuss.</p>'}
+  `).join("");
+  const todayLabel = formatBoardNotificationDate(payload.todayIso);
+  return {
+    subject: `Morning Meeting - ${todayLabel}`,
+    text: [
+      `Morning Meeting - ${todayLabel}`,
+      `Sent by ${senderName}`,
+      "",
+      "Meeting notes and actions",
+      notes,
+      "",
+      ...textSections
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.5;">
+        <h1 style="margin:0 0 4px;font-size:24px;">Morning Meeting</h1>
+        <p style="margin:0 0 20px;color:#667085;">${escapeHtml(todayLabel)} · Sent by ${escapeHtml(senderName)}</p>
+        <div style="padding:16px 18px;border:1px solid #ded5e8;border-radius:14px;background:#f8f5fb;">
+          <strong style="color:#4f2f72;">Meeting notes and actions</strong>
+          <p style="margin:8px 0 0;white-space:pre-wrap;">${escapeHtml(notes)}</p>
+        </div>
+        ${htmlSections}
+      </div>
+    `
+  };
+}
+
 function sanitizeJobPhoto(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -10076,6 +10126,51 @@ function createServer() {
     } catch (error) {
       console.error("Could not build Morning Meeting outline.", error.message || error);
       response.status(500).json({ error: "Could not load the Morning Meeting outline." });
+    }
+  });
+
+  app.post("/api/morning-meeting/send", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const notes = String(request.body?.notes || "").trim();
+    if (!notes) {
+      response.status(400).json({ error: "Add some meeting notes before emailing the office." });
+      return;
+    }
+
+    try {
+      const transportConfig = getCreditApplicationTransportConfig();
+      if (!transportConfig) {
+        response.status(500).json({ error: "Email is not configured yet. Please set SMTP details on the server." });
+        return;
+      }
+      const [store, usersStore] = await Promise.all([readStore(), readUsersStore()]);
+      const recipients = [...new Set(
+        (usersStore.users || [])
+          .map((user) => String(sanitizeUser(user).email || "").trim().toLowerCase())
+          .filter(looksLikeEmail)
+      )];
+      if (!recipients.length) {
+        response.status(400).json({ error: "No office user emails have been added in Permissions yet." });
+        return;
+      }
+
+      const email = buildMorningMeetingEmail(
+        buildMorningMeetingPayload(store),
+        notes,
+        String(request.user?.displayName || "SX Portal")
+      );
+      const transporter = nodemailer.createTransport(transportConfig);
+      await transporter.sendMail({
+        from: getCreditApplicationFromAddress(),
+        bcc: recipients.join(", "),
+        subject: email.subject,
+        text: email.text,
+        html: email.html
+      });
+      response.json({ ok: true, recipientCount: recipients.length });
+    } catch (error) {
+      console.error("Could not email Morning Meeting notes.", error.message || error);
+      response.status(500).json({ error: "Could not email the Morning Meeting notes." });
     }
   });
 

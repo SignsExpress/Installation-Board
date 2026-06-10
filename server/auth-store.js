@@ -132,6 +132,7 @@ function normalizePhotoDataUrl(value) {
 
 function normalizeUserProfile(user) {
   return {
+    email: normalizeProfileText(user?.email || "", 180).toLowerCase(),
     jobTitle: normalizeProfileText(user?.jobTitle || ""),
     phoneNumber: normalizeProfileText(user?.phoneNumber || "", 40),
     qualifications: normalizeQualifications(user?.qualifications),
@@ -357,6 +358,7 @@ async function createUser({ displayName, role = "client", password = "" }) {
     role: normalizedRole,
     permissions: getDefaultPermissions(normalizedRole),
     attendanceProfile: getDefaultAttendanceProfile(),
+    email: "",
     jobTitle: "",
     phoneNumber: "",
     qualifications: [],
@@ -474,6 +476,7 @@ async function updateUserProfile(userId, profile) {
   }
 
   const nextProfile = normalizeUserProfile(profile);
+  user.email = nextProfile.email;
   user.jobTitle = nextProfile.jobTitle;
   user.phoneNumber = nextProfile.phoneNumber;
   user.qualifications = nextProfile.qualifications;

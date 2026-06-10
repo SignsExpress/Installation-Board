@@ -7764,20 +7764,36 @@ button {
   width: min(1540px, calc(100% - 32px));
 }
 
-.morning-meeting-hero {
+.morning-meeting-toolbar {
   display: flex;
   justify-content: space-between;
-  align-items: end;
-  gap: 24px;
-  margin: 18px 0;
-  padding: 24px 28px;
-  border: 1px solid #ded5e8;
-  border-radius: 24px;
-  background: linear-gradient(135deg, #fff 0%, #f6f1fa 100%);
-  box-shadow: 0 12px 30px rgba(64, 42, 87, 0.08);
+  align-items: center;
+  gap: 16px;
+  margin: 14px 0 10px;
 }
 
-.morning-meeting-hero span,
+.morning-meeting-toolbar > strong {
+  color: #172033;
+  font-size: 1.15rem;
+}
+
+.morning-meeting-notes-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid #ded5e8;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06);
+}
+
+.morning-meeting-notes-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.morning-meeting-notes-copy span,
 .morning-meeting-section-head span {
   color: #76529a;
   font-size: 0.67rem;
@@ -7786,15 +7802,40 @@ button {
   text-transform: uppercase;
 }
 
-.morning-meeting-hero h1 {
-  margin: 5px 0 4px;
-  color: #172033;
-  font-size: clamp(1.7rem, 3vw, 2.5rem);
-}
-
-.morning-meeting-hero p {
+.morning-meeting-notes-copy p {
   margin: 0;
   color: #667085;
+  font-size: 0.76rem;
+}
+
+.morning-meeting-notes-panel textarea {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  padding: 13px 14px;
+  border: 1px solid #d8e0eb;
+  border-radius: 14px;
+  background: #fbfcfe;
+  color: #172033;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.morning-meeting-notes-panel textarea:focus {
+  outline: 2px solid rgba(103, 66, 139, 0.16);
+  border-color: #9676b5;
+}
+
+.morning-meeting-notes-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+}
+
+.morning-meeting-notes-actions span {
+  color: #667085;
+  font-size: 0.7rem;
   font-weight: 650;
 }
 
@@ -7963,6 +8004,12 @@ button {
 @media (max-width: 900px) {
   .morning-meeting-launcher {
     display: none;
+  }
+
+  .morning-meeting-toolbar,
+  .morning-meeting-notes-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
@@ -11235,7 +11282,7 @@ button {
 
 .permissions-profile-card {
   display: grid;
-  grid-template-columns: 72px minmax(160px, 0.8fr) minmax(150px, 0.7fr) minmax(260px, 1.4fr);
+  grid-template-columns: 72px minmax(140px, 0.7fr) minmax(210px, 1fr) minmax(140px, 0.7fr) minmax(260px, 1.4fr);
   gap: 12px;
   align-items: start;
   padding: 12px;

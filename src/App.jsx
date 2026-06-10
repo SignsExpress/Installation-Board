@@ -3006,6 +3006,7 @@ function PermissionsPanel({
   function updateUserProfileValue(user, patch) {
     if (!user || savingKey === `${user.id}:profile`) return;
     onUpdateUserProfile(user.id, {
+      email: user.email || "",
       jobTitle: user.jobTitle || "",
       phoneNumber: user.phoneNumber || "",
       qualifications: Array.isArray(user.qualifications) ? user.qualifications : [],
@@ -3144,6 +3145,16 @@ function PermissionsPanel({
                       defaultValue={user.jobTitle || ""}
                       placeholder="Installer"
                       onBlur={(event) => updateUserProfileValue(user, { jobTitle: event.target.value })}
+                      disabled={savingKey === `${user.id}:profile`}
+                    />
+                  </label>
+                  <label className="permissions-profile-field">
+                    Email
+                    <input
+                      type="email"
+                      defaultValue={user.email || ""}
+                      placeholder="name@company.co.uk"
+                      onBlur={(event) => updateUserProfileValue(user, { email: event.target.value })}
                       disabled={savingKey === `${user.id}:profile`}
                     />
                   </label>
@@ -16609,6 +16620,9 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
 function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [outline, setOutline] = useState(null);
   const [error, setError] = useState("");
+  const [meetingNotes, setMeetingNotes] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -16626,18 +16640,55 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     };
   }, []);
 
+  async function sendMeetingEmail() {
+    if (!meetingNotes.trim() || sending) return;
+    setSending(true);
+    setSendStatus("");
+    try {
+      const response = await fetch("/api/morning-meeting/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: meetingNotes })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not email the meeting notes.");
+      setSendStatus(`Sent to ${payload.recipientCount} office ${payload.recipientCount === 1 ? "user" : "users"}.`);
+    } catch (sendError) {
+      setSendStatus(sendError.message || "Could not email the meeting notes.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div className="app-shell morning-meeting-shell">
       <div className="page morning-meeting-page">
         <MainNavBar currentUser={currentUser} active="board" onLogout={onLogout} notifications={notifications} />
-        <header className="morning-meeting-hero">
-          <div>
-            <span>Daily operations</span>
-            <h1>Morning Meeting</h1>
-            <p>Yesterday’s work, today’s plan, and artwork approved yesterday.</p>
-          </div>
+        <div className="morning-meeting-toolbar">
+          <strong>Morning Meeting</strong>
           <button className="ghost-button" type="button" onClick={() => window.location.assign("/board")}>Back to Installation Board</button>
-        </header>
+        </div>
+        <section className="morning-meeting-notes-panel">
+          <div className="morning-meeting-notes-copy">
+            <span>Meeting notes and actions</span>
+            <p>These notes will be emailed with yesterday's jobs, today's jobs and yesterday's approved artwork.</p>
+          </div>
+          <textarea
+            value={meetingNotes}
+            onChange={(event) => {
+              setMeetingNotes(event.target.value);
+              setSendStatus("");
+            }}
+            placeholder="Add decisions, actions, reminders and anything the office needs to know..."
+            rows={5}
+          />
+          <div className="morning-meeting-notes-actions">
+            {sendStatus ? <span>{sendStatus}</span> : <span>Recipients come from the Email field in each user's Permissions profile.</span>}
+            <button className="primary-button" type="button" onClick={sendMeetingEmail} disabled={!meetingNotes.trim() || sending}>
+              {sending ? "Sending..." : "Finish meeting and email office"}
+            </button>
+          </div>
+        </section>
         {error ? <p className="form-error">{error}</p> : null}
         {!outline && !error ? <div className="board-loading">Preparing the meeting outline...</div> : null}
         {outline ? (
