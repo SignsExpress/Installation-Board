@@ -40,6 +40,7 @@ const streamClients = new Set();
 const DEFAULT_COREBRIDGE_BASE_URL = "https://corebridgev3.azure-api.net";
 const DEFAULT_COREBRIDGE_ORDER_PATH = "/core/api/order";
 const DEFAULT_COREBRIDGE_ESTIMATE_PATH = "/core/api/estimate";
+const DEFAULT_COREBRIDGE_INVOICE_PATH = "/core/api/invoice";
 const DEFAULT_COREBRIDGE_MATERIAL_PATH = "/core/api/material";
 const coreBridgeLineItemCategoryCache = new Map();
 const SESSION_COOKIE_NAME = "installation_board_session";
@@ -4808,6 +4809,7 @@ function getCoreBridgeConfig() {
     ).trim(),
     orderPath: String(process.env.COREBRIDGE_ORDER_PATH || process.env.COREBRIDGE_ENDPOINT_PATH || DEFAULT_COREBRIDGE_ORDER_PATH).trim(),
     estimatePath: String(process.env.COREBRIDGE_ESTIMATE_PATH || DEFAULT_COREBRIDGE_ESTIMATE_PATH).trim(),
+    invoicePath: String(process.env.COREBRIDGE_INVOICE_PATH || DEFAULT_COREBRIDGE_INVOICE_PATH).trim(),
     materialPath: String(process.env.COREBRIDGE_MATERIAL_PATH || DEFAULT_COREBRIDGE_MATERIAL_PATH).trim(),
     apiVersion: String(process.env.COREBRIDGE_API_VERSION || "v3.0").trim()
   };
@@ -4853,6 +4855,10 @@ function buildCoreBridgeOrderUrl(config, params = {}) {
 
 function buildCoreBridgeEstimateUrl(config, params = {}) {
   return buildCoreBridgeCollectionUrl(config, config.estimatePath, params);
+}
+
+function buildCoreBridgeInvoiceUrl(config, params = {}) {
+  return buildCoreBridgeCollectionUrl(config, config.invoicePath, params);
 }
 
 function getCoreBridgeMaterialPathVariants(config) {
@@ -4941,6 +4947,10 @@ function buildCoreBridgeOrderDetailUrl(config, orderId) {
 
 function buildCoreBridgeEstimateDetailUrl(config, orderId) {
   return buildCoreBridgeDetailUrl(config, config.estimatePath, orderId);
+}
+
+function buildCoreBridgeInvoiceDetailUrl(config, invoiceId) {
+  return buildCoreBridgeDetailUrl(config, config.invoicePath, invoiceId);
 }
 
 function buildCoreBridgeOrderDestinationsUrl(config, orderId) {
@@ -5786,10 +5796,12 @@ function normalizeCoreBridgeOrder(record, index) {
   ]);
 
   const normalized = {
-    id: pickFirst(flat, ["id", "orderid", "jobid", "salesorderid"]) || `corebridge-${index}`,
+    id: pickFirst(flat, ["id", "invoiceid", "orderid", "estimateid", "jobid", "salesorderid"]) || `corebridge-${index}`,
     orderReference: pickFirst(flat, [
       "formattednumber",
+      "invoicenumber",
       "ordernumber",
+      "estimatenumber",
       "orderreference",
       "reference",
       "jobnumber",
@@ -6109,6 +6121,40 @@ async function fetchCoreBridgeEstimateDetail(config, orderId, includeDebug = fal
   return normalized;
 }
 
+async function fetchCoreBridgeInvoiceDetail(config, invoiceId, includeDebug = false) {
+  const response = await fetch(buildCoreBridgeInvoiceDetailUrl(config, invoiceId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Invoice detail lookup failed for ${invoiceId} (${response.status})`);
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  const rawBody = await response.text();
+  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+    throw new Error(`Invoice detail lookup returned HTML for ${invoiceId}`);
+  }
+
+  const body = JSON.parse(rawBody);
+  const record = extractCoreBridgeDetailRecord(body, invoiceId);
+  const normalized = normalizeCoreBridgeOrder(record, 0);
+  normalized._detailFetched = true;
+  normalized._detailOrderId = invoiceId;
+  normalized._detailEntity = "invoice";
+
+  if (includeDebug) {
+    normalized.debugFields = buildCoreBridgeDebugFields(record);
+    normalized.debugRaw = JSON.stringify(record, null, 2);
+  }
+
+  return normalized;
+}
+
 async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   const response = await fetch(buildCoreBridgeOrderDestinationsUrl(config, orderId), {
     headers: {
@@ -6419,7 +6465,35 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   const looksLikeFormattedNumber = /[a-z]{2,5}-?\d+/i.test(normalizedSearch);
   const formattedSearchVariants = looksLikeFormattedNumber ? getCoreBridgeReferenceVariants(normalizedSearch) : [normalizedSearch];
   const looksLikeEstimateReference = formattedSearchVariants.some((value) => /^ests?-/i.test(value));
+  const looksLikeInvoiceReference = formattedSearchVariants.some((value) => /^invs?-/i.test(value));
   const requestPlans = formattedSearchVariants.flatMap((formattedNumber) => [
+    ...(looksLikeInvoiceReference
+      ? [
+          {
+            label: `invoice-detailed:${formattedNumber}`,
+            entity: "invoice",
+            url: buildCoreBridgeInvoiceUrl(config, {
+              take: 200,
+              sortBy: "-modifiedDT",
+              companylevel: "full",
+              contactlevel: "full",
+              notelevel: "full",
+              destinationlevel: "full",
+              itemlevel: "full",
+              formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
+            })
+          },
+          {
+            label: `invoice-basic:${formattedNumber}`,
+            entity: "invoice",
+            url: buildCoreBridgeInvoiceUrl(config, {
+              take: 200,
+              sortBy: "-modifiedDT",
+              formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
+            })
+          }
+        ]
+      : []),
     ...(looksLikeEstimateReference
       ? [
           {
@@ -6532,8 +6606,10 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             try {
               const detailedOrder = plan.entity === "estimate"
                 ? await fetchCoreBridgeEstimateDetail(config, order.id, includeDebug)
-                : await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
-              if (plan.entity !== "estimate") {
+                : plan.entity === "invoice"
+                  ? await fetchCoreBridgeInvoiceDetail(config, order.id, includeDebug)
+                  : await fetchCoreBridgeOrderDetail(config, order.id, includeDebug);
+              if (plan.entity === "order") {
                 try {
                   const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, order.id);
                   if (destinationAddress) {
@@ -7991,11 +8067,14 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   const explicitGrossLessVat = totals.totalScore >= 0 && totals.vatScore >= 0
     ? Math.max(Math.round((totals.total - totals.vatAmount) * 100) / 100, 0)
     : 0;
+  const explicitGrossAtRate = totals.totalScore >= 0 && Number(vatRate) > 0
+    ? Math.max(Math.round((totals.total / (1 + (Number(vatRate) / 100))) * 100) / 100, 0)
+    : 0;
   const resolvedPreTax = totals.preTaxScore >= 0
     ? totals.preTaxTotal
     : resolvedSubtotal > 0
       ? Math.max(Math.round((resolvedSubtotal - resolvedDiscount) * 100) / 100, 0)
-      : explicitGrossLessVat;
+      : explicitGrossLessVat || explicitGrossAtRate;
   const resolvedVat = totals.vatScore >= 0 ? totals.vatAmount : Math.round(resolvedPreTax * (vatRate / 100) * 100) / 100;
   const resolvedTotal = totals.totalScore >= 0 ? totals.total : Math.round((resolvedPreTax + resolvedVat) * 100) / 100;
   const resolvedTotalPaid = totals.totalPaidScore >= 0 ? totals.totalPaid : 0;
@@ -8560,9 +8639,9 @@ async function backfillInstallationJobValues(store, options = {}) {
     .filter((reference) => !resolvedValues.has(reference.toLowerCase()))
     .filter((reference) => {
       const attemptedAt = attemptedInstallationValueReferences.get(reference.toLowerCase()) || 0;
-      return Date.now() - attemptedAt > 1000 * 60 * 30;
+      return Date.now() - attemptedAt > 1000 * 60 * 2;
     });
-  const batchReferences = unresolvedReferences.slice(0, 8);
+  const batchReferences = unresolvedReferences.slice(0, 24);
 
   for (const reference of batchReferences) {
     attemptedInstallationValueReferences.set(reference.toLowerCase(), Date.now());
