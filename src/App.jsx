@@ -16617,12 +16617,72 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
   );
 }
 
+function MorningMeetingMaterials({ payload, loading, error, onFetch, onPrint }) {
+  const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
+  return (
+    <section className="morning-meeting-materials">
+      <div className="morning-meeting-materials-head">
+        <div>
+          <span>Production stock check</span>
+          <h2>Materials needed for approved artwork</h2>
+          <p>Live CoreBridge line-item quantities, sizes and material specifications for yesterday's approvals.</p>
+        </div>
+        <div className="morning-meeting-materials-actions">
+          <button className="ghost-button" type="button" onClick={onFetch} disabled={loading}>
+            {loading ? "Fetching materials..." : payload ? "Refresh needed materials" : "Fetch needed materials"}
+          </button>
+          {payload ? <button className="primary-button" type="button" onClick={onPrint}>Print stock check</button> : null}
+        </div>
+      </div>
+      {error ? <p className="form-error">{error}</p> : null}
+      {payload && !jobs.length ? <p className="morning-meeting-empty">There were no artwork approvals yesterday.</p> : null}
+      {jobs.length ? (
+        <div className="morning-meeting-material-jobs">
+          {jobs.map((job) => (
+            <article key={job.id} className="morning-meeting-material-job">
+              <div className="morning-meeting-material-job-head">
+                <div>
+                  <span>{job.orderReference || "No reference"}</span>
+                  <h3>{job.customerName || "Unnamed customer"}</h3>
+                  <p>{job.description || "No description added."}</p>
+                </div>
+                <small>{job.source}</small>
+              </div>
+              {job.lookupError ? <p className="morning-meeting-material-warning">{job.lookupError}</p> : null}
+              <table>
+                <thead>
+                  <tr><th>Check</th><th>Qty</th><th>Line item</th><th>Size</th><th>Material / specification</th></tr>
+                </thead>
+                <tbody>
+                  {job.lines.map((line) => (
+                    <tr key={line.id}>
+                      <td><span className="morning-meeting-stock-box" /></td>
+                      <td>{line.quantity || "-"}</td>
+                      <td>{line.lineItemName || "-"}</td>
+                      <td>{line.size || "-"}</td>
+                      <td>{[line.material, line.specification].filter((value, index, values) => value && values.indexOf(value) === index).join(" · ") || "-"}</td>
+                    </tr>
+                  ))}
+                  {!job.lines.length ? <tr><td colSpan="5">No production line items were found for this order.</td></tr> : null}
+                </tbody>
+              </table>
+            </article>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [outline, setOutline] = useState(null);
   const [error, setError] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState("");
+  const [materialsPayload, setMaterialsPayload] = useState(null);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [materialsError, setMaterialsError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -16660,6 +16720,28 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     }
   }
 
+  async function fetchNeededMaterials() {
+    if (materialsLoading) return;
+    setMaterialsLoading(true);
+    setMaterialsError("");
+    try {
+      const response = await fetch("/api/morning-meeting/materials");
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not fetch needed materials.");
+      setMaterialsPayload(payload);
+    } catch (loadError) {
+      setMaterialsError(loadError.message || "Could not fetch needed materials.");
+    } finally {
+      setMaterialsLoading(false);
+    }
+  }
+
+  function printMaterials() {
+    document.body.classList.add("printing-morning-meeting-materials");
+    window.print();
+    window.setTimeout(() => document.body.classList.remove("printing-morning-meeting-materials"), 300);
+  }
+
   return (
     <div className="app-shell morning-meeting-shell">
       <div className="page morning-meeting-page">
@@ -16692,11 +16774,20 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
         {error ? <p className="form-error">{error}</p> : null}
         {!outline && !error ? <div className="board-loading">Preparing the meeting outline...</div> : null}
         {outline ? (
-          <main className="morning-meeting-grid">
-            <MorningMeetingSection title="Yesterday’s Jobs" subtitle={formatTvSectionDate(outline.yesterdayIso)} items={outline.yesterdayJobs} />
-            <MorningMeetingSection title="Today’s Jobs" subtitle={formatTvSectionDate(outline.todayIso)} items={outline.todayJobs} />
-            <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
-          </main>
+          <>
+            <main className="morning-meeting-grid">
+              <MorningMeetingSection title="Yesterday’s Jobs" subtitle={formatTvSectionDate(outline.yesterdayIso)} items={outline.yesterdayJobs} />
+              <MorningMeetingSection title="Today’s Jobs" subtitle={formatTvSectionDate(outline.todayIso)} items={outline.todayJobs} />
+              <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
+            </main>
+            <MorningMeetingMaterials
+              payload={materialsPayload}
+              loading={materialsLoading}
+              error={materialsError}
+              onFetch={fetchNeededMaterials}
+              onPrint={printMaterials}
+            />
+          </>
         ) : null}
       </div>
     </div>

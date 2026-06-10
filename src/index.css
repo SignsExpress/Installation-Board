@@ -7995,6 +7995,125 @@ button {
   text-align: center;
 }
 
+.morning-meeting-materials {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #ded5e8;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(31, 41, 55, 0.06);
+}
+
+.morning-meeting-materials-head,
+.morning-meeting-material-job-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.morning-meeting-materials-head span,
+.morning-meeting-material-job-head span {
+  color: #76529a;
+  font-size: 0.67rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.morning-meeting-materials-head h2,
+.morning-meeting-material-job-head h3 {
+  margin: 4px 0;
+  color: #172033;
+}
+
+.morning-meeting-materials-head h2 {
+  font-size: 1.12rem;
+}
+
+.morning-meeting-materials-head p,
+.morning-meeting-material-job-head p {
+  margin: 0;
+  color: #667085;
+  font-size: 0.74rem;
+}
+
+.morning-meeting-materials-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.morning-meeting-material-jobs {
+  display: grid;
+  gap: 14px;
+}
+
+.morning-meeting-material-job {
+  overflow: hidden;
+  border: 1px solid #dfe5ee;
+  border-radius: 14px;
+}
+
+.morning-meeting-material-job-head {
+  padding: 13px 14px;
+  background: #f8fafc;
+}
+
+.morning-meeting-material-job-head h3 {
+  font-size: 0.92rem;
+}
+
+.morning-meeting-material-job-head small {
+  color: #76529a;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.morning-meeting-material-job table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.morning-meeting-material-job th,
+.morning-meeting-material-job td {
+  padding: 9px 10px;
+  border-top: 1px solid #e5eaf1;
+  color: #475569;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: top;
+}
+
+.morning-meeting-material-job th {
+  background: #fff;
+  color: #8994a5;
+  font-size: 0.59rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.morning-meeting-stock-box {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid #8994a5;
+  border-radius: 3px;
+}
+
+.morning-meeting-material-warning {
+  margin: 0;
+  padding: 8px 14px;
+  border-top: 1px solid #f0d9ae;
+  background: #fff8e9;
+  color: #8a5a12;
+  font-size: 0.68rem;
+}
+
 @media (max-width: 1100px) {
   .morning-meeting-grid {
     grid-template-columns: 1fr;
@@ -8007,9 +8126,40 @@ button {
   }
 
   .morning-meeting-toolbar,
-  .morning-meeting-notes-actions {
+  .morning-meeting-notes-actions,
+  .morning-meeting-materials-head {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .morning-meeting-materials-actions {
+    flex-direction: column;
+  }
+}
+
+@media print {
+  body.printing-morning-meeting-materials .morning-meeting-page > * {
+    display: none !important;
+  }
+
+  body.printing-morning-meeting-materials .morning-meeting-page,
+  body.printing-morning-meeting-materials .morning-meeting-page > .morning-meeting-materials {
+    display: block !important;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  body.printing-morning-meeting-materials .morning-meeting-materials-actions,
+  body.printing-morning-meeting-materials .form-error {
+    display: none !important;
+  }
+
+  body.printing-morning-meeting-materials .morning-meeting-material-job {
+    break-inside: avoid;
+    margin-top: 12px;
   }
 }
 

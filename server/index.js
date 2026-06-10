@@ -8667,6 +8667,133 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
   };
 }
 
+function extractProductionSize(value = "") {
+  const text = normalizeSocialText(value);
+  if (!text) return "";
+  const matches = text.match(/\b\d+(?:\.\d+)?\s*(?:mm|cm|m)?\s*(?:x|×)\s*\d+(?:\.\d+)?\s*(?:mm|cm|m)(?:\s*(?:x|×)\s*\d+(?:\.\d+)?\s*(?:mm|cm|m))?/gi);
+  return matches ? [...new Set(matches.map((match) => match.replace(/\s+/g, " ").trim()))].join(", ") : "";
+}
+
+function extractProductionMaterialLines(order = {}, fallbackItems = []) {
+  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+  const groups = new Map();
+  const materialLeafPattern = /(material|substrate|vinyl|film|laminat|media|board|sheet|panel|acrylic|foamex|dibond|acm|aluminium|polycarbonate|product|part|finish|colour|color|spec)/i;
+  const ignoreLeafPattern = /(id$|cost|price|amount|total|margin|markup|tax|vat|account|category|image|file|url)/i;
+
+  fields.forEach((field) => {
+    const match = matchCoreBridgeLineItemField(field.key);
+    const value = normalizeSocialText(field.value);
+    if (!match || !value) return;
+    const group = groups.get(match.indexKey) || {
+      index: match.index,
+      name: "",
+      nameScore: -1,
+      quantity: "",
+      description: "",
+      materials: [],
+      sizes: []
+    };
+    const leaf = match.leaf;
+    const nameScore = scoreCoreBridgeLineItemNameField(leaf);
+    if (nameScore > 0 && (!group.name || nameScore > group.nameScore) && !isGenericProFormaName(value)) {
+      group.name = value;
+      group.nameScore = nameScore;
+    }
+    if (/(quantity|qty)/i.test(leaf) && !group.quantity) group.quantity = value;
+    if (/(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf)) {
+      if (!group.description || value.length > group.description.length) group.description = value;
+    }
+    if (materialLeafPattern.test(leaf) && !ignoreLeafPattern.test(leaf) && value.length <= 500) {
+      group.materials.push(value);
+    }
+    if (/(width|height|length|dimension|size)/i.test(leaf) && !ignoreLeafPattern.test(leaf)) {
+      group.sizes.push(value);
+    }
+    groups.set(match.indexKey, group);
+  });
+
+  const lines = [...groups.values()]
+    .sort((left, right) => left.index - right.index)
+    .map((group, index) => {
+      const materialValues = [...new Set(group.materials.filter((value) =>
+        value &&
+        value !== group.name &&
+        !/^(true|false|null|undefined)$/i.test(value)
+      ))];
+      const detectedSize = extractProductionSize([group.name, group.description, ...materialValues, ...group.sizes].join(" "));
+      return {
+        id: `material-line-${index + 1}`,
+        lineItemName: group.name || `Line Item ${index + 1}`,
+        quantity: group.quantity || "",
+        size: detectedSize || [...new Set(group.sizes)].slice(0, 3).join(" x "),
+        material: materialValues.slice(0, 6).join(" · "),
+        specification: group.description || ""
+      };
+    })
+    .filter((line) => line.lineItemName || line.material || line.specification);
+
+  if (lines.length) return lines;
+  return (Array.isArray(fallbackItems) ? fallbackItems : []).map((item, index) => ({
+    id: `material-fallback-${index + 1}`,
+    lineItemName: String(item.name || `Line Item ${index + 1}`).trim(),
+    quantity: String(item.quantity || "").trim(),
+    size: extractProductionSize(`${item.name || ""} ${item.description || ""}`),
+    material: "",
+    specification: String(item.description || "").trim()
+  }));
+}
+
+async function fetchProductionOrderByReference(orderReference = "") {
+  const attempts = [];
+  for (const reference of getCoreBridgeReferenceFamily(orderReference)) {
+    try {
+      const lookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const order = (lookup.orders || []).find((entry) =>
+        String(entry.orderReference || "").trim().toLowerCase() === reference.toLowerCase()
+      ) || lookup.orders?.[0];
+      attempts.push({ reference, found: Boolean(order) });
+      if (order) return { order, attempts };
+    } catch (error) {
+      attempts.push({ reference, found: false, error: error.message || "Lookup failed" });
+    }
+  }
+  return { order: null, attempts };
+}
+
+async function buildMorningMeetingMaterialsPayload(store) {
+  const meeting = buildMorningMeetingPayload(store);
+  const approvedJobs = meeting.approvedYesterday;
+  const jobs = await Promise.all(approvedJobs.map(async (card) => {
+    try {
+      const { order, attempts } = await fetchProductionOrderByReference(card.orderReference);
+      return {
+        id: card.id,
+        orderReference: card.orderReference,
+        customerName: card.customerName,
+        description: card.description,
+        lines: extractProductionMaterialLines(order || {}, card.items),
+        source: order ? "CoreBridge live order" : "Approved artwork card",
+        lookupError: order ? "" : `No live CoreBridge order found. ${attempts.map((attempt) => attempt.error).filter(Boolean).join(" ")}`
+      };
+    } catch (error) {
+      return {
+        id: card.id,
+        orderReference: card.orderReference,
+        customerName: card.customerName,
+        description: card.description,
+        lines: extractProductionMaterialLines({}, card.items),
+        source: "Approved artwork card",
+        lookupError: error.message || "CoreBridge lookup failed."
+      };
+    }
+  }));
+  return {
+    generatedAt: new Date().toISOString(),
+    approvedDate: meeting.yesterdayIso,
+    jobs
+  };
+}
+
 const attemptedInstallationValueReferences = new Map();
 
 async function backfillInstallationJobValues(store, options = {}) {
@@ -10171,6 +10298,16 @@ function createServer() {
     } catch (error) {
       console.error("Could not email Morning Meeting notes.", error.message || error);
       response.status(500).json({ error: "Could not email the Morning Meeting notes." });
+    }
+  });
+
+  app.get("/api/morning-meeting/materials", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      response.json(await buildMorningMeetingMaterialsPayload(await readStore()));
+    } catch (error) {
+      console.error("Could not build Morning Meeting material stock sheet.", error.message || error);
+      response.status(500).json({ error: "Could not fetch the approved-job materials." });
     }
   });
 
