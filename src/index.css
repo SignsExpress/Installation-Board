@@ -6474,6 +6474,10 @@ button {
   color: #991b1b;
 }
 
+.job-notes.condensed-note {
+  display: none;
+}
+
 .job-actions {
   gap: 12px;
   align-items: center;
@@ -12557,7 +12561,6 @@ button {
   .client-mode .board-range,
   .client-mode .jobs-lane-button,
   .client-mode .job-meta-grid,
-  .client-mode .job-notes.compact,
   .client-mode .job-actions,
   .client-mode .date-holiday-controls,
   .client-mode .date-bank-holiday {
@@ -12601,6 +12604,14 @@ button {
   .client-mode .job-card-top p {
     margin-top: 3px;
     font-size: 0.84rem;
+  }
+
+  .client-mode .job-notes.compact {
+    display: block;
+    margin-top: 2px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    line-height: 1.35;
   }
 
   .client-mode .job-tag {

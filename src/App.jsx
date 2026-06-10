@@ -2312,6 +2312,9 @@ function renderJobCardContent({
             ) : null}
           </div>
         </div>
+        {isCondensed && job.notes ? (
+          <p className="job-notes compact condensed-note"><b>Notes:</b> {job.notes}</p>
+        ) : null}
         {!isCondensed ? (
           <>
             <div className="job-meta-grid">
@@ -2319,7 +2322,7 @@ function renderJobCardContent({
               <p><b>Contact:</b> {job.contact || "-"}</p>
               <p><b>Number:</b> {job.number || "-"}</p>
             </div>
-            <p className="job-notes compact"><b>Notes:</b> {job.notes || ""}</p>
+            {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
             <div className="job-actions">
               {!isClientMode ? (
                 <>
