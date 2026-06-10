@@ -107,6 +107,7 @@ const EMPTY_FORM = {
   customInstaller: "",
   jobType: "Install",
   customJobType: "",
+  jobTotalExVat: 0,
   isPlaceholder: false,
   notes: ""
 };
@@ -16755,6 +16756,16 @@ export default function App() {
       .slice(0, 12);
   }, [boardSearchQuery, jobs]);
 
+  const installationValueSummary = useMemo(() => {
+    const monthDate = parseIsoDate(`${board?.valueSummary?.monthId || ""}-01`);
+    return {
+      monthLabel: monthDate
+        ? new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthDate)
+        : "",
+      periods: Array.isArray(board?.valueSummary?.periods) ? board.valueSummary.periods : []
+    };
+  }, [board?.valueSummary]);
+
   useEffect(() => {
     let active = true;
 
@@ -18094,6 +18105,7 @@ export default function App() {
       contact: resolvedOrder.contact ?? "",
       number: resolvedOrder.number ?? "",
       address: resolvedOrder.address ?? "",
+      jobTotalExVat: Number(resolvedOrder.jobTotalExVat || 0),
       notes: resolvedOrder.notes ?? ""
     }));
     setOrderLookupOpen(false);
@@ -19341,22 +19353,25 @@ export default function App() {
               <div className="board-loading">Loading the shared installation board...</div>
             ) : (
               <div className="board board-with-history">
-                <div className="installation-board-toolbar">
-                  <div>
-                    <span className="installation-board-kicker">Installation Board</span>
-                    <h1>Scheduled work</h1>
-                    <p>Plan installations, surveys, deliveries and subcontractor work in one shared view.</p>
-                  </div>
-                  <div className="installation-board-summary" aria-label="Installation board summary">
-                    <div>
-                      <span>Booked</span>
-                      <strong>{board.weeks.reduce((total, week) => total + week.rows.reduce((rowTotal, row) => rowTotal + row.jobs.length, 0), 0)}</strong>
+                <div className="installation-value-dashboard" aria-label={`${installationValueSummary.monthLabel} booked work value`}>
+                  {installationValueSummary.periods.map((period) => (
+                    <div key={period.label} className={`installation-value-card ${period.isTotal ? "is-total" : ""}`}>
+                      <div className="installation-value-head">
+                        <span>{period.isTotal ? `${installationValueSummary.monthLabel} total` : period.label}</span>
+                        <strong>{formatProFormaMoney(period.current)}</strong>
+                      </div>
+                      <div className="installation-value-progress">
+                        <span style={{ width: `${period.progress}%` }} />
+                      </div>
+                      <small>
+                        {period.previous > 0
+                          ? `${period.changePercent >= 0 ? "+" : ""}${period.changePercent}% vs previous month (${formatProFormaMoney(period.previous)})`
+                          : period.current > 0
+                            ? `New work vs previous month (${formatProFormaMoney(0)})`
+                            : `No booked value in ${installationValueSummary.monthLabel}`}
+                      </small>
                     </div>
-                    <div>
-                      <span>Unscheduled</span>
-                      <strong>{board.unscheduled.length}</strong>
-                    </div>
-                  </div>
+                  ))}
                 </div>
                 <div className="board-history-launch board-history-launch-top">
                   <div className="board-history-actions">
@@ -19757,6 +19772,17 @@ export default function App() {
                   type="text"
                   value={form.description}
                   onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                />
+              </label>
+
+              <label>
+                Net job value
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.jobTotalExVat}
+                  onChange={(event) => setForm((current) => ({ ...current, jobTotalExVat: event.target.value }))}
                 />
               </label>
 

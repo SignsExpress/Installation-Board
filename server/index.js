@@ -2091,21 +2091,92 @@ function buildBirthdayEntriesForRange(store, startIso, endIso) {
   return entries;
 }
 
+function buildInstallationValueSummary(store, today = getTodayInLondon()) {
+  const currentMonthStart = getStartOfMonth(today);
+  const previousMonthStart = getStartOfMonth(addMonths(today, -1));
+  const currentMonthId = toIsoDate(currentMonthStart).slice(0, 7);
+  const previousMonthId = toIsoDate(previousMonthStart).slice(0, 7);
+  const weekCount = Math.ceil(getEndOfMonth(currentMonthStart).getUTCDate() / 7);
+  const values = Array.from({ length: weekCount }, () => ({ current: 0, previous: 0 }));
+  const linkedValues = new Map();
+  const linkedCards = [
+    ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
+    ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
+  ];
+  linkedCards.forEach((card) => {
+    const reference = String(card?.orderReference || "").trim().toLowerCase();
+    const value = Number(card?.jobTotalExVat || 0);
+    if (reference && Number.isFinite(value) && value > 0) linkedValues.set(reference, value);
+  });
+
+  let currentTotal = 0;
+  let previousTotal = 0;
+  const countedOrders = new Set();
+  [...(Array.isArray(store?.jobs) ? store.jobs : [])]
+    .sort((left, right) => String(left?.date || "").localeCompare(String(right?.date || "")))
+    .forEach((job) => {
+      const jobDate = parseIsoDate(job?.date);
+      const storedValue = Number(job?.jobTotalExVat || 0);
+      const linkedValue = linkedValues.get(String(job?.orderReference || "").trim().toLowerCase()) || 0;
+      const value = storedValue > 0 ? storedValue : linkedValue;
+      if (!jobDate || !Number.isFinite(value) || value <= 0) return;
+      const monthId = toIsoDate(jobDate).slice(0, 7);
+      const referenceKey = String(job?.orderReference || "").trim().toLowerCase();
+      const countKey = `${monthId}:${referenceKey || job?.id || ""}`;
+      if (countedOrders.has(countKey)) return;
+      countedOrders.add(countKey);
+      const weekIndex = Math.floor((jobDate.getUTCDate() - 1) / 7);
+      if (monthId === currentMonthId && values[weekIndex]) {
+        values[weekIndex].current += value;
+        currentTotal += value;
+      } else if (monthId === previousMonthId && values[weekIndex]) {
+        values[weekIndex].previous += value;
+        previousTotal += value;
+      }
+    });
+
+  const buildPeriod = (label, current, previous, isTotal = false) => {
+    const roundedCurrent = Math.round(current * 100) / 100;
+    const roundedPrevious = Math.round(previous * 100) / 100;
+    return {
+      label,
+      current: roundedCurrent,
+      previous: roundedPrevious,
+      changePercent: roundedPrevious > 0 ? Math.round(((roundedCurrent - roundedPrevious) / roundedPrevious) * 100) : null,
+      progress: Math.max(roundedCurrent, roundedPrevious) > 0
+        ? Math.round((roundedCurrent / Math.max(roundedCurrent, roundedPrevious)) * 100)
+        : 0,
+      isTotal
+    };
+  };
+
+  return {
+    monthId: currentMonthId,
+    periods: [
+      ...values.map((value, index) => buildPeriod(`Week ${index + 1}`, value.current, value.previous)),
+      buildPeriod("Month total", currentTotal, previousTotal, true)
+    ]
+  };
+}
+
 function buildBoardRowsFromStore(store, options = {}) {
   const today = options.today || getTodayInLondon();
   const mode = options.mode === "month" ? "month" : options.mode === "range" ? "range" : "rolling";
   const rangeStart = options.start || (mode === "month" ? getStartOfMonth(today) : getRollingWindow(today).start);
   const rangeEnd = options.end || (mode === "month" ? getEndOfMonth(today) : getRollingWindow(today).end);
   const birthdayEntries = buildBirthdayEntriesForRange(store, toIsoDate(rangeStart), toIsoDate(rangeEnd));
-  return buildBoardRows(store.jobs, store.holidays, {
-    ...options,
-    today,
-    mode,
-    start: rangeStart,
-    end: rangeEnd,
-    birthdayEntries,
-    holidayEvents: store.holidayEvents || []
-  });
+  return {
+    ...buildBoardRows(store.jobs, store.holidays, {
+      ...options,
+      today,
+      mode,
+      start: rangeStart,
+      end: rangeEnd,
+      birthdayEntries,
+      holidayEvents: store.holidayEvents || []
+    }),
+    valueSummary: buildInstallationValueSummary(store, today)
+  };
 }
 
 function sanitizeJobPhoto(payload) {
@@ -2658,6 +2729,7 @@ function sanitizeJob(payload) {
     customInstaller: String(payload.customInstaller || "").trim(),
     jobType: String(payload.jobType || "Install").trim(),
     customJobType: String(payload.customJobType || "").trim(),
+    jobTotalExVat: Number.isFinite(Number(payload.jobTotalExVat)) ? Math.max(0, Math.round(Number(payload.jobTotalExVat) * 100) / 100) : 0,
     isPlaceholder:
       payload.isPlaceholder === true ||
       String(payload.isPlaceholder || "").trim().toLowerCase() === "true" ||
@@ -9824,7 +9896,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         return;
       }
 
-      const order = await fetchCoreBridgeOrderDetail(config, orderId, includeDebug);
+      const order = await fetchCoreBridgeOrderDetail(config, orderId, true);
       try {
         const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, orderId);
         if (destinationAddress) {
@@ -9834,6 +9906,12 @@ app.get("/api/corebridge/orders", async (request, response) => {
         if (includeDebug) {
           order._destinationError = destinationError.message;
         }
+      }
+      const proFormaPayload = buildProFormaPayload(order);
+      order.jobTotalExVat = proFormaPayload.preTaxTotal || proFormaPayload.subtotal || 0;
+      if (!includeDebug) {
+        delete order.debugFields;
+        delete order.debugRaw;
       }
       response.json(order);
     } catch (error) {
