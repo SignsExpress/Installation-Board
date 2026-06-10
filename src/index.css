@@ -7697,6 +7697,237 @@ button {
   }
 }
 
+.installation-job-backdrop {
+  padding: 18px;
+  background: rgba(23, 32, 51, 0.5);
+  backdrop-filter: blur(3px);
+}
+
+.installation-job-backdrop .job-modal {
+  width: min(920px, calc(100vw - 36px));
+  max-height: min(900px, calc(100dvh - 36px));
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  border: 1px solid #d7e0ec;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(23, 32, 51, 0.22);
+  backdrop-filter: none;
+}
+
+.installation-job-backdrop .job-modal-head {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e6ebf2;
+  background: #f8fbff;
+}
+
+.installation-job-backdrop .job-modal-head > div {
+  gap: 2px;
+}
+
+.installation-job-backdrop .job-modal-head h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 0.96rem;
+  line-height: 1.25;
+}
+
+.installation-job-backdrop .job-modal-head p {
+  color: #6b7789;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.job-modal-kicker {
+  color: #67428b;
+  font-size: 0.56rem;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.installation-job-backdrop .job-modal-head .icon-button {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #536276;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.installation-job-backdrop .job-modal-head .icon-button:hover {
+  border-color: #bdcadb;
+  background: #f2f5f9;
+  color: #172033;
+}
+
+.installation-job-backdrop .job-form-scroll {
+  gap: 11px;
+  padding: 14px 16px 16px;
+  scrollbar-gutter: stable;
+}
+
+.installation-job-backdrop .job-form label {
+  gap: 5px;
+  color: #536276;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.installation-job-backdrop .job-form input,
+.installation-job-backdrop .job-form select,
+.installation-job-backdrop .job-form textarea {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #fff;
+  color: #172033;
+  font-size: 0.76rem;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.installation-job-backdrop .job-form textarea {
+  min-height: 82px;
+}
+
+.installation-job-backdrop .job-form input:focus,
+.installation-job-backdrop .job-form select:focus,
+.installation-job-backdrop .job-form textarea:focus {
+  border-color: #9d84b5;
+  box-shadow: 0 0 0 3px rgba(103, 66, 139, 0.1);
+}
+
+.installation-job-backdrop .corebridge-lookup-bar {
+  min-height: 46px;
+  padding: 7px 8px;
+  border: 1px solid #e0e7f0;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.installation-job-backdrop .corebridge-lookup-bar .ghost-button,
+.installation-job-backdrop .placeholder-toggle-button {
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+.installation-job-backdrop .corebridge-lookup-bar .muted {
+  color: #718096;
+  font-size: 0.68rem;
+  font-weight: 650;
+}
+
+.installation-job-backdrop .order-reference-row {
+  gap: 8px;
+}
+
+.installation-job-backdrop .placeholder-toggle-button {
+  padding: 0 11px;
+  border-color: #d7e0ec;
+  background: #fff;
+  color: #536276;
+}
+
+.installation-job-backdrop .placeholder-toggle-button.active {
+  border-color: #e0b94a;
+  background: #fff7cf;
+  color: #805b00;
+}
+
+.installation-job-backdrop .split-fields {
+  gap: 10px;
+}
+
+.installation-job-backdrop .installer-picker {
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid #e0e7f0;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.installation-job-backdrop .installer-chip {
+  min-height: 29px;
+  padding: 0 9px;
+  border-radius: 5px;
+  font-size: 0.64rem;
+  box-shadow: none;
+}
+
+.installation-job-backdrop .admin-job-summary {
+  padding-top: 2px;
+}
+
+.installation-job-backdrop .admin-job-detail-grid {
+  gap: 8px;
+}
+
+.installation-job-backdrop .detail-card {
+  padding: 9px;
+  border-radius: 7px;
+  border-color: #e0e7f0;
+  background: #f8fbff;
+  box-shadow: none;
+}
+
+.installation-job-backdrop .job-form-actions {
+  position: sticky;
+  bottom: -16px;
+  z-index: 4;
+  margin: 4px -16px -16px;
+  padding: 11px 16px;
+  border-top: 1px solid #e6ebf2;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 -8px 20px rgba(23, 32, 51, 0.05);
+  backdrop-filter: blur(8px);
+}
+
+.installation-job-backdrop .job-form-actions button {
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+@media (max-width: 620px) {
+  .installation-job-backdrop {
+    padding: 8px;
+  }
+
+  .installation-job-backdrop .job-modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+
+  .installation-job-backdrop .job-modal-head,
+  .installation-job-backdrop .job-form-scroll {
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+
+  .installation-job-backdrop .job-form-actions {
+    margin-left: -11px;
+    margin-right: -11px;
+    padding-left: 11px;
+    padding-right: 11px;
+  }
+}
+
 .filtering-board-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

@@ -19691,13 +19691,18 @@ export default function App() {
       </div>
       {!isClientMode && jobModalDate ? (
         <div
-          className="modal-backdrop"
+          className="modal-backdrop installation-job-backdrop"
           onPointerDown={handleBackdropPointerDown}
           onClick={(event) => handleBackdropClick(event, () => resetForm())}
         >
           <div className="modal job-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
             <div className="modal-head job-modal-head">
-              <button className="icon-button" type="button" onClick={() => resetForm()}>
+              <div>
+                <span className="job-modal-kicker">{editingId ? "Installation Board" : "New installation job"}</span>
+                <h3>{editingId ? `${form.orderReference || "Job"} - ${form.customerName || "Edit job"}` : "Add job to the board"}</h3>
+                <p>{form.date ? formatJobDate(form.date) : "Unscheduled"}</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => resetForm()} aria-label="Close job editor">
                 x
               </button>
             </div>
