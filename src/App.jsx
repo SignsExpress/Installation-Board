@@ -17188,7 +17188,22 @@ export default function App() {
       }
     }
 
+    async function handleValueUpdate() {
+      try {
+        const separator = buildBoardDataUrl(boardRange.startIso, boardRange.endIso).includes("?") ? "&" : "?";
+        const response = await fetch(`${buildBoardDataUrl(boardRange.startIso, boardRange.endIso)}${separator}backfill=0`);
+        if (!response.ok) return;
+        const payload = await response.json();
+        setBoard(payload.board || null);
+        setJobs(Array.isArray(payload.jobs) ? payload.jobs : []);
+        setHolidays(Array.isArray(payload.holidays) ? payload.holidays : []);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
     stream.addEventListener("board-updated", handleUpdate);
+    stream.addEventListener("installation-values-updated", handleValueUpdate);
     stream.onerror = () => {
       stream.close();
       window.setTimeout(() => window.location.reload(), 3000);
@@ -17196,6 +17211,7 @@ export default function App() {
 
     return () => {
       stream.removeEventListener("board-updated", handleUpdate);
+      stream.removeEventListener("installation-values-updated", handleValueUpdate);
       stream.close();
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);

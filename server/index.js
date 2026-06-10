@@ -4135,7 +4135,7 @@ function broadcast(event, payload) {
 }
 
 async function getBoardPayload(options = {}) {
-  const store = await backfillInstallationJobValues(await readStore(), options);
+  const store = await readStore();
   const today = getTodayInLondon();
   const navigation = buildMonthNavigation(today);
   let boardOptions = { today, mode: "rolling" };
@@ -8382,10 +8382,26 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
 }
 
 const attemptedInstallationValueReferences = new Set();
+let installationValueBackfillPromise = null;
+
+function scheduleInstallationJobValueBackfill(options = {}) {
+  if (installationValueBackfillPromise) return;
+  installationValueBackfillPromise = (async () => {
+    const store = await readStore();
+    const changed = await backfillInstallationJobValues(store, options);
+    if (changed) broadcast("installation-values-updated", { ok: true });
+  })()
+    .catch((error) => {
+      console.error("Could not complete Installation Board value backfill.", error.message || error);
+    })
+    .finally(() => {
+      installationValueBackfillPromise = null;
+    });
+}
 
 async function backfillInstallationJobValues(store, options = {}) {
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
-  const linkedValues = new Map();
+  const resolvedValues = new Map();
   const linkedCards = [
     ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
     ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
@@ -8393,22 +8409,12 @@ async function backfillInstallationJobValues(store, options = {}) {
   linkedCards.forEach((card) => {
     const reference = String(card?.orderReference || "").trim().toLowerCase();
     const value = Number(card?.jobTotalExVat || 0);
-    if (reference && Number.isFinite(value) && value > 0) linkedValues.set(reference, value);
-  });
-
-  let changed = false;
-  jobs.forEach((job) => {
-    const reference = String(job?.orderReference || "").trim().toLowerCase();
-    const linkedValue = linkedValues.get(reference) || 0;
-    if (reference && Number(job?.jobTotalExVat || 0) <= 0 && linkedValue > 0) {
-      job.jobTotalExVat = linkedValue;
-      changed = true;
-    }
+    if (reference && Number.isFinite(value) && value > 0) resolvedValues.set(reference, value);
   });
 
   const selectedMonth = options.mode === "month" ? String(options.monthId || "") : "";
-  const selectedStart = String(options.start || "");
-  const selectedEnd = String(options.end || "");
+  const selectedStart = options.start instanceof Date ? toIsoDate(options.start) : String(options.start || "");
+  const selectedEnd = options.end instanceof Date ? toIsoDate(options.end) : String(options.end || "");
   const isSelectedJob = (job) => {
     const date = String(job?.date || "");
     if (selectedMonth) return date.startsWith(`${selectedMonth}-`);
@@ -8423,6 +8429,7 @@ async function backfillInstallationJobValues(store, options = {}) {
       .filter((job) => String(job?.orderReference || "").trim() && Number(job?.jobTotalExVat || 0) <= 0)
       .map((job) => String(job.orderReference).trim())
   )]
+    .filter((reference) => !resolvedValues.has(reference.toLowerCase()))
     .filter((reference) => !attemptedInstallationValueReferences.has(reference.toLowerCase()))
     .slice(0, 12);
 
@@ -8434,18 +8441,26 @@ async function backfillInstallationJobValues(store, options = {}) {
       const proForma = buildProFormaPayload(order);
       const value = Number(proForma.preTaxTotal || proForma.subtotal || 0);
       if (!Number.isFinite(value) || value <= 0) continue;
-      jobs.forEach((job) => {
-        if (String(job?.orderReference || "").trim().toLowerCase() === reference.toLowerCase()) {
-          job.jobTotalExVat = Math.round(value * 100) / 100;
-          changed = true;
-        }
-      });
+      resolvedValues.set(reference.toLowerCase(), Math.round(value * 100) / 100);
     } catch (error) {
       console.error(`Could not backfill Installation Board value for ${reference}.`, error.message || error);
     }
   }
 
-  return changed ? writeStore(store) : store;
+  if (!resolvedValues.size) return false;
+  const latestStore = await readStore();
+  let changed = false;
+  latestStore.jobs.forEach((job) => {
+    const reference = String(job?.orderReference || "").trim().toLowerCase();
+    const value = resolvedValues.get(reference) || 0;
+    if (reference && Number(job?.jobTotalExVat || 0) <= 0 && value > 0) {
+      job.jobTotalExVat = value;
+      changed = true;
+    }
+  });
+  if (!changed) return false;
+  await writeStore(latestStore);
+  return true;
 }
 
 function needsDesignBoardCoreBridgeRefresh(card = {}) {
@@ -9809,9 +9824,25 @@ function createServer() {
         jobs: toPublicJobs(payload.jobs),
         holidays: payload.holidays
       });
+      if (String(request.query.backfill || "").trim() !== "0") {
+        scheduleInstallationJobValueBackfill({
+          start,
+          end,
+          mode: mode === "month" ? "month" : "rolling",
+          monthId
+        });
+      }
       return;
     }
     response.json(payload.board);
+    if (String(request.query.backfill || "").trim() !== "0") {
+      scheduleInstallationJobValueBackfill({
+        start,
+        end,
+        mode: mode === "month" ? "month" : "rolling",
+        monthId
+      });
+    }
   });
 
   app.get("/api/jobs", async (request, response) => {
