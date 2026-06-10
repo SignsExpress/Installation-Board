@@ -8452,7 +8452,10 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
   for (const reference of lookupReferences) {
     try {
       const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
-      const candidateOrder = (candidateLookup.orders || [])[0];
+      const expectedReferences = new Set(getCoreBridgeReferenceVariants(reference).map((value) => value.toLowerCase()));
+      const candidateOrder = (candidateLookup.orders || []).find((entry) =>
+        expectedReferences.has(String(entry?.orderReference || "").trim().toLowerCase())
+      ) || (candidateLookup.orders || [])[0];
       lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
       if (candidateOrder) {
         lookup = candidateLookup;

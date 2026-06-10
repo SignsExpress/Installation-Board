@@ -2271,39 +2271,43 @@ function renderJobCardContent({
             </strong>
             <p>{job.description || "No description"}</p>
           </div>
-        <div className="job-title-meta">
-          {Number(job.jobTotalExVat || 0) > 0 ? <span className="job-value-pill">{formatProFormaMoney(job.jobTotalExVat)}</span> : null}
-          {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
-          {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
-          {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
-          {latestRams ? (
-            <button
-              className="job-rams-pill"
-              type="button"
-              onClick={(event) => {
-                event.stopPropagation();
-                const ramsUrl = `/client/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`;
-                if (isClientMode) window.open(ramsUrl, "_blank", "noopener,noreferrer");
-                else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
-              }}
-            >
-              RAMS saved
-            </button>
-          ) : null}
-          {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
-          {installerLabels.length ? (
-            <div className="job-title-installers">
-              {installerLabels.map((installer) => {
-                const metaInstaller = getInstallerMeta(installer);
-                return (
-                  <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
-                    {installer}
-                  </span>
-                );
-              })}
-            </div>
-          ) : null}
+          <div className="job-title-meta">
+            <div className="job-title-meta-primary">
+              {installerLabels.length ? (
+                <div className="job-title-installers">
+                  {installerLabels.map((installer) => {
+                    const metaInstaller = getInstallerMeta(installer);
+                    return (
+                      <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
+                        {installer}
+                      </span>
+                    );
+                  })}
+                </div>
+              ) : null}
             <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+            </div>
+            <div className="job-title-meta-secondary">
+              {Number(job.jobTotalExVat || 0) > 0 ? <span className="job-value-pill">{formatInstallationValue(job.jobTotalExVat)}</span> : null}
+              {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
+              {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
+              {latestRams ? (
+                <button
+                  className="job-rams-pill"
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    const ramsUrl = `/client/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`;
+                    if (isClientMode) window.open(ramsUrl, "_blank", "noopener,noreferrer");
+                    else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                  }}
+                >
+                  RAMS saved
+                </button>
+              ) : null}
+              {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
+              {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
+            </div>
           </div>
         </div>
         {!isCondensed ? (
@@ -5401,6 +5405,11 @@ function formatProFormaMoney(value) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(numeric);
+}
+
+function formatInstallationValue(value) {
+  const roundedHundreds = Math.round((Number(value) || 0) / 100) * 100;
+  return `£${(roundedHundreds / 1000).toFixed(1)}k`;
 }
 
 function roundProFormaMoney(value) {
@@ -16919,7 +16928,7 @@ export default function App() {
     let active = true;
 
     async function fillHistoricInstallationValues() {
-      for (let batch = 0; batch < 8 && active; batch += 1) {
+      for (let batch = 0; batch < 30 && active; batch += 1) {
         try {
           const response = await fetch("/api/board/value-backfill", {
             method: "POST",
@@ -19422,16 +19431,16 @@ export default function App() {
                     <div key={period.label} className={`installation-value-card ${period.isTotal ? "is-total" : ""}`}>
                       <div className="installation-value-head">
                         <span>{period.isTotal ? `${installationValueSummary.monthLabel} total` : period.label}</span>
-                        <strong>{formatProFormaMoney(period.current)}</strong>
+                        <strong>{formatInstallationValue(period.current)}</strong>
                       </div>
                       <div className="installation-value-progress">
                         <span style={{ width: `${period.progress}%` }} />
                       </div>
                       <small>
                         {period.previous > 0
-                          ? `${period.changePercent >= 0 ? "+" : ""}${period.changePercent}% vs previous month (${formatProFormaMoney(period.previous)})`
+                          ? `${period.changePercent >= 0 ? "+" : ""}${period.changePercent}% vs previous month (${formatInstallationValue(period.previous)})`
                           : period.current > 0
-                            ? `New work vs previous month (${formatProFormaMoney(0)})`
+                            ? `New work vs previous month (${formatInstallationValue(0)})`
                             : `No booked value in ${installationValueSummary.monthLabel}`}
                       </small>
                     </div>

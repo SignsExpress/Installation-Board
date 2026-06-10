@@ -5898,11 +5898,20 @@ button {
 }
 
 .job-title-meta {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.job-title-meta-primary,
+.job-title-meta-secondary {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -14151,13 +14160,12 @@ button {
 }
 
 .installation-board-panel .job-title-meta {
-  flex: 1 1 260px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex: 0 1 340px;
+  align-self: stretch;
+  align-content: center;
 }
 
 .installation-board-panel .job-title-installers {
-  flex: 1 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   min-width: 0;
