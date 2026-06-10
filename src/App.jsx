@@ -2286,28 +2286,30 @@ function renderJobCardContent({
                 </div>
               ) : null}
             <span className={`job-tag ${meta.colorClass}`}>{getJobTypeLabel(job)}</span>
+            {Number(job.jobTotalExVat || 0) > 0 ? <span className="job-value-pill">{formatInstallationValue(job.jobTotalExVat)}</span> : null}
             </div>
-            <div className="job-title-meta-secondary">
-              {Number(job.jobTotalExVat || 0) > 0 ? <span className="job-value-pill">{formatInstallationValue(job.jobTotalExVat)}</span> : null}
-              {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
-              {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
-              {latestRams ? (
-                <button
-                  className="job-rams-pill"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    const ramsUrl = `/client/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`;
-                    if (isClientMode) window.open(ramsUrl, "_blank", "noopener,noreferrer");
-                    else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
-                  }}
-                >
-                  RAMS saved
-                </button>
-              ) : null}
-              {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
-              {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
-            </div>
+            {job.isPlaceholder || job.isSnagging || latestRams || job.isCompleted || (Array.isArray(job.photos) && job.photos.length) ? (
+              <div className="job-title-meta-secondary">
+                {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
+                {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
+                {latestRams ? (
+                  <button
+                    className="job-rams-pill"
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      const ramsUrl = `/client/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`;
+                      if (isClientMode) window.open(ramsUrl, "_blank", "noopener,noreferrer");
+                      else window.location.assign(`/rams?jobId=${encodeURIComponent(job.id)}&ramsId=${encodeURIComponent(latestRams.id)}`);
+                    }}
+                  >
+                    RAMS saved
+                  </button>
+                ) : null}
+                {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}
+                {Array.isArray(job.photos) && job.photos.length ? <span className="job-photo-pill">{job.photos.length} photo{job.photos.length === 1 ? "" : "s"}</span> : null}
+              </div>
+            ) : null}
           </div>
         </div>
         {!isCondensed ? (
@@ -16640,8 +16642,9 @@ export default function App() {
   const [pushSaving, setPushSaving] = useState(false);
   const [pushError, setPushError] = useState("");
   const [broadcastMessageSending, setBroadcastMessageSending] = useState(false);
-  const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
+  const [previousMonthDepth, setPreviousMonthDepth] = useState(6);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
+  const [historyRecoveryVersion, setHistoryRecoveryVersion] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
   const [boardSearchOpen, setBoardSearchOpen] = useState(false);
   const boardNotificationJobId = useMemo(() => {
@@ -16741,7 +16744,7 @@ export default function App() {
   }, [futureMonthDepth, previousMonthDepth, rollingEndIso, rollingStartIso, todayIso]);
 
   function resetBoardWindow() {
-    setPreviousMonthDepth(0);
+    setPreviousMonthDepth(6);
     setFutureMonthDepth(0);
   }
 
@@ -16918,6 +16921,7 @@ export default function App() {
         const result = await response.json();
         if (result.changed) {
           setMessage(createMessage(`${result.restored} historical jobs restored from backup.`, "success"));
+          setHistoryRecoveryVersion((current) => current + 1);
         }
       })
       .catch((error) => console.error(error));
@@ -16953,7 +16957,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+  }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso, historyRecoveryVersion]);
 
   useEffect(() => {
     if (!currentUser || !showTvInstalls) return undefined;
@@ -19448,15 +19452,17 @@ export default function App() {
                 </div>
                 <div className="board-history-launch board-history-launch-top">
                   <div className="board-history-actions">
-                    <button
-                      className="ghost-button board-history-button"
-                      type="button"
-                      onClick={() => setPreviousMonthDepth((current) => Math.min(6, current + 1))}
-                    >
-                      Previous months
-                    </button>
+                    {previousMonthDepth < 6 ? (
+                      <button
+                        className="ghost-button board-history-button"
+                        type="button"
+                        onClick={() => setPreviousMonthDepth((current) => Math.min(6, current + 1))}
+                      >
+                        Previous months
+                      </button>
+                    ) : null}
                     <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
-                      Current month
+                      6 previous months
                     </button>
                     <div className="board-history-search">
                       <input

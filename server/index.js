@@ -2124,9 +2124,16 @@ async function recoverHistoricalJobsFromBackups() {
   const names = fs.existsSync(backupDirectory)
     ? (await fsp.readdir(backupDirectory)).filter((name) => /^jobs-store-\d+.*\.json$/i.test(name))
     : [];
-  let bestBackup = null;
+  const recoveredHistoricalJobs = new Map();
+  const recoverySources = [];
+  const getRecoveryKey = (job) => String(job?.id || "").trim() || [
+    job?.date,
+    job?.orderReference,
+    job?.customerName,
+    job?.description
+  ].map((value) => String(value || "").trim().toLowerCase()).join("|");
 
-  for (const name of names) {
+  for (const name of names.sort()) {
     try {
       const parsed = JSON.parse(await fsp.readFile(path.join(backupDirectory, name), "utf8"));
       const jobs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.jobs) ? parsed.jobs : [];
@@ -2134,27 +2141,22 @@ async function recoverHistoricalJobsFromBackups() {
         const date = String(job?.date || "");
         return isValidIsoDate(date) && date < cutoff;
       });
-      if (!bestBackup || historicalJobs.length > bestBackup.historicalJobs.length) {
-        bestBackup = { name, historicalJobs };
+      if (historicalJobs.length) {
+        recoverySources.push({ name, jobCount: historicalJobs.length });
+        historicalJobs.forEach((job) => recoveredHistoricalJobs.set(getRecoveryKey(job), job));
       }
     } catch (error) {
       console.error(`Could not inspect historical recovery backup ${name}.`, error.message || error);
     }
   }
 
-  if (!bestBackup?.historicalJobs.length) {
-    return { changed: false, cutoff, restored: 0, backup: "", reason: "No backup contains historical jobs." };
+  if (!recoveredHistoricalJobs.size) {
+    return { changed: false, cutoff, restored: 0, backups: [], reason: "No backup contains historical jobs." };
   }
 
   const currentHistoricalJobs = currentJobs.filter((job) => String(job?.date || "") < cutoff);
-  const getRecoveryKey = (job) => String(job?.id || "").trim() || [
-    job?.date,
-    job?.orderReference,
-    job?.customerName,
-    job?.description
-  ].map((value) => String(value || "").trim().toLowerCase()).join("|");
   const mergedHistoricalJobs = new Map();
-  bestBackup.historicalJobs.forEach((job) => mergedHistoricalJobs.set(getRecoveryKey(job), job));
+  recoveredHistoricalJobs.forEach((job, key) => mergedHistoricalJobs.set(key, job));
   currentHistoricalJobs.forEach((job) => mergedHistoricalJobs.set(getRecoveryKey(job), job));
   const nextJobs = [...mergedHistoricalJobs.values(), ...protectedJobs];
   const nextProtectedJobs = nextJobs.filter((job) => String(job?.date || "") >= cutoff);
@@ -2163,7 +2165,7 @@ async function recoverHistoricalJobsFromBackups() {
   }
   const restored = nextJobs.length - currentJobs.length;
   if (restored <= 0) {
-    return { changed: false, cutoff, restored: 0, backup: bestBackup.name, reason: "Current store already contains this history." };
+    return { changed: false, cutoff, restored: 0, backups: recoverySources, reason: "Current store already contains all recoverable history." };
   }
 
   await snapshotFile(getDataFile(), "jobs-store-pre-history-recovery", 40);
@@ -2176,7 +2178,7 @@ async function recoverHistoricalJobsFromBackups() {
     changed: true,
     cutoff,
     restored,
-    backup: bestBackup.name,
+    backups: recoverySources,
     historicalJobCount: mergedHistoricalJobs.size
   };
 }
@@ -8484,9 +8486,11 @@ async function backfillInstallationJobValues(store, options = {}) {
     ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
   ];
   linkedCards.forEach((card) => {
-    const reference = String(card?.orderReference || "").trim().toLowerCase();
     const value = Number(card?.jobTotalExVat || 0);
-    if (reference && Number.isFinite(value) && value > 0) resolvedValues.set(reference, value);
+    if (!Number.isFinite(value) || value <= 0) return;
+    getSocialLookupReferences(card?.orderReference || "").forEach((reference) => {
+      resolvedValues.set(reference.toLowerCase(), value);
+    });
   });
 
   const selectedMonth = options.mode === "month" ? String(options.monthId || "") : "";
@@ -8538,7 +8542,14 @@ async function backfillInstallationJobValues(store, options = {}) {
       }
       if (!order) continue;
       const proForma = buildProFormaPayload(order);
-      const value = Number(proForma.preTaxTotal || proForma.subtotal || 0);
+      const value = Number(
+        proForma.preTaxTotal ||
+        proForma.subtotal ||
+        order.jobTotalExVat ||
+        order.preTaxTotal ||
+        order.subtotal ||
+        0
+      );
       if (!Number.isFinite(value) || value <= 0) continue;
       resolvedValues.set(reference.toLowerCase(), Math.round(value * 100) / 100);
     } catch (error) {
@@ -8552,7 +8563,9 @@ async function backfillInstallationJobValues(store, options = {}) {
   let changed = false;
   latestStore.jobs.forEach((job) => {
     const reference = String(job?.orderReference || "").trim().toLowerCase();
-    const value = resolvedValues.get(reference) || 0;
+    const value = getSocialLookupReferences(reference)
+      .map((candidate) => resolvedValues.get(candidate.toLowerCase()) || 0)
+      .find((candidate) => candidate > 0) || 0;
     if (reference && Number(job?.jobTotalExVat || 0) <= 0 && value > 0) {
       job.jobTotalExVat = value;
       changed = true;
