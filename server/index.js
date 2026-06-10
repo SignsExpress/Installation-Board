@@ -2208,27 +2208,47 @@ function buildInstallationValueSummary(store, today = getTodayInLondon()) {
     ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
   ];
   linkedCards.forEach((card) => {
-    const reference = String(card?.orderReference || "").trim().toLowerCase();
     const value = Number(card?.jobTotalExVat || 0);
-    if (reference && Number.isFinite(value) && value > 0) linkedValues.set(reference, value);
+    if (!Number.isFinite(value) || value <= 0) return;
+    getCoreBridgeReferenceVariants(card?.orderReference || "").forEach((reference) => {
+      linkedValues.set(reference.toLowerCase(), value);
+    });
   });
 
   let currentTotal = 0;
   let previousTotal = 0;
-  const countedOrders = new Set();
-  [...(Array.isArray(store?.jobs) ? store.jobs : [])]
-    .sort((left, right) => String(left?.date || "").localeCompare(String(right?.date || "")))
+  const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
+  const getDuplicateReference = (job) => {
+    const reference = String(job?.orderReference || "").trim();
+    return (getCoreBridgeReferenceVariants(reference)[0] || reference)
+      .replace(/^ords-/i, "ORD-")
+      .replace(/^ests-/i, "EST-")
+      .replace(/^invs-/i, "INV-")
+      .toLowerCase();
+  };
+  const latestJobByReference = new Map();
+  jobs.forEach((job, index) => {
+    const reference = getDuplicateReference(job);
+    if (!reference) return;
+    const existing = latestJobByReference.get(reference);
+    const date = String(job?.date || "");
+    if (!existing || date > existing.date || (date === existing.date && index > existing.index)) {
+      latestJobByReference.set(reference, { job, date, index });
+    }
+  });
+
+  jobs
     .forEach((job) => {
       const jobDate = parseIsoDate(job?.date);
       const storedValue = Number(job?.jobTotalExVat || 0);
-      const linkedValue = linkedValues.get(String(job?.orderReference || "").trim().toLowerCase()) || 0;
+      const linkedValue = getCoreBridgeReferenceVariants(job?.orderReference || "")
+        .map((reference) => linkedValues.get(reference.toLowerCase()) || 0)
+        .find((value) => value > 0) || 0;
       const value = storedValue > 0 ? storedValue : linkedValue;
       if (!jobDate || !Number.isFinite(value) || value <= 0) return;
+      const referenceKey = getDuplicateReference(job);
+      if (referenceKey && latestJobByReference.get(referenceKey)?.job !== job) return;
       const monthId = toIsoDate(jobDate).slice(0, 7);
-      const referenceKey = String(job?.orderReference || "").trim().toLowerCase();
-      const countKey = `${monthId}:${referenceKey || job?.id || ""}`;
-      if (countedOrders.has(countKey)) return;
-      countedOrders.add(countKey);
       const weekRanges = monthId === currentMonthId ? currentWeekRanges : previousWeekRanges;
       const weekIndex = weekRanges.findIndex((range) => jobDate >= range.start && jobDate <= range.end);
       if (monthId === currentMonthId && values[weekIndex]) {
@@ -7957,7 +7977,14 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   const resolvedDiscount = resolvedSubtotal > 0 && totals.preTaxScore >= 0
     ? derivedDiscount
     : sanitizedExplicitDiscount;
-  const resolvedPreTax = totals.preTaxScore >= 0 ? totals.preTaxTotal : Math.max(Math.round((resolvedSubtotal - resolvedDiscount) * 100) / 100, 0);
+  const explicitGrossLessVat = totals.totalScore >= 0 && totals.vatScore >= 0
+    ? Math.max(Math.round((totals.total - totals.vatAmount) * 100) / 100, 0)
+    : 0;
+  const resolvedPreTax = totals.preTaxScore >= 0
+    ? totals.preTaxTotal
+    : resolvedSubtotal > 0
+      ? Math.max(Math.round((resolvedSubtotal - resolvedDiscount) * 100) / 100, 0)
+      : explicitGrossLessVat;
   const resolvedVat = totals.vatScore >= 0 ? totals.vatAmount : Math.round(resolvedPreTax * (vatRate / 100) * 100) / 100;
   const resolvedTotal = totals.totalScore >= 0 ? totals.total : Math.round((resolvedPreTax + resolvedVat) * 100) / 100;
   const resolvedTotalPaid = totals.totalPaidScore >= 0 ? totals.totalPaid : 0;
@@ -8457,7 +8484,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
       const expectedReferences = new Set(getCoreBridgeReferenceVariants(reference).map((value) => value.toLowerCase()));
       const candidateOrder = (candidateLookup.orders || []).find((entry) =>
         expectedReferences.has(String(entry?.orderReference || "").trim().toLowerCase())
-      ) || (candidateLookup.orders || [])[0];
+      );
       lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
       if (candidateOrder) {
         lookup = candidateLookup;
@@ -8532,26 +8559,27 @@ async function backfillInstallationJobValues(store, options = {}) {
       const lookupReferences = typeof getSocialLookupReferences === "function"
         ? getSocialLookupReferences(reference)
         : getCoreBridgeReferenceVariants(reference);
-      let order = null;
+      let value = 0;
       for (const lookupReference of lookupReferences) {
         const result = await fetchDesignBoardOrderByReference(lookupReference);
-        if (result.order) {
-          order = result.order;
-          break;
-        }
+        if (!result.order) continue;
+        const proForma = buildProFormaPayload(result.order);
+        const candidateValue = Number(
+          proForma.preTaxTotal ||
+          proForma.subtotal ||
+          result.order.jobTotalExVat ||
+          result.order.preTaxTotal ||
+          result.order.subtotal ||
+          0
+        );
+        if (!Number.isFinite(candidateValue) || candidateValue <= 0) continue;
+        value = Math.round(candidateValue * 100) / 100;
+        break;
       }
-      if (!order) continue;
-      const proForma = buildProFormaPayload(order);
-      const value = Number(
-        proForma.preTaxTotal ||
-        proForma.subtotal ||
-        order.jobTotalExVat ||
-        order.preTaxTotal ||
-        order.subtotal ||
-        0
-      );
       if (!Number.isFinite(value) || value <= 0) continue;
-      resolvedValues.set(reference.toLowerCase(), Math.round(value * 100) / 100);
+      getSocialLookupReferences(reference).forEach((candidate) => {
+        resolvedValues.set(candidate.toLowerCase(), value);
+      });
     } catch (error) {
       console.error(`Could not backfill Installation Board value for ${reference}.`, error.message || error);
     }
