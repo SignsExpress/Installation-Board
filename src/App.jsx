@@ -16900,6 +16900,38 @@ export default function App() {
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
 
   useEffect(() => {
+    if (!currentUser || !showBoard) return undefined;
+    let active = true;
+
+    async function fillHistoricInstallationValues() {
+      for (let batch = 0; batch < 8 && active; batch += 1) {
+        try {
+          const response = await fetch("/api/board/value-backfill", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              start: boardRange.startIso,
+              end: boardRange.endIso
+            })
+          });
+          if (!response.ok) return;
+          const result = await response.json();
+          if (!result.hasMore) return;
+          await new Promise((resolve) => window.setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(error);
+          return;
+        }
+      }
+    }
+
+    fillHistoricInstallationValues();
+    return () => {
+      active = false;
+    };
+  }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
     if (!currentUser || !showTvInstalls) return undefined;
     let active = true;
 

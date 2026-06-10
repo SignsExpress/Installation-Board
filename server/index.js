@@ -8381,31 +8381,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
   };
 }
 
-const attemptedInstallationValueReferences = new Set();
-let installationValueBackfillPromise = null;
-
-function scheduleInstallationJobValueBackfill(options = {}) {
-  if (installationValueBackfillPromise) return;
-  installationValueBackfillPromise = (async () => {
-    let hasMore = true;
-    for (let batch = 0; batch < 6 && hasMore; batch += 1) {
-      const store = await readStore();
-      const result = await backfillInstallationJobValues(store, options);
-      hasMore = result.hasMore;
-      if (result.changed) broadcast("installation-values-updated", { ok: true });
-      if (hasMore) await new Promise((resolve) => setTimeout(resolve, 400));
-    }
-    if (hasMore) {
-      setTimeout(() => scheduleInstallationJobValueBackfill(options), 2000);
-    }
-  })()
-    .catch((error) => {
-      console.error("Could not complete Installation Board value backfill.", error.message || error);
-    })
-    .finally(() => {
-      installationValueBackfillPromise = null;
-    });
-}
+const attemptedInstallationValueReferences = new Map();
 
 async function backfillInstallationJobValues(store, options = {}) {
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
@@ -8447,13 +8423,26 @@ async function backfillInstallationJobValues(store, options = {}) {
       .map((job) => String(job.orderReference).trim())
   )]
     .filter((reference) => !resolvedValues.has(reference.toLowerCase()))
-    .filter((reference) => !attemptedInstallationValueReferences.has(reference.toLowerCase()));
+    .filter((reference) => {
+      const attemptedAt = attemptedInstallationValueReferences.get(reference.toLowerCase()) || 0;
+      return Date.now() - attemptedAt > 1000 * 60 * 30;
+    });
   const batchReferences = unresolvedReferences.slice(0, 8);
 
   for (const reference of batchReferences) {
-    attemptedInstallationValueReferences.add(reference.toLowerCase());
+    attemptedInstallationValueReferences.set(reference.toLowerCase(), Date.now());
     try {
-      const { order } = await fetchDesignBoardOrderByReference(reference);
+      const lookupReferences = typeof getSocialLookupReferences === "function"
+        ? getSocialLookupReferences(reference)
+        : getCoreBridgeReferenceVariants(reference);
+      let order = null;
+      for (const lookupReference of lookupReferences) {
+        const result = await fetchDesignBoardOrderByReference(lookupReference);
+        if (result.order) {
+          order = result.order;
+          break;
+        }
+      }
       if (!order) continue;
       const proForma = buildProFormaPayload(order);
       const value = Number(proForma.preTaxTotal || proForma.subtotal || 0);
@@ -9842,24 +9831,20 @@ function createServer() {
         jobs: toPublicJobs(payload.jobs),
         holidays: payload.holidays
       });
-      if (String(request.query.backfill || "").trim() !== "0") {
-        scheduleInstallationJobValueBackfill({
-          start,
-          end,
-          mode: mode === "month" ? "month" : "rolling",
-          monthId
-        });
-      }
       return;
     }
     response.json(payload.board);
-    if (String(request.query.backfill || "").trim() !== "0") {
-      scheduleInstallationJobValueBackfill({
-        start,
-        end,
-        mode: mode === "month" ? "month" : "rolling",
-        monthId
-      });
+  });
+
+  app.post("/api/board/value-backfill", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    try {
+      const result = await backfillInstallationJobValues(await readStore(), request.body || {});
+      if (result.changed) broadcast("installation-values-updated", { ok: true });
+      response.json(result);
+    } catch (error) {
+      console.error("Could not complete Installation Board value backfill.", error.message || error);
+      response.status(500).json({ error: "Could not update historic Installation Board values." });
     }
   });
 
