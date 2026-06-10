@@ -8674,14 +8674,103 @@ function extractProductionSize(value = "") {
   return matches ? [...new Set(matches.map((match) => match.replace(/\s+/g, " ").trim()))].join(", ") : "";
 }
 
-function extractProductionMaterialLines(order = {}, fallbackItems = []) {
-  const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
+function getCoreBridgeWorksOrderPathVariants() {
+  return [
+    "/core/api/workorder",
+    "/core/api/worksorder",
+    "/core/api/productionorder",
+    "/api/workorder",
+    "/api/worksorder",
+    "/api/productionorder"
+  ];
+}
+
+function extractCoreBridgeWorksOrderRecords(payload) {
+  const records = extractCoreBridgeRecords(payload);
+  if (records.length) return records;
+  if (!payload || typeof payload !== "object") return [];
+  if (
+    !Array.isArray(payload) &&
+    (payload.ID || payload.Id || payload.id) &&
+    Object.keys(payload).some((key) => /workorder|worksorder|productionorder|materialpart/i.test(key))
+  ) {
+    return [payload];
+  }
+  for (const candidate of [
+    payload.workOrders,
+    payload.worksOrders,
+    payload.workorders,
+    payload.productionOrders,
+    payload.productionorders,
+    payload.data?.workOrders,
+    payload.data?.worksOrders,
+    payload.data?.productionOrders
+  ]) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
+}
+
+function extractCoreBridgeWorksOrderDetail(payload, worksOrderId) {
+  if (!payload || typeof payload !== "object") return null;
+  const candidates = [
+    payload,
+    payload.data,
+    payload.workOrder,
+    payload.worksOrder,
+    payload.productionOrder,
+    payload.result,
+    payload.item,
+    payload.value
+  ];
+  return candidates.find((candidate) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return false;
+    const id = String(candidate.ID || candidate.Id || candidate.id || "");
+    return id === String(worksOrderId || "") || Object.keys(candidate).some((key) => /workorder|worksorder|productionorder|materialpart/i.test(key));
+  }) || null;
+}
+
+function extractCoreBridgeWorksOrderMaterialRecords(payload) {
+  const records = extractCoreBridgeRecords(payload);
+  if (records.length) return records;
+  if (!payload || typeof payload !== "object") return [];
+  for (const candidate of [
+    payload.materials,
+    payload.materialParts,
+    payload.materialparts,
+    payload.workOrderMaterials,
+    payload.workordermaterials,
+    payload.data?.materials,
+    payload.data?.materialParts,
+    payload.data?.workOrderMaterials
+  ]) {
+    if (Array.isArray(candidate)) return candidate;
+  }
+  return [];
+}
+
+function matchCoreBridgeWorksOrderMaterialField(key = "") {
+  const parts = String(key || "").toLowerCase().split(".").filter(Boolean);
+  for (let anchorIndex = parts.length - 1; anchorIndex >= 0; anchorIndex -= 1) {
+    const anchor = normalizeCoreBridgeFieldName(parts[anchorIndex]);
+    if (!/(workordermaterial|worksordermaterial|materialpart|materialusage|allocatedmaterial|productionmaterial|materials|components)/i.test(anchor)) continue;
+    const itemIndex = parts.findIndex((part, index) => index > anchorIndex && /^\d+$/.test(part));
+    if (itemIndex === -1 || itemIndex >= parts.length - 1) continue;
+    return {
+      indexKey: `${parts.slice(0, itemIndex).join(".")}:${parts[itemIndex]}`,
+      index: Number(parts[itemIndex]),
+      leaf: parts.slice(itemIndex + 1).join(".")
+    };
+  }
+  return null;
+}
+
+function extractWorksOrderMaterialLines(worksOrders = []) {
+  const fields = worksOrders.flatMap((worksOrder) => Array.isArray(worksOrder?.debugFields) ? worksOrder.debugFields : []);
   const groups = new Map();
-  const materialLeafPattern = /(material|substrate|vinyl|film|laminat|media|board|sheet|panel|acrylic|foamex|dibond|acm|aluminium|polycarbonate|product|part|finish|colour|color|spec)/i;
-  const ignoreLeafPattern = /(id$|cost|price|amount|total|margin|markup|tax|vat|account|category|image|file|url)/i;
 
   fields.forEach((field) => {
-    const match = matchCoreBridgeLineItemField(field.key);
+    const match = matchCoreBridgeWorksOrderMaterialField(field.key);
     const value = normalizeSocialText(field.value);
     if (!match || !value) return;
     const group = groups.get(match.indexKey) || {
@@ -8689,58 +8778,144 @@ function extractProductionMaterialLines(order = {}, fallbackItems = []) {
       name: "",
       nameScore: -1,
       quantity: "",
-      description: "",
-      materials: [],
-      sizes: []
+      unit: "",
+      width: "",
+      height: "",
+      length: "",
+      workOrder: ""
     };
     const leaf = match.leaf;
-    const nameScore = scoreCoreBridgeLineItemNameField(leaf);
-    if (nameScore > 0 && (!group.name || nameScore > group.nameScore) && !isGenericProFormaName(value)) {
+    let nameScore = 0;
+    if (/(materialpartname|materialname|partname)/i.test(leaf)) nameScore = 200;
+    else if (/(formattedname|displayname)/i.test(leaf)) nameScore = 150;
+    else if (/(name|description)/i.test(leaf)) nameScore = 80;
+    if (nameScore > group.nameScore && !/^\d+$/.test(value)) {
       group.name = value;
       group.nameScore = nameScore;
     }
-    if (/(quantity|qty)/i.test(leaf) && !group.quantity) group.quantity = value;
-    if (/(customerdescription|descriptiontext|lineitemdescription|itemdescription|productdescription|description|notes|memo)/i.test(leaf)) {
-      if (!group.description || value.length > group.description.length) group.description = value;
-    }
-    if (materialLeafPattern.test(leaf) && !ignoreLeafPattern.test(leaf) && value.length <= 500) {
-      group.materials.push(value);
-    }
-    if (/(width|height|length|dimension|size)/i.test(leaf) && !ignoreLeafPattern.test(leaf)) {
-      group.sizes.push(value);
-    }
+    if (/(quantity|requiredquantity|allocatedquantity|qty)/i.test(leaf) && !group.quantity) group.quantity = value;
+    if (/(unitname|unitofmeasure|uom|unit)$/i.test(leaf) && !group.unit) group.unit = value;
+    if (/(width|materialwidth)/i.test(leaf) && !group.width) group.width = value;
+    if (/(height|materialheight)/i.test(leaf) && !group.height) group.height = value;
+    if (/(length|materiallength)/i.test(leaf) && !group.length) group.length = value;
+    if (/(workordernumber|worksordernumber|formattednumber)/i.test(leaf) && !group.workOrder) group.workOrder = value;
     groups.set(match.indexKey, group);
   });
 
-  const lines = [...groups.values()]
+  return [...groups.values()]
+    .filter((group) => group.name)
     .sort((left, right) => left.index - right.index)
     .map((group, index) => {
-      const materialValues = [...new Set(group.materials.filter((value) =>
-        value &&
-        value !== group.name &&
-        !/^(true|false|null|undefined)$/i.test(value)
-      ))];
-      const detectedSize = extractProductionSize([group.name, group.description, ...materialValues, ...group.sizes].join(" "));
+      const dimensions = [group.width, group.height, group.length].filter(Boolean);
       return {
         id: `material-line-${index + 1}`,
-        lineItemName: group.name || `Line Item ${index + 1}`,
+        lineItemName: group.workOrder || `Works order material ${index + 1}`,
         quantity: group.quantity || "",
-        size: detectedSize || [...new Set(group.sizes)].slice(0, 3).join(" x "),
-        material: materialValues.slice(0, 6).join(" · "),
-        specification: group.description || ""
+        unit: group.unit || "",
+        size: extractProductionSize(`${group.name} ${dimensions.join(" x ")}`) || dimensions.join(" x "),
+        material: group.name,
+        specification: ""
       };
-    })
-    .filter((line) => line.lineItemName || line.material || line.specification);
+    });
+}
 
-  if (lines.length) return lines;
-  return (Array.isArray(fallbackItems) ? fallbackItems : []).map((item, index) => ({
-    id: `material-fallback-${index + 1}`,
-    lineItemName: String(item.name || `Line Item ${index + 1}`).trim(),
-    quantity: String(item.quantity || "").trim(),
-    size: extractProductionSize(`${item.name || ""} ${item.description || ""}`),
-    material: "",
-    specification: String(item.description || "").trim()
-  }));
+async function fetchCoreBridgeWorksOrders(order = {}, orderReference = "") {
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    const error = new Error("CoreBridge is not configured yet.");
+    error.statusCode = 503;
+    throw error;
+  }
+  const attempts = [];
+  const orderId = String(order?.id || order?._detailOrderId || "").trim();
+  const reference = String(order?.orderReference || orderReference || "").trim();
+  const params = [
+    { take: 100, orderId, itemlevel: "full", materiallevel: "full" },
+    { take: 100, orderid: orderId, itemlevel: "full", materiallevel: "full" },
+    { take: 100, formattednumber: reference, itemlevel: "full", materiallevel: "full" },
+    { take: 100, ordernumber: reference, itemlevel: "full", materiallevel: "full" }
+  ].filter((entry) => entry.orderId || entry.orderid || entry.formattednumber || entry.ordernumber);
+
+  const requestPlans = getCoreBridgeWorksOrderPathVariants().flatMap((pathValue) => [
+    ...params.map((query) => ({ pathValue, requestUrl: buildCoreBridgeCollectionUrl(config, pathValue, query) })),
+    ...(orderId
+      ? [
+          { pathValue, requestUrl: buildCoreBridgeDetailUrl(config, `${pathValue}/byorderid`, orderId) },
+          { pathValue, requestUrl: buildCoreBridgeDetailUrl(config, `${config.orderPath}/${orderId}`, pathValue.split("/").filter(Boolean).pop()) }
+        ]
+      : [])
+  ]);
+
+  for (const { pathValue, requestUrl } of requestPlans) {
+      try {
+        const response = await fetch(requestUrl, {
+          headers: {
+            Authorization: `Bearer ${config.token}`,
+            "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+            Accept: "application/json"
+          }
+        });
+        if (!response.ok) {
+          attempts.push(`${response.status} ${pathValue}`);
+          continue;
+        }
+        const rawBody = await response.text();
+        const records = extractCoreBridgeWorksOrderRecords(JSON.parse(rawBody));
+        if (!records.length) {
+          attempts.push(`EMPTY ${pathValue}`);
+          continue;
+        }
+        const detailedRecords = await Promise.all(records.slice(0, 50).map(async (record) => {
+          const id = String(record?.ID || record?.Id || record?.id || "").trim();
+          if (!id) return record;
+          try {
+            const detailUrl = new URL(buildCoreBridgeDetailUrl(config, pathValue, id));
+            detailUrl.searchParams.set("materiallevel", "full");
+            detailUrl.searchParams.set("componentlevel", "full");
+            const detailResponse = await fetch(detailUrl.toString(), {
+              headers: {
+                Authorization: `Bearer ${config.token}`,
+                "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+                Accept: "application/json"
+              }
+            });
+            if (!detailResponse.ok) return record;
+            const detailBody = JSON.parse(await detailResponse.text());
+            const detailRecord = extractCoreBridgeWorksOrderDetail(detailBody, id) || record;
+            const materialRecords = [];
+            for (const childPath of ["material", "materials", "materialpart", "materialparts", "workordermaterial"]) {
+              try {
+                const childResponse = await fetch(buildCoreBridgeDetailUrl(config, `${pathValue}/${id}`, childPath), {
+                  headers: {
+                    Authorization: `Bearer ${config.token}`,
+                    "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+                    Accept: "application/json"
+                  }
+                });
+                if (!childResponse.ok) continue;
+                materialRecords.push(...extractCoreBridgeWorksOrderMaterialRecords(JSON.parse(await childResponse.text())));
+              } catch (error) {
+                // Material subresources vary between CoreBridge installations.
+              }
+            }
+            return materialRecords.length ? { ...detailRecord, WorkOrderMaterials: materialRecords } : detailRecord;
+          } catch (error) {
+            return record;
+          }
+        }));
+        return {
+          worksOrders: detailedRecords.map((record) => ({
+            id: String(record?.ID || record?.Id || record?.id || ""),
+            debugFields: buildCoreBridgeDebugFields(record)
+          })),
+          sourcePath: pathValue,
+          attempts
+        };
+      } catch (error) {
+        attempts.push(`ERR ${pathValue} ${error.message}`);
+      }
+  }
+  return { worksOrders: [], sourcePath: "", attempts };
 }
 
 async function fetchProductionOrderByReference(orderReference = "") {
@@ -8766,14 +8941,18 @@ async function buildMorningMeetingMaterialsPayload(store) {
   const jobs = await Promise.all(approvedJobs.map(async (card) => {
     try {
       const { order, attempts } = await fetchProductionOrderByReference(card.orderReference);
+      const worksOrderLookup = order ? await fetchCoreBridgeWorksOrders(order, card.orderReference) : { worksOrders: [], sourcePath: "", attempts: [] };
+      const lines = extractWorksOrderMaterialLines(worksOrderLookup.worksOrders);
       return {
         id: card.id,
         orderReference: card.orderReference,
         customerName: card.customerName,
         description: card.description,
-        lines: extractProductionMaterialLines(order || {}, card.items),
-        source: order ? "CoreBridge live order" : "Approved artwork card",
-        lookupError: order ? "" : `No live CoreBridge order found. ${attempts.map((attempt) => attempt.error).filter(Boolean).join(" ")}`
+        lines,
+        source: lines.length ? "CoreBridge works order" : "No works-order materials found",
+        lookupError: lines.length
+          ? ""
+          : `No material allocations were returned from the CoreBridge works order. ${[...attempts, ...worksOrderLookup.attempts].map((attempt) => typeof attempt === "string" ? attempt : attempt.error).filter(Boolean).slice(0, 4).join(" ")}`
       };
     } catch (error) {
       return {
@@ -8781,8 +8960,8 @@ async function buildMorningMeetingMaterialsPayload(store) {
         orderReference: card.orderReference,
         customerName: card.customerName,
         description: card.description,
-        lines: extractProductionMaterialLines({}, card.items),
-        source: "Approved artwork card",
+        lines: [],
+        source: "No works-order materials found",
         lookupError: error.message || "CoreBridge lookup failed."
       };
     }

@@ -16624,8 +16624,8 @@ function MorningMeetingMaterials({ payload, loading, error, onFetch, onPrint }) 
       <div className="morning-meeting-materials-head">
         <div>
           <span>Production stock check</span>
-          <h2>Materials needed for approved artwork</h2>
-          <p>Live CoreBridge line-item quantities, sizes and material specifications for yesterday's approvals.</p>
+          <h2>Works-order materials for approved artwork</h2>
+          <p>Material parts allocated on the CoreBridge works orders for yesterday's approvals.</p>
         </div>
         <div className="morning-meeting-materials-actions">
           <button className="ghost-button" type="button" onClick={onFetch} disabled={loading}>
@@ -16651,19 +16651,19 @@ function MorningMeetingMaterials({ payload, loading, error, onFetch, onPrint }) 
               {job.lookupError ? <p className="morning-meeting-material-warning">{job.lookupError}</p> : null}
               <table>
                 <thead>
-                  <tr><th>Check</th><th>Qty</th><th>Line item</th><th>Size</th><th>Material / specification</th></tr>
+                  <tr><th>Check</th><th>Qty</th><th>Unit</th><th>Size</th><th>Works-order material</th></tr>
                 </thead>
                 <tbody>
                   {job.lines.map((line) => (
                     <tr key={line.id}>
                       <td><span className="morning-meeting-stock-box" /></td>
                       <td>{line.quantity || "-"}</td>
-                      <td>{line.lineItemName || "-"}</td>
+                      <td>{line.unit || "-"}</td>
                       <td>{line.size || "-"}</td>
-                      <td>{[line.material, line.specification].filter((value, index, values) => value && values.indexOf(value) === index).join(" · ") || "-"}</td>
+                      <td>{line.material || "-"}</td>
                     </tr>
                   ))}
-                  {!job.lines.length ? <tr><td colSpan="5">No production line items were found for this order.</td></tr> : null}
+                  {!job.lines.length ? <tr><td colSpan="5">No material allocations were found on the CoreBridge works order.</td></tr> : null}
                 </tbody>
               </table>
             </article>
