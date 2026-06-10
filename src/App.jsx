@@ -2568,14 +2568,6 @@ function getMaterialsPath() {
   return "/materials";
 }
 
-function canToggleAeroSkin(user) {
-  return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
-}
-
-function getUiSkin(user) {
-  return String(user?.uiSkin || "").trim().toLowerCase() === "aero" ? "aero" : "classic";
-}
-
 function HomeIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -2826,9 +2818,7 @@ function MainNavBar({
   currentUser,
   active = "home",
   onLogout,
-  notifications = [],
-  aeroEnabled = false,
-  onToggleAero
+  notifications = []
 }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
@@ -2884,7 +2874,6 @@ function MainNavBar({
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
   const navItems = [...primaryNavItems, notificationItem];
   const activeNavKey = primaryNavItems.some((item) => item.key === active) ? active : "home";
-  const showAeroToggle = canToggleAeroSkin(currentUser) && typeof onToggleAero === "function";
   return (
     <header className="host-nav-shell">
       <nav className="host-nav">
@@ -2921,23 +2910,6 @@ function MainNavBar({
             ))}
           </div>
           <div className="host-nav-meta">
-            {showAeroToggle ? (
-              <button
-                className={`host-nav-aero-toggle ${aeroEnabled ? "active" : ""}`}
-                type="button"
-                onClick={onToggleAero}
-                aria-pressed={aeroEnabled}
-                title={aeroEnabled ? "Turn Aero off" : "Turn Aero on"}
-              >
-                <span className="host-nav-aero-toggle-track" aria-hidden="true">
-                  <span className="host-nav-aero-toggle-thumb" />
-                </span>
-                <span className="host-nav-aero-toggle-copy">
-                  <strong>Aero</strong>
-                  <small>{aeroEnabled ? "On" : "Off"}</small>
-                </span>
-              </button>
-            ) : null}
             <button
               className={`host-nav-notification-bell ${active === "notifications" ? "active" : ""}`}
               type="button"
@@ -3648,9 +3620,7 @@ function NotificationsPage({
   pushEnabled = false,
   pushSaving = false,
   pushError = "",
-  onTogglePushNotifications,
-  aeroEnabled,
-  onToggleAero
+  onTogglePushNotifications
 }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [broadcastTitle, setBroadcastTitle] = useState("");
@@ -3681,8 +3651,6 @@ function NotificationsPage({
           active="notifications"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel notifications-panel">
@@ -3929,9 +3897,7 @@ function HostLandingPage({
   onResetPassword,
   onDeleteUser,
   onDownloadBackup,
-  notifications,
-  aeroEnabled,
-  onToggleAero
+  notifications
 }) {
   const [permissionsOpen, setPermissionsOpen] = useState(false);
   const proFormaPath = getProFormaPathForUser(currentUser);
@@ -3950,8 +3916,6 @@ function HostLandingPage({
           active="home"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel host-landing-panel">
@@ -4037,9 +4001,7 @@ function HostLandingPage({
 function ClientLandingPage({
   currentUser,
   onLogout,
-  notifications,
-  aeroEnabled,
-  onToggleAero
+  notifications
 }) {
   const proFormaPath = getProFormaPathForUser(currentUser);
   const designBoardPath = getDesignBoardPathForUser(currentUser);
@@ -4057,8 +4019,6 @@ function ClientLandingPage({
           active="home"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel host-landing-panel">
@@ -4250,7 +4210,7 @@ function TvInstallsPage({ jobs = [], loading = false, lastUpdated = "" }) {
   );
 }
 
-function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function MaterialsPage({ currentUser, onLogout, notifications }) {
   const adminMode = canEditMaterials(currentUser);
   const [payload, setPayload] = useState({ categories: MATERIAL_REQUEST_CATEGORIES, catalog: {}, requests: [] });
   const [selectedCategoryId, setSelectedCategoryId] = useState(MATERIAL_REQUEST_CATEGORIES[0]?.id || "");
@@ -4650,8 +4610,6 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
           active="materials"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel materials-page-panel">
@@ -5160,7 +5118,7 @@ function MaterialsPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   );
 }
 
-function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function DescriptionPullPage({ currentUser, onLogout, notifications }) {
   const [orderReference, setOrderReference] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -5221,8 +5179,6 @@ function DescriptionPullPage({ currentUser, onLogout, notifications, aeroEnabled
           active="description-pull"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel social-post-panel">
@@ -6330,7 +6286,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
 </html>`;
 }
 
-function ProFormaPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function ProFormaPage({ currentUser, onLogout, notifications }) {
   const [orderReference, setOrderReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -6776,8 +6732,6 @@ function removeLineItem(lineId) {
           active="pro-forma"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel social-post-panel pro-forma-panel">
@@ -7016,7 +6970,7 @@ function formatReportsDisplayDate(isoDate = "") {
   }).format(date);
 }
 
-function ReportsPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function ReportsPage({ currentUser, onLogout, notifications }) {
   const today = new Date();
   const defaultYear = today.getFullYear();
   const [companyName, setCompanyName] = useState("");
@@ -7094,8 +7048,6 @@ function ReportsPage({ currentUser, onLogout, notifications, aeroEnabled, onTogg
           active="reports"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel social-post-panel reports-panel">
@@ -7232,7 +7184,7 @@ function ReportsPage({ currentUser, onLogout, notifications, aeroEnabled, onTogg
   );
 }
 
-function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications }) {
   const [template, setTemplate] = useState(cloneDefaultProFormaTemplate());
   const [selectedSection, setSelectedSection] = useState("title");
   const [sampleReference, setSampleReference] = useState("ORD-3379");
@@ -7568,8 +7520,6 @@ function ProFormaTemplateBuilderPage({ currentUser, onLogout, notifications, aer
           active="pro-forma"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel social-post-panel pro-forma-panel">
@@ -7949,7 +7899,7 @@ function DesignBoardColumn({
   );
 }
 
-function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function DesignBoardPage({ currentUser, onLogout, notifications }) {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -8252,8 +8202,6 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
           active="design-board"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel design-board-panel">
@@ -8643,7 +8591,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications, aeroEnabled, on
   );
 }
 
-function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function FilteringBoardPage({ currentUser, onLogout, notifications }) {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -8693,8 +8641,6 @@ function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled,
           active="filtering"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
         <section className="panel filtering-board-panel">
           {error ? <p className="form-error">{error}</p> : null}
@@ -8772,7 +8718,7 @@ function FilteringBoardPage({ currentUser, onLogout, notifications, aeroEnabled,
   );
 }
 
-function SocialPostPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function SocialPostPage({ currentUser, onLogout, notifications }) {
   const suggestionId =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("suggestion") || ""
@@ -9113,8 +9059,6 @@ function SocialPostPage({ currentUser, onLogout, notifications, aeroEnabled, onT
           active="social-post"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel social-post-panel">
@@ -9456,7 +9400,7 @@ function SocialPostPage({ currentUser, onLogout, notifications, aeroEnabled, onT
   );
 }
 
-function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function RamsLogicPage({ currentUser, onLogout, notifications }) {
   const [ramsLogicDraft, setRamsLogicDraft] = useState(() => normalizeRamsLogic(RAMS_DEFAULT_LOGIC));
   const [logicStatus, setLogicStatus] = useState("");
   const [logicLoading, setLogicLoading] = useState(true);
@@ -9756,8 +9700,6 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
           active="rams"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel rams-panel rams-logic-full-panel">
@@ -10103,7 +10045,7 @@ function RamsLogicPage({ currentUser, onLogout, notifications, aeroEnabled, onTo
   );
 }
 
-function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnabled, onToggleAero }) {
+function RamsPage({ currentUser, onLogout, notifications, users = [] }) {
   const [jobs, setJobs] = useState([]);
   const [profileUsers, setProfileUsers] = useState(users);
   const [loadingJobs, setLoadingJobs] = useState(true);
@@ -10841,8 +10783,6 @@ function RamsPage({ currentUser, onLogout, notifications, users = [], aeroEnable
           active="rams"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel rams-panel">
@@ -11839,8 +11779,6 @@ function HolidaysPage({
   currentUser,
   onLogout,
   notifications,
-  aeroEnabled,
-  onToggleAero,
   holidays,
   holidayRequests,
   approvedHolidayRequests,
@@ -11930,8 +11868,6 @@ function HolidaysPage({
           active="holidays"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel holidays-panel">
@@ -12506,7 +12442,7 @@ function createMileageLine(overrides = {}) {
   };
 }
 
-function MileageUserPage({ currentUser, onLogout, notifications, onRefreshNotifications, aeroEnabled, onToggleAero }) {
+function MileageUserPage({ currentUser, onLogout, notifications, onRefreshNotifications }) {
   const initialMonth = useMemo(() => {
     const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
     return params.get("month") || toMonthIdFromIso(getLocalTodayIso());
@@ -12676,8 +12612,6 @@ function MileageUserPage({ currentUser, onLogout, notifications, onRefreshNotifi
           active="mileage"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel mileage-panel">
@@ -12845,7 +12779,7 @@ function MileageUserPage({ currentUser, onLogout, notifications, onRefreshNotifi
   );
 }
 
-function MileageAdminPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function MileageAdminPage({ currentUser, onLogout, notifications }) {
   const initialMonth = useMemo(() => {
     const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
     return params.get("month") || toMonthIdFromIso(getLocalTodayIso());
@@ -12891,8 +12825,6 @@ function MileageAdminPage({ currentUser, onLogout, notifications, aeroEnabled, o
           active="mileage"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel mileage-panel mileage-admin-panel">
@@ -12986,8 +12918,6 @@ function AttendancePage({
   currentUser,
   onLogout,
   notifications,
-  aeroEnabled,
-  onToggleAero,
   attendanceData,
   loading,
   attendanceMonthId,
@@ -13322,8 +13252,6 @@ function AttendancePage({
           active="attendance"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel holidays-panel attendance-panel">
@@ -13928,7 +13856,7 @@ function AttendancePage({
   );
 }
 
-function VinylEstimatorPage({ currentUser, onLogout, notifications, aeroEnabled, onToggleAero }) {
+function VinylEstimatorPage({ currentUser, onLogout, notifications }) {
   const pricingEditable = canEditVanEstimator(currentUser);
   const [svgMarkup, setSvgMarkup] = useState("");
   const [artBoardMarkup, setArtBoardMarkup] = useState("");
@@ -15708,8 +15636,6 @@ function VinylEstimatorPage({ currentUser, onLogout, notifications, aeroEnabled,
           active="van-estimator"
           onLogout={onLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={onToggleAero}
         />
 
         <section className="panel vinyl-estimator-panel">
@@ -16729,7 +16655,6 @@ export default function App() {
   const proFormaEditable = canEditProForma(currentUser);
   const hostShellMode = usesHostShell(currentUser);
   const isClientMode = currentUser ? !boardEditable : false;
-  const aeroEnabled = getUiSkin(currentUser) === "aero";
   const showInstallerDirectory = Boolean(currentUser && canAccessInstaller(currentUser) && isInstallerRoute);
   const showAttendance = Boolean(currentUser && canAccessAttendance(currentUser) && isAttendanceRoute);
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
@@ -16829,14 +16754,6 @@ export default function App() {
       .sort((left, right) => String(right?.date || "").localeCompare(String(left?.date || "")))
       .slice(0, 12);
   }, [boardSearchQuery, jobs]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    document.body.classList.toggle("theme-aero", aeroEnabled);
-    return () => {
-      document.body.classList.remove("theme-aero");
-    };
-  }, [aeroEnabled]);
 
   useEffect(() => {
     let active = true;
@@ -17672,18 +17589,6 @@ export default function App() {
     } finally {
       setPermissionSavingKey("");
     }
-  }
-
-  async function handleToggleAero() {
-    if (!currentUser || !canToggleAeroSkin(currentUser)) return;
-    const nextUiSkin = aeroEnabled ? "classic" : "aero";
-    await handleUpdateUserProfile(currentUser.id, {
-      jobTitle: currentUser.jobTitle || "",
-      phoneNumber: currentUser.phoneNumber || "",
-      qualifications: Array.isArray(currentUser.qualifications) ? currentUser.qualifications : [],
-      photoDataUrl: currentUser.photoDataUrl || "",
-      uiSkin: nextUiSkin
-    });
   }
 
   async function handleDownloadBackup() {
@@ -19147,8 +19052,6 @@ export default function App() {
         onDeleteUser={handleDeleteUser}
         onDownloadBackup={handleDownloadBackup}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19159,8 +19062,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19190,16 +19091,12 @@ export default function App() {
         onDeleteUser={handleDeleteUser}
         onDownloadBackup={handleDownloadBackup}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     ) : (
       <ClientLandingPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19227,8 +19124,6 @@ export default function App() {
         pushSaving={pushSaving}
         pushError={pushError}
         onTogglePushNotifications={togglePushNotifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19240,8 +19135,6 @@ export default function App() {
         onLogout={handleLogout}
         notifications={notifications}
         onRefreshNotifications={refreshNotifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19252,8 +19145,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19264,8 +19155,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19276,8 +19165,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19288,8 +19175,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19300,8 +19185,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19312,8 +19195,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19324,8 +19205,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19336,8 +19215,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19348,8 +19225,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19361,8 +19236,6 @@ export default function App() {
         onLogout={handleLogout}
         notifications={notifications}
         users={loginUsers}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
       />
     );
   }
@@ -19373,8 +19246,6 @@ export default function App() {
                   currentUser={currentUser}
                   onLogout={handleLogout}
                   notifications={notifications}
-                  aeroEnabled={aeroEnabled}
-                  onToggleAero={handleToggleAero}
                   attendanceData={attendanceData}
                   loading={attendanceLoading}
                   attendanceMonthId={attendanceMonthId}
@@ -19398,8 +19269,6 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
-        aeroEnabled={aeroEnabled}
-        onToggleAero={handleToggleAero}
         holidays={holidays}
         holidayRequests={holidayRequests}
         approvedHolidayRequests={approvedHolidayRequests}
@@ -19450,8 +19319,6 @@ export default function App() {
             active="installer"
             onLogout={handleLogout}
             notifications={notifications}
-            aeroEnabled={aeroEnabled}
-            onToggleAero={handleToggleAero}
           />
         )}
       />
@@ -19466,8 +19333,6 @@ export default function App() {
           active="board"
           onLogout={handleLogout}
           notifications={notifications}
-          aeroEnabled={aeroEnabled}
-          onToggleAero={handleToggleAero}
         />
 
         <div className="layout">
