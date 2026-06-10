@@ -2210,22 +2210,14 @@ function buildInstallationValueSummary(store, today = getTodayInLondon()) {
   linkedCards.forEach((card) => {
     const value = Number(card?.jobTotalExVat || 0);
     if (!Number.isFinite(value) || value <= 0) return;
-    getCoreBridgeReferenceVariants(card?.orderReference || "").forEach((reference) => {
-      linkedValues.set(reference.toLowerCase(), value);
-    });
+    const reference = String(card?.orderReference || "").trim().toLowerCase();
+    if (reference) linkedValues.set(reference, value);
   });
 
   let currentTotal = 0;
   let previousTotal = 0;
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
-  const getDuplicateReference = (job) => {
-    const reference = String(job?.orderReference || "").trim();
-    return (getCoreBridgeReferenceVariants(reference)[0] || reference)
-      .replace(/^ords-/i, "ORD-")
-      .replace(/^ests-/i, "EST-")
-      .replace(/^invs-/i, "INV-")
-      .toLowerCase();
-  };
+  const getDuplicateReference = (job) => getCoreBridgeReferenceFamilyKey(job?.orderReference || "");
   const latestJobByReference = new Map();
   jobs.forEach((job, index) => {
     const reference = getDuplicateReference(job);
@@ -2241,7 +2233,7 @@ function buildInstallationValueSummary(store, today = getTodayInLondon()) {
     .forEach((job) => {
       const jobDate = parseIsoDate(job?.date);
       const storedValue = Number(job?.jobTotalExVat || 0);
-      const linkedValue = getCoreBridgeReferenceVariants(job?.orderReference || "")
+      const linkedValue = getCoreBridgeReferenceFamily(job?.orderReference || "")
         .map((reference) => linkedValues.get(reference.toLowerCase()) || 0)
         .find((value) => value > 0) || 0;
       const value = storedValue > 0 ? storedValue : linkedValue;
@@ -6384,15 +6376,34 @@ function filterCoreBridgeOrders(orders, searchTerm = "", options = {}) {
 
 function getCoreBridgeReferenceVariants(reference = "") {
   const trimmed = String(reference || "").trim();
-  if (!trimmed) return [];
-  const variants = new Set([trimmed]);
-  if (/^ests-/i.test(trimmed)) variants.add(trimmed.replace(/^ests-/i, "EST-"));
-  if (/^est-/i.test(trimmed)) variants.add(trimmed.replace(/^est-/i, "ESTS-"));
-  if (/^ords-/i.test(trimmed)) variants.add(trimmed.replace(/^ords-/i, "ORD-"));
-  if (/^ord-/i.test(trimmed)) variants.add(trimmed.replace(/^ord-/i, "ORDS-"));
-  if (/^invs-/i.test(trimmed)) variants.add(trimmed.replace(/^invs-/i, "INV-"));
-  if (/^inv-/i.test(trimmed)) variants.add(trimmed.replace(/^inv-/i, "INVS-"));
-  return [...variants];
+  return trimmed ? [trimmed] : [];
+}
+
+function parseCoreBridgeReference(reference = "") {
+  const trimmed = String(reference || "").trim();
+  const match = trimmed.match(/^(EST|ORD|INV)(S?)-(.+)$/i);
+  if (!match) return null;
+  return {
+    type: match[1].toUpperCase(),
+    isSouthport: Boolean(match[2]),
+    suffix: match[3]
+  };
+}
+
+function getCoreBridgeReferenceFamily(reference = "") {
+  const trimmed = String(reference || "").trim();
+  const parsed = parseCoreBridgeReference(trimmed);
+  if (!parsed) return getCoreBridgeReferenceVariants(trimmed);
+  const siteSuffix = parsed.isSouthport ? "S" : "";
+  return ["INV", "ORD", "EST"].map((type) => `${type}${siteSuffix}-${parsed.suffix}`);
+}
+
+function getCoreBridgeReferenceFamilyKey(reference = "") {
+  const trimmed = String(reference || "").trim();
+  if (!trimmed) return "";
+  const parsed = parseCoreBridgeReference(trimmed);
+  if (!parsed) return `reference:${trimmed.toLowerCase()}`;
+  return `corebridge:${parsed.isSouthport ? "southport" : "main"}:${parsed.suffix.toLowerCase()}`;
 }
 
 async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, options = {}) {
@@ -8508,6 +8519,7 @@ const attemptedInstallationValueReferences = new Map();
 async function backfillInstallationJobValues(store, options = {}) {
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
   const resolvedValues = new Map();
+  const linkedValues = new Map();
   const linkedCards = [
     ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
     ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
@@ -8515,9 +8527,8 @@ async function backfillInstallationJobValues(store, options = {}) {
   linkedCards.forEach((card) => {
     const value = Number(card?.jobTotalExVat || 0);
     if (!Number.isFinite(value) || value <= 0) return;
-    getSocialLookupReferences(card?.orderReference || "").forEach((reference) => {
-      resolvedValues.set(reference.toLowerCase(), value);
-    });
+    const reference = String(card?.orderReference || "").trim().toLowerCase();
+    if (reference) linkedValues.set(reference, value);
   });
 
   const selectedMonth = options.mode === "month" ? String(options.monthId || "") : "";
@@ -8556,9 +8567,7 @@ async function backfillInstallationJobValues(store, options = {}) {
   for (const reference of batchReferences) {
     attemptedInstallationValueReferences.set(reference.toLowerCase(), Date.now());
     try {
-      const lookupReferences = typeof getSocialLookupReferences === "function"
-        ? getSocialLookupReferences(reference)
-        : getCoreBridgeReferenceVariants(reference);
+      const lookupReferences = getCoreBridgeReferenceFamily(reference);
       let value = 0;
       for (const lookupReference of lookupReferences) {
         const result = await fetchDesignBoardOrderByReference(lookupReference);
@@ -8576,8 +8585,13 @@ async function backfillInstallationJobValues(store, options = {}) {
         value = Math.round(candidateValue * 100) / 100;
         break;
       }
+      if (!value) {
+        value = lookupReferences
+          .map((candidate) => linkedValues.get(candidate.toLowerCase()) || 0)
+          .find((candidate) => candidate > 0) || 0;
+      }
       if (!Number.isFinite(value) || value <= 0) continue;
-      getSocialLookupReferences(reference).forEach((candidate) => {
+      getCoreBridgeReferenceFamily(reference).forEach((candidate) => {
         resolvedValues.set(candidate.toLowerCase(), value);
       });
     } catch (error) {
@@ -8591,7 +8605,7 @@ async function backfillInstallationJobValues(store, options = {}) {
   let changed = false;
   latestStore.jobs.forEach((job) => {
     const reference = String(job?.orderReference || "").trim().toLowerCase();
-    const value = getSocialLookupReferences(reference)
+    const value = getCoreBridgeReferenceFamily(reference)
       .map((candidate) => resolvedValues.get(candidate.toLowerCase()) || 0)
       .find((candidate) => candidate > 0) || 0;
     if (reference && Number(job?.jobTotalExVat || 0) <= 0 && value > 0) {
@@ -8863,25 +8877,7 @@ function buildSocialPostBrief(order, voice) {
 }
 
 function getSocialLookupReferences(reference = "") {
-  const trimmed = String(reference || "").trim();
-  const references = [...getCoreBridgeReferenceVariants(trimmed)];
-  const addReferenceFamily = (value, nextPrefix) => {
-    getCoreBridgeReferenceVariants(value.replace(/^(ests?|ords?|invs?)-/i, `${nextPrefix}-`))
-      .forEach((candidate) => references.push(candidate));
-  };
-  if (/^ests?-/i.test(trimmed)) {
-    addReferenceFamily(trimmed, "ORD");
-    addReferenceFamily(trimmed, "INV");
-  }
-  if (/^invs?-/i.test(trimmed)) {
-    addReferenceFamily(trimmed, "ORD");
-    addReferenceFamily(trimmed, "EST");
-  }
-  if (/^ords?-/i.test(trimmed)) {
-    addReferenceFamily(trimmed, "INV");
-    addReferenceFamily(trimmed, "EST");
-  }
-  return [...new Set(references.filter(Boolean))];
+  return getCoreBridgeReferenceFamily(reference);
 }
 
 async function fetchSocialPostOrderByReference(orderReference = "") {
