@@ -2297,6 +2297,30 @@ function buildBoardRowsFromStore(store, options = {}) {
   };
 }
 
+function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
+  const todayIso = toIsoDate(today);
+  const yesterdayIso = toIsoDate(addDays(today, -1));
+  const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
+  const filteringCards = sanitizeFilteringBoardState(store?.filteringBoard).cards;
+  const sortJobs = (items) => [...items].sort((left, right) =>
+    String(left?.customerName || "").localeCompare(String(right?.customerName || ""))
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    todayIso,
+    yesterdayIso,
+    yesterdayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === yesterdayIso))),
+    todayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === todayIso))),
+    approvedYesterday: filteringCards
+      .filter((card) => {
+        const approvedAt = new Date(card?.approvedAt || "");
+        return Number.isFinite(approvedAt.getTime()) && toIsoDate(approvedAt) === yesterdayIso;
+      })
+      .sort((left, right) => String(left?.approvedAt || "").localeCompare(String(right?.approvedAt || "")))
+  };
+}
+
 function sanitizeJobPhoto(payload) {
   return {
     id: String(payload.id || makeId()),
@@ -10043,6 +10067,16 @@ function createServer() {
       return;
     }
     response.json(payload.board);
+  });
+
+  app.get("/api/morning-meeting", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    try {
+      response.json(buildMorningMeetingPayload(await readStore()));
+    } catch (error) {
+      console.error("Could not build Morning Meeting outline.", error.message || error);
+      response.status(500).json({ error: "Could not load the Morning Meeting outline." });
+    }
   });
 
   app.post("/api/board/value-backfill", async (request, response) => {

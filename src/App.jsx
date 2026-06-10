@@ -16550,6 +16550,108 @@ function CreditApplicationPage() {
   );
 }
 
+function MorningMeetingItem({ item, kind = "job" }) {
+  const installers = Array.isArray(item?.installers) ? item.installers.filter(Boolean) : [];
+  const badges = kind === "approval"
+    ? ["Artwork approved"]
+    : [
+        installers.length ? installers.join(", ") : "",
+        item?.customJobType || item?.jobType || "",
+        item?.isCompleted ? "Complete" : "",
+        item?.isSnagging ? "Snagging" : ""
+      ].filter(Boolean);
+
+  return (
+    <article className={`morning-meeting-item ${kind === "approval" ? "is-approval" : ""}`}>
+      <div className="morning-meeting-item-head">
+        <div>
+          <span className="morning-meeting-reference">{item?.orderReference || "No reference"}</span>
+          <h3>{item?.customerName || "Unnamed customer"}</h3>
+          <p>{item?.description || "No description added."}</p>
+        </div>
+        {Number(item?.jobTotalExVat || 0) > 0 ? <strong>{formatInstallationValue(item.jobTotalExVat)}</strong> : null}
+      </div>
+      {badges.length ? (
+        <div className="morning-meeting-badges">
+          {badges.map((badge) => <span key={badge}>{badge}</span>)}
+        </div>
+      ) : null}
+      <dl className="morning-meeting-meta">
+        {item?.address || item?.siteAddress ? <div><dt>Address</dt><dd>{item.address || item.siteAddress}</dd></div> : null}
+        {item?.contact ? <div><dt>Contact</dt><dd>{item.contact}{item.number ? ` · ${item.number}` : ""}</dd></div> : null}
+        {kind === "approval" && item?.approvedAt ? <div><dt>Approved</dt><dd>{formatDateTime(item.approvedAt)}</dd></div> : null}
+      </dl>
+      {item?.notes ? <p className="morning-meeting-note"><b>Notes:</b> {item.notes}</p> : null}
+      {item?.designerNote ? <p className="morning-meeting-note is-designer"><b>Designer note:</b> {item.designerNote}</p> : null}
+    </article>
+  );
+}
+
+function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
+  return (
+    <section className="morning-meeting-section">
+      <div className="morning-meeting-section-head">
+        <div>
+          <span>{subtitle}</span>
+          <h2>{title}</h2>
+        </div>
+        <strong>{items.length}</strong>
+      </div>
+      <div className="morning-meeting-list">
+        {items.length
+          ? items.map((item) => <MorningMeetingItem key={`${kind}-${item.id}`} item={item} kind={kind} />)
+          : <p className="morning-meeting-empty">Nothing to discuss in this section.</p>}
+      </div>
+    </section>
+  );
+}
+
+function MorningMeetingPage({ currentUser, onLogout, notifications }) {
+  const [outline, setOutline] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/morning-meeting")
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || "Could not load the Morning Meeting.");
+        if (active) setOutline(payload);
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError.message || "Could not load the Morning Meeting.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <div className="app-shell morning-meeting-shell">
+      <div className="page morning-meeting-page">
+        <MainNavBar currentUser={currentUser} active="board" onLogout={onLogout} notifications={notifications} />
+        <header className="morning-meeting-hero">
+          <div>
+            <span>Daily operations</span>
+            <h1>Morning Meeting</h1>
+            <p>Yesterday’s work, today’s plan, and artwork approved yesterday.</p>
+          </div>
+          <button className="ghost-button" type="button" onClick={() => window.location.assign("/board")}>Back to Installation Board</button>
+        </header>
+        {error ? <p className="form-error">{error}</p> : null}
+        {!outline && !error ? <div className="board-loading">Preparing the meeting outline...</div> : null}
+        {outline ? (
+          <main className="morning-meeting-grid">
+            <MorningMeetingSection title="Yesterday’s Jobs" subtitle={formatTvSectionDate(outline.yesterdayIso)} items={outline.yesterdayJobs} />
+            <MorningMeetingSection title="Today’s Jobs" subtitle={formatTvSectionDate(outline.todayIso)} items={outline.todayJobs} />
+            <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
+          </main>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
@@ -16574,6 +16676,7 @@ export default function App() {
   const isRamsLogicRoute = pathname.startsWith("/rams/logic");
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
+  const isMorningMeetingRoute = pathname.startsWith("/morning-meeting");
   const isBoardRoute = pathname.startsWith("/board");
   const isDesignBoardRoute = pathname.startsWith("/design-board");
   const isFilteringRoute = pathname.startsWith("/filtering");
@@ -16708,8 +16811,9 @@ export default function App() {
       canAccessBoard(currentUser) &&
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -17191,7 +17295,7 @@ export default function App() {
       return;
     }
 
-    if ((isBoardRoute || isClientBoardRoute || isClientRamsRoute) && !canAccessBoard(currentUser)) {
+    if ((isBoardRoute || isClientBoardRoute || isClientRamsRoute || isMorningMeetingRoute) && !canAccessBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -17211,7 +17315,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -17234,7 +17338,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -19129,6 +19233,16 @@ export default function App() {
     );
   }
 
+  if (showMorningMeeting) {
+    return (
+      <MorningMeetingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
   if (showHostLanding) {
     return (
       <HostLandingPage
@@ -19784,6 +19898,12 @@ export default function App() {
           </section>
         </div>
       </div>
+      {!isClientMode ? (
+        <button className="morning-meeting-launcher" type="button" onClick={() => window.location.assign("/morning-meeting")}>
+          <span>Morning Meeting</span>
+          <small>Open daily outline</small>
+        </button>
+      ) : null}
       {!isClientMode && jobModalDate ? (
         <div
           className="modal-backdrop installation-job-backdrop"
