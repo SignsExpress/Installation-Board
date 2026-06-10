@@ -2091,6 +2091,23 @@ function buildBirthdayEntriesForRange(store, startIso, endIso) {
   return entries;
 }
 
+async function inspectBoardStoreFile(file) {
+  const stats = await fsp.stat(file);
+  const raw = await fsp.readFile(file, "utf8");
+  const parsed = JSON.parse(raw);
+  const jobs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+  const dates = jobs.map((job) => String(job?.date || "")).filter(isValidIsoDate).sort();
+  return {
+    name: path.basename(file),
+    size: stats.size,
+    modifiedAt: stats.mtime.toISOString(),
+    jobCount: jobs.length,
+    referencedJobCount: jobs.filter((job) => String(job?.orderReference || "").trim()).length,
+    firstJobDate: dates[0] || "",
+    lastJobDate: dates[dates.length - 1] || ""
+  };
+}
+
 function buildInstallationValueSummary(store, today = getTodayInLondon()) {
   const currentMonthStart = getStartOfMonth(today);
   const previousMonthStart = getStartOfMonth(addMonths(today, -1));
@@ -9845,6 +9862,30 @@ function createServer() {
     } catch (error) {
       console.error("Could not complete Installation Board value backfill.", error.message || error);
       response.status(500).json({ error: "Could not update historic Installation Board values." });
+    }
+  });
+
+  app.get("/api/board/backups", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const backupDirectory = path.join(path.dirname(getDataFile()), "backups");
+    try {
+      const names = fs.existsSync(backupDirectory)
+        ? (await fsp.readdir(backupDirectory)).filter((name) => /^jobs-store-\d+.*\.json$/i.test(name))
+        : [];
+      const backups = [];
+      for (const name of names.sort().reverse()) {
+        try {
+          backups.push(await inspectBoardStoreFile(path.join(backupDirectory, name)));
+        } catch (error) {
+          backups.push({ name, error: error.message || "Could not inspect backup." });
+        }
+      }
+      response.json({
+        current: await inspectBoardStoreFile(getDataFile()),
+        backups
+      });
+    } catch (error) {
+      response.status(500).json({ error: error.message || "Could not inspect board backups." });
     }
   });
 
