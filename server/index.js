@@ -8387,9 +8387,17 @@ let installationValueBackfillPromise = null;
 function scheduleInstallationJobValueBackfill(options = {}) {
   if (installationValueBackfillPromise) return;
   installationValueBackfillPromise = (async () => {
-    const store = await readStore();
-    const changed = await backfillInstallationJobValues(store, options);
-    if (changed) broadcast("installation-values-updated", { ok: true });
+    let hasMore = true;
+    for (let batch = 0; batch < 6 && hasMore; batch += 1) {
+      const store = await readStore();
+      const result = await backfillInstallationJobValues(store, options);
+      hasMore = result.hasMore;
+      if (result.changed) broadcast("installation-values-updated", { ok: true });
+      if (hasMore) await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+    if (hasMore) {
+      setTimeout(() => scheduleInstallationJobValueBackfill(options), 2000);
+    }
   })()
     .catch((error) => {
       console.error("Could not complete Installation Board value backfill.", error.message || error);
@@ -8415,25 +8423,34 @@ async function backfillInstallationJobValues(store, options = {}) {
   const selectedMonth = options.mode === "month" ? String(options.monthId || "") : "";
   const selectedStart = options.start instanceof Date ? toIsoDate(options.start) : String(options.start || "");
   const selectedEnd = options.end instanceof Date ? toIsoDate(options.end) : String(options.end || "");
+  const currentMonthId = toMonthId(getStartOfMonth(getTodayInLondon()));
+  const previousMonthId = toMonthId(addMonths(getTodayInLondon(), -1));
   const isSelectedJob = (job) => {
     const date = String(job?.date || "");
     if (selectedMonth) return date.startsWith(`${selectedMonth}-`);
     return Boolean(selectedStart && selectedEnd && date >= selectedStart && date <= selectedEnd);
   };
+  const getJobPriority = (job) => {
+    const monthId = String(job?.date || "").slice(0, 7);
+    if (monthId === currentMonthId) return 0;
+    if (monthId === previousMonthId) return 1;
+    if (isSelectedJob(job)) return 2;
+    return 3;
+  };
   const unresolvedReferences = [...new Set(
     [...jobs]
       .sort((left, right) => {
-        const selectedDifference = Number(isSelectedJob(right)) - Number(isSelectedJob(left));
-        return selectedDifference || String(right?.date || "").localeCompare(String(left?.date || ""));
+        const priorityDifference = getJobPriority(left) - getJobPriority(right);
+        return priorityDifference || String(right?.date || "").localeCompare(String(left?.date || ""));
       })
       .filter((job) => String(job?.orderReference || "").trim() && Number(job?.jobTotalExVat || 0) <= 0)
       .map((job) => String(job.orderReference).trim())
   )]
     .filter((reference) => !resolvedValues.has(reference.toLowerCase()))
-    .filter((reference) => !attemptedInstallationValueReferences.has(reference.toLowerCase()))
-    .slice(0, 12);
+    .filter((reference) => !attemptedInstallationValueReferences.has(reference.toLowerCase()));
+  const batchReferences = unresolvedReferences.slice(0, 8);
 
-  for (const reference of unresolvedReferences) {
+  for (const reference of batchReferences) {
     attemptedInstallationValueReferences.add(reference.toLowerCase());
     try {
       const { order } = await fetchDesignBoardOrderByReference(reference);
@@ -8447,7 +8464,8 @@ async function backfillInstallationJobValues(store, options = {}) {
     }
   }
 
-  if (!resolvedValues.size) return false;
+  const hasMore = unresolvedReferences.length > batchReferences.length;
+  if (!resolvedValues.size) return { changed: false, hasMore };
   const latestStore = await readStore();
   let changed = false;
   latestStore.jobs.forEach((job) => {
@@ -8458,9 +8476,9 @@ async function backfillInstallationJobValues(store, options = {}) {
       changed = true;
     }
   });
-  if (!changed) return false;
+  if (!changed) return { changed: false, hasMore };
   await writeStore(latestStore);
-  return true;
+  return { changed: true, hasMore };
 }
 
 function needsDesignBoardCoreBridgeRefresh(card = {}) {

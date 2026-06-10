@@ -14141,8 +14141,27 @@ button {
 .installation-board-panel .job-type-other-card { border-top: 3px solid #5f88d6; }
 
 .installation-board-panel .job-card-top {
+  flex-wrap: wrap;
   padding-bottom: 7px;
   border-bottom: 1px solid #edf1f6;
+}
+
+.installation-board-panel .job-title-wrap {
+  flex: 1 1 220px;
+}
+
+.installation-board-panel .job-title-meta {
+  flex: 1 1 260px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.installation-board-panel .job-title-installers {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  min-width: 0;
+  white-space: normal;
 }
 
 .installation-board-panel .job-card-top strong {
