@@ -19326,8 +19326,8 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
-      <div className="page">
+    <div className={`app-shell installation-board-shell ${isClientMode ? "client-mode" : "editor-mode"}`}>
+      <div className="page installation-board-page">
         <MainNavBar
           currentUser={currentUser}
           active="board"
@@ -19336,11 +19336,28 @@ export default function App() {
         />
 
         <div className="layout">
-          <section className="panel board-panel board-panel-full">
+          <section className="panel board-panel board-panel-full installation-board-panel">
             {loading || !board ? (
               <div className="board-loading">Loading the shared installation board...</div>
             ) : (
               <div className="board board-with-history">
+                <div className="installation-board-toolbar">
+                  <div>
+                    <span className="installation-board-kicker">Installation Board</span>
+                    <h1>Scheduled work</h1>
+                    <p>Plan installations, surveys, deliveries and subcontractor work in one shared view.</p>
+                  </div>
+                  <div className="installation-board-summary" aria-label="Installation board summary">
+                    <div>
+                      <span>Booked</span>
+                      <strong>{board.weeks.reduce((total, week) => total + week.rows.reduce((rowTotal, row) => rowTotal + row.jobs.length, 0), 0)}</strong>
+                    </div>
+                    <div>
+                      <span>Unscheduled</span>
+                      <strong>{board.unscheduled.length}</strong>
+                    </div>
+                  </div>
+                </div>
                 <div className="board-history-launch board-history-launch-top">
                   <div className="board-history-actions">
                     <button

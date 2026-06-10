@@ -13586,3 +13586,391 @@ button {
     padding: 24px 16px 40px;
   }
 }
+
+/* Keep Installation, Design and Filtering boards in one visual system. */
+.installation-board-page {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.installation-board-panel {
+  margin-top: 14px;
+  padding: 14px;
+}
+
+.installation-board-panel .board-with-history {
+  gap: 10px;
+}
+
+.installation-board-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 5px 2px 8px;
+}
+
+.installation-board-toolbar h1 {
+  margin: 2px 0 3px;
+  color: #172033;
+  font-size: 1.05rem;
+  line-height: 1.2;
+}
+
+.installation-board-toolbar p {
+  margin: 0;
+  color: #6b7789;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.installation-board-kicker {
+  color: #67428b;
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.installation-board-summary {
+  display: flex;
+  gap: 8px;
+}
+
+.installation-board-summary > div {
+  display: grid;
+  min-width: 88px;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 1px solid #e0e7f0;
+  border-radius: 8px;
+  background: #fff;
+  text-align: right;
+}
+
+.installation-board-summary span {
+  color: #7a8798;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.installation-board-summary strong {
+  color: #172033;
+  font-size: 0.86rem;
+}
+
+.installation-board-panel .board-history-launch-top {
+  padding: 9px;
+  border: 1px solid #d9e0eb;
+  border-radius: 9px;
+  background: #f8fbff;
+}
+
+.installation-board-panel .board-history-button {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 6px;
+  border-color: #d9e1eb;
+  background: #fff;
+  color: #536276;
+  font-size: 0.68rem;
+  font-weight: 750;
+  box-shadow: none;
+}
+
+.installation-board-panel .board-history-button:hover {
+  border-color: #bdcadb;
+  background: #f2f5f9;
+  transform: none;
+}
+
+.installation-board-panel .board-history-search input {
+  min-height: 34px;
+  padding: 0 10px;
+  border-color: #d9e1eb;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.installation-board-panel .week-block {
+  border-color: #d9e0eb;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.installation-board-panel .week-header {
+  padding: 8px 11px;
+  background: #edf3fb;
+}
+
+.installation-board-panel .week-header strong {
+  color: #32425b;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.installation-board-panel .board-row {
+  border-top-color: #dfe6ef;
+  min-height: 84px;
+  background: #fff;
+}
+
+.installation-board-panel .board-row.is-today {
+  background: #fcfaff;
+  box-shadow: inset 3px 0 0 #67428b;
+}
+
+.installation-board-panel .board-row.is-drop-target {
+  background: #f4effa;
+  box-shadow: inset 3px 0 0 #67428b;
+}
+
+.installation-board-panel .date-cell {
+  border-right-color: #dfe6ef;
+  padding: 11px 12px;
+  background: #f8fbff;
+}
+
+.installation-board-panel .board-row.is-today .date-cell {
+  background: #f4effa;
+}
+
+.installation-board-panel .date-today-pill {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #67428b;
+  font-size: 0.56rem;
+}
+
+.installation-board-panel .date-day {
+  color: #6b7789;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.installation-board-panel .date-number {
+  color: #172033;
+  font-size: 1.3rem;
+}
+
+.installation-board-panel .jobs-cell {
+  padding: 9px 10px;
+}
+
+.installation-board-panel .jobs-lane-button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border-radius: 7px;
+  border-color: #d6dbe7;
+  background: #fbfcfe;
+  color: #7a8798;
+  font-size: 0.68rem;
+  box-shadow: none;
+}
+
+.installation-board-panel .jobs-lane-button.is-empty {
+  min-height: 44px;
+  padding: 8px 10px;
+}
+
+.installation-board-panel .job-stack {
+  gap: 8px;
+}
+
+.installation-board-panel .job-card {
+  gap: 9px;
+  padding: 10px 11px;
+  border-color: #d7e0ec;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 4px 12px rgba(31, 41, 55, 0.06);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.installation-board-panel .job-card:hover {
+  border-color: #bdcadb;
+  box-shadow: 0 9px 22px rgba(31, 41, 55, 0.1);
+  transform: translateY(-1px);
+}
+
+.installation-board-panel .job-type-install-card,
+.installation-board-panel .job-type-vehicle-card,
+.installation-board-panel .job-type-delivery-card,
+.installation-board-panel .job-type-subcontractor-card,
+.installation-board-panel .job-type-signs-express-card,
+.installation-board-panel .job-type-survey-card,
+.installation-board-panel .job-type-other-card {
+  background: #fff;
+}
+
+.installation-board-panel .job-type-install-card { border-top: 3px solid #dc6b6b; }
+.installation-board-panel .job-type-vehicle-card { border-top: 3px solid #58b47a; }
+.installation-board-panel .job-type-delivery-card { border-top: 3px solid #8b74c8; }
+.installation-board-panel .job-type-subcontractor-card { border-top: 3px solid #dd9b52; }
+.installation-board-panel .job-type-signs-express-card { border-top: 3px solid #718096; }
+.installation-board-panel .job-type-survey-card { border-top: 3px solid #cf6d9d; }
+.installation-board-panel .job-type-other-card { border-top: 3px solid #5f88d6; }
+
+.installation-board-panel .job-card-top {
+  padding-bottom: 7px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+.installation-board-panel .job-card-top strong {
+  color: #172033;
+  font-size: 0.84rem;
+}
+
+.installation-board-panel .job-ref-inline {
+  color: #67428b;
+  font-weight: 800;
+}
+
+.installation-board-panel .job-card-top p {
+  margin-top: 3px;
+  color: #475569;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.installation-board-panel .job-meta-grid {
+  gap: 5px 10px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.installation-board-panel .job-meta-grid p {
+  color: #536276;
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.installation-board-panel .job-meta-grid b {
+  color: #7a8798;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.installation-board-panel .job-notes.compact {
+  margin: 0;
+  padding: 7px 8px;
+  border: 1px solid #f3b5af;
+  border-left: 3px solid #d92d20;
+  border-radius: 6px;
+  background: #fff5f4;
+  color: #b42318;
+  font-size: 0.68rem;
+}
+
+.installation-board-panel .job-actions {
+  padding-top: 7px;
+  border-top: 1px solid #edf1f6;
+  gap: 5px;
+}
+
+.installation-board-panel .job-actions .text-button,
+.installation-board-panel .card-duplicate-handle {
+  min-height: 27px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #536276;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.installation-board-panel .job-actions .text-button:hover,
+.installation-board-panel .card-duplicate-handle:hover {
+  background: #f2f5f9;
+  color: #172033;
+}
+
+.installation-board-panel .job-actions .text-button.danger {
+  color: #c5221f;
+}
+
+.installation-board-panel .job-tag,
+.installation-board-panel .installer-badge.title-inline,
+.installation-board-panel .placeholder-status-pill,
+.installation-board-panel .job-snagging-pill,
+.installation-board-panel .job-complete-pill,
+.installation-board-panel .job-photo-pill,
+.installation-board-panel .job-rams-pill {
+  border-radius: 5px;
+  padding: 4px 7px;
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.installation-board-panel .unscheduled-section {
+  margin-top: 2px;
+  padding: 12px;
+  border: 1px solid #d9e0eb;
+  border-radius: 10px;
+  background: #f8fbff;
+  box-shadow: none;
+}
+
+.installation-board-panel .unscheduled-head h2 {
+  margin: 0;
+  color: #172033;
+  font-size: 0.9rem;
+}
+
+.installation-board-panel .unscheduled-head p {
+  margin-top: 3px;
+  font-size: 0.7rem;
+}
+
+.installation-board-panel .unscheduled-empty {
+  min-height: 58px;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 900px) {
+  .installation-board-toolbar {
+    align-items: flex-start;
+  }
+
+  .installation-board-toolbar p {
+    display: none;
+  }
+
+  .installation-board-summary > div {
+    min-width: 72px;
+  }
+}
+
+@media (max-width: 620px) {
+  .installation-board-panel {
+    padding: 10px;
+  }
+
+  .installation-board-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .installation-board-summary {
+    width: 100%;
+  }
+
+  .installation-board-summary > div {
+    flex: 1 1 0;
+    text-align: left;
+  }
+}
