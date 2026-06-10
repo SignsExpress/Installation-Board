@@ -16631,7 +16631,7 @@ export default function App() {
   const [pushSaving, setPushSaving] = useState(false);
   const [pushError, setPushError] = useState("");
   const [broadcastMessageSending, setBroadcastMessageSending] = useState(false);
-  const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
+  const [previousMonthDepth, setPreviousMonthDepth] = useState(3);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
   const [boardSearchOpen, setBoardSearchOpen] = useState(false);
@@ -16731,7 +16731,7 @@ export default function App() {
   }, [futureMonthDepth, previousMonthDepth, rollingEndIso, rollingStartIso, todayIso]);
 
   function resetBoardWindow() {
-    setPreviousMonthDepth(0);
+    setPreviousMonthDepth(3);
     setFutureMonthDepth(0);
   }
 
@@ -19432,7 +19432,7 @@ export default function App() {
                       Previous months
                     </button>
                     <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
-                      Current month
+                      Recent months
                     </button>
                     <div className="board-history-search">
                       <input
