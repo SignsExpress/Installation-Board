@@ -16642,7 +16642,7 @@ export default function App() {
   const [pushSaving, setPushSaving] = useState(false);
   const [pushError, setPushError] = useState("");
   const [broadcastMessageSending, setBroadcastMessageSending] = useState(false);
-  const [previousMonthDepth, setPreviousMonthDepth] = useState(6);
+  const [previousMonthDepth, setPreviousMonthDepth] = useState(0);
   const [futureMonthDepth, setFutureMonthDepth] = useState(0);
   const [historyRecoveryVersion, setHistoryRecoveryVersion] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
@@ -16744,7 +16744,7 @@ export default function App() {
   }, [futureMonthDepth, previousMonthDepth, rollingEndIso, rollingStartIso, todayIso]);
 
   function resetBoardWindow() {
-    setPreviousMonthDepth(6);
+    setPreviousMonthDepth(0);
     setFutureMonthDepth(0);
   }
 
@@ -19452,17 +19452,15 @@ export default function App() {
                 </div>
                 <div className="board-history-launch board-history-launch-top">
                   <div className="board-history-actions">
-                    {previousMonthDepth < 6 ? (
-                      <button
-                        className="ghost-button board-history-button"
-                        type="button"
-                        onClick={() => setPreviousMonthDepth((current) => Math.min(6, current + 1))}
-                      >
-                        Previous months
-                      </button>
-                    ) : null}
+                    <button
+                      className="ghost-button board-history-button"
+                      type="button"
+                      onClick={() => setPreviousMonthDepth((current) => Math.min(6, current + 1))}
+                    >
+                      Previous months
+                    </button>
                     <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
-                      6 previous months
+                      Current view
                     </button>
                     <div className="board-history-search">
                       <input
