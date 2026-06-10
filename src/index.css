@@ -5711,7 +5711,8 @@ button {
 .job-card.is-condensed .placeholder-status-pill,
 .job-card.is-condensed .job-snagging-pill,
 .job-card.is-condensed .job-complete-pill,
-.job-card.is-condensed .job-photo-pill {
+.job-card.is-condensed .job-photo-pill,
+.job-card.is-condensed .job-value-pill {
   font-size: 0.68rem;
   padding: 4px 8px;
 }
@@ -5903,6 +5904,21 @@ button {
   gap: 8px;
   flex: 0 0 auto;
   min-width: 0;
+}
+
+.job-value-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 9px;
+  border: 1px solid #d9cde5;
+  border-radius: 999px;
+  background: #fbf8fe;
+  color: #5f3c74;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .job-meta-grid {

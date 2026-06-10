@@ -2272,6 +2272,7 @@ function renderJobCardContent({
             <p>{job.description || "No description"}</p>
           </div>
         <div className="job-title-meta">
+          {Number(job.jobTotalExVat || 0) > 0 ? <span className="job-value-pill">{formatProFormaMoney(job.jobTotalExVat)}</span> : null}
           {job.isPlaceholder ? <span className="placeholder-status-pill">Placeholder</span> : null}
           {job.isSnagging ? <span className="job-snagging-pill">Snagging</span> : null}
           {job.isCompleted ? <span className="job-complete-pill">Complete</span> : null}

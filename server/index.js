@@ -2096,8 +2096,20 @@ function buildInstallationValueSummary(store, today = getTodayInLondon()) {
   const previousMonthStart = getStartOfMonth(addMonths(today, -1));
   const currentMonthId = toIsoDate(currentMonthStart).slice(0, 7);
   const previousMonthId = toIsoDate(previousMonthStart).slice(0, 7);
-  const weekCount = Math.ceil(getEndOfMonth(currentMonthStart).getUTCDate() / 7);
-  const values = Array.from({ length: weekCount }, () => ({ current: 0, previous: 0 }));
+  const getMonthWeekRanges = (monthStart) => {
+    const monthEnd = getEndOfMonth(monthStart);
+    const ranges = [];
+    for (let cursor = getStartOfWeek(monthStart); cursor <= monthEnd; cursor = addDays(cursor, 7)) {
+      ranges.push({
+        start: cursor < monthStart ? monthStart : cursor,
+        end: addDays(cursor, 6) > monthEnd ? monthEnd : addDays(cursor, 6)
+      });
+    }
+    return ranges;
+  };
+  const currentWeekRanges = getMonthWeekRanges(currentMonthStart);
+  const previousWeekRanges = getMonthWeekRanges(previousMonthStart);
+  const values = Array.from({ length: currentWeekRanges.length }, () => ({ current: 0, previous: 0 }));
   const linkedValues = new Map();
   const linkedCards = [
     ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
@@ -2125,7 +2137,8 @@ function buildInstallationValueSummary(store, today = getTodayInLondon()) {
       const countKey = `${monthId}:${referenceKey || job?.id || ""}`;
       if (countedOrders.has(countKey)) return;
       countedOrders.add(countKey);
-      const weekIndex = Math.floor((jobDate.getUTCDate() - 1) / 7);
+      const weekRanges = monthId === currentMonthId ? currentWeekRanges : previousWeekRanges;
+      const weekIndex = weekRanges.findIndex((range) => jobDate >= range.start && jobDate <= range.end);
       if (monthId === currentMonthId && values[weekIndex]) {
         values[weekIndex].current += value;
         currentTotal += value;
@@ -4122,7 +4135,7 @@ function broadcast(event, payload) {
 }
 
 async function getBoardPayload(options = {}) {
-  const store = await readStore();
+  const store = await backfillInstallationJobValues(await readStore(), options);
   const today = getTodayInLondon();
   const navigation = buildMonthNavigation(today);
   let boardOptions = { today, mode: "rolling" };
@@ -8366,6 +8379,73 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
     order,
     lookupAttempts
   };
+}
+
+const attemptedInstallationValueReferences = new Set();
+
+async function backfillInstallationJobValues(store, options = {}) {
+  const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
+  const linkedValues = new Map();
+  const linkedCards = [
+    ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
+    ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
+  ];
+  linkedCards.forEach((card) => {
+    const reference = String(card?.orderReference || "").trim().toLowerCase();
+    const value = Number(card?.jobTotalExVat || 0);
+    if (reference && Number.isFinite(value) && value > 0) linkedValues.set(reference, value);
+  });
+
+  let changed = false;
+  jobs.forEach((job) => {
+    const reference = String(job?.orderReference || "").trim().toLowerCase();
+    const linkedValue = linkedValues.get(reference) || 0;
+    if (reference && Number(job?.jobTotalExVat || 0) <= 0 && linkedValue > 0) {
+      job.jobTotalExVat = linkedValue;
+      changed = true;
+    }
+  });
+
+  const selectedMonth = options.mode === "month" ? String(options.monthId || "") : "";
+  const selectedStart = String(options.start || "");
+  const selectedEnd = String(options.end || "");
+  const isSelectedJob = (job) => {
+    const date = String(job?.date || "");
+    if (selectedMonth) return date.startsWith(`${selectedMonth}-`);
+    return Boolean(selectedStart && selectedEnd && date >= selectedStart && date <= selectedEnd);
+  };
+  const unresolvedReferences = [...new Set(
+    [...jobs]
+      .sort((left, right) => {
+        const selectedDifference = Number(isSelectedJob(right)) - Number(isSelectedJob(left));
+        return selectedDifference || String(right?.date || "").localeCompare(String(left?.date || ""));
+      })
+      .filter((job) => String(job?.orderReference || "").trim() && Number(job?.jobTotalExVat || 0) <= 0)
+      .map((job) => String(job.orderReference).trim())
+  )]
+    .filter((reference) => !attemptedInstallationValueReferences.has(reference.toLowerCase()))
+    .slice(0, 12);
+
+  for (const reference of unresolvedReferences) {
+    attemptedInstallationValueReferences.add(reference.toLowerCase());
+    try {
+      const { order } = await fetchDesignBoardOrderByReference(reference);
+      if (!order) continue;
+      const proForma = buildProFormaPayload(order);
+      const value = Number(proForma.preTaxTotal || proForma.subtotal || 0);
+      if (!Number.isFinite(value) || value <= 0) continue;
+      jobs.forEach((job) => {
+        if (String(job?.orderReference || "").trim().toLowerCase() === reference.toLowerCase()) {
+          job.jobTotalExVat = Math.round(value * 100) / 100;
+          changed = true;
+        }
+      });
+    } catch (error) {
+      console.error(`Could not backfill Installation Board value for ${reference}.`, error.message || error);
+    }
+  }
+
+  return changed ? writeStore(store) : store;
 }
 
 function needsDesignBoardCoreBridgeRefresh(card = {}) {
