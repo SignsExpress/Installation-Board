@@ -2108,6 +2108,79 @@ async function inspectBoardStoreFile(file) {
   };
 }
 
+async function recoverHistoricalJobsFromBackups() {
+  const cutoff = toIsoDate(getStartOfMonth(getTodayInLondon()));
+  const currentStore = await readStore();
+  const currentJobs = Array.isArray(currentStore.jobs) ? currentStore.jobs : [];
+  const protectedJobs = currentJobs.filter((job) => String(job?.date || "") >= cutoff);
+  const getProtectedSignature = (jobs) => JSON.stringify(
+    [...jobs].sort((left, right) => {
+      const dateDifference = String(left?.date || "").localeCompare(String(right?.date || ""));
+      return dateDifference || String(left?.id || "").localeCompare(String(right?.id || ""));
+    })
+  );
+  const protectedSignature = getProtectedSignature(protectedJobs);
+  const backupDirectory = path.join(path.dirname(getDataFile()), "backups");
+  const names = fs.existsSync(backupDirectory)
+    ? (await fsp.readdir(backupDirectory)).filter((name) => /^jobs-store-\d+.*\.json$/i.test(name))
+    : [];
+  let bestBackup = null;
+
+  for (const name of names) {
+    try {
+      const parsed = JSON.parse(await fsp.readFile(path.join(backupDirectory, name), "utf8"));
+      const jobs = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.jobs) ? parsed.jobs : [];
+      const historicalJobs = jobs.filter((job) => {
+        const date = String(job?.date || "");
+        return isValidIsoDate(date) && date < cutoff;
+      });
+      if (!bestBackup || historicalJobs.length > bestBackup.historicalJobs.length) {
+        bestBackup = { name, historicalJobs };
+      }
+    } catch (error) {
+      console.error(`Could not inspect historical recovery backup ${name}.`, error.message || error);
+    }
+  }
+
+  if (!bestBackup?.historicalJobs.length) {
+    return { changed: false, cutoff, restored: 0, backup: "", reason: "No backup contains historical jobs." };
+  }
+
+  const currentHistoricalJobs = currentJobs.filter((job) => String(job?.date || "") < cutoff);
+  const getRecoveryKey = (job) => String(job?.id || "").trim() || [
+    job?.date,
+    job?.orderReference,
+    job?.customerName,
+    job?.description
+  ].map((value) => String(value || "").trim().toLowerCase()).join("|");
+  const mergedHistoricalJobs = new Map();
+  bestBackup.historicalJobs.forEach((job) => mergedHistoricalJobs.set(getRecoveryKey(job), job));
+  currentHistoricalJobs.forEach((job) => mergedHistoricalJobs.set(getRecoveryKey(job), job));
+  const nextJobs = [...mergedHistoricalJobs.values(), ...protectedJobs];
+  const nextProtectedJobs = nextJobs.filter((job) => String(job?.date || "") >= cutoff);
+  if (getProtectedSignature(nextProtectedJobs) !== protectedSignature) {
+    throw new Error(`Historical recovery aborted because jobs dated ${cutoff} or later would change.`);
+  }
+  const restored = nextJobs.length - currentJobs.length;
+  if (restored <= 0) {
+    return { changed: false, cutoff, restored: 0, backup: bestBackup.name, reason: "Current store already contains this history." };
+  }
+
+  await snapshotFile(getDataFile(), "jobs-store-pre-history-recovery", 40);
+  const savedStore = await writeStore({ ...currentStore, jobs: nextJobs });
+  const savedProtectedJobs = savedStore.jobs.filter((job) => String(job?.date || "") >= cutoff);
+  if (getProtectedSignature(savedProtectedJobs) !== protectedSignature) {
+    throw new Error(`Historical recovery verification failed because jobs dated ${cutoff} or later changed.`);
+  }
+  return {
+    changed: true,
+    cutoff,
+    restored,
+    backup: bestBackup.name,
+    historicalJobCount: mergedHistoricalJobs.size
+  };
+}
+
 function buildInstallationValueSummary(store, today = getTodayInLondon()) {
   const currentMonthStart = getStartOfMonth(today);
   const previousMonthStart = getStartOfMonth(addMonths(today, -1));
@@ -9886,6 +9959,18 @@ function createServer() {
       });
     } catch (error) {
       response.status(500).json({ error: error.message || "Could not inspect board backups." });
+    }
+  });
+
+  app.post("/api/board/recover-history", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const result = await recoverHistoricalJobsFromBackups();
+      if (result.changed) broadcast("board-updated", buildBoardRowsFromStore(await readStore()));
+      response.json(result);
+    } catch (error) {
+      console.error("Could not recover historical Installation Board jobs.", error.message || error);
+      response.status(500).json({ error: error.message || "Could not recover historical Installation Board jobs." });
     }
   });
 

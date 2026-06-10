@@ -16649,6 +16649,7 @@ export default function App() {
   const clientPhotoInputRef = useRef(null);
   const adminPhotoInputRef = useRef(null);
   const openedNotificationJobIdRef = useRef("");
+  const historyRecoveryAttemptedRef = useRef(false);
   const boardEditable = canEditBoard(currentUser);
   const designBoardEditable = canEditDesignBoard(currentUser);
   const filteringEditable = canEditFiltering(currentUser);
@@ -16898,6 +16899,20 @@ export default function App() {
       active = false;
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
+
+  useEffect(() => {
+    if (!currentUser || !showBoard || historyRecoveryAttemptedRef.current) return;
+    historyRecoveryAttemptedRef.current = true;
+    fetch("/api/board/recover-history", { method: "POST" })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const result = await response.json();
+        if (result.changed) {
+          setMessage(createMessage(`${result.restored} historical jobs restored from backup.`, "success"));
+        }
+      })
+      .catch((error) => console.error(error));
+  }, [currentUser, showBoard]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
