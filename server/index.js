@@ -9195,7 +9195,12 @@ async function fetchCoreBridgeWorksOrders(order = {}, orderReference = "") {
 
 async function fetchProductionOrderByReference(orderReference = "") {
   const attempts = [];
-  for (const reference of getCoreBridgeReferenceFamily(orderReference)) {
+  const references = getCoreBridgeReferenceFamily(orderReference);
+  const preferredReferences = [
+    ...references.filter((reference) => /^ORD/i.test(reference)),
+    ...references.filter((reference) => /^EST/i.test(reference))
+  ];
+  for (const reference of preferredReferences) {
     try {
       const lookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
       const order = (lookup.orders || []).find((entry) =>
@@ -9210,37 +9215,245 @@ async function fetchProductionOrderByReference(orderReference = "") {
   return { order: null, attempts };
 }
 
+function getCaseInsensitiveValue(record, names = []) {
+  if (!record || typeof record !== "object") return undefined;
+  const lookup = new Map(Object.keys(record).map((key) => [key.toLowerCase(), key]));
+  for (const name of names) {
+    const key = lookup.get(String(name).toLowerCase());
+    if (key !== undefined) return record[key];
+  }
+  return undefined;
+}
+
+function parseCoreBridgeAssemblyJson(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(String(value));
+  } catch {
+    return null;
+  }
+}
+
+function getCoreBridgeArray(record, names = []) {
+  const value = getCaseInsensitiveValue(record, names);
+  if (Array.isArray(value)) return value;
+  const parsed = parseCoreBridgeAssemblyJson(value);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function getCoreBridgeText(record, names = []) {
+  const value = getCaseInsensitiveValue(record, names);
+  if (value === undefined || value === null) return "";
+  if (typeof value === "object") {
+    return getCoreBridgeText(value, ["Name", "DisplayName", "Description", "Value"]);
+  }
+  return String(value).trim();
+}
+
+function getCoreBridgeNumber(record, names = []) {
+  const value = getCaseInsensitiveValue(record, names);
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatJobMaterialNumber(value, maximumFractionDigits = 5) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return number.toLocaleString("en-GB", { maximumFractionDigits });
+}
+
+function formatJobMaterialDimension(value, fallbackUnit = "mm") {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  if (/[a-z]/i.test(text)) return text;
+  const number = Number(text);
+  return Number.isFinite(number) ? `${formatJobMaterialNumber(number, 2)}${fallbackUnit}` : text;
+}
+
+function getJobMaterialSize(record, stock = false) {
+  const prefix = stock ? ["Stock", "Material", "Roll", "Sheet"] : ["Finished", "Item", ""];
+  const read = (dimension) => {
+    const names = prefix.flatMap((part) => [
+      `${part}${dimension}`,
+      `${part}${dimension}MM`,
+      `${part}${dimension}Mm`
+    ]);
+    return getCoreBridgeText(record, names);
+  };
+  const width = read("Width");
+  const height = read("Height");
+  const length = read("Length");
+  const dimensions = [width, height || length].filter(Boolean).map((value) => formatJobMaterialDimension(value));
+  if (dimensions.length >= 2) return dimensions.join(" x ");
+  const explicit = getCoreBridgeText(record, stock
+    ? ["StockSize", "MaterialSize", "RollSize", "SheetSize"]
+    : ["FinishedSize", "ItemSize", "Size"]);
+  if (explicit) return explicit;
+  return stock ? "" : extractProductionSize(getCoreBridgeText(record, ["Description", "CustomerDescription", "Specification"]));
+}
+
+function formatJobMaterialUsageUnit(value) {
+  const unit = String(value || "").trim();
+  const normalized = unit.toLowerCase().replace(/[\s_-]+/g, "");
+  if (["sqm", "m2", "squaremeter", "squaremeters", "squaremetre", "squaremetres"].includes(normalized)) return "m²";
+  if (["sqft", "ft2", "squarefoot", "squarefeet"].includes(normalized)) return "ft²";
+  if (["linearmetre", "linearmetres", "lm"].includes(normalized)) return "linear m";
+  return unit;
+}
+
+function classifyJobMaterialComponent(record) {
+  const source = [
+    getCoreBridgeText(record, ["ComponentType", "Type", "VariableName", "CategoryName", "Category"]),
+    getCoreBridgeText(record, ["Name", "ComponentName", "MaterialName", "PartName"])
+  ].join(" ").toLowerCase();
+  if (/(labour|labor|employee|installer|operator|time)/.test(source)) return "Labour";
+  if (/(service|delivery|design|artwork|survey)/.test(source)) return "Service";
+  if (/(fixing|screw|bolt|nut|washer|bracket|adhesive|tape|clip|rivet)/.test(source)) return "Fixing";
+  if (/(laminate|vinyl|material|substrate|panel|sheet|roll|ink|paint)/.test(source)) return "Material";
+  return "Component";
+}
+
+function extractJobMaterialComponent(record, context, index) {
+  const componentType = getCoreBridgeText(record, ["ComponentTypeName", "ComponentType", "TypeName", "Type"]);
+  const variableName = getCoreBridgeText(record, ["VariableName", "Variable", "RoleName"]);
+  const name = getCoreBridgeText(record, ["MaterialName", "Material", "MaterialPart", "PartName", "ComponentName", "Name", "DisplayName", "Description"]) || `Component ${index + 1}`;
+  const kind = classifyJobMaterialComponent(record);
+  const usage = getCoreBridgeNumber(record, ["TotalQuantity", "MaterialUsage", "Usage", "ConsumedQuantity", "TotalUsage"]);
+  const usageUnit = getCoreBridgeText(record, ["TotalQuantityUnit", "MaterialUsageUnit", "UsageUnit", "UnitName", "UnitOfMeasure", "UOM", "Unit"]);
+  const componentQuantity = getCoreBridgeNumber(record, ["QuantityRequired", "RequiredQuantity", "ComponentQuantity", "Quantity", "Qty"]);
+  const employees = getCoreBridgeNumber(record, ["NumberOfEmployees", "EmployeeCount", "Employees", "People"]);
+  const time = getCoreBridgeNumber(record, ["Time", "Minutes", "LabourMinutes", "LaborMinutes", "Duration"]) || ((kind === "Labour" || kind === "Service") ? usage : 0);
+  const timeUnit = getCoreBridgeText(record, ["TimeUnit", "DurationUnit"]) || (time ? "minutes" : "");
+  const isConsumptionMaterial = kind === "Material" && usage > 0;
+  return {
+    id: String(getCaseInsensitiveValue(record, ["ID", "Id", "id"]) || `${context.itemIndex}-${index}-${name}`),
+    name,
+    kind,
+    componentType,
+    variableName,
+    requirement: kind === "Labour" || kind === "Service"
+      ? (componentQuantity > 0 ? `${formatJobMaterialNumber(componentQuantity, 2)} off` : "")
+      : `${formatJobMaterialNumber(componentQuantity > 0 && !isConsumptionMaterial ? componentQuantity : context.itemQuantity || 1, 2)} off`,
+    finishedSize: getJobMaterialSize(record, false) || context.finishedSize,
+    stockSize: getJobMaterialSize(record, true),
+    materialUsage: isConsumptionMaterial ? `${formatJobMaterialNumber(usage)}${usageUnit ? ` ${formatJobMaterialUsageUnit(usageUnit)}` : ""}` : "",
+    labour: time || employees
+      ? `${time ? `${formatJobMaterialNumber(time, 2)} ${timeUnit}` : ""}${time && employees ? " · " : ""}${employees ? `${formatJobMaterialNumber(employees, 2)} employee${employees === 1 ? "" : "s"}` : ""}`
+      : "",
+    notes: getCoreBridgeText(record, ["Notes", "Note", "Specification"])
+  };
+}
+
+function collectJobMaterialComponents(item, itemIndex) {
+  const itemQuantity = getCoreBridgeNumber(item, ["Quantity", "Qty", "ItemQuantity", "TotalItemQuantity"]) || 1;
+  const itemAssembly = parseCoreBridgeAssemblyJson(getCaseInsensitiveValue(item, ["AssemblyDataJSON", "AssemblyDataJson", "AssemblyData"]));
+  const finishedSize = getJobMaterialSize(item, false) || getJobMaterialSize(itemAssembly, false);
+  const collected = [];
+  const seen = new Set();
+
+  const visit = (record) => {
+    if (!record || typeof record !== "object") return;
+    const assembly = parseCoreBridgeAssemblyJson(getCaseInsensitiveValue(record, ["AssemblyDataJSON", "AssemblyDataJson", "AssemblyData"]));
+    const children = [
+      ...(Array.isArray(assembly) ? assembly : []),
+      ...getCoreBridgeArray(record, ["Components", "components"]),
+      ...getCoreBridgeArray(record, ["ChildComponents", "childComponents"]),
+      ...getCoreBridgeArray(assembly, ["Components", "components"]),
+      ...getCoreBridgeArray(assembly, ["ChildComponents", "childComponents"])
+    ];
+    children.forEach((child) => {
+      const fingerprint = JSON.stringify(child);
+      if (!seen.has(fingerprint)) {
+        seen.add(fingerprint);
+        collected.push(extractJobMaterialComponent(child, { itemIndex, itemQuantity, finishedSize }, collected.length));
+        visit(child);
+      }
+    });
+    if (assembly && assembly !== record) visit(assembly);
+  };
+  visit(item);
+  return collected;
+}
+
+function findCoreBridgeJobItems(record) {
+  if (!record || typeof record !== "object") return [];
+  const direct = getCoreBridgeArray(record, ["Items", "OrderItems", "EstimateItems", "LineItems"]);
+  if (direct.length) return direct;
+  for (const value of Object.values(record)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const nested = findCoreBridgeJobItems(value);
+    if (nested.length) return nested;
+  }
+  return [];
+}
+
+function buildJobMaterialsFromOrder(order) {
+  const raw = parseCoreBridgeAssemblyJson(order?.debugRaw) || order;
+  return findCoreBridgeJobItems(raw).map((item, index) => {
+    const quantity = getCoreBridgeNumber(item, ["Quantity", "Qty", "ItemQuantity", "TotalItemQuantity"]) || 1;
+    return {
+      id: String(getCaseInsensitiveValue(item, ["ID", "Id", "id"]) || `item-${index + 1}`),
+      lineItemName: getCoreBridgeText(item, ["LineItemName", "ItemName", "Name", "Description"]) || `Item ${index + 1}`,
+      quantity,
+      quantityLabel: `${formatJobMaterialNumber(quantity, 2)} off`,
+      categoryName: getCoreBridgeText(item, ["CategoryName", "Category", "LineItemCategoryName", "ItemCategoryName"]),
+      finishedSize: getJobMaterialSize(item, false),
+      components: collectJobMaterialComponents(item, index)
+    };
+  });
+}
+
+async function fetchCoreBridgeJobAssemblyDetail(order) {
+  const config = getCoreBridgeConfig();
+  const id = String(order?.id || order?._detailOrderId || "").trim();
+  if (!id) return order;
+  const entity = String(order?._detailEntity || "").toLowerCase();
+  const pathValue = entity === "estimate" ? config.estimatePath : config.orderPath;
+  const url = new URL(buildCoreBridgeDetailUrl(config, pathValue, id));
+  url.searchParams.set("componentlevel", "full");
+  url.searchParams.set("childcomponentlevel", "full");
+  url.searchParams.set("assemblylevel", "full");
+  url.searchParams.set("materiallevel", "full");
+  const result = await fetchCoreBridgeExplorerUrl(config, url.toString());
+  if (!result.ok || typeof result.body !== "object") return order;
+  const raw = extractCoreBridgeDetailRecord(result.body, id) || result.body;
+  return { ...order, debugRaw: JSON.stringify(raw, null, 2) };
+}
+
 async function buildMorningMeetingMaterialsPayload(store) {
   const meeting = buildMorningMeetingPayload(store);
   const approvedJobs = meeting.approvedYesterday;
-  const jobs = await Promise.all(approvedJobs.map(async (card) => {
+  const jobs = [];
+  for (const card of approvedJobs) {
     try {
       const { order, attempts } = await fetchProductionOrderByReference(card.orderReference);
-      const worksOrderLookup = order ? await fetchCoreBridgeWorksOrders(order, card.orderReference) : { worksOrders: [], sourcePath: "", attempts: [] };
-      const lines = extractWorksOrderMaterialLines(worksOrderLookup.worksOrders);
-      return {
+      const assemblyOrder = order ? await fetchCoreBridgeJobAssemblyDetail(order) : null;
+      const items = assemblyOrder ? buildJobMaterialsFromOrder(assemblyOrder) : [];
+      const componentCount = items.reduce((total, item) => total + item.components.length, 0);
+      jobs.push({
         id: card.id,
         orderReference: card.orderReference,
         customerName: card.customerName,
         description: card.description,
-        lines,
-        source: lines.length ? "CoreBridge works order" : "No works-order materials found",
-        lookupError: lines.length
+        items,
+        source: componentCount ? "CoreBridge item assemblies" : "No assembly components found",
+        lookupError: componentCount
           ? ""
-          : `No material allocations were returned from the CoreBridge works order. ${[...attempts, ...worksOrderLookup.attempts].map((attempt) => typeof attempt === "string" ? attempt : attempt.error).filter(Boolean).slice(0, 4).join(" ")}`
-      };
+          : `No components were returned from Items → Components → ChildComponents → AssemblyDataJSON. ${attempts.map((attempt) => attempt.error).filter(Boolean).slice(0, 4).join(" ")}`
+      });
     } catch (error) {
-      return {
+      jobs.push({
         id: card.id,
         orderReference: card.orderReference,
         customerName: card.customerName,
         description: card.description,
-        lines: [],
-        source: "No works-order materials found",
+        items: [],
+        source: "No assembly components found",
         lookupError: error.message || "CoreBridge lookup failed."
-      };
+      });
     }
-  }));
+  }
   return {
     generatedAt: new Date().toISOString(),
     approvedDate: meeting.yesterdayIso,

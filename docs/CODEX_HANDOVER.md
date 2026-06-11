@@ -52,9 +52,10 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - Meeting notes can be entered and emailed to every user with an Email value in their Permissions profile.
 - Meeting emails use a cleaner card layout and place persisted job notes directly beneath the relevant jobs.
 - Uses the server SMTP configuration already shared with credit applications.
-- Can fetch and print a production stock-check sheet for yesterday's approved artwork.
-- The stock-check lookup finds the matching CoreBridge order, tries the available works-order endpoints and material subresources, and extracts allocated material quantity, unit, dimensions, and material name.
-- Keep the multi-path CoreBridge works-order lookup defensive because endpoint shapes vary between CoreBridge installations.
+- Can fetch and print a Job Materials Report for yesterday's approved artwork.
+- The Job Materials Report reads the matching Estimate/Order item assemblies through `Items`, `Components`, `ChildComponents`, and `AssemblyDataJSON`.
+- It separates finished-item quantity and size from stock size and material consumption. Never treat roll-material `TotalQuantity` as the number of finished items.
+- It also lists nested materials, laminates, fixings, labour/service parts, time, and employee counts where CoreBridge supplies them.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`
