@@ -4017,7 +4017,7 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const systemCards = [
-    canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="Corebridge APIs" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null,
+    canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="Corebridge APIs" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null, // Render redeploy nudge.
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards].filter((items) => items.length).length;
