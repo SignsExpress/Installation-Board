@@ -4032,11 +4032,13 @@ function HostLandingPage({
         />
 
         <section className="panel host-landing-panel">
-          <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
-          <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
-          <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
-          <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
-          <HostLaunchSection title="System">{systemCards}</HostLaunchSection>
+          <div className="host-landing-sections">
+            <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
+            <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
+            <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
+            <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
+            <HostLaunchSection title="System">{systemCards}</HostLaunchSection>
+          </div>
         </section>
 
       </div>
@@ -4122,10 +4124,12 @@ function ClientLandingPage({
         />
 
         <section className="panel host-landing-panel">
-          <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
-          <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
-          <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
-          <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
+          <div className="host-landing-sections">
+            <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
+            <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
+            <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
+            <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
+          </div>
         </section>
 
       </div>
@@ -16979,6 +16983,21 @@ function formatPlannerQuantity(count) {
   return `${quantity}no.`;
 }
 
+function parsePlannerQuantityLabel(value) {
+  const match = String(value || "").match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+}
+
+function resolvePlannerQuantity(primaryValue, quantityLabel) {
+  const numericPrimary = Number(primaryValue || 0);
+  const labelQuantity = parsePlannerQuantityLabel(quantityLabel);
+  return Math.max(
+    numericPrimary > 0 ? numericPrimary : 0,
+    labelQuantity > 0 ? labelQuantity : 0,
+    1
+  );
+}
+
 function formatPlannerHours(hours) {
   const totalMinutes = Math.max(0, Math.round((Number(hours) || 0) * 60));
   const wholeHours = Math.floor(totalMinutes / 60);
@@ -17014,7 +17033,7 @@ function extractPlannerMaterials(payload) {
         id: matched.id || `${job.id}-${item.id}-${index}`,
         name: materialName || matched.name || "Unnamed material",
         type: inferPlannerTypeFromName(materialName || matched.name || "", matched.type || ""),
-        quantity: Number(matched.quantity || item.quantity || 0) || 1,
+        quantity: resolvePlannerQuantity(matched.quantity || item.quantity || 0, matched.quantityLabel || item.quantityLabel || ""),
         quantityLabel: matched.quantityLabel || item.quantityLabel || "",
         finishedSize: matched.finishedSize || item.finishedSize || "",
         stockSize: matched.stockSize || "",
@@ -17047,7 +17066,7 @@ function groupPanelPlannerRows(rows = []) {
       productionHours: 0
     };
     current.rows.push(row);
-    current.totalQuantity += Math.max(0, Math.round(Number(row.quantity || 0)));
+    current.totalQuantity += Math.max(0, Math.round(resolvePlannerQuantity(row.quantity || 0, row.quantityLabel || "")));
     current.productionHours += Number(row.productionHours || 0) || 0;
     grouped.set(key, current);
   });
@@ -17067,6 +17086,10 @@ function getSheetPresetMatch(width, height) {
 function getSuggestedMaterialSheetSetting(group) {
   const stockSizeHint = group.rows.map((row) => parsePlannerDimensions(row.stockSize)).find(Boolean);
   if (stockSizeHint) {
+    if (stockSizeHint.height <= 10 || stockSizeHint.width <= 10) {
+      const width = Math.max(stockSizeHint.width, stockSizeHint.height);
+      return { preset: "custom", customWidth: Math.round(width), customHeight: "N/A", stockLabel: `${Math.round(width)}mm roll width` };
+    }
     const preset = getSheetPresetMatch(stockSizeHint.width, stockSizeHint.height);
     if (preset) {
       return { preset: preset.value, customWidth: preset.width, customHeight: String(preset.height), stockLabel: formatPlannerSize(preset.width, preset.height) };
@@ -17089,7 +17112,8 @@ function getSuggestedMaterialSheetSetting(group) {
 function getMaterialSheetDimensions(setting = {}) {
   if (setting.preset === "custom") {
     const width = Number(setting.customWidth || 0);
-    const height = setting.customHeight === "na" ? 0 : Number(setting.customHeight || 0);
+    const customHeight = String(setting.customHeight || "").trim().toLowerCase();
+    const height = !customHeight || customHeight === "na" || customHeight === "n/a" ? 0 : Number(customHeight);
     return { width, height };
   }
   const preset = MATERIAL_SHEET_PRESETS.find((entry) => entry.value === setting.preset) || MATERIAL_SHEET_PRESETS[0];
@@ -17100,7 +17124,7 @@ function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
   const kerf = 3;
   const expandedPieces = rows.flatMap((row) => {
     const size = parsePlannerDimensions(row.finishedSize);
-    const quantity = Math.max(0, Math.round(Number(row.quantity || 0)));
+    const quantity = Math.max(0, Math.round(resolvePlannerQuantity(row.quantity || 0, row.quantityLabel || "")));
     if (!size || !quantity) return [];
     return Array.from({ length: quantity }, (_, index) => ({
       id: `${row.id}-${index + 1}`,
@@ -17110,7 +17134,67 @@ function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
       jobReference: row.jobReference
     }));
   }).sort((a, b) => (b.height * b.width) - (a.height * a.width));
-  if (!expandedPieces.length || !(sheetWidth > 0) || !(sheetHeight > 0)) return null;
+  if (!expandedPieces.length || !(sheetWidth > 0)) return null;
+
+  if (!(sheetHeight > 0)) {
+    let cursorX = 0;
+    let cursorY = 0;
+    let rowHeight = 0;
+    const placements = [];
+
+    expandedPieces.forEach((piece) => {
+      const orientations = [
+        { width: piece.width, height: piece.height },
+        { width: piece.height, height: piece.width }
+      ].filter((entry, index, array) => index === 0 || entry.width !== array[0].width || entry.height !== array[0].height);
+
+      let placed = false;
+      for (const option of orientations) {
+        if (option.width > sheetWidth) continue;
+        const needsNewRow = cursorX > 0 && (cursorX + option.width > sheetWidth);
+        const nextX = needsNewRow ? 0 : cursorX;
+        const nextY = needsNewRow ? cursorY + rowHeight + kerf : cursorY;
+        placements.push({
+          ...piece,
+          width: option.width,
+          height: option.height,
+          x: nextX,
+          y: nextY
+        });
+        cursorX = nextX + option.width + kerf;
+        cursorY = nextY;
+        rowHeight = needsNewRow ? option.height : Math.max(rowHeight, option.height);
+        placed = true;
+        break;
+      }
+      if (!placed) {
+        placements.push({
+          ...piece,
+          width: piece.width,
+          height: piece.height,
+          x: 0,
+          y: cursorY + rowHeight + kerf
+        });
+        cursorX = piece.width + kerf;
+        cursorY = cursorY + rowHeight + kerf;
+        rowHeight = piece.height;
+      }
+    });
+
+    const usedLength = placements.reduce((max, piece) => Math.max(max, piece.y + piece.height), 0);
+    const usedArea = expandedPieces.reduce((total, piece) => total + (piece.width * piece.height), 0);
+    return {
+      totalSheets: 1,
+      sheetWidth,
+      sheetHeight: Math.max(usedLength, 1),
+      sheetSizeLabel: `${Math.round(sheetWidth)}mm wide x ${Math.round(usedLength)}mm run`,
+      totalWasteArea: Math.max(0, (sheetWidth * usedLength) - usedArea),
+      summaryLines: rows.map((row) => `${row.jobReference} - ${row.quantityLabel}${row.finishedSize ? ` - ${row.finishedSize}` : ""}`),
+      sheets: [{ placements }],
+      mode: "roll",
+      usedLength
+    };
+  }
 
   const sheets = [];
   let currentSheet = { placements: [], cursorX: 0, cursorY: 0, rowHeight: 0 };
@@ -17224,7 +17308,7 @@ function PanelSheetDiagram({ sheetPlan, materialName }) {
               </g>
             ))}
           </svg>
-          <figcaption>Sheet {index + 1} of {sheetPlan.totalSheets} - {sheetPlan.sheetSizeLabel}</figcaption>
+          <figcaption>{sheetPlan.mode === "roll" ? `Run ${index + 1} - ${sheetPlan.sheetSizeLabel}` : `Sheet ${index + 1} of ${sheetPlan.totalSheets} - ${sheetPlan.sheetSizeLabel}`}</figcaption>
         </figure>
       ))}
     </div>
@@ -17249,33 +17333,28 @@ function MorningMeetingMaterials({
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
   const panelRows = filterPanelPlannerRows(plannerRows);
   const panelGroups = groupPanelPlannerRows(panelRows);
+  const plannerSummary = payload
+    ? `${jobs.length} approved job${jobs.length === 1 ? "" : "s"} ready for production review`
+    : "Build a clean production report from CoreBridge assemblies";
   return (
     <section className="morning-meeting-materials">
       <div className="morning-meeting-materials-head">
         <div className="morning-meeting-materials-summary">
           <span>Production requirements</span>
           <h2>Job Materials Report</h2>
-          <p>{loading ? loadingStep : payload ? `${jobs.length} approved job${jobs.length === 1 ? "" : "s"} ready for production review.` : "Finished quantities, sizes and materials pulled through from CoreBridge assemblies."}</p>
           <div className="morning-meeting-material-status-row">
-            {payload ? <span className="morning-meeting-material-status-meta">{panelRows.length} panel line{panelRows.length === 1 ? "" : "s"} ready for sheet planning</span> : null}
+            <span className="morning-meeting-material-status-meta">{loading ? loadingStep : plannerSummary}</span>
+            {payload ? <span className="morning-meeting-material-status-pill">{panelRows.length} panel line{panelRows.length === 1 ? "" : "s"} ready</span> : null}
+            {loading ? <span className="morning-meeting-material-status-pill is-live"><span className="inline-spinner" aria-hidden="true" /> Working live</span> : null}
           </div>
         </div>
         <div className="morning-meeting-materials-actions">
           <button className="ghost-button morning-meeting-material-fetch" type="button" onClick={onFetch} disabled={loading}>
             <span className="morning-meeting-material-fetch-inner">
               {loading ? <span className="inline-spinner" aria-hidden="true" /> : null}
-              <span>{loading ? "Building report" : payload ? "Refresh report" : "Build report"}</span>
+              <span>{loading ? "Building report..." : payload ? "Refresh report" : "Build report"}</span>
             </span>
           </button>
-          {loading ? (
-            <div className="morning-meeting-material-load-status">
-              <span className="inline-spinner" aria-hidden="true" />
-              <div>
-                <strong>{loadingStep}</strong>
-                <small>Running in the background</small>
-              </div>
-            </div>
-          ) : null}
           {payload ? <button className="ghost-button" type="button" onClick={onTogglePlanner}>{plannerOpen ? "Hide order materials" : "Order materials"}</button> : null}
           {payload ? <button className="primary-button" type="button" onClick={onPrint}>Print report</button> : null}
         </div>
@@ -17287,7 +17366,7 @@ function MorningMeetingMaterials({
           <div className="morning-meeting-material-planner-head">
             <div>
               <h3>Order materials</h3>
-              <p>Panels are grouped automatically by material, with a sheet suggestion on each one.</p>
+              <p>Panels are grouped by stock material, with a tighter sheet suggestion on each one.</p>
             </div>
             <div className="morning-meeting-material-planner-actions">
               <button className="primary-button" type="button" onClick={onFinaliseMaterials} disabled={!panelRows.length}>
@@ -17320,14 +17399,21 @@ function MorningMeetingMaterials({
                       </label>
                       <label>
                         <span>Custom height</span>
-                        <select value={materialGroupSettings[group.key]?.customHeight || "na"} onChange={(event) => onMaterialGroupSettingChange(group.key, "customHeight", event.target.value)}>
-                          <option value="na">N/A</option>
-                          <option value="1000">1000mm</option>
-                          <option value="1220">1220mm</option>
-                          <option value="1500">1500mm</option>
-                          <option value="2440">2440mm</option>
-                          <option value="3050">3050mm</option>
-                        </select>
+                        <input
+                          type="text"
+                          list={`material-height-options-${group.key}`}
+                          value={materialGroupSettings[group.key]?.customHeight || "N/A"}
+                          onChange={(event) => onMaterialGroupSettingChange(group.key, "customHeight", event.target.value)}
+                          placeholder="N/A"
+                        />
+                        <datalist id={`material-height-options-${group.key}`}>
+                          <option value="N/A" />
+                          <option value="1000" />
+                          <option value="1220" />
+                          <option value="1500" />
+                          <option value="2440" />
+                          <option value="3050" />
+                        </datalist>
                       </label>
                     </>
                   ) : null}
@@ -17336,7 +17422,8 @@ function MorningMeetingMaterials({
                   {group.rows.map((row) => (
                     <div key={row.id} className="morning-meeting-material-order-line">
                       <span>{row.jobReference}</span>
-                      <small>{row.quantityLabel}{row.finishedSize ? ` - ${row.finishedSize}` : ""}</small>
+                      <strong>{row.quantityLabel}{row.finishedSize ? ` - ${row.finishedSize}` : ""}</strong>
+                      <small>{row.lineItemTitle || row.customerName || "Panel item"}</small>
                     </div>
                   ))}
                 </div>
@@ -17353,20 +17440,25 @@ function MorningMeetingMaterials({
                       <h4>{group.name}</h4>
                       <p>{formatPlannerQuantity(group.totalQuantity)} - {group.totalProductionLabel} estimated production time</p>
                     </div>
-                    <span>Panel layout</span>
+                    <span>{group.sheetPlan?.mode === "roll" ? "Run layout" : "Panel layout"}</span>
                   </div>
                   <div className="morning-meeting-material-plan-card-body">
                     {group.sheetPlan ? (
-                      <div className="morning-meeting-material-plan-block">
-                        <strong>{group.sheetPlan.totalSheets} sheet{group.sheetPlan.totalSheets === 1 ? "" : "s"} of {group.sheetPlan.sheetSizeLabel}</strong>
-                        <small>Estimated waste area: {(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2</small>
+                      <div className="morning-meeting-material-plan-layout">
+                        <div className="morning-meeting-material-plan-block">
+                          <strong>{group.sheetPlan.mode === "roll" ? `1 run of ${group.sheetPlan.sheetSizeLabel}` : `${group.sheetPlan.totalSheets} sheet${group.sheetPlan.totalSheets === 1 ? "" : "s"} of ${group.sheetPlan.sheetSizeLabel}`}</strong>
+                          <small>{group.sheetPlan.mode === "roll" ? `Estimated unused area: ${(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2` : `Estimated waste area: ${(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2`}</small>
+                          {group.sheetPlan.mode === "roll" ? <em>Using N/A height. Layout is worked out from the sheet width, then the required run length.</em> : null}
+                          <div className="morning-meeting-material-plan-summary">
+                            {group.sheetPlan.summaryLines.map((line) => <span key={`${group.key}-${line}`}>{line}</span>)}
+                          </div>
+                        </div>
                         <PanelSheetDiagram sheetPlan={group.sheetPlan} materialName={group.name} />
-                        {group.sheetPlan.summaryLines.map((line) => <span key={`${group.key}-${line}`}>{line}</span>)}
                       </div>
                     ) : (
                       <div className="morning-meeting-material-plan-block">
                         <strong>Diagram unavailable</strong>
-                        <small>Set a numeric custom width and height for this material to draw the sheet layout.</small>
+                        <small>Set a numeric custom width, or use N/A height to work from width and run length.</small>
                       </div>
                     )}
                   </div>
