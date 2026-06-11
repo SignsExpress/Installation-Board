@@ -62,6 +62,8 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - The report toolbar now shows a live loading state while the background fetch runs, with steps such as CoreBridge lookup and AI simplification.
 - Material names in the visible checklist should have trailing stock sizes stripped out so production sees the clean material name first.
 - The report now includes an `Order materials` workflow focused on panel stock only. It groups returned panel materials under the actual material name, then renders sheet-layout diagrams showing how the finished panels fit inside the chosen sheet size.
+- The host landing page now includes a `Job Materials` launch module that opens the Morning Meeting materials workflow directly.
+- The panel ordering strip now uses the tidied material list as its source, gives each material its own suggested sheet size, and allows per-material overrides including custom sizes.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`

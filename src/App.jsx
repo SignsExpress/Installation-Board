@@ -4024,6 +4024,9 @@ function HostLandingPage({
             {canAccessBoard(currentUser) ? (
               <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
             ) : null}
+            {canAccessBoard(currentUser) ? (
+              <HostLaunchCard icon="materials" label="Job Materials" description="Morning Meeting production planner" onClick={() => goTo("/morning-meeting")} />
+            ) : null}
             {canAccessDesignBoard(currentUser) ? (
               <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
             ) : null}
@@ -4126,6 +4129,9 @@ function ClientLandingPage({
             ) : null}
             {canAccessBoard(currentUser) ? (
               <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
+            ) : null}
+            {canAccessBoard(currentUser) ? (
+              <HostLaunchCard icon="materials" label="Job Materials" description="Morning Meeting production planner" onClick={() => goTo("/morning-meeting")} />
             ) : null}
             {canAccessDesignBoard(currentUser) ? (
               <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
@@ -16996,26 +17002,46 @@ function formatPlannerHours(hours) {
   return `${minutes} mins`;
 }
 
+function getPlannerMaterialKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function inferPlannerTypeFromName(name = "", fallbackType = "") {
+  if (fallbackType) return fallbackType;
+  const source = String(name || "").toLowerCase();
+  if (/(board|panel|sheet|foam|dibond|acm|magnet|correx|rigid|bubble board)/.test(source)) return "sheet";
+  if (/(vinyl|laminate|film|mactac|metamark|banner)/.test(source)) return "roll";
+  return "other";
+}
+
 function extractPlannerMaterials(payload) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
-  return jobs.flatMap((job) => (Array.isArray(job.items) ? job.items : []).flatMap((item) => (
-    Array.isArray(item.plannerMaterials) ? item.plannerMaterials : []
-  ).map((material, index) => ({
-    id: material.id || `${job.id}-${item.id}-${index}`,
-    name: material.name || "Unnamed material",
-    type: material.type || "other",
-    quantity: Number(material.quantity || 0) || 1,
-    quantityLabel: material.quantityLabel || "",
-    finishedSize: material.finishedSize || "",
-    stockSize: material.stockSize || "",
-    usage: material.usage || "",
-    lineItemTitle: material.lineItemTitle || item.title || item.lineItemName || "",
-    categoryName: material.categoryName || "",
-    jobReference: material.jobReference || job.orderReference || "",
-    customerName: material.customerName || job.customerName || "",
-    description: job.description || "",
-    productionHours: Number(item.productionHours || 0) || 0
-  }))));
+  return jobs.flatMap((job) => (Array.isArray(job.items) ? job.items : []).flatMap((item) => {
+    const rawMaterials = Array.isArray(item.plannerMaterials) ? item.plannerMaterials : [];
+    const rawMaterialMap = new Map(rawMaterials.map((material) => [getPlannerMaterialKey(material.name), material]));
+    const sourceNames = Array.isArray(item.materials) && item.materials.length
+      ? item.materials
+      : rawMaterials.map((material) => material.name).filter(Boolean);
+    return sourceNames.map((materialName, index) => {
+      const matched = rawMaterialMap.get(getPlannerMaterialKey(materialName)) || rawMaterials[index] || {};
+      return {
+        id: matched.id || `${job.id}-${item.id}-${index}`,
+        name: materialName || matched.name || "Unnamed material",
+        type: inferPlannerTypeFromName(materialName || matched.name || "", matched.type || ""),
+        quantity: Number(matched.quantity || item.quantity || 0) || 1,
+        quantityLabel: matched.quantityLabel || item.quantityLabel || "",
+        finishedSize: matched.finishedSize || item.finishedSize || "",
+        stockSize: matched.stockSize || "",
+        usage: matched.usage || "",
+        lineItemTitle: matched.lineItemTitle || item.title || item.lineItemName || "",
+        categoryName: matched.categoryName || "",
+        jobReference: matched.jobReference || job.orderReference || "",
+        customerName: matched.customerName || job.customerName || "",
+        description: job.description || "",
+        productionHours: Number(item.productionHours || 0) || 0
+      };
+    });
+  }));
 }
 
 function filterPanelPlannerRows(rows = []) {
@@ -17040,6 +17066,48 @@ function groupPanelPlannerRows(rows = []) {
     grouped.set(key, current);
   });
   return [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function getSheetPresetMatch(width, height) {
+  const numericWidth = Number(width || 0);
+  const numericHeight = Number(height || 0);
+  if (!numericWidth || !numericHeight) return null;
+  return MATERIAL_SHEET_PRESETS.find((preset) => preset.value !== "custom" && (
+    (preset.width === numericWidth && preset.height === numericHeight) ||
+    (preset.width === numericHeight && preset.height === numericWidth)
+  )) || null;
+}
+
+function getSuggestedMaterialSheetSetting(group) {
+  const stockSizeHint = group.rows.map((row) => parsePlannerDimensions(row.stockSize)).find(Boolean);
+  if (stockSizeHint) {
+    const preset = getSheetPresetMatch(stockSizeHint.width, stockSizeHint.height);
+    if (preset) {
+      return { preset: preset.value, customWidth: preset.width, customHeight: String(preset.height), stockLabel: formatPlannerSize(preset.width, preset.height) };
+    }
+    return { preset: "custom", customWidth: Math.round(stockSizeHint.width), customHeight: String(Math.round(stockSizeHint.height)), stockLabel: formatPlannerSize(stockSizeHint.width, stockSizeHint.height) };
+  }
+  const allPiecesFitSmall = group.rows.every((row) => {
+    const size = parsePlannerDimensions(row.finishedSize);
+    if (!size) return false;
+    const fitsStandard = size.width <= 1220 && size.height <= 2440;
+    const fitsRotated = size.height <= 1220 && size.width <= 2440;
+    return fitsStandard || fitsRotated;
+  });
+  if (allPiecesFitSmall) {
+    return { preset: "1220x2440", customWidth: 1220, customHeight: "2440", stockLabel: "Suggested 1220 x 2440mm" };
+  }
+  return { preset: "3050x1500", customWidth: 3050, customHeight: "1500", stockLabel: "Suggested 3050 x 1500mm" };
+}
+
+function getMaterialSheetDimensions(setting = {}) {
+  if (setting.preset === "custom") {
+    const width = Number(setting.customWidth || 0);
+    const height = setting.customHeight === "na" ? 0 : Number(setting.customHeight || 0);
+    return { width, height };
+  }
+  const preset = MATERIAL_SHEET_PRESETS.find((entry) => entry.value === setting.preset) || MATERIAL_SHEET_PRESETS[0];
+  return { width: preset.width, height: preset.height };
 }
 
 function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
@@ -17117,13 +17185,17 @@ function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
   };
 }
 
-function buildMaterialsOrderPlan(rows, settings) {
-  const sheetSize = getPlannerPresetSize(settings.sheetPreset, MATERIAL_SHEET_PRESETS, settings.customSheetWidth, settings.customSheetHeight);
-  return groupPanelPlannerRows(filterPanelPlannerRows(rows)).map((group) => ({
+function buildMaterialsOrderPlan(rows, materialSettingsByKey = {}) {
+  return groupPanelPlannerRows(filterPanelPlannerRows(rows)).map((group) => {
+    const setting = materialSettingsByKey[group.key] || getSuggestedMaterialSheetSetting(group);
+    const sheetSize = getMaterialSheetDimensions(setting);
+    return ({
     ...group,
+    sheetSetting: setting,
     sheetPlan: buildSheetPlanForGroup(group.rows, sheetSize.width, sheetSize.height),
     totalProductionLabel: formatPlannerHours(group.productionHours)
-  })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+  }).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function PanelSheetDiagram({ sheetPlan, materialName }) {
@@ -17185,8 +17257,8 @@ function MorningMeetingMaterials({
   plannerRows,
   onFinaliseMaterials,
   finalisedPlan,
-  plannerSettings,
-  onPlannerSettingsChange
+  materialGroupSettings,
+  onMaterialGroupSettingChange
 }) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
   const panelRows = filterPanelPlannerRows(plannerRows);
@@ -17206,9 +17278,18 @@ function MorningMeetingMaterials({
           <button className="ghost-button morning-meeting-material-fetch" type="button" onClick={onFetch} disabled={loading}>
             <span className="morning-meeting-material-fetch-inner">
               {loading ? <span className="inline-spinner" aria-hidden="true" /> : null}
-              <span>{loading ? loadingStep : payload ? "Refresh report" : "Build report"}</span>
+              <span>{loading ? "Building report" : payload ? "Refresh report" : "Build report"}</span>
             </span>
           </button>
+          {loading ? (
+            <div className="morning-meeting-material-load-status">
+              <span className="inline-spinner" aria-hidden="true" />
+              <div>
+                <strong>{loadingStep}</strong>
+                <small>Running in the background</small>
+              </div>
+            </div>
+          ) : null}
           {payload ? <button className="ghost-button" type="button" onClick={onTogglePlanner}>{plannerOpen ? "Hide order materials" : "Order materials"}</button> : null}
           {payload ? <button className="primary-button" type="button" onClick={onPrint}>Print report</button> : null}
         </div>
@@ -17220,7 +17301,7 @@ function MorningMeetingMaterials({
           <div className="morning-meeting-material-planner-head">
             <div>
               <h3>Order materials</h3>
-              <p>Panels are grouped automatically by material. Then you can turn that straight into a sheet layout.</p>
+              <p>Panels are grouped automatically by material, with a sheet suggestion on each one.</p>
             </div>
             <div className="morning-meeting-material-planner-actions">
               <button className="primary-button" type="button" onClick={onFinaliseMaterials} disabled={!panelRows.length}>
@@ -17228,32 +17309,42 @@ function MorningMeetingMaterials({
               </button>
             </div>
           </div>
-          <div className="morning-meeting-material-planner-settings">
-            <label>
-              <span>Panel sheet</span>
-              <select value={plannerSettings.sheetPreset} onChange={(event) => onPlannerSettingsChange("sheetPreset", event.target.value)}>
-                {MATERIAL_SHEET_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
-              </select>
-            </label>
-            {plannerSettings.sheetPreset === "custom" ? (
-              <>
-                <label>
-                  <span>Custom width</span>
-                  <input type="number" min="1" value={plannerSettings.customSheetWidth} onChange={(event) => onPlannerSettingsChange("customSheetWidth", event.target.value)} />
-                </label>
-                <label>
-                  <span>Custom height</span>
-                  <input type="number" min="1" value={plannerSettings.customSheetHeight} onChange={(event) => onPlannerSettingsChange("customSheetHeight", event.target.value)} />
-                </label>
-              </>
-            ) : null}
-          </div>
           <div className="morning-meeting-material-planner-list">
             {panelGroups.map((group) => (
               <article key={group.key} className="morning-meeting-material-order-group">
                 <div className="morning-meeting-material-order-group-head">
-                  <strong>{group.name}</strong>
+                  <div>
+                    <strong>{group.name}</strong>
+                    <small>{materialGroupSettings[group.key]?.stockLabel || "No stock size returned"}</small>
+                  </div>
                   <span>{formatPlannerQuantity(group.totalQuantity)}</span>
+                </div>
+                <div className="morning-meeting-material-order-group-settings">
+                  <label>
+                    <span>Sheet size</span>
+                    <select value={materialGroupSettings[group.key]?.preset || "1220x2440"} onChange={(event) => onMaterialGroupSettingChange(group.key, "preset", event.target.value)}>
+                      {MATERIAL_SHEET_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+                    </select>
+                  </label>
+                  {materialGroupSettings[group.key]?.preset === "custom" ? (
+                    <>
+                      <label>
+                        <span>Custom width</span>
+                        <input type="number" min="1" value={materialGroupSettings[group.key]?.customWidth || ""} onChange={(event) => onMaterialGroupSettingChange(group.key, "customWidth", event.target.value)} />
+                      </label>
+                      <label>
+                        <span>Custom height</span>
+                        <select value={materialGroupSettings[group.key]?.customHeight || "na"} onChange={(event) => onMaterialGroupSettingChange(group.key, "customHeight", event.target.value)}>
+                          <option value="na">N/A</option>
+                          <option value="1000">1000mm</option>
+                          <option value="1220">1220mm</option>
+                          <option value="1500">1500mm</option>
+                          <option value="2440">2440mm</option>
+                          <option value="3050">3050mm</option>
+                        </select>
+                      </label>
+                    </>
+                  ) : null}
                 </div>
                 <div className="morning-meeting-material-order-group-lines">
                   {group.rows.map((row) => (
@@ -17286,7 +17377,12 @@ function MorningMeetingMaterials({
                         <PanelSheetDiagram sheetPlan={group.sheetPlan} materialName={group.name} />
                         {group.sheetPlan.summaryLines.map((line) => <span key={`${group.key}-${line}`}>{line}</span>)}
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="morning-meeting-material-plan-block">
+                        <strong>Diagram unavailable</strong>
+                        <small>Set a numeric custom width and height for this material to draw the sheet layout.</small>
+                      </div>
+                    )}
                   </div>
                 </article>
               ))}
@@ -17356,16 +17452,13 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [materialsLoadingStep, setMaterialsLoadingStep] = useState(MATERIAL_REPORT_PROGRESS_STEPS[0]);
   const [materialsPlannerOpen, setMaterialsPlannerOpen] = useState(false);
   const [finalisedMaterialsPlan, setFinalisedMaterialsPlan] = useState([]);
-  const [materialsPlannerSettings, setMaterialsPlannerSettings] = useState({
-    sheetPreset: "3050x1500",
-    customSheetWidth: 3050,
-    customSheetHeight: 1500
-  });
+  const [materialGroupSettings, setMaterialGroupSettings] = useState({});
   const [selectedJobIds, setSelectedJobIds] = useState(() => new Set());
   const [jobNoteDrafts, setJobNoteDrafts] = useState({});
   const [jobNotesSaving, setJobNotesSaving] = useState(false);
   const [jobNotesStatus, setJobNotesStatus] = useState("");
   const plannerRows = useMemo(() => extractPlannerMaterials(materialsPayload), [materialsPayload]);
+  const plannerPanelGroups = useMemo(() => groupPanelPlannerRows(filterPanelPlannerRows(plannerRows)), [plannerRows]);
 
   useEffect(() => {
     let active = true;
@@ -17409,7 +17502,26 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
 
   useEffect(() => {
     setFinalisedMaterialsPlan([]);
-  }, [plannerRows, materialsPlannerSettings]);
+  }, [plannerRows, materialGroupSettings]);
+
+  useEffect(() => {
+    if (!plannerPanelGroups.length) {
+      setMaterialGroupSettings({});
+      return;
+    }
+    setMaterialGroupSettings((current) => {
+      const next = { ...current };
+      plannerPanelGroups.forEach((group) => {
+        if (!next[group.key]) {
+          next[group.key] = getSuggestedMaterialSheetSetting(group);
+        }
+      });
+      Object.keys(next).forEach((key) => {
+        if (!plannerPanelGroups.some((group) => group.key === key)) delete next[key];
+      });
+      return next;
+    });
+  }, [plannerPanelGroups]);
 
   function toggleJobNote(jobId) {
     setSelectedJobIds((current) => {
@@ -17421,12 +17533,18 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     setJobNotesStatus("");
   }
 
-  function updatePlannerSetting(field, value) {
-    setMaterialsPlannerSettings((current) => ({ ...current, [field]: value }));
+  function updateMaterialGroupSetting(groupKey, field, value) {
+    setMaterialGroupSettings((current) => ({
+      ...current,
+      [groupKey]: {
+        ...(current[groupKey] || {}),
+        [field]: value
+      }
+    }));
   }
 
   function finaliseMaterialsPlan() {
-    const plan = buildMaterialsOrderPlan(plannerRows, materialsPlannerSettings);
+    const plan = buildMaterialsOrderPlan(plannerRows, materialGroupSettings);
     setFinalisedMaterialsPlan(plan);
   }
 
@@ -17560,8 +17678,8 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
               plannerRows={plannerRows}
               onFinaliseMaterials={finaliseMaterialsPlan}
               finalisedPlan={finalisedMaterialsPlan}
-              plannerSettings={materialsPlannerSettings}
-              onPlannerSettingsChange={updatePlannerSetting}
+              materialGroupSettings={materialGroupSettings}
+              onMaterialGroupSettingChange={updateMaterialGroupSetting}
             />
           </>
         ) : null}

@@ -8234,7 +8234,7 @@ button {
 }
 
 .morning-meeting-material-fetch {
-  min-width: 230px;
+  min-width: 152px;
 }
 
 .morning-meeting-material-fetch-inner {
@@ -8271,6 +8271,28 @@ button {
   color: #667085;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.morning-meeting-material-load-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.morning-meeting-material-load-status strong {
+  display: block;
+  color: #172033;
+  font-size: 0.66rem;
+}
+
+.morning-meeting-material-load-status small {
+  display: block;
+  color: #667085;
+  font-size: 0.58rem;
 }
 
 .morning-meeting-material-planner {
@@ -8353,7 +8375,7 @@ button {
 .morning-meeting-material-order-group-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: start;
   gap: 12px;
   padding: 12px 14px;
   border-bottom: 1px solid #edf1f5;
@@ -8373,6 +8395,14 @@ button {
   font-size: 0.78rem;
 }
 
+.morning-meeting-material-order-group-head small {
+  display: block;
+  margin-top: 3px;
+  color: #667085;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
 .morning-meeting-material-order-group-head span,
 .morning-meeting-material-plan-card-head > span {
   color: #76529a;
@@ -8384,6 +8414,26 @@ button {
 
 .morning-meeting-material-order-group-lines {
   padding: 10px 14px 12px;
+}
+
+.morning-meeting-material-order-group-settings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f5;
+  background: #fff;
+}
+
+.morning-meeting-material-order-group-settings label {
+  display: grid;
+  gap: 6px;
+}
+
+.morning-meeting-material-order-group-settings label span {
+  color: #667085;
+  font-size: 0.62rem;
+  font-weight: 800;
 }
 
 .morning-meeting-material-order-line {
@@ -8752,6 +8802,10 @@ button {
   .morning-meeting-material-planner-settings {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .morning-meeting-material-order-group-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -8807,6 +8861,10 @@ button {
   }
 
   .morning-meeting-material-planner-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .morning-meeting-material-order-group-settings {
     grid-template-columns: 1fr;
   }
 }
