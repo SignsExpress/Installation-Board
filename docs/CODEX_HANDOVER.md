@@ -1,6 +1,6 @@
 # Codex Handover
 
-Last updated: 10 June 2026
+Last updated: 11 June 2026
 
 This note is for continuing development from another computer or a fresh Codex window.
 
@@ -37,7 +37,31 @@ Do not ask the user to run PowerShell for normal development tasks.
 
 ## Current Product State
 
-The portal contains multiple operational modules including Installation Board, Design Board, Filtering, Attendance, Holidays, Mileage, Materials, Vehicle Pricing, RAMS, Social Post, Description Pull, Pro-Forma, Subcontractors, and Notifications.
+The portal contains multiple operational modules including Installation Board, Morning Meeting, Design Board, Filtering, Attendance, Holidays, Mileage, Materials, Vehicle Pricing, RAMS, Social Post, Description Pull, Pro-Forma, Subcontractors, and Notifications.
+
+### Morning Meeting
+
+The Morning Meeting Board is available at `/morning-meeting` and launches from the Installation Board.
+
+- Shows yesterday's installation jobs, today's installation jobs, and artwork approved yesterday.
+- Includes job references, customers, descriptions, values, installers/job types, addresses, contacts, and relevant notes.
+- Meeting notes can be entered and emailed to every user with an Email value in their Permissions profile.
+- Uses the server SMTP configuration already shared with credit applications.
+- Can fetch and print a production stock-check sheet for yesterday's approved artwork.
+- The stock-check lookup finds the matching CoreBridge order, tries the available works-order endpoints and material subresources, and extracts allocated material quantity, unit, dimensions, and material name.
+- Keep the multi-path CoreBridge works-order lookup defensive because endpoint shapes vary between CoreBridge installations.
+- Latest related commits:
+  - `01e86dd Pull materials from CoreBridge works orders`
+  - `7fb0d3f Add approved job materials stock sheet`
+  - `7f8cc91 Email morning meeting notes`
+  - `7c0bec6 Add morning meeting outline`
+
+### Installation Board
+
+- The rolling installation history and full card layout were restored.
+- Installation values were corrected, including duplicate-total handling and invoice-value prioritisation.
+- Mobile cards now show installation notes.
+- Latest related commits include `db6942b`, `47d718e`, `e2ff130`, `5cb3388`, `8b0635f`, and `d1ca4ad`.
 
 ### Design Board
 
@@ -122,6 +146,16 @@ git push
 
 ## Recent Commit History
 
+- `01e86dd` Pull materials from CoreBridge works orders
+- `7fb0d3f` Add approved job materials stock sheet
+- `7f8cc91` Email morning meeting notes
+- `7c0bec6` Add morning meeting outline
+- `db6942b` Show installation notes on mobile cards
+- `47d718e` Resolve missing installation invoice values
+- `e2ff130` Prioritize invoice values by branch
+- `5cb3388` Fix installation values and duplicate totals
+- `8b0635f` Restore rolling installation board view
+- `d1ca4ad` Restore full installation history and card layout
 - `c93ed17` Add design board drag auto-scroll
 - `2267b4c` Align filtering board with design board
 - `fba70f1` Stabilise design pull loading button
