@@ -59,6 +59,9 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - The visible report is deliberately compact: one `quantity + finished size` heading, a deduplicated checklist of named production materials/fixings, and one total estimated production-time line converted to hours and minutes. Do not expose generic assembly wrappers or machine/layout internals.
 - The report uses the existing server-side OpenAI configuration to organise the full grounded CoreBridge evidence into concise production overviews. AI must not invent details; when unavailable, the rule-based summary remains as fallback.
 - Job Materials Report item summaries display in a four-column desktop grid beneath each job reference.
+- The report toolbar now shows a live loading state while the background fetch runs, with steps such as CoreBridge lookup and AI simplification.
+- Material names in the visible checklist should have trailing stock sizes stripped out so production sees the clean material name first.
+- The report now includes an `Order materials` workflow that lets users tick/untick the material list, finalise it, group like materials, estimate panel sheet usage, estimate roll usage, and suggest panel offcuts from waste.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`

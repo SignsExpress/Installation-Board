@@ -9314,6 +9314,62 @@ function classifyJobMaterialComponent(record) {
   return "Component";
 }
 
+function normalizeJobMaterialDurationUnit(unit = "", fallbackKey = "") {
+  const source = `${String(unit || "").trim()} ${String(fallbackKey || "").trim()}`.toLowerCase();
+  if (!source) return "";
+  if (/(^|\\W)(minute|minutes|min|mins)(\\W|$)/.test(source)) return "minutes";
+  if (/(^|\\W)(hour|hours|hr|hrs)(\\W|$)/.test(source)) return "hours";
+  if (/(^|\\W)(second|seconds|sec|secs)(\\W|$)/.test(source)) return "seconds";
+  return "";
+}
+
+function convertJobMaterialDurationToHours(value, unit = "") {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+  switch (normalizeJobMaterialDurationUnit(unit)) {
+    case "seconds":
+      return numeric / 3600;
+    case "minutes":
+      return numeric / 60;
+    case "hours":
+      return numeric;
+    default:
+      return numeric;
+  }
+}
+
+function extractJobMaterialDuration(record, kind, usage, usageUnit) {
+  const numericFields = [
+    { key: "Time", unitKey: "TimeUnit", fallbackUnit: "hours" },
+    { key: "Duration", unitKey: "DurationUnit", fallbackUnit: "hours" },
+    { key: "Minutes", unitKey: "TimeUnit", fallbackUnit: "minutes" },
+    { key: "LabourMinutes", unitKey: "TimeUnit", fallbackUnit: "minutes" },
+    { key: "LaborMinutes", unitKey: "TimeUnit", fallbackUnit: "minutes" }
+  ];
+  for (const field of numericFields) {
+    const value = getCoreBridgeNumber(record, [field.key]);
+    if (!(value > 0)) continue;
+    const unit = getCoreBridgeText(record, [field.unitKey]) || field.fallbackUnit;
+    const normalizedUnit = normalizeJobMaterialDurationUnit(unit, field.key) || normalizeJobMaterialDurationUnit(field.fallbackUnit);
+    return {
+      displayValue: value,
+      displayUnit: normalizedUnit || field.fallbackUnit,
+      productionHours: convertJobMaterialDurationToHours(value, normalizedUnit || field.fallbackUnit)
+    };
+  }
+  if (kind === "Labour" || kind === "Service") {
+    const inferredUnit = normalizeJobMaterialDurationUnit(usageUnit);
+    if (usage > 0 && inferredUnit) {
+      return {
+        displayValue: usage,
+        displayUnit: inferredUnit,
+        productionHours: convertJobMaterialDurationToHours(usage, inferredUnit)
+      };
+    }
+  }
+  return { displayValue: 0, displayUnit: "", productionHours: 0 };
+}
+
 function extractJobMaterialComponent(record, context, index) {
   const componentType = getCoreBridgeText(record, ["ComponentTypeName", "ComponentType", "TypeName", "Type"]);
   const variableName = getCoreBridgeText(record, ["VariableName", "Variable", "RoleName"]);
@@ -9323,11 +9379,13 @@ function extractJobMaterialComponent(record, context, index) {
   const usageUnit = getCoreBridgeText(record, ["TotalQuantityUnit", "MaterialUsageUnit", "UsageUnit", "UnitName", "UnitOfMeasure", "UOM", "Unit"]);
   const componentQuantity = getCoreBridgeNumber(record, ["QuantityRequired", "RequiredQuantity", "ComponentQuantity", "Quantity", "Qty"]);
   const employees = getCoreBridgeNumber(record, ["NumberOfEmployees", "EmployeeCount", "Employees", "People"]);
-  const time = getCoreBridgeNumber(record, ["Time", "Minutes", "LabourMinutes", "LaborMinutes", "Duration"]) || ((kind === "Labour" || kind === "Service") ? usage : 0);
-  const timeUnit = getCoreBridgeText(record, ["TimeUnit", "DurationUnit"]) || (time ? "minutes" : "");
+  const duration = extractJobMaterialDuration(record, kind, usage, usageUnit);
+  const time = duration.displayValue;
+  const timeUnit = duration.displayUnit;
   const isConsumptionMaterial = kind === "Material" && usage > 0;
   return {
     id: String(getCaseInsensitiveValue(record, ["ID", "Id", "id"]) || `${context.itemIndex}-${index}-${name}`),
+    rawName: name,
     name,
     kind,
     componentType,
@@ -9341,7 +9399,7 @@ function extractJobMaterialComponent(record, context, index) {
     labour: time || employees
       ? `${time ? `${formatJobMaterialNumber(time, 2)} ${timeUnit}` : ""}${time && employees ? " · " : ""}${employees ? `${formatJobMaterialNumber(employees, 2)} employee${employees === 1 ? "" : "s"}` : ""}`
       : "",
-    productionHours: kind === "Labour" || kind === "Service" ? time : 0,
+    productionHours: kind === "Labour" || kind === "Service" ? duration.productionHours : 0,
     notes: getCoreBridgeText(record, ["Notes", "Note", "Specification"])
   };
 }
@@ -9411,8 +9469,39 @@ function buildJobMaterialsFromOrder(order) {
 
 function cleanProductionMaterialName(value = "") {
   return String(value || "")
-    .replace(/\s+\d+(?:\.\d+)?\s*(?:mm)?\s*x\s*\d+(?:\.\d+)?\s*(?:mm)?\s*$/i, "")
+    .replace(/\s+\d+(?:\.\d+)?\s*(?:mm|cm|m)?\s*x\s*\d+(?:\.\d+)?\s*(?:mm|cm|m)?(?:\s*x\s*\d+(?:\.\d+)?\s*(?:mm|cm|m)?)?\s*$/i, "")
     .trim();
+}
+
+function extractJobMaterialDimensions(value = "") {
+  const source = String(value || "").replace(/,/g, " ").trim();
+  if (!source) return null;
+  const match = source.match(/(\d+(?:\.\d+)?)\s*(?:mm)?\s*x\s*(\d+(?:\.\d+)?)(?:\s*(?:mm))?/i);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!(width > 0) || !(height > 0)) return null;
+  return { width, height, label: `${formatJobMaterialNumber(width)}mm x ${formatJobMaterialNumber(height)}mm` };
+}
+
+function extractJobMaterialStockSize(component) {
+  return extractJobMaterialDimensions(component?.stockSize)
+    || extractJobMaterialDimensions(component?.rawName)
+    || extractJobMaterialDimensions(component?.name);
+}
+
+function inferJobMaterialPlannerType(component, cleanedName = "") {
+  const source = [
+    cleanedName,
+    component?.componentType,
+    component?.variableName,
+    component?.stockSize,
+    component?.rawName,
+    component?.materialUsage
+  ].filter(Boolean).join(" ").toLowerCase();
+  if (/(vinyl|laminate|wrap|banner|fabric|print film|window film|frost|etch|metamark|mactac)/.test(source)) return "roll";
+  if (/(panel|board|sheet|foam|dibond|acm|magnet|correx|bubble board|rigid)/.test(source)) return "sheet";
+  return "other";
 }
 
 function isUsefulProductionMaterial(component) {
@@ -9441,12 +9530,28 @@ function buildCompactJobMaterialItems(items = []) {
   return items.map((item) => {
     const materialNames = [];
     const seenNames = new Set();
+    const plannerMaterials = [];
     (item.components || []).filter(isUsefulProductionMaterial).forEach((component) => {
       const name = cleanProductionMaterialName(component.name);
       const key = name.toLowerCase();
       if (!name || seenNames.has(key)) return;
       seenNames.add(key);
       materialNames.push(name);
+      const stockSize = extractJobMaterialStockSize(component);
+      plannerMaterials.push({
+        id: `${item.id}-${plannerMaterials.length + 1}`,
+        name,
+        type: inferJobMaterialPlannerType(component, name),
+        quantity: Number(item.quantity || 1) || 1,
+        quantityLabel: String(item.quantityLabel || "").replace(/\s+off$/i, "no."),
+        finishedSize: item.finishedSize || component.finishedSize || "",
+        stockSize: stockSize?.label || "",
+        stockWidth: stockSize?.width || 0,
+        stockHeight: stockSize?.height || 0,
+        usage: component.materialUsage || "",
+        lineItemName: item.lineItemName || "",
+        categoryName: item.categoryName || ""
+      });
     });
     const productionHours = (item.components || []).reduce((total, component) => {
       const hours = Number(component.productionHours || 0);
@@ -9458,6 +9563,7 @@ function buildCompactJobMaterialItems(items = []) {
       quantityLabel: String(item.quantityLabel || "").replace(/\s+off$/i, "no."),
       finishedSize: item.finishedSize,
       materials: materialNames,
+      plannerMaterials,
       ...formatProductionDuration(productionHours)
     };
   });
@@ -9486,7 +9592,7 @@ function sanitizeAiJobMaterialItems(payload, fallbackItems = []) {
   return fallbackItems.map((fallback, index) => {
     const aiItem = aiItems[index] || {};
     const materials = Array.isArray(aiItem.materials)
-      ? aiItem.materials.map((value) => String(value || "").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20)
+      ? aiItem.materials.map((value) => cleanProductionMaterialName(String(value || "").replace(/\s+/g, " ").trim())).filter(Boolean).slice(0, 20)
       : fallback.materials;
     return {
       ...fallback,
@@ -9607,7 +9713,15 @@ async function buildMorningMeetingMaterialsPayload(store) {
       const aiSummary = assemblyOrder
         ? await generateAiJobMaterialsSummary(assemblyOrder, detailedItems, fallbackItems)
         : { items: fallbackItems, source: "rules", warning: "" };
-      const items = aiSummary.items;
+      const items = aiSummary.items.map((item) => ({
+        ...item,
+        plannerMaterials: (Array.isArray(item?.plannerMaterials) ? item.plannerMaterials : []).map((material) => ({
+          ...material,
+          jobReference: card.orderReference,
+          customerName: card.customerName,
+          lineItemTitle: item.title || item.lineItemName || ""
+        }))
+      }));
       const usefulItemCount = items.filter((item) => item.materials.length || item.overview).length;
       const productionTime = formatProductionDuration(items.reduce((total, item) => total + Number(item.productionHours || 0), 0));
       jobs.push({
