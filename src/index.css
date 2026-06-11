@@ -11060,6 +11060,22 @@ button {
   gap: 10px;
 }
 
+.host-landing-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.host-landing-section {
+  display: grid;
+  gap: 10px;
+}
+
+.host-landing-section-head h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 0.9rem;
+}
+
 .host-launch-card {
   position: relative;
   border: 1px solid var(--sx-main-border);

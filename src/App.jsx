@@ -3953,6 +3953,20 @@ function HostLaunchCard({ icon, label, description, onClick, disabled = false, s
   );
 }
 
+function HostLaunchSection({ title, children }) {
+  if (!children.length) return null;
+  return (
+    <section className="host-landing-section">
+      <div className="host-landing-section-head">
+        <h3>{title}</h3>
+      </div>
+      <div className="host-landing-actions">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function HostLandingPage({
   currentUser,
   onLogout,
@@ -3976,6 +3990,37 @@ function HostLandingPage({
     window.location.assign(path);
   }
 
+  const boardCards = [
+    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
+    canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
+    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
+    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null
+  ].filter(Boolean);
+
+  const adminCards = [
+    canAccessAttendance(currentUser) ? <HostLaunchCard key="attendance" icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} /> : null,
+    canAccessHolidays(currentUser) ? <HostLaunchCard key="holidays" icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} /> : null,
+    canAccessMileage(currentUser) ? <HostLaunchCard key="mileage" icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} /> : null
+  ].filter(Boolean);
+
+  const toolsCards = [
+    canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
+    canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
+    canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
+    canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
+    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null
+  ].filter(Boolean);
+
+  const operationsCards = [
+    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
+    canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
+  ].filter(Boolean);
+
+  const systemCards = [
+    canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="CoreBridge Explorer" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null,
+    currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
+  ].filter(Boolean);
+
   return (
     <div className="app-shell host-landing-shell">
       <div className="page host-landing-page">
@@ -3987,56 +4032,11 @@ function HostLandingPage({
         />
 
         <section className="panel host-landing-panel">
-          <div className="host-landing-actions">
-            {canAccessAttendance(currentUser) ? (
-              <HostLaunchCard icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} />
-            ) : null}
-            {canAccessHolidays(currentUser) ? (
-              <HostLaunchCard icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} />
-            ) : null}
-            {canAccessMileage(currentUser) ? (
-              <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
-            ) : null}
-            {canAccessMaterials(currentUser) ? (
-              <HostLaunchCard icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} />
-            ) : null}
-            {canAccessRams(currentUser) ? (
-              <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
-            ) : null}
-            {canAccessSocialPost(currentUser) ? (
-              <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
-            ) : null}
-            {canAccessDescriptionPull(currentUser) ? (
-              <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
-            ) : null}
-            {canEditBoard(currentUser) ? (
-              <HostLaunchCard icon="board" label="CoreBridge Explorer" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} />
-            ) : null}
-              {canAccessProForma(currentUser) ? (
-               <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-            ) : null}
-            {canAccessVanEstimator(currentUser) ? (
-              <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
-            ) : null}
-            {canAccessInstaller(currentUser) ? (
-              <HostLaunchCard icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} />
-            ) : null}
-            {canAccessBoard(currentUser) ? (
-              <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
-            ) : null}
-            {canAccessBoard(currentUser) ? (
-              <HostLaunchCard icon="materials" label="Job Materials" description="Morning Meeting production planner" onClick={() => goTo("/morning-meeting")} />
-            ) : null}
-            {canAccessDesignBoard(currentUser) ? (
-              <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
-            ) : null}
-            {canAccessFiltering(currentUser) ? (
-              <HostLaunchCard icon="filtering" label="Filtering" description="Approved artwork holding" onClick={() => goTo(filteringPath)} />
-            ) : null}
-            {currentUser?.canManagePermissions ? (
-              <HostLaunchCard icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} />
-            ) : null}
-          </div>
+          <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
+          <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
+          <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
+          <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
+          <HostLaunchSection title="System">{systemCards}</HostLaunchSection>
         </section>
 
       </div>
@@ -4085,6 +4085,32 @@ function ClientLandingPage({
     window.location.assign(path);
   }
 
+  const boardCards = [
+    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
+    canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
+    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
+    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null
+  ].filter(Boolean);
+
+  const adminCards = [
+    canAccessAttendance(currentUser) ? <HostLaunchCard key="attendance" icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} /> : null,
+    canAccessHolidays(currentUser) ? <HostLaunchCard key="holidays" icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} /> : null,
+    canAccessMileage(currentUser) ? <HostLaunchCard key="mileage" icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} /> : null
+  ].filter(Boolean);
+
+  const toolsCards = [
+    canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
+    canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
+    canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
+    canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
+    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null
+  ].filter(Boolean);
+
+  const operationsCards = [
+    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
+    canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
+  ].filter(Boolean);
+
   return (
     <div className="app-shell host-landing-shell client-landing-shell">
       <div className="page host-landing-page">
@@ -4096,50 +4122,10 @@ function ClientLandingPage({
         />
 
         <section className="panel host-landing-panel">
-          <div className="host-landing-actions">
-            {canAccessAttendance(currentUser) ? (
-              <HostLaunchCard icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} />
-            ) : null}
-            {canAccessHolidays(currentUser) ? (
-              <HostLaunchCard icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} />
-            ) : null}
-            {canAccessMileage(currentUser) ? (
-              <HostLaunchCard icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} />
-            ) : null}
-            {canAccessMaterials(currentUser) ? (
-              <HostLaunchCard icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} />
-            ) : null}
-            {canAccessRams(currentUser) ? (
-              <HostLaunchCard icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} />
-            ) : null}
-            {canAccessSocialPost(currentUser) ? (
-              <HostLaunchCard icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} />
-            ) : null}
-            {canAccessDescriptionPull(currentUser) ? (
-              <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
-            ) : null}
-              {canAccessProForma(currentUser) ? (
-               <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
-            ) : null}
-            {canAccessVanEstimator(currentUser) ? (
-              <HostLaunchCard icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} />
-            ) : null}
-            {canAccessInstaller(currentUser) ? (
-              <HostLaunchCard icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} />
-            ) : null}
-            {canAccessBoard(currentUser) ? (
-              <HostLaunchCard icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} />
-            ) : null}
-            {canAccessBoard(currentUser) ? (
-              <HostLaunchCard icon="materials" label="Job Materials" description="Morning Meeting production planner" onClick={() => goTo("/morning-meeting")} />
-            ) : null}
-            {canAccessDesignBoard(currentUser) ? (
-              <HostLaunchCard icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} />
-            ) : null}
-            {canAccessFiltering(currentUser) ? (
-              <HostLaunchCard icon="filtering" label="Filtering" description="Approved artwork holding" onClick={() => goTo(filteringPath)} />
-            ) : null}
-          </div>
+          <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
+          <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
+          <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
+          <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
         </section>
 
       </div>
