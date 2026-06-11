@@ -9448,7 +9448,7 @@ function findCoreBridgeJobItems(record) {
 }
 
 function buildJobMaterialsFromOrder(order) {
-  const raw = parseCoreBridgeAssemblyJson(order?.debugRaw) || order;
+  const raw = order?._assemblyRaw || parseCoreBridgeAssemblyJson(order?.debugRaw) || order;
   return findCoreBridgeJobItems(raw).map((item, index) => {
     const quantity = getCoreBridgeNumber(item, ["Quantity", "Qty", "ItemQuantity", "TotalItemQuantity"]) || 1;
     return {
@@ -9620,14 +9620,14 @@ async function generateAiJobMaterialsSummary(order, detailedItems, fallbackItems
     orderDescription: order?.description || "",
     orderSourceFields: compactFields((Array.isArray(order?.debugFields) ? order.debugFields : [])
       .filter((field) => /(description|material|component|assembly|quantity|size|width|height|time|labour|labor|service|fixing)/i.test(String(field.key || ""))), 200),
-    items: detailedItems.map((item) => ({
+    items: detailedItems.slice(0, 30).map((item) => ({
       lineItemName: item.lineItemName,
       description: item.description,
       categoryName: item.categoryName,
       quantity: item.quantity,
       finishedSize: item.finishedSize,
-      sourceFields: compactFields(item.sourceFields),
-      components: (item.components || []).map((component) => ({
+      sourceFields: compactFields(item.sourceFields, 40),
+      components: (item.components || []).slice(0, 60).map((component) => ({
         name: component.name,
         kind: component.kind,
         componentType: component.componentType,
@@ -9641,6 +9641,10 @@ async function generateAiJobMaterialsSummary(order, detailedItems, fallbackItems
       }))
     }))
   };
+  const evidenceJson = JSON.stringify(evidence);
+  if (evidenceJson.length > 120000) {
+    return { items: fallbackItems, source: "rules", warning: "AI summary skipped because the CoreBridge evidence was too large." };
+  }
   const prompt = [
     "Create a concise production overview for each signage line item using only the supplied CoreBridge evidence.",
     "The result is for production staff, not a customer and not a technical API report.",
@@ -9655,7 +9659,7 @@ async function generateAiJobMaterialsSummary(order, detailedItems, fallbackItems
     "Return JSON only in this exact shape:",
     '{"items":[{"title":"short useful item name","quantity":"2no.","finishedSize":"600mm x 400mm","overview":"one concise sentence","materials":["5mm Bubble Board"]}]}',
     "",
-    JSON.stringify(evidence)
+    evidenceJson
   ].join("\n");
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -9697,7 +9701,7 @@ async function fetchCoreBridgeJobAssemblyDetail(order) {
   const result = await fetchCoreBridgeExplorerUrl(config, url.toString());
   if (!result.ok || typeof result.body !== "object") return order;
   const raw = extractCoreBridgeDetailRecord(result.body, id) || result.body;
-  return { ...order, debugRaw: JSON.stringify(raw, null, 2) };
+  return { ...order, _assemblyRaw: raw };
 }
 
 async function buildMorningMeetingMaterialsPayload(store) {
