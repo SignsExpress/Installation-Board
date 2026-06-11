@@ -10383,6 +10383,11 @@ function createServer() {
     }
 
     const session = getSessionFromRequest(request);
+    if (request.path === "/morning-meeting/send") {
+      request.user = session ? await getFreshSessionUser(session) : null;
+      next();
+      return;
+    }
     if (!session) {
       response.status(401).json({ error: "Login required." });
       return;
@@ -10436,7 +10441,6 @@ function createServer() {
   });
 
   app.post("/api/morning-meeting/send", async (request, response) => {
-    if (!requireBoardAdmin(request, response)) return;
     const notes = String(request.body?.notes || "").trim();
     if (!notes) {
       response.status(400).json({ error: "Add some meeting notes before emailing the office." });
