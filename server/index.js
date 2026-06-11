@@ -9508,7 +9508,7 @@ function isUsefulProductionMaterial(component) {
   if (!component || !["Material", "Fixing"].includes(component.kind)) return false;
   const name = String(component.name || "").trim();
   if (!name) return false;
-  return !/^(?:\d+\.\s*)?(?:vinyl\s*:\s*printed|printed vinyl sx|lamination sx|laminator sx|layout|material|component)$/i.test(name);
+  return !/^(?:\d+\.\s*)?(?:vinyl\s*:\s*printed|printed vinyl sx|lamination sx|laminator sx|layout|material|component|panel:\s*uv print.*|uv print.*|collection|courier|setup fee|production labour|machine time detail|jfx\d+.*|jv\d+.*)$/i.test(name);
 }
 
 function formatProductionDuration(hoursValue) {

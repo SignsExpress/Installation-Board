@@ -8309,7 +8309,7 @@ button {
 
 .morning-meeting-material-planner-settings {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding: 12px;
   border: 1px solid #e8edf4;
@@ -8328,14 +8328,6 @@ button {
   font-weight: 800;
 }
 
-.morning-meeting-material-planner-settings label.is-checkbox {
-  grid-column: span 2;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-top: 22px;
-}
-
 .morning-meeting-material-planner-settings input,
 .morning-meeting-material-planner-settings select {
   width: 100%;
@@ -8347,40 +8339,41 @@ button {
   gap: 10px;
 }
 
-.morning-meeting-material-order-row,
+.morning-meeting-material-order-group,
 .morning-meeting-material-plan-card {
   border: 1px solid #e1e7f0;
   border-radius: 14px;
   background: #fff;
 }
 
-.morning-meeting-material-order-row {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 10px;
+.morning-meeting-material-order-group {
+  overflow: hidden;
+}
+
+.morning-meeting-material-order-group-head {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  padding: 11px 13px;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f5;
+  background: #f8fafc;
 }
 
-.morning-meeting-material-order-row.is-selected {
-  border-color: #cdbbe6;
-  box-shadow: 0 8px 18px rgba(118, 82, 154, 0.08);
-}
-
-.morning-meeting-material-order-row > div,
+.morning-meeting-material-order-group-lines,
 .morning-meeting-material-plan-card-body,
 .morning-meeting-material-plan-block {
   display: grid;
   gap: 4px;
 }
 
-.morning-meeting-material-order-row strong,
+.morning-meeting-material-order-group-head strong,
 .morning-meeting-material-plan-block strong {
   color: #172033;
   font-size: 0.78rem;
 }
 
-.morning-meeting-material-order-row span,
+.morning-meeting-material-order-group-head span,
 .morning-meeting-material-plan-card-head > span {
   color: #76529a;
   font-size: 0.64rem;
@@ -8389,13 +8382,58 @@ button {
   text-transform: none;
 }
 
-.morning-meeting-material-order-row small,
+.morning-meeting-material-order-group-lines {
+  padding: 10px 14px 12px;
+}
+
+.morning-meeting-material-order-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.morning-meeting-material-order-line:last-child {
+  border-bottom: 0;
+}
+
+.morning-meeting-material-order-line span,
+.morning-meeting-material-order-line small,
 .morning-meeting-material-plan-block small,
 .morning-meeting-material-plan-block span,
 .morning-meeting-material-plan-block em {
   color: #667085;
   font-size: 0.67rem;
   font-style: normal;
+}
+
+.morning-meeting-sheet-diagrams {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 10px;
+}
+
+.morning-meeting-sheet-figure {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.morning-meeting-sheet-svg {
+  width: 100%;
+  max-width: 560px;
+  aspect-ratio: 1.5;
+  border: 1px solid #d9e2ec;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.morning-meeting-sheet-figure figcaption {
+  color: #667085;
+  font-size: 0.66rem;
+  font-weight: 700;
 }
 
 .morning-meeting-material-plan-card {
@@ -8770,11 +8808,6 @@ button {
 
   .morning-meeting-material-planner-settings {
     grid-template-columns: 1fr;
-  }
-
-  .morning-meeting-material-planner-settings label.is-checkbox {
-    grid-column: auto;
-    padding-top: 0;
   }
 }
 

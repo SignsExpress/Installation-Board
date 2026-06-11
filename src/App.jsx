@@ -16959,16 +16959,6 @@ const MATERIAL_SHEET_PRESETS = [
   { value: "custom", label: "Custom size", width: 0, height: 0 }
 ];
 
-const MATERIAL_OFFCUT_TARGETS = [
-  { label: "1500 x 1500mm", width: 1500, height: 1500 },
-  { label: "1220 x 1220mm", width: 1220, height: 1220 },
-  { label: "1220 x 800mm", width: 1220, height: 800 },
-  { label: "1000 x 1000mm", width: 1000, height: 1000 },
-  { label: "600 x 450mm", width: 600, height: 450 },
-  { label: "A3", width: 420, height: 297 },
-  { label: "A4", width: 297, height: 210 }
-];
-
 function parsePlannerDimensions(value) {
   const source = String(value || "").replace(/,/g, " ");
   const match = source.match(/(\d+(?:\.\d+)?)\s*mm?\s*x\s*(\d+(?:\.\d+)?)/i) || source.match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
@@ -17028,86 +17018,159 @@ function extractPlannerMaterials(payload) {
   }))));
 }
 
-function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight, convertOffcuts) {
+function filterPanelPlannerRows(rows = []) {
+  return rows.filter((row) => row.type === "sheet");
+}
+
+function groupPanelPlannerRows(rows = []) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const key = String(row.name || "").trim().toLowerCase();
+    if (!key) return;
+    const current = grouped.get(key) || {
+      key,
+      name: row.name,
+      rows: [],
+      totalQuantity: 0,
+      productionHours: 0
+    };
+    current.rows.push(row);
+    current.totalQuantity += Math.max(0, Math.round(Number(row.quantity || 0)));
+    current.productionHours += Number(row.productionHours || 0) || 0;
+    grouped.set(key, current);
+  });
+  return [...grouped.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
   const kerf = 3;
-  const pieces = rows.flatMap((row) => {
+  const expandedPieces = rows.flatMap((row) => {
     const size = parsePlannerDimensions(row.finishedSize);
     const quantity = Math.max(0, Math.round(Number(row.quantity || 0)));
-    return size && quantity ? [{ ...size, quantity }] : [];
-  });
-  if (!pieces.length || !(sheetWidth > 0) || !(sheetHeight > 0)) return null;
-  let totalSheets = 0;
-  let totalWasteArea = 0;
-  const layouts = [];
-  pieces.forEach((piece) => {
+    if (!size || !quantity) return [];
+    return Array.from({ length: quantity }, (_, index) => ({
+      id: `${row.id}-${index + 1}`,
+      width: size.width,
+      height: size.height,
+      label: formatPlannerSize(size.width, size.height),
+      jobReference: row.jobReference
+    }));
+  }).sort((a, b) => (b.height * b.width) - (a.height * a.width));
+  if (!expandedPieces.length || !(sheetWidth > 0) || !(sheetHeight > 0)) return null;
+
+  const sheets = [];
+  let currentSheet = { placements: [], cursorX: 0, cursorY: 0, rowHeight: 0 };
+
+  const startNewSheet = () => {
+    if (currentSheet.placements.length) {
+      sheets.push({ placements: currentSheet.placements });
+    }
+    currentSheet = { placements: [], cursorX: 0, cursorY: 0, rowHeight: 0 };
+  };
+
+  expandedPieces.forEach((piece) => {
     const orientations = [
       { width: piece.width, height: piece.height },
       { width: piece.height, height: piece.width }
-    ].filter((entry, idx, array) => idx === 0 || entry.width !== array[0].width || entry.height !== array[0].height);
-    const ranked = orientations.map((entry) => {
-      const across = Math.floor((sheetWidth + kerf) / (entry.width + kerf));
-      const down = Math.floor((sheetHeight + kerf) / (entry.height + kerf));
-      const perSheet = across > 0 && down > 0 ? across * down : 0;
-      const sheets = perSheet ? Math.ceil(piece.quantity / perSheet) : Infinity;
-      return { ...entry, across, down, perSheet, sheets };
-    }).sort((a, b) => a.sheets - b.sheets || b.perSheet - a.perSheet);
-    const best = ranked.find((entry) => entry.perSheet > 0);
-    if (!best) return;
-    const sheetsNeeded = Math.ceil(piece.quantity / best.perSheet);
-    totalSheets += sheetsNeeded;
-    totalWasteArea += Math.max(0, (sheetsNeeded * sheetWidth * sheetHeight) - (piece.width * piece.height * piece.quantity));
-    layouts.push({
-      sizeLabel: formatPlannerSize(piece.width, piece.height),
-      quantity: piece.quantity,
-      perSheet: best.perSheet,
-      sheetsNeeded
-    });
-  });
-  const offcutSuggestions = [];
-  if (convertOffcuts && totalWasteArea > 0) {
-    let remainingArea = totalWasteArea;
-    MATERIAL_OFFCUT_TARGETS.forEach((target) => {
-      const targetArea = (target.width + kerf) * (target.height + kerf);
-      const count = Math.floor(remainingArea / targetArea);
-      if (count > 0) {
-        offcutSuggestions.push({ label: target.label, count });
-        remainingArea -= count * targetArea;
+    ].filter((entry, index, array) => index === 0 || entry.width !== array[0].width || entry.height !== array[0].height);
+
+    const placeOnCurrentSheet = () => {
+      for (const option of orientations) {
+        if (option.width > sheetWidth || option.height > sheetHeight) continue;
+        const needsNewRow = currentSheet.cursorX > 0 && (currentSheet.cursorX + option.width > sheetWidth);
+        const nextX = needsNewRow ? 0 : currentSheet.cursorX;
+        const nextY = needsNewRow ? currentSheet.cursorY + currentSheet.rowHeight + kerf : currentSheet.cursorY;
+        if (nextY + option.height > sheetHeight) continue;
+        currentSheet.placements.push({
+          ...piece,
+          width: option.width,
+          height: option.height,
+          x: nextX,
+          y: nextY
+        });
+        currentSheet.cursorX = nextX + option.width + kerf;
+        currentSheet.cursorY = nextY;
+        currentSheet.rowHeight = needsNewRow ? option.height : Math.max(currentSheet.rowHeight, option.height);
+        return true;
       }
-    });
-  }
+      return false;
+    };
+
+    if (!placeOnCurrentSheet()) {
+      startNewSheet();
+      placeOnCurrentSheet();
+    }
+  });
+
+  if (currentSheet.placements.length) sheets.push({ placements: currentSheet.placements });
+
+  const usedArea = expandedPieces.reduce((total, piece) => total + (piece.width * piece.height), 0);
+  const totalSheetArea = sheets.length * sheetWidth * sheetHeight;
   return {
-    totalSheets,
+    totalSheets: sheets.length,
+    sheetWidth,
+    sheetHeight,
     sheetSizeLabel: formatPlannerSize(sheetWidth, sheetHeight),
-    totalWasteArea,
-    layouts,
-    offcutSuggestions
+    totalWasteArea: Math.max(0, totalSheetArea - usedArea),
+    summaryLines: rows.map((row) => `${row.jobReference} - ${row.quantityLabel}${row.finishedSize ? ` - ${row.finishedSize}` : ""}`),
+    sheets
   };
 }
 
 function buildMaterialsOrderPlan(rows, settings) {
-  const selectedRows = rows.filter((row) => row.selected);
-  const grouped = new Map();
-  selectedRows.forEach((row) => {
-    const key = `${row.type}|${row.name}`;
-    const current = grouped.get(key) || {
-      key,
-      name: row.name,
-      type: row.type,
-      totalQuantity: 0,
-      rows: [],
-      productionHours: 0
-    };
-    current.totalQuantity += Math.max(0, Math.round(Number(row.quantity || 0)));
-    current.productionHours += Number(row.productionHours || 0) || 0;
-    current.rows.push(row);
-    grouped.set(key, current);
-  });
   const sheetSize = getPlannerPresetSize(settings.sheetPreset, MATERIAL_SHEET_PRESETS, settings.customSheetWidth, settings.customSheetHeight);
-  return [...grouped.values()].map((group) => ({
+  return groupPanelPlannerRows(filterPanelPlannerRows(rows)).map((group) => ({
     ...group,
-    sheetPlan: group.type === "sheet" ? buildSheetPlanForGroup(group.rows, sheetSize.width, sheetSize.height, settings.convertOffcuts) : null,
+    sheetPlan: buildSheetPlanForGroup(group.rows, sheetSize.width, sheetSize.height),
     totalProductionLabel: formatPlannerHours(group.productionHours)
   })).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function PanelSheetDiagram({ sheetPlan, materialName }) {
+  if (!sheetPlan?.sheets?.length) return null;
+  return (
+    <div className="morning-meeting-sheet-diagrams">
+      {sheetPlan.sheets.map((sheet, index) => (
+        <figure key={`${materialName}-${index + 1}`} className="morning-meeting-sheet-figure">
+          <svg
+            className="morning-meeting-sheet-svg"
+            viewBox={`0 0 ${sheetPlan.sheetWidth} ${sheetPlan.sheetHeight}`}
+            role="img"
+            aria-label={`${materialName} sheet ${index + 1}`}
+          >
+            <rect x="0" y="0" width={sheetPlan.sheetWidth} height={sheetPlan.sheetHeight} rx="18" ry="18" fill="#f8fafc" stroke="#94a3b8" strokeWidth="10" />
+            {sheet.placements.map((piece, pieceIndex) => (
+              <g key={piece.id}>
+                <rect
+                  x={piece.x}
+                  y={piece.y}
+                  width={piece.width}
+                  height={piece.height}
+                  fill={pieceIndex % 2 === 0 ? "#dbeafe" : "#e9d5ff"}
+                  stroke="#475569"
+                  strokeWidth="6"
+                  rx="12"
+                  ry="12"
+                />
+                <text
+                  x={piece.x + piece.width / 2}
+                  y={piece.y + piece.height / 2}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={Math.max(42, Math.min(piece.width, piece.height) * 0.18)}
+                  fill="#172033"
+                  fontWeight="700"
+                >
+                  {piece.label}
+                </text>
+              </g>
+            ))}
+          </svg>
+          <figcaption>Sheet {index + 1} of {sheetPlan.totalSheets} - {sheetPlan.sheetSizeLabel}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
 }
 
 function MorningMeetingMaterials({
@@ -17120,16 +17183,14 @@ function MorningMeetingMaterials({
   plannerOpen,
   onTogglePlanner,
   plannerRows,
-  selectedMaterialIds,
-  onToggleMaterial,
-  onToggleAllMaterials,
   onFinaliseMaterials,
   finalisedPlan,
   plannerSettings,
   onPlannerSettingsChange
 }) {
   const jobs = Array.isArray(payload?.jobs) ? payload.jobs : [];
-  const selectedCount = plannerRows.filter((row) => selectedMaterialIds.has(row.id)).length;
+  const panelRows = filterPanelPlannerRows(plannerRows);
+  const panelGroups = groupPanelPlannerRows(panelRows);
   return (
     <section className="morning-meeting-materials">
       <div className="morning-meeting-materials-head">
@@ -17138,7 +17199,7 @@ function MorningMeetingMaterials({
           <h2>Job Materials Report</h2>
           <p>{loading ? loadingStep : payload ? `${jobs.length} approved job${jobs.length === 1 ? "" : "s"} ready for production review.` : "Finished quantities, sizes and materials pulled through from CoreBridge assemblies."}</p>
           <div className="morning-meeting-material-status-row">
-            {payload ? <span className="morning-meeting-material-status-meta">{plannerRows.length} material line{plannerRows.length === 1 ? "" : "s"} found</span> : null}
+            {payload ? <span className="morning-meeting-material-status-meta">{panelRows.length} panel line{panelRows.length === 1 ? "" : "s"} ready for sheet planning</span> : null}
           </div>
         </div>
         <div className="morning-meeting-materials-actions">
@@ -17159,14 +17220,11 @@ function MorningMeetingMaterials({
           <div className="morning-meeting-material-planner-head">
             <div>
               <h3>Order materials</h3>
-              <p>Untick anything you do not want to order, then finalise it into a cleaner materials list with panel planning where needed.</p>
+              <p>Panels are grouped automatically by material. Then you can turn that straight into a sheet layout.</p>
             </div>
             <div className="morning-meeting-material-planner-actions">
-              <button className="ghost-button" type="button" onClick={onToggleAllMaterials}>
-                {plannerRows.length && selectedCount === plannerRows.length ? "Untick all" : "Tick all"}
-              </button>
-              <button className="primary-button" type="button" onClick={onFinaliseMaterials} disabled={!selectedCount}>
-                Finalise
+              <button className="primary-button" type="button" onClick={onFinaliseMaterials} disabled={!panelRows.length}>
+                Show sheet layout
               </button>
             </div>
           </div>
@@ -17189,23 +17247,25 @@ function MorningMeetingMaterials({
                 </label>
               </>
             ) : null}
-            <label className="is-checkbox">
-              <input type="checkbox" checked={plannerSettings.convertOffcuts} onChange={(event) => onPlannerSettingsChange("convertOffcuts", event.target.checked)} />
-              <span>Convert panel waste into usable offcuts</span>
-            </label>
           </div>
           <div className="morning-meeting-material-planner-list">
-            {plannerRows.map((row) => (
-              <label key={row.id} className={`morning-meeting-material-order-row ${selectedMaterialIds.has(row.id) ? "is-selected" : ""}`}>
-                <input type="checkbox" checked={selectedMaterialIds.has(row.id)} onChange={() => onToggleMaterial(row.id)} />
-                <div>
-                  <strong>{row.name}</strong>
-                  <span>{row.jobReference}</span>
-                  <small>{row.quantityLabel}{row.finishedSize ? ` · ${row.finishedSize}` : ""}{row.stockSize ? ` · stock ${row.stockSize}` : ""}</small>
+            {panelGroups.map((group) => (
+              <article key={group.key} className="morning-meeting-material-order-group">
+                <div className="morning-meeting-material-order-group-head">
+                  <strong>{group.name}</strong>
+                  <span>{formatPlannerQuantity(group.totalQuantity)}</span>
                 </div>
-              </label>
+                <div className="morning-meeting-material-order-group-lines">
+                  {group.rows.map((row) => (
+                    <div key={row.id} className="morning-meeting-material-order-line">
+                      <span>{row.jobReference}</span>
+                      <small>{row.quantityLabel}{row.finishedSize ? ` - ${row.finishedSize}` : ""}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
             ))}
-            {!plannerRows.length ? <p className="morning-meeting-empty">Build the report first to prepare the order list.</p> : null}
+            {!panelGroups.length ? <p className="morning-meeting-empty">No panel materials were returned from the approved jobs.</p> : null}
           </div>
           {finalisedPlan?.length ? (
             <div className="morning-meeting-material-plan-results">
@@ -17214,22 +17274,17 @@ function MorningMeetingMaterials({
                   <div className="morning-meeting-material-plan-card-head">
                     <div>
                       <h4>{group.name}</h4>
-                      <p>{formatPlannerQuantity(group.totalQuantity)} selected · {group.totalProductionLabel} estimated production time</p>
+                      <p>{formatPlannerQuantity(group.totalQuantity)} - {group.totalProductionLabel} estimated production time</p>
                     </div>
-                    <span>{group.type === "sheet" ? "Panel" : group.type === "roll" ? "Vinyl / laminate" : "General"}</span>
+                    <span>Panel layout</span>
                   </div>
                   <div className="morning-meeting-material-plan-card-body">
                     {group.sheetPlan ? (
                       <div className="morning-meeting-material-plan-block">
                         <strong>{group.sheetPlan.totalSheets} sheet{group.sheetPlan.totalSheets === 1 ? "" : "s"} of {group.sheetPlan.sheetSizeLabel}</strong>
                         <small>Estimated waste area: {(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2</small>
-                        {group.sheetPlan.layouts.map((layout) => <span key={`${group.key}-${layout.sizeLabel}`}>{layout.quantity} off {layout.sizeLabel} · {layout.perSheet} per sheet · {layout.sheetsNeeded} sheet{layout.sheetsNeeded === 1 ? "" : "s"}</span>)}
-                        {group.sheetPlan.offcutSuggestions.length ? <em>Potential offcuts: {group.sheetPlan.offcutSuggestions.map((entry) => `${entry.count} x ${entry.label}`).join(", ")}</em> : null}
-                      </div>
-                    ) : null}
-                    {!group.sheetPlan ? (
-                      <div className="morning-meeting-material-plan-block">
-                        {group.rows.map((row) => <span key={row.id}>{row.jobReference} · {row.quantityLabel}{row.finishedSize ? ` ${row.finishedSize}` : ""}</span>)}
+                        <PanelSheetDiagram sheetPlan={group.sheetPlan} materialName={group.name} />
+                        {group.sheetPlan.summaryLines.map((line) => <span key={`${group.key}-${line}`}>{line}</span>)}
                       </div>
                     ) : null}
                   </div>
@@ -17300,13 +17355,11 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [materialsError, setMaterialsError] = useState("");
   const [materialsLoadingStep, setMaterialsLoadingStep] = useState(MATERIAL_REPORT_PROGRESS_STEPS[0]);
   const [materialsPlannerOpen, setMaterialsPlannerOpen] = useState(false);
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState(() => new Set());
   const [finalisedMaterialsPlan, setFinalisedMaterialsPlan] = useState([]);
   const [materialsPlannerSettings, setMaterialsPlannerSettings] = useState({
     sheetPreset: "3050x1500",
     customSheetWidth: 3050,
-    customSheetHeight: 1500,
-    convertOffcuts: true
+    customSheetHeight: 1500
   });
   const [selectedJobIds, setSelectedJobIds] = useState(() => new Set());
   const [jobNoteDrafts, setJobNoteDrafts] = useState({});
@@ -17355,22 +17408,8 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   }, [materialsLoading]);
 
   useEffect(() => {
-    if (!plannerRows.length) {
-      setSelectedMaterialIds(new Set());
-      return;
-    }
-    setSelectedMaterialIds((current) => {
-      if (current.size) {
-        const next = new Set([...current].filter((id) => plannerRows.some((row) => row.id === id)));
-        return next.size ? next : new Set(plannerRows.map((row) => row.id));
-      }
-      return new Set(plannerRows.map((row) => row.id));
-    });
-  }, [plannerRows]);
-
-  useEffect(() => {
     setFinalisedMaterialsPlan([]);
-  }, [plannerRows, selectedMaterialIds, materialsPlannerSettings]);
+  }, [plannerRows, materialsPlannerSettings]);
 
   function toggleJobNote(jobId) {
     setSelectedJobIds((current) => {
@@ -17382,32 +17421,12 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     setJobNotesStatus("");
   }
 
-  function togglePlannerMaterial(materialId) {
-    setSelectedMaterialIds((current) => {
-      const next = new Set(current);
-      if (next.has(materialId)) next.delete(materialId);
-      else next.add(materialId);
-      return next;
-    });
-  }
-
-  function toggleAllPlannerMaterials() {
-    setSelectedMaterialIds((current) => (
-      current.size === plannerRows.length
-        ? new Set()
-        : new Set(plannerRows.map((row) => row.id))
-    ));
-  }
-
   function updatePlannerSetting(field, value) {
     setMaterialsPlannerSettings((current) => ({ ...current, [field]: value }));
   }
 
   function finaliseMaterialsPlan() {
-    const plan = buildMaterialsOrderPlan(
-      plannerRows.map((row) => ({ ...row, selected: selectedMaterialIds.has(row.id) })),
-      materialsPlannerSettings
-    );
+    const plan = buildMaterialsOrderPlan(plannerRows, materialsPlannerSettings);
     setFinalisedMaterialsPlan(plan);
   }
 
@@ -17539,9 +17558,6 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
               plannerOpen={materialsPlannerOpen}
               onTogglePlanner={() => setMaterialsPlannerOpen((current) => !current)}
               plannerRows={plannerRows}
-              selectedMaterialIds={selectedMaterialIds}
-              onToggleMaterial={togglePlannerMaterial}
-              onToggleAllMaterials={toggleAllPlannerMaterials}
               onFinaliseMaterials={finaliseMaterialsPlan}
               finalisedPlan={finalisedMaterialsPlan}
               plannerSettings={materialsPlannerSettings}
