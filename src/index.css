@@ -8258,6 +8258,64 @@ button {
   background: #fff;
 }
 
+.morning-meeting-material-item.is-compact {
+  padding: 10px 11px;
+}
+
+.morning-meeting-material-item.is-compact h4 {
+  margin: 0 0 7px;
+  color: #172033;
+  font-size: 0.76rem;
+}
+
+.morning-meeting-material-checklist {
+  display: grid;
+  gap: 5px;
+}
+
+.morning-meeting-material-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #f7f9fc;
+}
+
+.morning-meeting-material-checklist strong {
+  color: #334155;
+  font-size: 0.66rem;
+}
+
+.morning-meeting-production-time {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 13px;
+  border-top: 1px solid #d8e7dd;
+  background: #eefbf3;
+}
+
+.morning-meeting-production-time span {
+  color: #166534;
+  font-size: 0.59rem;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.morning-meeting-production-time strong {
+  color: #14532d;
+  font-size: 0.76rem;
+}
+
+.morning-meeting-production-time small {
+  color: #4f735c;
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
 .morning-meeting-material-item-head {
   display: flex;
   align-items: center;

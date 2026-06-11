@@ -9310,7 +9310,7 @@ function classifyJobMaterialComponent(record) {
   if (/(labour|labor|employee|installer|operator|time)/.test(source)) return "Labour";
   if (/(service|delivery|design|artwork|survey)/.test(source)) return "Service";
   if (/(fixing|screw|bolt|nut|washer|bracket|adhesive|tape|clip|rivet)/.test(source)) return "Fixing";
-  if (/(laminate|vinyl|material|substrate|panel|sheet|roll|ink|paint)/.test(source)) return "Material";
+  if (/(laminate|vinyl|material|substrate|panel|sheet|roll|ink|paint|magnet)/.test(source)) return "Material";
   return "Component";
 }
 
@@ -9341,6 +9341,7 @@ function extractJobMaterialComponent(record, context, index) {
     labour: time || employees
       ? `${time ? `${formatJobMaterialNumber(time, 2)} ${timeUnit}` : ""}${time && employees ? " · " : ""}${employees ? `${formatJobMaterialNumber(employees, 2)} employee${employees === 1 ? "" : "s"}` : ""}`
       : "",
+    productionHours: kind === "Labour" || kind === "Service" ? time : 0,
     notes: getCoreBridgeText(record, ["Notes", "Note", "Specification"])
   };
 }
@@ -9404,6 +9405,60 @@ function buildJobMaterialsFromOrder(order) {
   });
 }
 
+function cleanProductionMaterialName(value = "") {
+  return String(value || "")
+    .replace(/\s+\d+(?:\.\d+)?\s*(?:mm)?\s*x\s*\d+(?:\.\d+)?\s*(?:mm)?\s*$/i, "")
+    .trim();
+}
+
+function isUsefulProductionMaterial(component) {
+  if (!component || !["Material", "Fixing"].includes(component.kind)) return false;
+  const name = String(component.name || "").trim();
+  if (!name) return false;
+  return !/^(?:\d+\.\s*)?(?:vinyl\s*:\s*printed|printed vinyl sx|lamination sx|laminator sx|layout|material|component)$/i.test(name);
+}
+
+function formatProductionDuration(hoursValue) {
+  const productionHours = Number(hoursValue || 0);
+  const roundedMinutes = Math.max(0, Math.round(productionHours * 60));
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+  return {
+    productionHours: Math.round(productionHours * 100) / 100,
+    productionMinutes: roundedMinutes,
+    productionTimeLabel: [
+      hours ? `${hours} hr${hours === 1 ? "" : "s"}` : "",
+      minutes ? `${minutes} min${minutes === 1 ? "" : "s"}` : ""
+    ].filter(Boolean).join(" ") || "0 mins"
+  };
+}
+
+function buildCompactJobMaterialItems(items = []) {
+  return items.map((item) => {
+    const materialNames = [];
+    const seenNames = new Set();
+    (item.components || []).filter(isUsefulProductionMaterial).forEach((component) => {
+      const name = cleanProductionMaterialName(component.name);
+      const key = name.toLowerCase();
+      if (!name || seenNames.has(key)) return;
+      seenNames.add(key);
+      materialNames.push(name);
+    });
+    const productionHours = (item.components || []).reduce((total, component) => {
+      const hours = Number(component.productionHours || 0);
+      return total + (Number.isFinite(hours) ? hours : 0);
+    }, 0);
+    return {
+      id: item.id,
+      lineItemName: item.lineItemName,
+      quantityLabel: String(item.quantityLabel || "").replace(/\s+off$/i, "no."),
+      finishedSize: item.finishedSize,
+      materials: materialNames,
+      ...formatProductionDuration(productionHours)
+    };
+  });
+}
+
 async function fetchCoreBridgeJobAssemblyDetail(order) {
   const config = getCoreBridgeConfig();
   const id = String(order?.id || order?._detailOrderId || "").trim();
@@ -9429,16 +9484,18 @@ async function buildMorningMeetingMaterialsPayload(store) {
     try {
       const { order, attempts } = await fetchProductionOrderByReference(card.orderReference);
       const assemblyOrder = order ? await fetchCoreBridgeJobAssemblyDetail(order) : null;
-      const items = assemblyOrder ? buildJobMaterialsFromOrder(assemblyOrder) : [];
-      const componentCount = items.reduce((total, item) => total + item.components.length, 0);
+      const items = assemblyOrder ? buildCompactJobMaterialItems(buildJobMaterialsFromOrder(assemblyOrder)) : [];
+      const materialCount = items.reduce((total, item) => total + item.materials.length, 0);
+      const productionTime = formatProductionDuration(items.reduce((total, item) => total + Number(item.productionHours || 0), 0));
       jobs.push({
         id: card.id,
         orderReference: card.orderReference,
         customerName: card.customerName,
         description: card.description,
         items,
-        source: componentCount ? "CoreBridge item assemblies" : "No assembly components found",
-        lookupError: componentCount
+        ...productionTime,
+        source: materialCount ? "CoreBridge item assemblies" : "No production materials found",
+        lookupError: materialCount
           ? ""
           : `No components were returned from Items → Components → ChildComponents → AssemblyDataJSON. ${attempts.map((attempt) => attempt.error).filter(Boolean).slice(0, 4).join(" ")}`
       });

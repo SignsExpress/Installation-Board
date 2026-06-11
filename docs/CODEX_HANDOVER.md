@@ -56,6 +56,7 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - The Job Materials Report reads the matching Estimate/Order item assemblies through `Items`, `Components`, `ChildComponents`, and `AssemblyDataJSON`.
 - It separates finished-item quantity and size from stock size and material consumption. Never treat roll-material `TotalQuantity` as the number of finished items.
 - It also lists nested materials, laminates, fixings, labour/service parts, time, and employee counts where CoreBridge supplies them.
+- The visible report is deliberately compact: one `quantity + finished size` heading, a deduplicated checklist of named production materials/fixings, and one total estimated production-time line converted to hours and minutes. Do not expose generic assembly wrappers or machine/layout internals.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`

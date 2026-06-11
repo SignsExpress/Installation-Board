@@ -16979,45 +16979,28 @@ function MorningMeetingMaterials({ payload, loading, error, onFetch, onPrint }) 
               {job.lookupError ? <p className="morning-meeting-material-warning">{job.lookupError}</p> : null}
               <div className="morning-meeting-material-items">
                 {(job.items || []).map((item) => (
-                  <section key={item.id} className="morning-meeting-material-item">
-                    <div className="morning-meeting-material-item-head">
-                      <div>
-                        <span>{item.categoryName || "No category returned"}</span>
-                        <h4>{item.lineItemName}</h4>
-                      </div>
-                      <div className="morning-meeting-material-item-facts">
-                        <strong>{item.quantityLabel}</strong>
-                        {item.finishedSize ? <span>{item.finishedSize}</span> : null}
-                      </div>
-                    </div>
-                    <div className="morning-meeting-component-list">
-                      {(item.components || []).map((component) => (
-                        <article key={component.id} className="morning-meeting-component">
+                  <section key={item.id} className="morning-meeting-material-item is-compact">
+                    <h4>{item.quantityLabel}{item.finishedSize ? ` ${item.finishedSize}` : ""}</h4>
+                    <div className="morning-meeting-material-checklist">
+                      {(item.materials || []).map((material) => (
+                        <label key={material}>
                           <span className="morning-meeting-stock-box" />
-                          <div className="morning-meeting-component-main">
-                            <div className="morning-meeting-component-title">
-                              <span>{component.kind}</span>
-                              <strong>{component.name}</strong>
-                            </div>
-                            {component.componentType || component.variableName ? (
-                              <small>{[component.componentType, component.variableName].filter(Boolean).join(" · ")}</small>
-                            ) : null}
-                          </div>
-                          <dl>
-                            <div><dt>Required</dt><dd>{component.requirement || "-"}</dd></div>
-                            <div><dt>Finished size</dt><dd>{component.finishedSize || "-"}</dd></div>
-                            <div><dt>Stock size</dt><dd>{component.stockSize || "-"}</dd></div>
-                            <div><dt>Material usage</dt><dd>{component.materialUsage || "-"}</dd></div>
-                            {component.labour ? <div><dt>Labour / service</dt><dd>{component.labour}</dd></div> : null}
-                          </dl>
-                        </article>
+                          <strong>{material}</strong>
+                        </label>
                       ))}
-                      {!item.components?.length ? <p className="morning-meeting-empty">No assembly components were returned for this line item.</p> : null}
+                      {!item.materials?.length ? <p className="morning-meeting-empty">No named production materials were returned for this line item.</p> : null}
                     </div>
                   </section>
                 ))}
                 {!job.items?.length ? <p className="morning-meeting-empty">No line-item assemblies were returned from CoreBridge.</p> : null}
               </div>
+              {job.productionHours > 0 ? (
+                <div className="morning-meeting-production-time">
+                  <span>Total estimated production time</span>
+                  <strong>{job.productionTimeLabel}</strong>
+                  <small>{job.productionHours} hrs · {job.productionMinutes} mins</small>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
