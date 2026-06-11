@@ -8041,6 +8041,7 @@ button {
   padding: 10px 10px 0;
 }
 
+/* Keep installer-plan actions obvious above the install lists. */
 .morning-meeting-section-button {
   display: inline-flex;
   align-items: center;
