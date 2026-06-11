@@ -8227,11 +8227,27 @@ button {
   flex-wrap: wrap;
 }
 
+.morning-meeting-materials .primary-button,
+.morning-meeting-materials .ghost-button,
+.morning-meeting-material-action-button {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 13px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: none;
+}
+
 .morning-meeting-material-fetch {
   min-width: 142px;
   min-height: 42px;
   padding-inline: 16px;
   border-radius: 14px;
+}
+
+.morning-meeting-material-action-button {
+  min-width: 0;
 }
 
 .morning-meeting-material-fetch-inner {
@@ -8443,6 +8459,15 @@ button {
   font-weight: 800;
 }
 
+.morning-meeting-material-order-group-settings input,
+.morning-meeting-material-order-group-settings select {
+  min-height: 36px;
+  padding: 0 11px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .morning-meeting-material-order-line {
   display: grid;
   gap: 3px;
@@ -8537,6 +8562,12 @@ button {
   padding: 7px 9px;
   border-radius: 10px;
   background: #f8fafc;
+}
+
+.morning-meeting-material-plan-block em {
+  color: #76529a;
+  font-size: 0.64rem;
+  font-weight: 700;
 }
 
 .morning-meeting-material-jobs {

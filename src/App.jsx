@@ -16955,6 +16955,16 @@ const MATERIAL_SHEET_PRESETS = [
   { value: "custom", label: "Custom size", width: 0, height: 0 }
 ];
 
+const MATERIAL_OFFCUT_TARGETS = [
+  { label: "1500 x 1500mm", width: 1500, height: 1500 },
+  { label: "1220 x 1220mm", width: 1220, height: 1220 },
+  { label: "1220 x 800mm", width: 1220, height: 800 },
+  { label: "1000 x 1000mm", width: 1000, height: 1000 },
+  { label: "600 x 450mm", width: 600, height: 450 },
+  { label: "A3", width: 420, height: 297 },
+  { label: "A4", width: 297, height: 210 }
+];
+
 function parsePlannerDimensions(value) {
   const source = String(value || "").replace(/,/g, " ");
   const match = source.match(/(\d+(?:\.\d+)?)\s*mm?\s*x\s*(\d+(?:\.\d+)?)/i) || source.match(/(\d+(?:\.\d+)?)\s*x\s*(\d+(?:\.\d+)?)/i);
@@ -17120,6 +17130,27 @@ function getMaterialSheetDimensions(setting = {}) {
   return { width: preset.width, height: preset.height };
 }
 
+function getOffcutSuggestions(totalWasteArea, sheetWidth, sheetHeight) {
+  const kerf = 3;
+  if (!(totalWasteArea > 0) || !(sheetWidth > 0) || !(sheetHeight > 0)) return [];
+  let remainingArea = totalWasteArea;
+  const suggestions = [];
+  MATERIAL_OFFCUT_TARGETS.forEach((target) => {
+    const fitsSheet = (
+      (target.width <= sheetWidth && target.height <= sheetHeight) ||
+      (target.height <= sheetWidth && target.width <= sheetHeight)
+    );
+    if (!fitsSheet) return;
+    const targetArea = (target.width + kerf) * (target.height + kerf);
+    const count = Math.floor(remainingArea / targetArea);
+    if (count > 0) {
+      suggestions.push({ label: target.label, count });
+      remainingArea -= count * targetArea;
+    }
+  });
+  return suggestions;
+}
+
 function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
   const kerf = 3;
   const expandedPieces = rows.flatMap((row) => {
@@ -17192,7 +17223,8 @@ function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
       summaryLines: rows.map((row) => `${row.jobReference} - ${row.quantityLabel}${row.finishedSize ? ` - ${row.finishedSize}` : ""}`),
       sheets: [{ placements }],
       mode: "roll",
-      usedLength
+      usedLength,
+      offcutSuggestions: []
     };
   }
 
@@ -17251,7 +17283,8 @@ function buildSheetPlanForGroup(rows, sheetWidth, sheetHeight) {
     sheetSizeLabel: formatPlannerSize(sheetWidth, sheetHeight),
     totalWasteArea: Math.max(0, totalSheetArea - usedArea),
     summaryLines: rows.map((row) => `${row.jobReference} - ${row.quantityLabel}${row.finishedSize ? ` - ${row.finishedSize}` : ""}`),
-    sheets
+    sheets,
+    offcutSuggestions: getOffcutSuggestions(Math.max(0, totalSheetArea - usedArea), sheetWidth, sheetHeight)
   };
 }
 
@@ -17355,8 +17388,8 @@ function MorningMeetingMaterials({
               <span>{loading ? "Building report..." : payload ? "Refresh report" : "Build report"}</span>
             </span>
           </button>
-          {payload ? <button className="ghost-button" type="button" onClick={onTogglePlanner}>{plannerOpen ? "Hide order materials" : "Order materials"}</button> : null}
-          {payload ? <button className="primary-button" type="button" onClick={onPrint}>Print report</button> : null}
+          {payload ? <button className="ghost-button morning-meeting-material-action-button" type="button" onClick={onTogglePlanner}>{plannerOpen ? "Hide order materials" : "Order materials"}</button> : null}
+          {payload ? <button className="primary-button morning-meeting-material-action-button" type="button" onClick={onPrint}>Print report</button> : null}
         </div>
       </div>
       {error ? <p className="form-error">{error}</p> : null}
@@ -17369,7 +17402,7 @@ function MorningMeetingMaterials({
               <p>Panels are grouped by stock material, with a tighter sheet suggestion on each one.</p>
             </div>
             <div className="morning-meeting-material-planner-actions">
-              <button className="primary-button" type="button" onClick={onFinaliseMaterials} disabled={!panelRows.length}>
+              <button className="primary-button morning-meeting-material-action-button" type="button" onClick={onFinaliseMaterials} disabled={!panelRows.length}>
                 Show sheet layout
               </button>
             </div>
@@ -17449,6 +17482,7 @@ function MorningMeetingMaterials({
                           <strong>{group.sheetPlan.mode === "roll" ? `1 run of ${group.sheetPlan.sheetSizeLabel}` : `${group.sheetPlan.totalSheets} sheet${group.sheetPlan.totalSheets === 1 ? "" : "s"} of ${group.sheetPlan.sheetSizeLabel}`}</strong>
                           <small>{group.sheetPlan.mode === "roll" ? `Estimated unused area: ${(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2` : `Estimated waste area: ${(group.sheetPlan.totalWasteArea / 1000000).toFixed(2)} m2`}</small>
                           {group.sheetPlan.mode === "roll" ? <em>Using N/A height. Layout is worked out from the sheet width, then the required run length.</em> : null}
+                          {group.sheetPlan.offcutSuggestions?.length ? <em>Potential offcuts: {group.sheetPlan.offcutSuggestions.map((entry) => `${entry.count} x ${entry.label}`).join(", ")}</em> : null}
                           <div className="morning-meeting-material-plan-summary">
                             {group.sheetPlan.summaryLines.map((line) => <span key={`${group.key}-${line}`}>{line}</span>)}
                           </div>
