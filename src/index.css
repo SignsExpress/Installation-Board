@@ -8867,9 +8867,7 @@ button {
   }
 
   .host-landing-sections {
-    grid-auto-flow: row;
-    grid-auto-columns: unset;
-    overflow-x: visible;
+    grid-template-columns: 1fr;
   }
 
   .morning-meeting-material-items {
@@ -11150,12 +11148,9 @@ button {
 
 .host-landing-sections {
   display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(220px, 1fr);
+  grid-template-columns: repeat(var(--host-landing-columns, 4), minmax(0, 1fr));
   gap: 18px;
   align-items: start;
-  overflow-x: auto;
-  padding-bottom: 4px;
 }
 
 .host-landing-section {

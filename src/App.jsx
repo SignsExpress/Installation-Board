@@ -4020,6 +4020,7 @@ function HostLandingPage({
     canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="CoreBridge Explorer" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null,
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
+  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards].filter((items) => items.length).length;
 
   return (
     <div className="app-shell host-landing-shell">
@@ -4031,7 +4032,7 @@ function HostLandingPage({
           notifications={notifications}
         />
 
-        <section className="panel host-landing-panel">
+        <section className="panel host-landing-panel" style={{ "--host-landing-columns": sectionCount }}>
           <div className="host-landing-sections">
             <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
             <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
@@ -4112,6 +4113,7 @@ function ClientLandingPage({
     canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
     canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
   ].filter(Boolean);
+  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards].filter((items) => items.length).length;
 
   return (
     <div className="app-shell host-landing-shell client-landing-shell">
@@ -4123,7 +4125,7 @@ function ClientLandingPage({
           notifications={notifications}
         />
 
-        <section className="panel host-landing-panel">
+        <section className="panel host-landing-panel" style={{ "--host-landing-columns": sectionCount }}>
           <div className="host-landing-sections">
             <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
             <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
