@@ -8036,11 +8036,20 @@ button {
   gap: 8px;
 }
 
+.morning-meeting-section-action-bar {
+  display: flex;
+  padding: 10px 10px 0;
+}
+
 .morning-meeting-section-button {
-  min-height: 30px;
-  padding: 0 10px;
-  border-radius: 9px;
-  font-size: 0.68rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 11px;
+  font-size: 0.74rem;
   font-weight: 800;
 }
 
@@ -9057,6 +9066,7 @@ button {
   .morning-meeting-installer-stop-head,
   .morning-meeting-installer-plan-return,
   .morning-meeting-section-head-actions,
+  .morning-meeting-section-action-bar,
   .morning-meeting-installer-plan-feedback {
     grid-template-columns: 1fr;
     flex-direction: column;

@@ -16835,10 +16835,10 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job", acti
           <h2>{displayTitle}</h2>
         </div>
         <div className="morning-meeting-section-head-actions">
-          {action}
           <strong>{items.length}</strong>
         </div>
       </div>
+      {action ? <div className="morning-meeting-section-action-bar">{action}</div> : null}
       <div className="morning-meeting-list">
         {items.length
           ? items.map((item) => <MorningMeetingItem key={`${kind}-${item.id}`} item={item} kind={kind} />)
@@ -17934,14 +17934,14 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
                 title="Today’s Jobs"
                 subtitle={formatTvSectionDate(outline.todayIso)}
                 items={outline.todayJobs}
-                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("today")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "today" ? "Planning..." : "Create installer plan"}</button>}
+                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("today")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "today" ? "Planning today's route..." : "Create today's installer plan"}</button>}
               />
               <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
               <MorningMeetingSection
                 title="Tomorrow's Installs"
                 subtitle={formatTvSectionDate(outline.tomorrowIso)}
                 items={outline.tomorrowJobs}
-                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("tomorrow")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "tomorrow" ? "Planning..." : "Create installer plan"}</button>}
+                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("tomorrow")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "tomorrow" ? "Planning tomorrow's route..." : "Create tomorrow's installer plan"}</button>}
               />
             </main>
             <MorningMeetingInstallerPlan
