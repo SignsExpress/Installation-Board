@@ -13849,6 +13849,20 @@ button {
     width: 100%;
   }
 
+  .host-landing-sections {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .host-landing-section,
+  .host-landing-section .host-landing-actions {
+    display: contents;
+  }
+
+  .host-landing-section-head {
+    display: none;
+  }
+
   .host-landing-actions {
     grid-template-columns: 1fr;
   }
