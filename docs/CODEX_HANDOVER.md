@@ -61,7 +61,7 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - Job Materials Report item summaries display in a four-column desktop grid beneath each job reference.
 - The report toolbar now shows a live loading state while the background fetch runs, with steps such as CoreBridge lookup and AI simplification.
 - Material names in the visible checklist should have trailing stock sizes stripped out so production sees the clean material name first.
-- The report now includes an `Order materials` workflow that lets users tick/untick the material list, finalise it, group like materials, estimate panel sheet usage, estimate roll usage, and suggest panel offcuts from waste.
+- The report now includes an `Order materials` workflow that lets users tick/untick the material list, finalise it, group like materials, estimate panel sheet usage, and suggest panel offcuts from waste. Vinyls and laminates stay as a clean grouped list without a roll-usage calculator.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`

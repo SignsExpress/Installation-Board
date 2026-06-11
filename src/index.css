@@ -8188,10 +8188,10 @@ button {
 }
 
 .morning-meeting-materials-head {
-  padding: 18px;
-  border: 1px solid #e4dff0;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #fcfbff 0%, #f7f9ff 100%);
+  padding: 8px 2px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .morning-meeting-materials-summary {
@@ -8234,7 +8234,7 @@ button {
 }
 
 .morning-meeting-material-fetch {
-  min-width: 156px;
+  min-width: 230px;
 }
 
 .morning-meeting-material-fetch-inner {
@@ -8267,69 +8267,19 @@ button {
   gap: 10px;
 }
 
-.morning-meeting-material-status-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #4c1d95;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  text-transform: none;
-}
-
-.morning-meeting-material-status-chip.is-loading {
-  background: #f4ecff;
-}
-
-.morning-meeting-material-status-chip.is-ready {
-  background: #eaf8ef;
-  color: #166534;
-}
-
 .morning-meeting-material-status-meta {
   color: #667085;
   font-size: 0.72rem;
   font-weight: 700;
 }
 
-.morning-meeting-material-progress {
-  display: grid;
-  gap: 6px;
-  max-width: 560px;
-}
-
-.morning-meeting-material-progress-bar {
-  overflow: hidden;
-  height: 8px;
-  border-radius: 999px;
-  background: #e6eaf3;
-}
-
-.morning-meeting-material-progress-bar span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #76529a 0%, #8b5cf6 100%);
-  transition: width 220ms ease;
-}
-
-.morning-meeting-material-progress small {
-  color: #667085;
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
 .morning-meeting-material-planner {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 16px;
   border: 1px solid #e5eaf1;
-  border-radius: 18px;
-  background: #fbfcff;
+  border-radius: 16px;
+  background: #fcfdff;
 }
 
 .morning-meeting-material-planner-head {
@@ -8359,8 +8309,12 @@ button {
 
 .morning-meeting-material-planner-settings {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  padding: 12px;
+  border: 1px solid #e8edf4;
+  border-radius: 14px;
+  background: #fff;
 }
 
 .morning-meeting-material-planner-settings label {
@@ -8379,7 +8333,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 24px;
+  padding-top: 22px;
 }
 
 .morning-meeting-material-planner-settings input,
@@ -8403,14 +8357,14 @@ button {
 .morning-meeting-material-order-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  padding: 12px 14px;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 13px;
 }
 
 .morning-meeting-material-order-row.is-selected {
   border-color: #cdbbe6;
-  box-shadow: 0 10px 24px rgba(118, 82, 154, 0.08);
+  box-shadow: 0 8px 18px rgba(118, 82, 154, 0.08);
 }
 
 .morning-meeting-material-order-row > div,
@@ -8423,13 +8377,13 @@ button {
 .morning-meeting-material-order-row strong,
 .morning-meeting-material-plan-block strong {
   color: #172033;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
 }
 
 .morning-meeting-material-order-row span,
 .morning-meeting-material-plan-card-head > span {
   color: #76529a;
-  font-size: 0.68rem;
+  font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: none;
@@ -8440,7 +8394,7 @@ button {
 .morning-meeting-material-plan-block span,
 .morning-meeting-material-plan-block em {
   color: #667085;
-  font-size: 0.7rem;
+  font-size: 0.67rem;
   font-style: normal;
 }
 
