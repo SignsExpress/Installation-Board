@@ -8036,24 +8036,6 @@ button {
   gap: 8px;
 }
 
-.morning-meeting-section-action-bar {
-  display: flex;
-  padding: 10px 10px 0;
-}
-
-/* Keep installer-plan actions obvious above the install lists during deploy recovery nudges. */
-.morning-meeting-section-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 38px;
-  padding: 0 14px;
-  border-radius: 11px;
-  font-size: 0.74rem;
-  font-weight: 800;
-}
-
 .morning-meeting-section-head h2 {
   margin: 4px 0 0;
   color: #172033;
@@ -8075,140 +8057,6 @@ button {
   display: grid;
   gap: 10px;
   padding: 8px;
-}
-
-.morning-meeting-installer-plan {
-  display: grid;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 14px;
-  border: 1px solid #dfe5ee;
-  border-radius: 12px;
-  background: #fff;
-}
-
-.morning-meeting-installer-plan-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 16px;
-}
-
-.morning-meeting-installer-plan-head span {
-  color: #76529a;
-  font-size: 0.67rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.morning-meeting-installer-plan-head h2 {
-  margin: 4px 0;
-  color: #172033;
-  font-size: 0.95rem;
-}
-
-.morning-meeting-installer-plan-head p,
-.morning-meeting-installer-stop-head p,
-.morning-meeting-installer-stop-copy p {
-  margin: 0;
-  color: #667085;
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-
-.morning-meeting-installer-plan-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.morning-meeting-installer-plan-feedback {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-}
-
-.morning-meeting-installer-plan-feedback textarea {
-  width: 100%;
-  min-height: 76px;
-  resize: vertical;
-}
-
-.morning-meeting-installer-plan-summary {
-  display: grid;
-  gap: 6px;
-  padding: 12px;
-  border-radius: 10px;
-  background: #f8fafc;
-}
-
-.morning-meeting-installer-plan-summary strong {
-  color: #172033;
-  font-size: 0.88rem;
-}
-
-.morning-meeting-installer-plan-summary span {
-  color: #667085;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.morning-meeting-installer-plan-stops {
-  display: grid;
-  gap: 10px;
-}
-
-.morning-meeting-installer-stop {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #dfe5ee;
-  border-radius: 10px;
-  background: #fcfdff;
-}
-
-.morning-meeting-installer-stop-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 12px;
-}
-
-.morning-meeting-installer-stop-head span {
-  color: #76529a;
-  font-size: 0.64rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.morning-meeting-installer-stop-head h3 {
-  margin: 3px 0;
-  color: #172033;
-  font-size: 0.9rem;
-}
-
-.morning-meeting-installer-stop-head strong {
-  flex: 0 0 auto;
-  color: #67428b;
-  font-size: 0.78rem;
-}
-
-.morning-meeting-installer-stop-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.morning-meeting-installer-plan-return {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 12px;
-  border-radius: 10px;
-  background: #eefbf3;
-  color: #14532d;
 }
 
 .morning-meeting-item {
@@ -9063,12 +8911,7 @@ button {
     align-items: stretch;
   }
 
-  .morning-meeting-installer-plan-head,
-  .morning-meeting-installer-stop-head,
-  .morning-meeting-installer-plan-return,
-  .morning-meeting-section-head-actions,
-  .morning-meeting-section-action-bar,
-  .morning-meeting-installer-plan-feedback {
+  .morning-meeting-section-head-actions {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
