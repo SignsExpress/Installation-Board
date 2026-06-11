@@ -45,7 +45,9 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 
 - Shows yesterday's installation jobs, today's installation jobs, and artwork approved yesterday.
 - Also shows tomorrow's installation jobs.
-- Yesterday's installs can be selected and given job-specific meeting notes. Saving applies each note to every matching `EST`/`ORD`/`INV` instance on the Installation Board.
+- Yesterday's installs can be selected and given job-specific Morning Meeting notes. Saving applies each note to every matching `EST`/`ORD`/`INV` instance on the Installation Board.
+- Morning Meeting notes are stored separately from ordinary job notes and appear in a dedicated green note box on Installation Board cards.
+- Typing `@` in a job-specific Morning Meeting note suggests portal users. Selected mentions use the full name and appear bold in the emailed meeting summary.
 - Includes job references, customers, descriptions, values, installers/job types, addresses, contacts, and relevant notes.
 - Meeting notes can be entered and emailed to every user with an Email value in their Permissions profile.
 - Meeting emails use a cleaner card layout and place persisted job notes directly beneath the relevant jobs.
@@ -101,6 +103,7 @@ The Design Board has recently been substantially redesigned:
 - RAMS first-aid facilities gained support for a custom hospital when postcode lookup is incomplete.
 - Design approval targets and progress bars were added.
 - Design cards gained notes, contact numbers, net totals, priority state, and improved layout.
+- Notifications are grouped under day headings, newest day first, with a two-column desktop feed.
 
 ## Important Known Issue To Preserve
 

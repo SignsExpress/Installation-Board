@@ -2082,6 +2082,31 @@ function formatNotificationDate(value) {
   }).format(parsed);
 }
 
+function getNotificationDay(value) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { key: "unknown", label: "Earlier" };
+  const key = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Europe/London"
+  }).format(parsed);
+  const todayKey = getLocalTodayIso();
+  const yesterdayKey = toIsoDate(addDays(parseIsoDate(todayKey), -1));
+  const label = key === todayKey
+    ? "Today"
+    : key === yesterdayKey
+      ? "Yesterday"
+      : new Intl.DateTimeFormat("en-GB", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          timeZone: "Europe/London"
+        }).format(parsed);
+  return { key, label };
+}
+
 function toMonthIdFromIso(value) {
   const parsed = parseIsoDate(value);
   if (!parsed) return "";
@@ -2315,6 +2340,9 @@ function renderJobCardContent({
         {isCondensed && job.notes ? (
           <p className="job-notes compact condensed-note"><b>Notes:</b> {job.notes}</p>
         ) : null}
+        {isCondensed && job.morningMeetingNotes ? (
+          <p className="job-notes compact condensed-note morning-meeting-card-note"><b>Morning meeting:</b> {job.morningMeetingNotes}</p>
+        ) : null}
         {!isCondensed ? (
           <>
             <div className="job-meta-grid">
@@ -2323,6 +2351,7 @@ function renderJobCardContent({
               <p><b>Number:</b> {job.number || "-"}</p>
             </div>
             {job.notes ? <p className="job-notes compact"><b>Notes:</b> {job.notes}</p> : null}
+            {job.morningMeetingNotes ? <p className="job-notes compact morning-meeting-card-note"><b>Morning meeting:</b> {job.morningMeetingNotes}</p> : null}
             <div className="job-actions">
               {!isClientMode ? (
                 <>
@@ -3628,6 +3657,42 @@ function PermissionsPanel({
   );
 }
 
+function NotificationFeedCard({ notification, onOpenNotification, onMarkNotificationRead }) {
+  const category = getNotificationCategory(notification);
+  const CategoryIcon = category.icon;
+  const formattedMessage = formatNotificationMessage(notification.message);
+  const formattedTimestamp = formatNotificationDate(notification.createdAt);
+  return (
+    <article className={`notification-feed-card ${notification.read ? "read" : "unread"}`}>
+      <button type="button" className="notification-feed-main" onClick={() => onOpenNotification(notification)}>
+        <span className={`notification-feed-icon ${category.className}`}>
+          <CategoryIcon />
+        </span>
+        <div className="notification-feed-copy">
+          <div className="notification-feed-top">
+            <div className="notification-feed-title-row">
+              <strong>{notification.title}</strong>
+              {formattedTimestamp ? <time className="notification-feed-time" dateTime={notification.createdAt}>{formattedTimestamp}</time> : null}
+            </div>
+            <div className="notification-feed-meta-row">
+              <span className={`notification-feed-tag ${category.className}`}>{category.label}</span>
+              {!notification.read ? <span className="notification-feed-status">Unread</span> : null}
+            </div>
+          </div>
+          <p className="notification-feed-message">{formattedMessage || notification.message}</p>
+        </div>
+      </button>
+      <div className="notification-feed-actions">
+        {!notification.read ? (
+          <button type="button" className="text-button" onClick={() => onMarkNotificationRead(notification.id)}>
+            Mark read
+          </button>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 function NotificationsPage({
   currentUser,
   onLogout,
@@ -3663,6 +3728,16 @@ function NotificationsPage({
     if (activeFilter === "all") return true;
     if (activeFilter === "unread") return !notification.read;
     return category === activeFilter;
+  });
+  const notificationDays = Object.values(filteredNotifications.reduce((groups, notification) => {
+    const day = getNotificationDay(notification.createdAt);
+    if (!groups[day.key]) groups[day.key] = { ...day, notifications: [] };
+    groups[day.key].notifications.push(notification);
+    return groups;
+  }, {})).sort((left, right) => {
+    if (left.key === "unknown") return 1;
+    if (right.key === "unknown") return -1;
+    return right.key.localeCompare(left.key);
   });
 
   return (
@@ -3770,57 +3845,25 @@ function NotificationsPage({
           </div>
 
           {filteredNotifications.length ? (
-                <div className="notifications-feed">
-                  {filteredNotifications.map((notification) => {
-                    const category = getNotificationCategory(notification);
-                    const CategoryIcon = category.icon;
-                    const formattedMessage = formatNotificationMessage(notification.message);
-                    const formattedTimestamp = formatNotificationDate(notification.createdAt);
-                    return (
-                      <article
+            <div className="notifications-days">
+              {notificationDays.map((day) => (
+                <section key={day.key} className="notifications-day">
+                  <div className="notifications-day-head">
+                    <h3>{day.label}</h3>
+                    <span>{day.notifications.length}</span>
+                  </div>
+                  <div className="notifications-feed">
+                    {day.notifications.map((notification) => (
+                      <NotificationFeedCard
                         key={notification.id}
-                        className={`notification-feed-card ${notification.read ? "read" : "unread"}`}
-                      >
-                        <button
-                          type="button"
-                          className="notification-feed-main"
-                          onClick={() => onOpenNotification(notification)}
-                        >
-                          <span className={`notification-feed-icon ${category.className}`}>
-                            <CategoryIcon />
-                          </span>
-                          <div className="notification-feed-copy">
-                            <div className="notification-feed-top">
-                              <div className="notification-feed-title-row">
-                                <strong>{notification.title}</strong>
-                                {formattedTimestamp ? (
-                                  <time className="notification-feed-time" dateTime={notification.createdAt}>
-                                    {formattedTimestamp}
-                                  </time>
-                                ) : null}
-                              </div>
-                              <div className="notification-feed-meta-row">
-                                <span className={`notification-feed-tag ${category.className}`}>{category.label}</span>
-                                {!notification.read ? <span className="notification-feed-status">Unread</span> : null}
-                              </div>
-                            </div>
-                            <p className="notification-feed-message">{formattedMessage || notification.message}</p>
-                          </div>
-                        </button>
-                        <div className="notification-feed-actions">
-                          {!notification.read ? (
-                            <button
-                              type="button"
-                              className="text-button"
-                              onClick={() => onMarkNotificationRead(notification.id)}
-                            >
-                              Mark read
-                            </button>
-                          ) : null}
-                        </div>
-                      </article>
-                    );
-                  })}
+                        notification={notification}
+                        onOpenNotification={onOpenNotification}
+                        onMarkNotificationRead={onMarkNotificationRead}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
               </div>
             ) : (
             <div className="notifications-empty">No notifications in this view.</div>
@@ -16593,6 +16636,7 @@ function MorningMeetingItem({ item, kind = "job" }) {
         {kind === "approval" && item?.approvedAt ? <div><dt>Approved</dt><dd>{formatDateTime(item.approvedAt)}</dd></div> : null}
       </dl>
       {item?.notes ? <p className="morning-meeting-note"><b>Notes:</b> {item.notes}</p> : null}
+      {item?.morningMeetingNotes ? <p className="morning-meeting-note is-meeting"><b>Morning meeting:</b> {item.morningMeetingNotes}</p> : null}
       {item?.designerNote ? <p className="morning-meeting-note is-designer"><b>Designer note:</b> {item.designerNote}</p> : null}
     </article>
   );
@@ -16625,7 +16669,73 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
   );
 }
 
-function MorningMeetingJobNotes({ jobs = [], selectedJobIds, noteDrafts, onToggle, onChange, onSave, saving, status }) {
+function MorningMeetingMentionTextarea({ value, people = [], onChange, onFocus, placeholder }) {
+  const textareaRef = useRef(null);
+  const [mentionMatch, setMentionMatch] = useState(null);
+
+  function refreshMention(nextValue, caret) {
+    const beforeCaret = nextValue.slice(0, caret);
+    const match = beforeCaret.match(/(?:^|\s)@([^@\n]*)$/);
+    if (!match) {
+      setMentionMatch(null);
+      return;
+    }
+    const query = match[1].trim().toLowerCase();
+    const suggestions = people
+      .filter((person) => !query || String(person).toLowerCase().split(/\s+/).some((part) => part.startsWith(query)))
+      .slice(0, 6);
+    setMentionMatch(suggestions.length ? {
+      start: caret - match[1].length - 1,
+      end: caret,
+      suggestions
+    } : null);
+  }
+
+  function selectPerson(person) {
+    if (!mentionMatch) return;
+    const nextValue = `${value.slice(0, mentionMatch.start)}@${person} ${value.slice(mentionMatch.end)}`;
+    const nextCaret = mentionMatch.start + person.length + 2;
+    onChange(nextValue);
+    setMentionMatch(null);
+    window.setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCaret, nextCaret);
+    }, 0);
+  }
+
+  return (
+    <div className="morning-meeting-mention-field">
+      <textarea
+        ref={textareaRef}
+        rows={2}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+          refreshMention(event.target.value, event.target.selectionStart);
+        }}
+        onClick={(event) => refreshMention(event.currentTarget.value, event.currentTarget.selectionStart)}
+        onFocus={(event) => {
+          onFocus?.();
+          refreshMention(event.currentTarget.value, event.currentTarget.selectionStart);
+        }}
+        onBlur={() => window.setTimeout(() => setMentionMatch(null), 120)}
+        placeholder={placeholder}
+      />
+      {mentionMatch ? (
+        <div className="morning-meeting-mention-suggestions">
+          {mentionMatch.suggestions.map((person) => (
+            <button key={person} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => selectPerson(person)}>
+              <span>{getInitials(person)}</span>
+              <strong>{person}</strong>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MorningMeetingJobNotes({ jobs = [], people = [], selectedJobIds, noteDrafts, onToggle, onChange, onSave, saving, status }) {
   return (
     <section className="morning-meeting-job-notes">
       <div className="morning-meeting-job-notes-head">
@@ -16641,23 +16751,23 @@ function MorningMeetingJobNotes({ jobs = [], selectedJobIds, noteDrafts, onToggl
         {jobs.length ? jobs.map((job) => {
           const selected = selectedJobIds.has(job.id);
           return (
-            <label key={job.id} className={`morning-meeting-job-note-row ${selected ? "is-selected" : ""}`}>
+            <div key={job.id} className={`morning-meeting-job-note-row ${selected ? "is-selected" : ""}`}>
               <input type="checkbox" checked={selected} onChange={() => onToggle(job.id)} />
               <div className="morning-meeting-job-note-identity">
                 <strong>{job.orderReference || "No reference"}</strong>
                 <span>{job.customerName || "Unnamed customer"}</span>
                 <small>{job.description || "No description added."}</small>
               </div>
-              <textarea
-                rows={2}
-                value={noteDrafts[job.id] ?? job.notes ?? ""}
-                onChange={(event) => onChange(job.id, event.target.value)}
+              <MorningMeetingMentionTextarea
+                value={noteDrafts[job.id] ?? job.morningMeetingNotes ?? ""}
+                people={people}
+                onChange={(note) => onChange(job.id, note)}
                 onFocus={() => {
                   if (!selected) onToggle(job.id);
                 }}
                 placeholder="Add a note against this job..."
               />
-            </label>
+            </div>
           );
         }) : <p className="morning-meeting-empty">There were no installations yesterday.</p>}
       </div>
@@ -16748,8 +16858,8 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
           const existingNotes = {};
           const selected = new Set();
           (payload.yesterdayJobs || []).forEach((job) => {
-            existingNotes[job.id] = job.notes || "";
-            if (job.notes) selected.add(job.id);
+            existingNotes[job.id] = job.morningMeetingNotes || "";
+            if (job.morningMeetingNotes) selected.add(job.id);
           });
           setJobNoteDrafts(existingNotes);
           setSelectedJobIds(selected);
@@ -16849,6 +16959,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
         {outline ? (
           <MorningMeetingJobNotes
             jobs={outline.yesterdayJobs}
+            people={outline.people || []}
             selectedJobIds={selectedJobIds}
             noteDrafts={jobNoteDrafts}
             onToggle={toggleJobNote}

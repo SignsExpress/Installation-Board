@@ -2374,7 +2374,26 @@ function buildMorningMeetingEmail(payload, notes, senderName) {
   };
 }
 
-function buildMorningMeetingEmailV2(payload, notes, senderName) {
+function renderMorningMeetingMentions(value, people = []) {
+  let rendered = escapeHtml(value);
+  [...new Set(people.map((person) => String(person || "").trim()).filter(Boolean))]
+    .sort((left, right) => right.length - left.length)
+    .forEach((person) => {
+      const mention = escapeHtml(`@${person}`);
+      rendered = rendered.split(mention).join(`<strong style="color:#166534;">${mention}</strong>`);
+    });
+  return rendered.replace(/\r?\n/g, "<br />");
+}
+
+function getMorningMeetingPeople(usersStore) {
+  return [...new Set(
+    (usersStore?.users || [])
+      .map((user) => String(sanitizeUser(user).displayName || "").trim())
+      .filter(Boolean)
+  )].sort((left, right) => left.localeCompare(right));
+}
+
+function buildMorningMeetingEmailV2(payload, notes, senderName, people = []) {
   const sections = [
     ["Yesterday's installs", payload.yesterdayJobs],
     ["Today's installs", payload.todayJobs],
@@ -2383,7 +2402,7 @@ function buildMorningMeetingEmailV2(payload, notes, senderName) {
   ];
   const summarize = (item = {}) => {
     const summary = `${item.orderReference || "No reference"} - ${item.customerName || "Unnamed customer"}: ${item.description || "No description added"}`;
-    return item.notes ? `${summary}\n  Note: ${item.notes}` : summary;
+    return item.morningMeetingNotes ? `${summary}\n  Morning meeting: ${item.morningMeetingNotes}` : summary;
   };
   const textSections = sections.map(([title, items]) => [
     title,
@@ -2398,7 +2417,7 @@ function buildMorningMeetingEmailV2(payload, notes, senderName) {
             <div style="color:#67428b;font-size:11px;font-weight:700;">${escapeHtml(item.orderReference || "No reference")}</div>
             <strong style="display:block;margin-top:2px;color:#172033;font-size:13px;">${escapeHtml(item.customerName || "Unnamed customer")}</strong>
             <div style="margin-top:3px;color:#526075;font-size:12px;">${escapeHtml(item.description || "No description added.")}</div>
-            ${item.notes ? `<div style="margin-top:7px;padding:7px 8px;border-radius:5px;background:#fff4f2;color:#a82c25;font-size:12px;"><strong>Job note:</strong> ${escapeHtml(item.notes)}</div>` : ""}
+            ${item.morningMeetingNotes ? `<div style="margin-top:7px;padding:7px 8px;border:1px solid #bbdfc8;border-radius:5px;background:#eefbf3;color:#166534;font-size:12px;"><strong>Morning meeting:</strong> ${renderMorningMeetingMentions(item.morningMeetingNotes, people)}</div>` : ""}
           </div>
         `).join("")
         : '<p style="margin:0;color:#667085;font-size:12px;">Nothing to discuss.</p>'}
@@ -2446,7 +2465,7 @@ function applyMorningMeetingJobNotes(store, entries = []) {
         ? getCoreBridgeReferenceFamilyKey(job?.orderReference || "") === referenceKey
         : String(job?.id || "") === String(sourceJob.id || "");
       if (!matches) return;
-      jobs[index] = sanitizeJob({ ...job, notes: note, createdAt: job.createdAt });
+      jobs[index] = sanitizeJob({ ...job, morningMeetingNotes: note, createdAt: job.createdAt });
       updatedCount += 1;
     });
   });
@@ -3027,6 +3046,7 @@ function sanitizeJob(payload) {
     photos: rawPhotos,
     ramsDocuments: rawRamsDocuments,
     notes: String(payload.notes || "").trim(),
+    morningMeetingNotes: String(payload.morningMeetingNotes || "").trim(),
     createdAt: String(payload.createdAt || new Date().toISOString()),
     updatedAt: new Date().toISOString()
   };
@@ -10517,7 +10537,8 @@ function createServer() {
   app.get("/api/morning-meeting", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     try {
-      response.json(buildMorningMeetingPayload(await readStore()));
+      const [store, usersStore] = await Promise.all([readStore(), readUsersStore()]);
+      response.json({ ...buildMorningMeetingPayload(store), people: getMorningMeetingPeople(usersStore) });
     } catch (error) {
       console.error("Could not build Morning Meeting outline.", error.message || error);
       response.status(500).json({ error: "Could not load the Morning Meeting outline." });
@@ -10527,12 +10548,12 @@ function createServer() {
   app.post("/api/morning-meeting/job-notes", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
-      const store = await readStore();
+      const [store, usersStore] = await Promise.all([readStore(), readUsersStore()]);
       const updatedCount = applyMorningMeetingJobNotes(store, request.body?.jobNotes);
       const savedStore = await writeStore(store);
       const payload = buildMorningMeetingPayload(savedStore);
       broadcast("board-updated", buildBoardRowsFromStore(savedStore));
-      response.json({ ...payload, updatedCount });
+      response.json({ ...payload, people: getMorningMeetingPeople(usersStore), updatedCount });
     } catch (error) {
       console.error("Could not save Morning Meeting job notes.", error.message || error);
       response.status(500).json({ error: "Could not save the job notes." });
@@ -10562,7 +10583,8 @@ function createServer() {
       const email = buildMorningMeetingEmailV2(
         buildMorningMeetingPayload(store),
         notes,
-        String(request.user?.displayName || "SX Portal")
+        String(request.user?.displayName || "SX Portal"),
+        getMorningMeetingPeople(usersStore)
       );
       const transporter = nodemailer.createTransport(transportConfig);
       await transporter.sendMail({
@@ -11473,6 +11495,9 @@ app.get("/api/corebridge/orders", async (request, response) => {
     const existingJob = index >= 0 ? sanitizeJob(store.jobs[index]) : null;
     if (index >= 0) {
       nextJob.createdAt = store.jobs[index].createdAt || nextJob.createdAt;
+      if (request.body?.morningMeetingNotes === undefined) {
+        nextJob.morningMeetingNotes = existingJob.morningMeetingNotes;
+      }
       store.jobs[index] = nextJob;
     } else {
       store.jobs.unshift(nextJob);
