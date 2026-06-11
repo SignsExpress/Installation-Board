@@ -44,8 +44,11 @@ The portal contains multiple operational modules including Installation Board, M
 The Morning Meeting Board is available at `/morning-meeting` and launches from the Installation Board.
 
 - Shows yesterday's installation jobs, today's installation jobs, and artwork approved yesterday.
+- Also shows tomorrow's installation jobs.
+- Yesterday's installs can be selected and given job-specific meeting notes. Saving applies each note to every matching `EST`/`ORD`/`INV` instance on the Installation Board.
 - Includes job references, customers, descriptions, values, installers/job types, addresses, contacts, and relevant notes.
 - Meeting notes can be entered and emailed to every user with an Email value in their Permissions profile.
+- Meeting emails use a cleaner card layout and place persisted job notes directly beneath the relevant jobs.
 - Uses the server SMTP configuration already shared with credit applications.
 - Can fetch and print a production stock-check sheet for yesterday's approved artwork.
 - The stock-check lookup finds the matching CoreBridge order, tries the available works-order endpoints and material subresources, and extracts allocated material quantity, unit, dimensions, and material name.

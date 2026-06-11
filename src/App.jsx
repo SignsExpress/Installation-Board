@@ -16599,12 +16599,20 @@ function MorningMeetingItem({ item, kind = "job" }) {
 }
 
 function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
+  const displayTitle = title.startsWith("Yesterday")
+    ? "Yesterday's Installs"
+    : title.startsWith("Today")
+      ? "Today's Installs"
+      : title;
+  const displaySubtitle = kind === "approval"
+    ? formatTvSectionDate(toIsoDate(addDays(parseIsoDate(getLocalTodayIso()), -1)))
+    : subtitle;
   return (
-    <section className="morning-meeting-section">
+    <section className={`morning-meeting-section ${kind === "approval" ? "is-approval-section" : ""} ${displayTitle.startsWith("Tomorrow") ? "is-tomorrow-section" : ""}`.trim()}>
       <div className="morning-meeting-section-head">
         <div>
-          <span>{subtitle}</span>
-          <h2>{title}</h2>
+          <span>{displaySubtitle}</span>
+          <h2>{displayTitle}</h2>
         </div>
         <strong>{items.length}</strong>
       </div>
@@ -16613,6 +16621,47 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
           ? items.map((item) => <MorningMeetingItem key={`${kind}-${item.id}`} item={item} kind={kind} />)
           : <p className="morning-meeting-empty">Nothing to discuss in this section.</p>}
       </div>
+    </section>
+  );
+}
+
+function MorningMeetingJobNotes({ jobs = [], selectedJobIds, noteDrafts, onToggle, onChange, onSave, saving, status }) {
+  return (
+    <section className="morning-meeting-job-notes">
+      <div className="morning-meeting-job-notes-head">
+        <div>
+          <strong>Notes against yesterday's installs</strong>
+          <span>Select a job and add a note. It will update every matching card on the Installation Board.</span>
+        </div>
+        <button className="primary-button" type="button" onClick={onSave} disabled={saving || !selectedJobIds.size}>
+          {saving ? "Saving..." : "Save job notes"}
+        </button>
+      </div>
+      <div className="morning-meeting-job-note-list">
+        {jobs.length ? jobs.map((job) => {
+          const selected = selectedJobIds.has(job.id);
+          return (
+            <label key={job.id} className={`morning-meeting-job-note-row ${selected ? "is-selected" : ""}`}>
+              <input type="checkbox" checked={selected} onChange={() => onToggle(job.id)} />
+              <div className="morning-meeting-job-note-identity">
+                <strong>{job.orderReference || "No reference"}</strong>
+                <span>{job.customerName || "Unnamed customer"}</span>
+                <small>{job.description || "No description added."}</small>
+              </div>
+              <textarea
+                rows={2}
+                value={noteDrafts[job.id] ?? job.notes ?? ""}
+                onChange={(event) => onChange(job.id, event.target.value)}
+                onFocus={() => {
+                  if (!selected) onToggle(job.id);
+                }}
+                placeholder="Add a note against this job..."
+              />
+            </label>
+          );
+        }) : <p className="morning-meeting-empty">There were no installations yesterday.</p>}
+      </div>
+      {status ? <span className="morning-meeting-job-notes-status">{status}</span> : null}
     </section>
   );
 }
@@ -16683,6 +16732,10 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [materialsPayload, setMaterialsPayload] = useState(null);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [materialsError, setMaterialsError] = useState("");
+  const [selectedJobIds, setSelectedJobIds] = useState(() => new Set());
+  const [jobNoteDrafts, setJobNoteDrafts] = useState({});
+  const [jobNotesSaving, setJobNotesSaving] = useState(false);
+  const [jobNotesStatus, setJobNotesStatus] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -16690,7 +16743,17 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
       .then(async (response) => {
         const payload = await readJsonResponse(response, "Could not load the Morning Meeting. Render may still be deploying the latest server.");
         if (!response.ok) throw new Error(payload.error || "Could not load the Morning Meeting.");
-        if (active) setOutline(payload);
+        if (active) {
+          setOutline(payload);
+          const existingNotes = {};
+          const selected = new Set();
+          (payload.yesterdayJobs || []).forEach((job) => {
+            existingNotes[job.id] = job.notes || "";
+            if (job.notes) selected.add(job.id);
+          });
+          setJobNoteDrafts(existingNotes);
+          setSelectedJobIds(selected);
+        }
       })
       .catch((loadError) => {
         if (active) setError(loadError.message || "Could not load the Morning Meeting.");
@@ -16700,11 +16763,48 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     };
   }, []);
 
+  function toggleJobNote(jobId) {
+    setSelectedJobIds((current) => {
+      const next = new Set(current);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+    setJobNotesStatus("");
+  }
+
+  async function saveJobNotes() {
+    if (!selectedJobIds.size || jobNotesSaving) return true;
+    setJobNotesSaving(true);
+    setJobNotesStatus("");
+    try {
+      const response = await fetch("/api/morning-meeting/job-notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobNotes: [...selectedJobIds].map((jobId) => ({ jobId, note: jobNoteDrafts[jobId] || "" }))
+        })
+      });
+      const payload = await readJsonResponse(response, "Could not reach the Morning Meeting job notes service.");
+      if (!response.ok) throw new Error(payload.error || "Could not save the job notes.");
+      setOutline(payload);
+      setJobNotesStatus(`Saved across ${payload.updatedCount || 0} Installation Board card${payload.updatedCount === 1 ? "" : "s"}.`);
+      return true;
+    } catch (saveError) {
+      setJobNotesStatus(saveError.message || "Could not save the job notes.");
+      return false;
+    } finally {
+      setJobNotesSaving(false);
+    }
+  }
+
   async function sendMeetingEmail() {
-    if (!meetingNotes.trim() || sending) return;
+    if (sending) return;
     setSending(true);
     setSendStatus("");
     try {
+      const saved = await saveJobNotes();
+      if (!saved) throw new Error("Save the selected job notes before emailing the office.");
       const response = await fetch("/api/morning-meeting/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -16746,27 +16846,34 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     <div className="app-shell morning-meeting-shell">
       <div className="page morning-meeting-page">
         <MainNavBar currentUser={currentUser} active="board" onLogout={onLogout} notifications={notifications} />
-        <div className="morning-meeting-toolbar">
-          <strong>Morning Meeting</strong>
-          <button className="ghost-button" type="button" onClick={() => window.location.assign("/board")}>Back to Installation Board</button>
-        </div>
+        {outline ? (
+          <MorningMeetingJobNotes
+            jobs={outline.yesterdayJobs}
+            selectedJobIds={selectedJobIds}
+            noteDrafts={jobNoteDrafts}
+            onToggle={toggleJobNote}
+            onChange={(jobId, note) => {
+              setJobNoteDrafts((current) => ({ ...current, [jobId]: note }));
+              setJobNotesStatus("");
+            }}
+            onSave={saveJobNotes}
+            saving={jobNotesSaving}
+            status={jobNotesStatus}
+          />
+        ) : null}
         <section className="morning-meeting-notes-panel">
-          <div className="morning-meeting-notes-copy">
-            <span>Meeting notes and actions</span>
-            <p>These notes will be emailed with yesterday's jobs, today's jobs and yesterday's approved artwork.</p>
-          </div>
           <textarea
             value={meetingNotes}
             onChange={(event) => {
               setMeetingNotes(event.target.value);
               setSendStatus("");
             }}
-            placeholder="Add decisions, actions, reminders and anything the office needs to know..."
+            placeholder="General meeting notes, actions and reminders..."
             rows={5}
           />
           <div className="morning-meeting-notes-actions">
             {sendStatus ? <span>{sendStatus}</span> : <span>Recipients come from the Email field in each user's Permissions profile.</span>}
-            <button className="primary-button" type="button" onClick={sendMeetingEmail} disabled={!meetingNotes.trim() || sending}>
+            <button className="primary-button" type="button" onClick={sendMeetingEmail} disabled={sending || jobNotesSaving}>
               {sending ? "Sending..." : "Finish meeting and email office"}
             </button>
           </div>
@@ -16779,6 +16886,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
               <MorningMeetingSection title="Yesterday’s Jobs" subtitle={formatTvSectionDate(outline.yesterdayIso)} items={outline.yesterdayJobs} />
               <MorningMeetingSection title="Today’s Jobs" subtitle={formatTvSectionDate(outline.todayIso)} items={outline.todayJobs} />
               <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
+              <MorningMeetingSection title="Tomorrow's Installs" subtitle={formatTvSectionDate(outline.tomorrowIso)} items={outline.tomorrowJobs} />
             </main>
             <MorningMeetingMaterials
               payload={materialsPayload}

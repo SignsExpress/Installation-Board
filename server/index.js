@@ -2300,6 +2300,7 @@ function buildBoardRowsFromStore(store, options = {}) {
 function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
   const todayIso = toIsoDate(today);
   const yesterdayIso = toIsoDate(addDays(today, -1));
+  const tomorrowIso = toIsoDate(addDays(today, 1));
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
   const filteringCards = sanitizeFilteringBoardState(store?.filteringBoard).cards;
   const sortJobs = (items) => [...items].sort((left, right) =>
@@ -2310,8 +2311,10 @@ function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
     generatedAt: new Date().toISOString(),
     todayIso,
     yesterdayIso,
+    tomorrowIso,
     yesterdayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === yesterdayIso))),
     todayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === todayIso))),
+    tomorrowJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === tomorrowIso))),
     approvedYesterday: filteringCards
       .filter((card) => {
         const approvedAt = new Date(card?.approvedAt || "");
@@ -2369,6 +2372,87 @@ function buildMorningMeetingEmail(payload, notes, senderName) {
       </div>
     `
   };
+}
+
+function buildMorningMeetingEmailV2(payload, notes, senderName) {
+  const sections = [
+    ["Yesterday's installs", payload.yesterdayJobs],
+    ["Today's installs", payload.todayJobs],
+    ["Tomorrow's installs", payload.tomorrowJobs],
+    ["Approved artwork", payload.approvedYesterday]
+  ];
+  const summarize = (item = {}) => {
+    const summary = `${item.orderReference || "No reference"} - ${item.customerName || "Unnamed customer"}: ${item.description || "No description added"}`;
+    return item.notes ? `${summary}\n  Note: ${item.notes}` : summary;
+  };
+  const textSections = sections.map(([title, items]) => [
+    title,
+    ...(items.length ? items.map((item) => `- ${summarize(item)}`) : ["- Nothing to discuss"])
+  ].join("\n"));
+  const htmlSections = sections.map(([title, items]) => `
+    <section style="margin-top:20px;">
+      <h2 style="margin:0 0 8px;color:#172033;font-size:16px;">${escapeHtml(title)}</h2>
+      ${items.length
+        ? items.map((item) => `
+          <div style="margin:0 0 8px;padding:11px 12px;border:1px solid #dfe5ee;border-left:3px solid #67428b;border-radius:7px;background:#ffffff;">
+            <div style="color:#67428b;font-size:11px;font-weight:700;">${escapeHtml(item.orderReference || "No reference")}</div>
+            <strong style="display:block;margin-top:2px;color:#172033;font-size:13px;">${escapeHtml(item.customerName || "Unnamed customer")}</strong>
+            <div style="margin-top:3px;color:#526075;font-size:12px;">${escapeHtml(item.description || "No description added.")}</div>
+            ${item.notes ? `<div style="margin-top:7px;padding:7px 8px;border-radius:5px;background:#fff4f2;color:#a82c25;font-size:12px;"><strong>Job note:</strong> ${escapeHtml(item.notes)}</div>` : ""}
+          </div>
+        `).join("")
+        : '<p style="margin:0;color:#667085;font-size:12px;">Nothing to discuss.</p>'}
+    </section>
+  `).join("");
+  const todayLabel = formatBoardNotificationDate(payload.todayIso);
+  return {
+    subject: `Morning Meeting - ${todayLabel}`,
+    text: [
+      `Morning Meeting - ${todayLabel}`,
+      `Sent by ${senderName}`,
+      "",
+      ...(notes ? ["Meeting notes and actions", notes, ""] : []),
+      ...textSections
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.5;">
+        <h1 style="margin:0 0 4px;font-size:22px;">Morning Meeting</h1>
+        <p style="margin:0 0 16px;color:#667085;font-size:12px;">${escapeHtml(todayLabel)} - Sent by ${escapeHtml(senderName)}</p>
+        ${notes ? `<div style="padding:12px 14px;border:1px solid #ded5e8;border-radius:7px;background:#f8f5fb;">
+          <strong style="color:#4f2f72;font-size:13px;">Meeting notes and actions</strong>
+          <p style="margin:6px 0 0;white-space:pre-wrap;font-size:12px;">${escapeHtml(notes)}</p>
+        </div>` : ""}
+        ${htmlSections}
+      </div>
+    `
+  };
+}
+
+function applyMorningMeetingJobNotes(store, entries = []) {
+  const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
+  const processedKeys = new Set();
+  let updatedCount = 0;
+
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const sourceJob = jobs.find((job) => String(job?.id || "") === String(entry?.jobId || ""));
+    if (!sourceJob) return;
+    const referenceKey = getCoreBridgeReferenceFamilyKey(sourceJob.orderReference || "");
+    const updateKey = referenceKey || `job:${sourceJob.id}`;
+    if (processedKeys.has(updateKey)) return;
+    processedKeys.add(updateKey);
+    const note = String(entry?.note || "").trim();
+    jobs.forEach((job, index) => {
+      const matches = referenceKey
+        ? getCoreBridgeReferenceFamilyKey(job?.orderReference || "") === referenceKey
+        : String(job?.id || "") === String(sourceJob.id || "");
+      if (!matches) return;
+      jobs[index] = sanitizeJob({ ...job, notes: note, createdAt: job.createdAt });
+      updatedCount += 1;
+    });
+  });
+
+  store.jobs = jobs;
+  return updatedCount;
 }
 
 function sanitizeJobPhoto(payload) {
@@ -10440,12 +10524,23 @@ function createServer() {
     }
   });
 
+  app.post("/api/morning-meeting/job-notes", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const updatedCount = applyMorningMeetingJobNotes(store, request.body?.jobNotes);
+      const savedStore = await writeStore(store);
+      const payload = buildMorningMeetingPayload(savedStore);
+      broadcast("board-updated", buildBoardRowsFromStore(savedStore));
+      response.json({ ...payload, updatedCount });
+    } catch (error) {
+      console.error("Could not save Morning Meeting job notes.", error.message || error);
+      response.status(500).json({ error: "Could not save the job notes." });
+    }
+  });
+
   app.post("/api/morning-meeting/send", async (request, response) => {
     const notes = String(request.body?.notes || "").trim();
-    if (!notes) {
-      response.status(400).json({ error: "Add some meeting notes before emailing the office." });
-      return;
-    }
 
     try {
       const transportConfig = getCreditApplicationTransportConfig();
@@ -10464,7 +10559,7 @@ function createServer() {
         return;
       }
 
-      const email = buildMorningMeetingEmail(
+      const email = buildMorningMeetingEmailV2(
         buildMorningMeetingPayload(store),
         notes,
         String(request.user?.displayName || "SX Portal")
