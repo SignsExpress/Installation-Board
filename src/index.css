@@ -8041,7 +8041,7 @@ button {
   padding: 10px 10px 0;
 }
 
-/* Keep installer-plan actions obvious above the install lists. */
+/* Keep installer-plan actions obvious above the install lists during deploy recovery nudges. */
 .morning-meeting-section-button {
   display: inline-flex;
   align-items: center;
