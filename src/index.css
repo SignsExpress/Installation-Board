@@ -8247,6 +8247,8 @@ button {
 
 .morning-meeting-material-items {
   display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
   gap: 10px;
   padding: 10px;
 }
@@ -8262,10 +8264,32 @@ button {
   padding: 10px 11px;
 }
 
-.morning-meeting-material-item.is-compact h4 {
-  margin: 0 0 7px;
+.morning-meeting-material-compact-head {
+  display: grid;
+  gap: 3px;
+  min-height: 78px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5eaf1;
+}
+
+.morning-meeting-material-compact-head > span {
+  color: #76529a;
+  font-size: 0.57rem;
+  font-weight: 850;
+}
+
+.morning-meeting-material-compact-head h4 {
+  margin: 0;
   color: #172033;
   font-size: 0.76rem;
+}
+
+.morning-meeting-material-compact-head p {
+  margin: 0;
+  color: #667085;
+  font-size: 0.59rem;
+  line-height: 1.4;
 }
 
 .morning-meeting-material-checklist {
@@ -8312,6 +8336,16 @@ button {
 
 .morning-meeting-production-time small {
   color: #4f735c;
+  font-size: 0.58rem;
+  font-weight: 700;
+}
+
+.morning-meeting-material-ai-note {
+  margin: 0;
+  padding: 6px 13px;
+  border-top: 1px solid #e5eaf1;
+  background: #f8fafc;
+  color: #718096;
   font-size: 0.58rem;
   font-weight: 700;
 }
@@ -8475,6 +8509,10 @@ button {
   .morning-meeting-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .morning-meeting-material-items {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -8500,6 +8538,10 @@ button {
   .morning-meeting-component dl {
     grid-column: 1 / -1;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .morning-meeting-material-items {
+    grid-template-columns: 1fr;
   }
 
   .morning-meeting-job-notes-head {

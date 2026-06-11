@@ -9396,11 +9396,15 @@ function buildJobMaterialsFromOrder(order) {
     return {
       id: String(getCaseInsensitiveValue(item, ["ID", "Id", "id"]) || `item-${index + 1}`),
       lineItemName: getCoreBridgeText(item, ["LineItemName", "ItemName", "Name", "Description"]) || `Item ${index + 1}`,
+      description: getCoreBridgeText(item, ["CustomerDescription", "Description", "Specification", "Notes"]),
       quantity,
       quantityLabel: `${formatJobMaterialNumber(quantity, 2)} off`,
       categoryName: getCoreBridgeText(item, ["CategoryName", "Category", "LineItemCategoryName", "ItemCategoryName"]),
       finishedSize: getJobMaterialSize(item, false),
-      components: collectJobMaterialComponents(item, index)
+      components: collectJobMaterialComponents(item, index),
+      sourceFields: buildCoreBridgeDebugFields(item)
+        .filter((field) => /(description|material|component|assembly|quantity|size|width|height|time|labour|labor|service|fixing)/i.test(String(field.key || "")))
+        .slice(0, 160)
     };
   });
 }
@@ -9459,6 +9463,120 @@ function buildCompactJobMaterialItems(items = []) {
   });
 }
 
+function extractJsonObjectFromAi(value = "") {
+  const text = String(value || "").trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  try {
+    return JSON.parse(text);
+  } catch {
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(text.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+}
+
+function sanitizeAiJobMaterialItems(payload, fallbackItems = []) {
+  const aiItems = Array.isArray(payload?.items) ? payload.items : [];
+  return fallbackItems.map((fallback, index) => {
+    const aiItem = aiItems[index] || {};
+    const materials = Array.isArray(aiItem.materials)
+      ? aiItem.materials.map((value) => String(value || "").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 20)
+      : fallback.materials;
+    return {
+      ...fallback,
+      title: String(aiItem.title || fallback.lineItemName || `Item ${index + 1}`).replace(/\s+/g, " ").trim().slice(0, 180),
+      quantityLabel: String(aiItem.quantity || fallback.quantityLabel || "").replace(/\s+/g, " ").trim().slice(0, 60),
+      finishedSize: String(aiItem.finishedSize || fallback.finishedSize || "").replace(/\s+/g, " ").trim().slice(0, 100),
+      overview: String(aiItem.overview || "").replace(/\s+/g, " ").trim().slice(0, 500),
+      materials: materials.length ? [...new Set(materials)] : fallback.materials
+    };
+  });
+}
+
+async function generateAiJobMaterialsSummary(order, detailedItems, fallbackItems) {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey) {
+    return { items: fallbackItems, source: "rules", warning: "AI is not configured." };
+  }
+  const compactFields = (fields = [], limit = 160) => (Array.isArray(fields) ? fields : []).slice(0, limit).map((field) => ({
+    key: String(field?.key || "").slice(0, 300),
+    value: String(field?.value ?? "").replace(/\s+/g, " ").trim().slice(0, 800)
+  })).filter((field) => field.key && field.value);
+  const evidence = {
+    orderReference: order?.orderReference || "",
+    customerName: order?.customerName || "",
+    orderDescription: order?.description || "",
+    orderSourceFields: compactFields((Array.isArray(order?.debugFields) ? order.debugFields : [])
+      .filter((field) => /(description|material|component|assembly|quantity|size|width|height|time|labour|labor|service|fixing)/i.test(String(field.key || ""))), 200),
+    items: detailedItems.map((item) => ({
+      lineItemName: item.lineItemName,
+      description: item.description,
+      categoryName: item.categoryName,
+      quantity: item.quantity,
+      finishedSize: item.finishedSize,
+      sourceFields: compactFields(item.sourceFields),
+      components: (item.components || []).map((component) => ({
+        name: component.name,
+        kind: component.kind,
+        componentType: component.componentType,
+        variableName: component.variableName,
+        requirement: component.requirement,
+        finishedSize: component.finishedSize,
+        stockSize: component.stockSize,
+        materialUsage: component.materialUsage,
+        labour: component.labour,
+        notes: component.notes
+      }))
+    }))
+  };
+  const prompt = [
+    "Create a concise production overview for each signage line item using only the supplied CoreBridge evidence.",
+    "The result is for production staff, not a customer and not a technical API report.",
+    "For every line item:",
+    "- Preserve the customer/job quantity and finished item size.",
+    "- Write one short overview explaining what is being made.",
+    "- List only actual physical materials, laminates, vinyls, substrates, fixings and service parts production needs.",
+    "- Use specific material names found anywhere in the nested component evidence.",
+    "- Exclude machines, printers, laminators, layout, setup, generic wrappers and labour rows from materials.",
+    "- Do not invent materials, quantities, dimensions or processes.",
+    "- Keep separate line items separate and retain their original order.",
+    "Return JSON only in this exact shape:",
+    '{"items":[{"title":"short useful item name","quantity":"2no.","finishedSize":"600mm x 400mm","overview":"one concise sentence","materials":["5mm Bubble Board"]}]}',
+    "",
+    JSON.stringify(evidence)
+  ].join("\n");
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: String(process.env.JOB_MATERIALS_AI_MODEL || process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim(),
+        messages: [
+          { role: "system", content: "You are a careful UK signage production planner. You summarise messy Bill of Materials evidence without inventing facts." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.15,
+        response_format: { type: "json_object" }
+      })
+    });
+    const payload = await response.json();
+    const parsed = extractJsonObjectFromAi(payload?.choices?.[0]?.message?.content);
+    if (!response.ok || !parsed) throw new Error(payload?.error?.message || "AI returned an invalid materials summary.");
+    return { items: sanitizeAiJobMaterialItems(parsed, fallbackItems), source: "ai", warning: "" };
+  } catch (error) {
+    return { items: fallbackItems, source: "rules", warning: error.message || "AI materials summary failed." };
+  }
+}
+
 async function fetchCoreBridgeJobAssemblyDetail(order) {
   const config = getCoreBridgeConfig();
   const id = String(order?.id || order?._detailOrderId || "").trim();
@@ -9484,8 +9602,13 @@ async function buildMorningMeetingMaterialsPayload(store) {
     try {
       const { order, attempts } = await fetchProductionOrderByReference(card.orderReference);
       const assemblyOrder = order ? await fetchCoreBridgeJobAssemblyDetail(order) : null;
-      const items = assemblyOrder ? buildCompactJobMaterialItems(buildJobMaterialsFromOrder(assemblyOrder)) : [];
-      const materialCount = items.reduce((total, item) => total + item.materials.length, 0);
+      const detailedItems = assemblyOrder ? buildJobMaterialsFromOrder(assemblyOrder) : [];
+      const fallbackItems = buildCompactJobMaterialItems(detailedItems);
+      const aiSummary = assemblyOrder
+        ? await generateAiJobMaterialsSummary(assemblyOrder, detailedItems, fallbackItems)
+        : { items: fallbackItems, source: "rules", warning: "" };
+      const items = aiSummary.items;
+      const usefulItemCount = items.filter((item) => item.materials.length || item.overview).length;
       const productionTime = formatProductionDuration(items.reduce((total, item) => total + Number(item.productionHours || 0), 0));
       jobs.push({
         id: card.id,
@@ -9494,8 +9617,9 @@ async function buildMorningMeetingMaterialsPayload(store) {
         description: card.description,
         items,
         ...productionTime,
-        source: materialCount ? "CoreBridge item assemblies" : "No production materials found",
-        lookupError: materialCount
+        source: usefulItemCount ? (aiSummary.source === "ai" ? "AI-organised CoreBridge details" : "CoreBridge item assemblies") : "No production details found",
+        aiWarning: aiSummary.warning,
+        lookupError: usefulItemCount
           ? ""
           : `No components were returned from Items → Components → ChildComponents → AssemblyDataJSON. ${attempts.map((attempt) => attempt.error).filter(Boolean).slice(0, 4).join(" ")}`
       });

@@ -57,6 +57,8 @@ The Morning Meeting Board is available at `/morning-meeting` and launches from t
 - It separates finished-item quantity and size from stock size and material consumption. Never treat roll-material `TotalQuantity` as the number of finished items.
 - It also lists nested materials, laminates, fixings, labour/service parts, time, and employee counts where CoreBridge supplies them.
 - The visible report is deliberately compact: one `quantity + finished size` heading, a deduplicated checklist of named production materials/fixings, and one total estimated production-time line converted to hours and minutes. Do not expose generic assembly wrappers or machine/layout internals.
+- The report uses the existing server-side OpenAI configuration to organise the full grounded CoreBridge evidence into concise production overviews. AI must not invent details; when unavailable, the rule-based summary remains as fallback.
+- Job Materials Report item summaries display in a four-column desktop grid beneath each job reference.
 - Latest related commits:
   - `01e86dd Pull materials from CoreBridge works orders`
   - `7fb0d3f Add approved job materials stock sheet`

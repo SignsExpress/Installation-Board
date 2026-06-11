@@ -16977,10 +16977,15 @@ function MorningMeetingMaterials({ payload, loading, error, onFetch, onPrint }) 
                 <small>{job.source}</small>
               </div>
               {job.lookupError ? <p className="morning-meeting-material-warning">{job.lookupError}</p> : null}
+              {job.aiWarning && !job.lookupError ? <p className="morning-meeting-material-ai-note">AI tidy-up unavailable; showing the CoreBridge fallback.</p> : null}
               <div className="morning-meeting-material-items">
                 {(job.items || []).map((item) => (
                   <section key={item.id} className="morning-meeting-material-item is-compact">
-                    <h4>{item.quantityLabel}{item.finishedSize ? ` ${item.finishedSize}` : ""}</h4>
+                    <div className="morning-meeting-material-compact-head">
+                      <span>{item.quantityLabel}{item.finishedSize ? ` ${item.finishedSize}` : ""}</span>
+                      <h4>{item.title || item.lineItemName}</h4>
+                      {item.overview ? <p>{item.overview}</p> : null}
+                    </div>
                     <div className="morning-meeting-material-checklist">
                       {(item.materials || []).map((material) => (
                         <label key={material}>
