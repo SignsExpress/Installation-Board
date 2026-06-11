@@ -13099,6 +13099,10 @@ app.get("/api/corebridge/orders", async (request, response) => {
     });
   });
 
+  app.use("/api", (request, response) => {
+    response.status(404).json({ error: "API route not found. The latest server deployment may still be starting." });
+  });
+
   if (fs.existsSync(DIST_DIR)) {
     app.use(express.static(DIST_DIR));
     app.get("*", (request, response) => {

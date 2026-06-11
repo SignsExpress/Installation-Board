@@ -16688,7 +16688,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     let active = true;
     fetch("/api/morning-meeting")
       .then(async (response) => {
-        const payload = await response.json();
+        const payload = await readJsonResponse(response, "Could not load the Morning Meeting. Render may still be deploying the latest server.");
         if (!response.ok) throw new Error(payload.error || "Could not load the Morning Meeting.");
         if (active) setOutline(payload);
       })
@@ -16710,7 +16710,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes: meetingNotes })
       });
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, "Could not reach the Morning Meeting email service. Render may still be deploying the latest server.");
       if (!response.ok) throw new Error(payload.error || "Could not email the meeting notes.");
       setSendStatus(`Sent to ${payload.recipientCount} office ${payload.recipientCount === 1 ? "user" : "users"}.`);
     } catch (sendError) {
@@ -16726,7 +16726,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     setMaterialsError("");
     try {
       const response = await fetch("/api/morning-meeting/materials");
-      const payload = await response.json();
+      const payload = await readJsonResponse(response, "Could not reach the Morning Meeting materials service. Render may still be deploying the latest server.");
       if (!response.ok) throw new Error(payload.error || "Could not fetch needed materials.");
       setMaterialsPayload(payload);
     } catch (loadError) {
