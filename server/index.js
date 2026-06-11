@@ -2447,6 +2447,284 @@ function buildMorningMeetingEmailV2(payload, notes, senderName, people = []) {
   };
 }
 
+const INSTALLER_PLAN_DEPOT = {
+  label: "Signs Express Central Lancashire",
+  address: "Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP"
+};
+
+function formatInstallerPlanDuration(minutesValue) {
+  const totalMinutes = Math.max(0, Math.round(Number(minutesValue) || 0));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours && minutes) return `${hours} hrs ${minutes} mins`;
+  if (hours) return `${hours} hr${hours === 1 ? "" : "s"}`;
+  return `${minutes} mins`;
+}
+
+function parseInstallerPlanTimeHint(note = "") {
+  const match = String(note || "").match(/\b(\d{1,2})[:.](\d{2})\b/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  return (hours * 60) + minutes;
+}
+
+async function estimateDrivingJourney(from, to) {
+  const [origin, destination] = await Promise.all([
+    geocodeMileageLocation(from),
+    geocodeMileageLocation(to)
+  ]);
+
+  if (!origin || !destination) {
+    return { miles: 0, minutes: 0, resolved: false, message: "Could not resolve one of those addresses." };
+  }
+
+  const routeUrl = new URL(
+    `https://router.project-osrm.org/route/v1/driving/${origin.lon},${origin.lat};${destination.lon},${destination.lat}`
+  );
+  routeUrl.searchParams.set("overview", "false");
+  const response = await fetch(routeUrl, { headers: { Accept: "application/json" } });
+  if (!response.ok) {
+    return { miles: 0, minutes: 0, resolved: false, message: "Could not calculate a driving route." };
+  }
+  const payload = await response.json();
+  const route = payload?.routes?.[0] || {};
+  const distanceMeters = Number(route.distance);
+  const durationSeconds = Number(route.duration);
+  if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds)) {
+    return { miles: 0, minutes: 0, resolved: false, message: "Could not calculate a driving route." };
+  }
+
+  return {
+    miles: Math.round((distanceMeters / 1609.344) * 10) / 10,
+    minutes: Math.max(1, Math.round(durationSeconds / 60)),
+    resolved: true,
+    origin: origin.label,
+    destination: destination.label,
+    originPoint: origin,
+    destinationPoint: destination
+  };
+}
+
+async function chooseAiInstallerPlanSequence({ scopeLabel, dateIso, jobs, feedback }) {
+  const apiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  if (!apiKey || !jobs.length) return null;
+  const compactJobs = jobs.slice(0, 16).map((job) => ({
+    id: job.id,
+    reference: job.orderReference,
+    customer: job.customerName,
+    description: job.description,
+    address: job.address,
+    contact: job.contact,
+    number: job.number,
+    notes: String(job.notes || "").trim().slice(0, 500),
+    morningMeetingNotes: String(job.morningMeetingNotes || "").trim().slice(0, 500),
+    approximatePosition: job.geo ? `${job.geo.lat.toFixed(5)}, ${job.geo.lon.toFixed(5)}` : "",
+    distanceFromDepotMiles: job.depotJourney?.resolved ? job.depotJourney.miles : null,
+    earliestTimeHint: job.timeHintLabel || ""
+  }));
+  const prompt = [
+    `Build a practical installer route draft for ${scopeLabel} (${dateIso}).`,
+    "The fitters must start at and finish at Signs Express Central Lancashire, Unit 3, Sherdley Road, Lostock Hall, Preston PR5 5LP.",
+    "Use the notes and timing hints to decide if any job needs to happen first or at a specific time.",
+    "Prefer a sensible geographic route and do not invent any job details.",
+    "Do not invent travel times because the server will calculate those afterwards.",
+    feedback ? `User feedback for this revision: ${String(feedback).slice(0, 700)}` : "",
+    "Return JSON only in this exact shape:",
+    '{"summary":"short route summary","orderedJobIds":["job-1","job-2"],"stopInstructions":[{"jobId":"job-1","instruction":"plain instruction for fitters","reason":"why this stop sits here"}]}',
+    "",
+    JSON.stringify({
+      depot: INSTALLER_PLAN_DEPOT,
+      jobs: compactJobs
+    })
+  ].filter(Boolean).join("\n");
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: String(process.env.JOB_MATERIALS_AI_MODEL || process.env.SOCIAL_POST_AI_MODEL || "gpt-4o-mini").trim(),
+        messages: [
+          { role: "system", content: "You are a careful UK installation planner. You sequence jobs without inventing facts." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" }
+      })
+    });
+    const payload = await response.json();
+    const parsed = extractJsonObjectFromAi(payload?.choices?.[0]?.message?.content);
+    if (!response.ok || !parsed || !Array.isArray(parsed?.orderedJobIds)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function buildHeuristicInstallerOrder(jobs = []) {
+  const locked = [];
+  const flexible = [];
+  jobs.forEach((job) => {
+    if (Number.isFinite(job.timeHintMinutes)) locked.push(job);
+    else flexible.push(job);
+  });
+  locked.sort((left, right) => left.timeHintMinutes - right.timeHintMinutes);
+
+  const ordered = [];
+  let currentPoint = null;
+  const walk = (pool) => {
+    while (pool.length) {
+      if (!currentPoint) {
+        const next = pool.shift();
+        ordered.push(next);
+        currentPoint = next.geo || null;
+        continue;
+      }
+      let bestIndex = 0;
+      let bestDistance = Number.POSITIVE_INFINITY;
+      pool.forEach((job, index) => {
+        const distance = job.geo ? getDistanceKmBetween(currentPoint, job.geo) : Number.POSITIVE_INFINITY;
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      });
+      const [next] = pool.splice(bestIndex, 1);
+      ordered.push(next);
+      currentPoint = next.geo || currentPoint;
+    }
+  };
+
+  walk([...locked]);
+  walk([...flexible]);
+  return ordered;
+}
+
+async function buildMorningMeetingInstallerPlan(store, scope = "tomorrow", feedback = "") {
+  const payload = buildMorningMeetingPayload(store);
+  const jobs = scope === "today" ? payload.todayJobs : payload.tomorrowJobs;
+  const dateIso = scope === "today" ? payload.todayIso : payload.tomorrowIso;
+  const scopeLabel = scope === "today" ? "today's installs" : "tomorrow's installs";
+  const jobsWithGeo = await Promise.all(jobs.map(async (job) => {
+    const address = String(job.address || job.siteAddress || "").trim();
+    const geo = address ? await geocodeMileageLocation(address) : null;
+    const noteSource = [job.notes, job.morningMeetingNotes, job.designerNote].filter(Boolean).join(" | ");
+    const timeHintMinutes = parseInstallerPlanTimeHint(noteSource);
+    const depotJourney = address ? await estimateDrivingJourney(INSTALLER_PLAN_DEPOT.address, address) : { miles: 0, minutes: 0, resolved: false, message: "Address missing." };
+    return {
+      ...job,
+      geo,
+      depotJourney,
+      timeHintMinutes,
+      timeHintLabel: Number.isFinite(timeHintMinutes) ? `${String(Math.floor(timeHintMinutes / 60)).padStart(2, "0")}:${String(timeHintMinutes % 60).padStart(2, "0")}` : ""
+    };
+  }));
+
+  const aiPlan = await chooseAiInstallerPlanSequence({ scopeLabel, dateIso, jobs: jobsWithGeo, feedback });
+  const heuristicOrder = buildHeuristicInstallerOrder(jobsWithGeo);
+  const orderedJobs = (() => {
+    const sourceIds = Array.isArray(aiPlan?.orderedJobIds) ? aiPlan.orderedJobIds.map((value) => String(value || "")) : [];
+    const byId = new Map(jobsWithGeo.map((job) => [String(job.id || ""), job]));
+    const selected = sourceIds.map((id) => byId.get(id)).filter(Boolean);
+    const remaining = jobsWithGeo.filter((job) => !selected.some((entry) => entry.id === job.id));
+    return selected.length ? [...selected, ...remaining] : heuristicOrder;
+  })();
+
+  const stopInstructionsById = new Map(
+    (Array.isArray(aiPlan?.stopInstructions) ? aiPlan.stopInstructions : [])
+      .map((entry) => [String(entry?.jobId || ""), {
+        instruction: String(entry?.instruction || "").trim(),
+        reason: String(entry?.reason || "").trim()
+      }])
+      .filter(([jobId]) => jobId)
+  );
+
+  const stops = [];
+  let previousAddress = INSTALLER_PLAN_DEPOT.address;
+  let totalMiles = 0;
+  let totalMinutes = 0;
+  for (const job of orderedJobs) {
+    const journey = await estimateDrivingJourney(previousAddress, job.address || job.siteAddress || "");
+    totalMiles += Number(journey.miles || 0);
+    totalMinutes += Number(journey.minutes || 0);
+    const aiStop = stopInstructionsById.get(String(job.id || ""));
+    stops.push({
+      id: job.id,
+      orderReference: job.orderReference,
+      customerName: job.customerName,
+      description: job.description,
+      address: job.address || job.siteAddress || "",
+      contact: job.contact || "",
+      number: job.number || "",
+      notes: job.notes || "",
+      morningMeetingNotes: job.morningMeetingNotes || "",
+      badges: [job.jobType, job.jobTypeSecondary, job.installMethod].filter(Boolean),
+      timeHintLabel: job.timeHintLabel || "",
+      travelMiles: journey.miles || 0,
+      travelMinutes: journey.minutes || 0,
+      travelLabel: journey.resolved ? `${journey.miles} miles · ${formatInstallerPlanDuration(journey.minutes)}` : (journey.message || "Travel estimate unavailable."),
+      instruction: aiStop?.instruction || (job.timeHintLabel ? `Try to arrive around ${job.timeHintLabel}. Check the notes before setting off.` : "Complete this stop in the most practical sequence with the rest of the day."),
+      reason: aiStop?.reason || (job.timeHintLabel ? "This stop includes a timing hint in the notes." : "Grouped into the route by location.")
+    });
+    previousAddress = job.address || job.siteAddress || previousAddress;
+  }
+
+  const returnJourney = stops.length
+    ? await estimateDrivingJourney(previousAddress, INSTALLER_PLAN_DEPOT.address)
+    : { miles: 0, minutes: 0, resolved: true };
+  totalMiles += Number(returnJourney.miles || 0);
+  totalMinutes += Number(returnJourney.minutes || 0);
+
+  return {
+    scope,
+    scopeLabel,
+    dateIso,
+    dateLabel: formatBoardNotificationDate(dateIso),
+    depot: INSTALLER_PLAN_DEPOT,
+    summary: String(aiPlan?.summary || `Start at the unit, work through the ${scopeLabel} in the planned order, then return to base.`).trim(),
+    feedback: String(feedback || "").trim(),
+    source: aiPlan ? "ai" : "rules",
+    totalMiles: Math.round(totalMiles * 10) / 10,
+    totalMinutes: Math.max(0, Math.round(totalMinutes)),
+    totalTravelLabel: `${Math.round(totalMiles * 10) / 10} miles · ${formatInstallerPlanDuration(totalMinutes)}`,
+    returnJourney: {
+      miles: returnJourney.miles || 0,
+      minutes: returnJourney.minutes || 0,
+      label: returnJourney.resolved ? `${returnJourney.miles} miles · ${formatInstallerPlanDuration(returnJourney.minutes)}` : (returnJourney.message || "Travel estimate unavailable.")
+    },
+    stops
+  };
+}
+
+function buildInstallerPlanPdf(plan = {}) {
+  const lines = [
+    { text: `${plan.scopeLabel || "Installer plan"} - ${plan.dateLabel || ""}`, bold: true, size: 13, gap: 6, maxLength: 64 },
+    { text: `Start and finish: ${sanitizePdfLine(plan?.depot?.label)} - ${sanitizePdfLine(plan?.depot?.address)}`, gap: 4 },
+    { text: `Suggested travel total: ${sanitizePdfLine(plan.totalTravelLabel || "Unavailable")}`, gap: 4 },
+    { text: `Route summary: ${sanitizePdfLine(plan.summary || "No summary generated.")}`, gap: 8, maxLength: 84 }
+  ];
+  (Array.isArray(plan.stops) ? plan.stops : []).forEach((stop, index) => {
+    lines.push({ text: `${index + 1}. ${sanitizePdfLine(stop.orderReference)} - ${sanitizePdfLine(stop.customerName)}`, bold: true, size: 11, gap: 3, maxLength: 74 });
+    lines.push({ text: sanitizePdfLine(stop.description), gap: 2, maxLength: 84 });
+    lines.push({ text: `Address: ${sanitizePdfLine(stop.address)}`, gap: 2, maxLength: 84 });
+    lines.push({ text: `Travel from previous stop: ${sanitizePdfLine(stop.travelLabel)}`, gap: 2 });
+    if (stop.contact || stop.number) lines.push({ text: `Contact: ${sanitizePdfLine(stop.contact)}${stop.number ? ` - ${sanitizePdfLine(stop.number)}` : ""}`, gap: 2, maxLength: 84 });
+    if (stop.timeHintLabel) lines.push({ text: `Timing note: aim for ${sanitizePdfLine(stop.timeHintLabel)}`, gap: 2 });
+    lines.push({ text: `Instruction: ${sanitizePdfLine(stop.instruction)}`, gap: 2, maxLength: 84 });
+    if (stop.reason) lines.push({ text: `Why here: ${sanitizePdfLine(stop.reason)}`, gap: 2, maxLength: 84 });
+    if (stop.notes) lines.push({ text: `Job notes: ${sanitizePdfLine(stop.notes)}`, gap: 2, maxLength: 84 });
+    if (stop.morningMeetingNotes) lines.push({ text: `Morning meeting notes: ${sanitizePdfLine(stop.morningMeetingNotes)}`, gap: 2, maxLength: 84 });
+    lines.push("__GAP__");
+  });
+  lines.push({ text: `Return to unit: ${sanitizePdfLine(plan.returnJourney?.label || "Unavailable")}`, bold: true, gap: 3 });
+  return buildSimpleTextPdf(`Installer Plan - ${plan.dateLabel || "Morning Meeting"}`, lines);
+}
+
 function applyMorningMeetingJobNotes(store, entries = []) {
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
   const processedKeys = new Set();
@@ -11291,6 +11569,33 @@ function createServer() {
     } catch (error) {
       console.error("Could not build Morning Meeting material stock sheet.", error.message || error);
       response.status(500).json({ error: "Could not fetch the approved-job materials." });
+    }
+  });
+
+  app.post("/api/morning-meeting/installer-plan", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    try {
+      const scope = String(request.body?.scope || "tomorrow").trim().toLowerCase() === "today" ? "today" : "tomorrow";
+      const feedback = String(request.body?.feedback || "").trim();
+      const plan = await buildMorningMeetingInstallerPlan(await readStore(), scope, feedback);
+      response.json({ plan });
+    } catch (error) {
+      console.error("Could not build Morning Meeting installer plan.", error.message || error);
+      response.status(500).json({ error: "Could not build the installer plan draft." });
+    }
+  });
+
+  app.post("/api/morning-meeting/installer-plan/pdf", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    try {
+      const pdfBuffer = buildInstallerPlanPdf(request.body?.plan || {});
+      const safeDate = String(request.body?.plan?.dateIso || getTodayInLondon().toISOString().slice(0, 10)).replace(/[^\d-]/g, "") || "installer-plan";
+      response.setHeader("Content-Type", "application/pdf");
+      response.setHeader("Content-Disposition", `attachment; filename="installer-plan-${safeDate}.pdf"`);
+      response.send(pdfBuffer);
+    } catch (error) {
+      console.error("Could not build installer plan PDF.", error.message || error);
+      response.status(500).json({ error: "Could not create the installer PDF." });
     }
   });
 

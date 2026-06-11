@@ -16809,7 +16809,16 @@ function MorningMeetingItem({ item, kind = "job" }) {
   );
 }
 
-function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
+function formatInstallerPlanDuration(minutesValue) {
+  const totalMinutes = Math.max(0, Math.round(Number(minutesValue) || 0));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours && minutes) return `${hours} hrs ${minutes} mins`;
+  if (hours) return `${hours} hr${hours === 1 ? "" : "s"}`;
+  return `${minutes} mins`;
+}
+
+function MorningMeetingSection({ title, subtitle, items = [], kind = "job", action = null }) {
   const displayTitle = title.startsWith("Yesterday")
     ? "Yesterday's Installs"
     : title.startsWith("Today")
@@ -16825,13 +16834,101 @@ function MorningMeetingSection({ title, subtitle, items = [], kind = "job" }) {
           <span>{displaySubtitle}</span>
           <h2>{displayTitle}</h2>
         </div>
-        <strong>{items.length}</strong>
+        <div className="morning-meeting-section-head-actions">
+          {action}
+          <strong>{items.length}</strong>
+        </div>
       </div>
       <div className="morning-meeting-list">
         {items.length
           ? items.map((item) => <MorningMeetingItem key={`${kind}-${item.id}`} item={item} kind={kind} />)
           : <p className="morning-meeting-empty">Nothing to discuss in this section.</p>}
       </div>
+    </section>
+  );
+}
+
+function MorningMeetingInstallerPlan({
+  plan,
+  scope,
+  loading,
+  error,
+  feedback,
+  onFeedbackChange,
+  onGenerate,
+  onCreatePdf,
+  pdfBusy
+}) {
+  const title = scope === "today" ? "Today's installer plan" : "Tomorrow's installer plan";
+  return (
+    <section className="morning-meeting-installer-plan">
+      <div className="morning-meeting-installer-plan-head">
+        <div>
+          <span>Installer planning</span>
+          <h2>{title}</h2>
+          <p>{plan ? `Draft built for ${plan.dateLabel}. Review it, tweak the AI prompt if needed, then create the fitter PDF.` : "Create a route-aware fitter plan draft from the selected installs and notes."}</p>
+        </div>
+        <div className="morning-meeting-installer-plan-actions">
+          <button className="ghost-button" type="button" onClick={() => onGenerate(scope)} disabled={loading}>
+            {loading ? "Building..." : plan ? "Refresh draft" : "Create draft"}
+          </button>
+          <button className="primary-button" type="button" onClick={onCreatePdf} disabled={!plan || pdfBusy}>
+            {pdfBusy ? "Creating PDF..." : "Approve / Create PDF"}
+          </button>
+        </div>
+      </div>
+      {error ? <p className="form-error">{error}</p> : null}
+      <div className="morning-meeting-installer-plan-feedback">
+        <textarea
+          rows={3}
+          value={feedback}
+          onChange={(event) => onFeedbackChange(event.target.value)}
+          placeholder="Tell AI what to change, for example: Start at James Hall first for the 09:00 meeting, then head back toward Longridge."
+        />
+        <button className="ghost-button" type="button" onClick={() => onGenerate(scope)} disabled={loading}>
+          {loading ? "Reworking..." : "Rework plan with AI"}
+        </button>
+      </div>
+      {plan ? (
+        <>
+          <div className="morning-meeting-installer-plan-summary">
+            <div>
+              <strong>{plan.totalTravelLabel}</strong>
+              <span>Start and finish: {plan.depot?.label} - {plan.depot?.address}</span>
+            </div>
+            <p>{plan.summary}</p>
+          </div>
+          <div className="morning-meeting-installer-plan-stops">
+            {Array.isArray(plan.stops) && plan.stops.length ? plan.stops.map((stop, index) => (
+              <article key={`${plan.scope}-${stop.id}`} className="morning-meeting-installer-stop">
+                <div className="morning-meeting-installer-stop-head">
+                  <div>
+                    <span>Stop {index + 1}</span>
+                    <h3>{stop.orderReference} - {stop.customerName}</h3>
+                    <p>{stop.description}</p>
+                  </div>
+                  <strong>{stop.travelLabel}</strong>
+                </div>
+                <dl className="morning-meeting-meta">
+                  {stop.address ? <div><dt>Address</dt><dd>{stop.address}</dd></div> : null}
+                  {stop.contact ? <div><dt>Contact</dt><dd>{stop.contact}{stop.number ? ` - ${stop.number}` : ""}</dd></div> : null}
+                  {stop.timeHintLabel ? <div><dt>Timing</dt><dd>{stop.timeHintLabel}</dd></div> : null}
+                </dl>
+                <div className="morning-meeting-installer-stop-copy">
+                  <p><b>Instruction:</b> {stop.instruction}</p>
+                  <p><b>Why here:</b> {stop.reason}</p>
+                  {stop.notes ? <p className="morning-meeting-note"><b>Notes:</b> {stop.notes}</p> : null}
+                  {stop.morningMeetingNotes ? <p className="morning-meeting-note is-meeting"><b>Morning meeting:</b> {stop.morningMeetingNotes}</p> : null}
+                </div>
+              </article>
+            )) : <p className="morning-meeting-empty">No installs were available for this plan.</p>}
+          </div>
+          <div className="morning-meeting-installer-plan-return">
+            <strong>Return to unit</strong>
+            <span>{plan.returnJourney?.label || formatInstallerPlanDuration(0)}</span>
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }
@@ -17571,6 +17668,12 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [jobNoteDrafts, setJobNoteDrafts] = useState({});
   const [jobNotesSaving, setJobNotesSaving] = useState(false);
   const [jobNotesStatus, setJobNotesStatus] = useState("");
+  const [installerPlanScope, setInstallerPlanScope] = useState("tomorrow");
+  const [installerPlan, setInstallerPlan] = useState(null);
+  const [installerPlanFeedback, setInstallerPlanFeedback] = useState("");
+  const [installerPlanLoading, setInstallerPlanLoading] = useState(false);
+  const [installerPlanError, setInstallerPlanError] = useState("");
+  const [installerPlanPdfBusy, setInstallerPlanPdfBusy] = useState(false);
   const plannerRows = useMemo(() => extractPlannerMaterials(materialsPayload), [materialsPayload]);
   const plannerPanelGroups = useMemo(() => groupPanelPlannerRows(filterPanelPlannerRows(plannerRows)), [plannerRows]);
 
@@ -17733,6 +17836,57 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     window.setTimeout(() => document.body.classList.remove("printing-morning-meeting-materials"), 300);
   }
 
+  async function generateInstallerPlan(scope) {
+    if (installerPlanLoading) return;
+    setInstallerPlanScope(scope);
+    setInstallerPlanLoading(true);
+    setInstallerPlanError("");
+    try {
+      const response = await fetch("/api/morning-meeting/installer-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, feedback: installerPlanFeedback })
+      });
+      const payload = await readJsonResponse(response, "Could not reach the installer plan service.");
+      if (!response.ok) throw new Error(payload.error || "Could not build the installer plan draft.");
+      setInstallerPlan(payload.plan || null);
+    } catch (planError) {
+      setInstallerPlanError(planError.message || "Could not build the installer plan draft.");
+    } finally {
+      setInstallerPlanLoading(false);
+    }
+  }
+
+  async function createInstallerPlanPdf() {
+    if (!installerPlan || installerPlanPdfBusy) return;
+    setInstallerPlanPdfBusy(true);
+    setInstallerPlanError("");
+    try {
+      const response = await fetch("/api/morning-meeting/installer-plan/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: installerPlan })
+      });
+      if (!response.ok) {
+        const payload = await readJsonResponse(response, "Could not create the installer PDF.");
+        throw new Error(payload.error || "Could not create the installer PDF.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `installer-plan-${installerPlan.dateIso || installerPlan.scope || "route"}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (pdfError) {
+      setInstallerPlanError(pdfError.message || "Could not create the installer PDF.");
+    } finally {
+      setInstallerPlanPdfBusy(false);
+    }
+  }
+
   return (
     <div className="app-shell morning-meeting-shell">
       <div className="page morning-meeting-page">
@@ -17776,10 +17930,31 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
           <>
             <main className="morning-meeting-grid">
               <MorningMeetingSection title="Yesterday’s Jobs" subtitle={formatTvSectionDate(outline.yesterdayIso)} items={outline.yesterdayJobs} />
-              <MorningMeetingSection title="Today’s Jobs" subtitle={formatTvSectionDate(outline.todayIso)} items={outline.todayJobs} />
+              <MorningMeetingSection
+                title="Today’s Jobs"
+                subtitle={formatTvSectionDate(outline.todayIso)}
+                items={outline.todayJobs}
+                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("today")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "today" ? "Planning..." : "Create installer plan"}</button>}
+              />
               <MorningMeetingSection title="Approved Artwork" subtitle="Approved yesterday from Eddy’s Design Board workflow" items={outline.approvedYesterday} kind="approval" />
-              <MorningMeetingSection title="Tomorrow's Installs" subtitle={formatTvSectionDate(outline.tomorrowIso)} items={outline.tomorrowJobs} />
+              <MorningMeetingSection
+                title="Tomorrow's Installs"
+                subtitle={formatTvSectionDate(outline.tomorrowIso)}
+                items={outline.tomorrowJobs}
+                action={<button className="ghost-button morning-meeting-section-button" type="button" onClick={() => generateInstallerPlan("tomorrow")} disabled={installerPlanLoading}>{installerPlanLoading && installerPlanScope === "tomorrow" ? "Planning..." : "Create installer plan"}</button>}
+              />
             </main>
+            <MorningMeetingInstallerPlan
+              plan={installerPlan}
+              scope={installerPlanScope}
+              loading={installerPlanLoading}
+              error={installerPlanError}
+              feedback={installerPlanFeedback}
+              onFeedbackChange={setInstallerPlanFeedback}
+              onGenerate={generateInstallerPlan}
+              onCreatePdf={createInstallerPlanPdf}
+              pdfBusy={installerPlanPdfBusy}
+            />
             <MorningMeetingMaterials
               payload={materialsPayload}
               loading={materialsLoading}
