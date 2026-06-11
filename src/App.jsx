@@ -2877,6 +2877,7 @@ function MainNavBar({
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
   const descriptionPullAllowed = canAccessDescriptionPull(currentUser);
+  const coreBridgeExplorerAllowed = canEditBoard(currentUser);
   const proFormaAllowed = canAccessProForma(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
   const homePath = getHomePathForUser(currentUser);
@@ -2891,6 +2892,7 @@ function MainNavBar({
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
   const descriptionPullPath = "/description-pull";
+  const coreBridgeExplorerPath = "/corebridge-explorer";
   const proFormaPath = getProFormaPathForUser(currentUser);
   const installerPath = "/installer";
   const notificationsPath = "/notifications";
@@ -2908,6 +2910,7 @@ function MainNavBar({
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
+    { key: "corebridge-explorer", label: "CoreBridge Explorer", path: coreBridgeExplorerPath, allowed: coreBridgeExplorerAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
@@ -4005,6 +4008,9 @@ function HostLandingPage({
             ) : null}
             {canAccessDescriptionPull(currentUser) ? (
               <HostLaunchCard icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} />
+            ) : null}
+            {canEditBoard(currentUser) ? (
+              <HostLaunchCard icon="board" label="CoreBridge Explorer" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} />
             ) : null}
               {canAccessProForma(currentUser) ? (
                <HostLaunchCard icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} />
@@ -5308,6 +5314,169 @@ function DescriptionPullPage({ currentUser, onLogout, notifications }) {
               </div>
               {copyStatus ? <p className="muted-copy">{copyStatus}</p> : null}
             </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function CoreBridgeExplorerPage({ currentUser, onLogout, notifications }) {
+  const [apis, setApis] = useState([]);
+  const [filter, setFilter] = useState("");
+  const [reference, setReference] = useState("");
+  const [selectedApiId, setSelectedApiId] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
+
+  useEffect(() => {
+    fetch("/api/corebridge-explorer/catalog")
+      .then(async (response) => {
+        const payload = await readJsonResponse(response, "Could not load the CoreBridge API catalogue.");
+        if (!response.ok) throw new Error(payload.error || "Could not load the CoreBridge API catalogue.");
+        const nextApis = Array.isArray(payload.apis) ? payload.apis : [];
+        setApis(nextApis);
+        setSelectedApiId((current) => current || nextApis[0]?.id || "");
+      })
+      .catch((loadError) => setError(loadError.message || "Could not load the CoreBridge API catalogue."));
+  }, []);
+
+  const selectedApi = apis.find((api) => api.id === selectedApiId) || null;
+  const filteredApis = apis.filter((api) => {
+    const query = filter.trim().toLowerCase();
+    if (!query) return true;
+    return [api.name, api.category, api.description, ...(api.paths || [])].join(" ").toLowerCase().includes(query);
+  });
+  const categories = [...new Set(filteredApis.map((api) => api.category))];
+  const output = result?.result?.body;
+  const outputText = output === undefined || output === null
+    ? ""
+    : typeof output === "string"
+      ? output
+      : JSON.stringify(output, null, 2);
+  const apiDetailsText = result
+    ? [
+        selectedApi?.name || result.apiId,
+        `Reference: ${result.reference}`,
+        ...(result.attempts || []).map((attempt) => `${attempt.status} ${attempt.url}`)
+      ].join("\n")
+    : "";
+
+  async function runQuery(event) {
+    event.preventDefault();
+    if (!selectedApiId || !reference.trim()) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    setCopyStatus("");
+    try {
+      const response = await fetch("/api/corebridge-explorer/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiId: selectedApiId, reference: reference.trim() })
+      });
+      const payload = await readJsonResponse(response, "CoreBridge returned an unreadable response.");
+      if (!response.ok) throw new Error(payload.error || "Could not query CoreBridge.");
+      setResult(payload);
+    } catch (queryError) {
+      setError(queryError.message || "Could not query CoreBridge.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyOutput(text, message) {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    setCopyStatus(message);
+  }
+
+  return (
+    <div className="app-shell corebridge-explorer-shell">
+      <div className="page corebridge-explorer-page">
+        <MainNavBar currentUser={currentUser} active="corebridge-explorer" onLogout={onLogout} notifications={notifications} />
+        <section className="panel corebridge-explorer-panel">
+          <form className="corebridge-explorer-toolbar" onSubmit={runQuery}>
+            <label className="corebridge-explorer-filter">
+              <span>Find an API</span>
+              <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Search APIs, categories or paths..." />
+            </label>
+            <label>
+              <span>Job reference or search value</span>
+              <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="EST-3644, ORD-3644..." />
+            </label>
+            <button className="primary-button" type="submit" disabled={loading || !selectedApiId || !reference.trim()}>
+              {loading ? "Pulling..." : "Pull from CoreBridge"}
+            </button>
+          </form>
+
+          <div className="corebridge-explorer-layout">
+            <aside className="corebridge-explorer-catalog">
+              <div className="corebridge-explorer-catalog-head">
+                <strong>CoreBridge APIs</strong>
+                <span>{filteredApis.length} shown</span>
+              </div>
+              {categories.map((category) => (
+                <section key={category} className="corebridge-explorer-category">
+                  <h3>{category}</h3>
+                  {filteredApis.filter((api) => api.category === category).map((api) => (
+                    <button key={api.id} type="button" className={selectedApiId === api.id ? "active" : ""} onClick={() => {
+                      setSelectedApiId(api.id);
+                      setResult(null);
+                      setError("");
+                    }}>
+                      <strong>{api.name}</strong>
+                      <span>{api.description}</span>
+                      <code>{(api.paths || []).join("  |  ")}</code>
+                    </button>
+                  ))}
+                </section>
+              ))}
+              {!filteredApis.length ? <p className="muted-copy">No APIs match that search.</p> : null}
+            </aside>
+
+            <main className="corebridge-explorer-result">
+              <div className="corebridge-explorer-result-head">
+                <div>
+                  <span>{selectedApi?.category || "Select an API"}</span>
+                  <h2>{selectedApi?.name || "CoreBridge response"}</h2>
+                  <p>{selectedApi?.description || "Choose an API on the left, enter a job reference, then pull the raw response."}</p>
+                </div>
+                <div className="corebridge-explorer-copy-actions">
+                  <button className="ghost-button" type="button" disabled={!apiDetailsText} onClick={() => copyOutput(apiDetailsText, "API details copied.")}>Copy API details</button>
+                  <button className="ghost-button" type="button" disabled={!outputText} onClick={() => copyOutput(outputText, "Response copied.")}>Copy response</button>
+                </div>
+              </div>
+              {error ? <p className="form-error">{error}</p> : null}
+              {result ? (
+                <>
+                  <div className="corebridge-explorer-summary">
+                    <span className={result.result?.ok ? "is-success" : "is-error"}>{result.result ? `${result.result.status} ${result.result.ok ? "Success" : "Failed"}` : "No successful endpoint"}</span>
+                    {result.resolvedId ? <span>Resolved ID: {result.resolvedId}</span> : null}
+                    <span>{result.attempts?.length || 0} API attempt{result.attempts?.length === 1 ? "" : "s"}</span>
+                    {copyStatus ? <strong>{copyStatus}</strong> : null}
+                  </div>
+                  <details className="corebridge-explorer-attempts">
+                    <summary>API attempts and paths</summary>
+                    {(result.attempts || []).map((attempt, index) => (
+                      <div key={`${attempt.url}-${index}`}>
+                        <span className={attempt.ok ? "is-success" : "is-error"}>{attempt.status}</span>
+                        <code>{attempt.url}</code>
+                        <small>{attempt.durationMs}ms{attempt.purpose ? ` · ${attempt.purpose}` : ""}</small>
+                      </div>
+                    ))}
+                  </details>
+                  <pre className="corebridge-explorer-json">{outputText || "No response body was returned by the attempted APIs."}</pre>
+                </>
+              ) : (
+                <div className="corebridge-explorer-empty">
+                  <strong>Raw CoreBridge data will appear here</strong>
+                  <p>Select the API that sounds closest to what you need. The attempted path and untouched response will make it clear which field should be mapped.</p>
+                </div>
+              )}
+            </main>
           </div>
         </section>
       </div>
@@ -17029,6 +17198,7 @@ export default function App() {
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
+  const isCoreBridgeExplorerRoute = pathname.startsWith("/corebridge-explorer");
   const isCreditApplicationRoute = pathname.startsWith("/credit-application");
   const isTvInstallsRoute = pathname.startsWith("/tv/installs");
   const isProFormaTemplateRoute = pathname.startsWith("/pro-forma/template");
@@ -17145,6 +17315,7 @@ export default function App() {
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
+  const showCoreBridgeExplorer = Boolean(currentUser && canEditBoard(currentUser) && isCoreBridgeExplorerRoute);
   const showTvInstalls = Boolean(currentUser && canAccessBoard(currentUser) && isTvInstallsRoute);
   const showProFormaTemplate = Boolean(currentUser && canEditProForma(currentUser) && isProFormaTemplateRoute);
   const showDesignBoard = Boolean(
@@ -17173,7 +17344,7 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
@@ -17631,6 +17802,11 @@ export default function App() {
       return;
     }
 
+    if (isCoreBridgeExplorerRoute && !canEditBoard(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isTvInstallsRoute && !canAccessBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -17676,7 +17852,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -17699,7 +17875,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -19597,6 +19773,16 @@ export default function App() {
   if (showMorningMeeting) {
     return (
       <MorningMeetingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showCoreBridgeExplorer) {
+    return (
+      <CoreBridgeExplorerPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}

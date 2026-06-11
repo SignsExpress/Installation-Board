@@ -5077,6 +5077,177 @@ function getCoreBridgeLineItemCategoryPathVariants() {
   ];
 }
 
+function getCoreBridgeExplorerCatalog(config = getCoreBridgeConfig()) {
+  return [
+    { id: "order-search", category: "Jobs", name: "Order search", description: "Order collection filtered by job reference.", strategy: "collection", entity: "order", paths: [config.orderPath] },
+    { id: "order-detail", category: "Jobs", name: "Order full detail", description: "Complete order record including full nested levels.", strategy: "detail", entity: "order", paths: [config.orderPath] },
+    { id: "estimate-search", category: "Jobs", name: "Estimate search", description: "Estimate collection filtered by job reference.", strategy: "collection", entity: "estimate", paths: [config.estimatePath] },
+    { id: "estimate-detail", category: "Jobs", name: "Estimate full detail", description: "Complete estimate record including full nested levels.", strategy: "detail", entity: "estimate", paths: [config.estimatePath] },
+    { id: "invoice-search", category: "Jobs", name: "Invoice search", description: "Invoice collection filtered by job reference.", strategy: "collection", entity: "invoice", paths: [config.invoicePath] },
+    { id: "invoice-detail", category: "Jobs", name: "Invoice full detail", description: "Complete invoice record including full nested levels.", strategy: "detail", entity: "invoice", paths: [config.invoicePath] },
+    { id: "order-items", category: "Line Items", name: "Order items", description: "Line-item subresource attached to an order.", strategy: "subresource", entity: "order", suffix: "orderitem", paths: [`${config.orderPath}/{id}/orderitem`] },
+    { id: "estimate-items", category: "Line Items", name: "Estimate items", description: "Line-item subresource attached to an estimate.", strategy: "subresource", entity: "estimate", suffix: "estimateitem", paths: [`${config.estimatePath}/{id}/estimateitem`] },
+    { id: "invoice-items", category: "Line Items", name: "Invoice items", description: "Line-item subresource attached to an invoice.", strategy: "subresource", entity: "invoice", suffix: "invoiceitem", paths: [`${config.invoicePath}/{id}/invoiceitem`] },
+    { id: "order-destinations", category: "Destinations & Contacts", name: "Order destinations", description: "Destination and contact records attached to an order.", strategy: "subresource", entity: "order", suffix: "orderdestination", paths: [`${config.orderPath}/{id}/orderdestination`] },
+    { id: "works-orders", category: "Production", name: "Works orders", description: "Known works-order and production-order API variants.", strategy: "variant-collection", entity: "order", paths: getCoreBridgeWorksOrderPathVariants() },
+    { id: "works-order-materials", category: "Production", name: "Works-order materials", description: "Known material subresources beneath a works order.", strategy: "works-materials", entity: "order", paths: ["{worksOrderPath}/{id}/materialpart", "{worksOrderPath}/{id}/material", "{worksOrderPath}/{id}/materials"] },
+    { id: "materials", category: "Materials", name: "Materials and components", description: "Known material, material-part and component API variants.", strategy: "variant-search", paths: getCoreBridgeMaterialPathVariants(config) },
+    { id: "line-item-categories", category: "Reference Data", name: "Line-item categories", description: "Known category simple-list API variants.", strategy: "variant-search", paths: getCoreBridgeLineItemCategoryPathVariants() }
+  ].map(({ strategy, entity, suffix, ...publicEntry }) => publicEntry);
+}
+
+function getCoreBridgeExplorerDefinition(apiId, config = getCoreBridgeConfig()) {
+  const definitions = [
+    { id: "order-search", strategy: "collection", entity: "order", paths: [config.orderPath] },
+    { id: "order-detail", strategy: "detail", entity: "order", paths: [config.orderPath] },
+    { id: "estimate-search", strategy: "collection", entity: "estimate", paths: [config.estimatePath] },
+    { id: "estimate-detail", strategy: "detail", entity: "estimate", paths: [config.estimatePath] },
+    { id: "invoice-search", strategy: "collection", entity: "invoice", paths: [config.invoicePath] },
+    { id: "invoice-detail", strategy: "detail", entity: "invoice", paths: [config.invoicePath] },
+    { id: "order-items", strategy: "subresource", entity: "order", suffix: "orderitem", paths: [config.orderPath] },
+    { id: "estimate-items", strategy: "subresource", entity: "estimate", suffix: "estimateitem", paths: [config.estimatePath] },
+    { id: "invoice-items", strategy: "subresource", entity: "invoice", suffix: "invoiceitem", paths: [config.invoicePath] },
+    { id: "order-destinations", strategy: "subresource", entity: "order", suffix: "orderdestination", paths: [config.orderPath] },
+    { id: "works-orders", strategy: "variant-collection", entity: "order", paths: getCoreBridgeWorksOrderPathVariants() },
+    { id: "works-order-materials", strategy: "works-materials", entity: "order", paths: getCoreBridgeWorksOrderPathVariants() },
+    { id: "materials", strategy: "variant-search", paths: getCoreBridgeMaterialPathVariants(config) },
+    { id: "line-item-categories", strategy: "variant-search", paths: getCoreBridgeLineItemCategoryPathVariants() }
+  ];
+  return definitions.find((entry) => entry.id === String(apiId || "")) || null;
+}
+
+async function fetchCoreBridgeExplorerUrl(config, url) {
+  const startedAt = Date.now();
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+  const rawBody = await response.text();
+  let body = rawBody;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    // Keeping a non-JSON response visible is useful when identifying an invalid API.
+  }
+  return {
+    ok: response.ok,
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    url,
+    contentType: String(response.headers.get("content-type") || ""),
+    body
+  };
+}
+
+function getCoreBridgeExplorerEntityPath(config, entity) {
+  if (entity === "estimate") return config.estimatePath;
+  if (entity === "invoice") return config.invoicePath;
+  return config.orderPath;
+}
+
+function getCoreBridgeExplorerReference(reference, entity) {
+  const family = getCoreBridgeReferenceFamily(reference);
+  const prefix = entity === "estimate" ? "EST" : entity === "invoice" ? "INV" : "ORD";
+  return family.find((candidate) => String(candidate).toUpperCase().startsWith(prefix)) || String(reference || "").trim();
+}
+
+async function resolveCoreBridgeExplorerEntity(config, entity, reference) {
+  const variants = getCoreBridgeReferenceVariants(getCoreBridgeExplorerReference(reference, entity));
+  for (const formattednumber of variants.length ? variants : [reference]) {
+    const url = buildCoreBridgeCollectionUrl(config, getCoreBridgeExplorerEntityPath(config, entity), {
+      take: 20,
+      sortBy: "-modifiedDT",
+      formattednumber
+    });
+    const result = await fetchCoreBridgeExplorerUrl(config, url);
+    if (!result.ok || typeof result.body !== "object") continue;
+    const records = extractCoreBridgeRecords(result.body);
+    const record = records.find((candidate) => {
+      const normalized = normalizeCoreBridgeOrder(candidate, 0);
+      return getCoreBridgeReferenceFamilyKey(normalized.orderReference) === getCoreBridgeReferenceFamilyKey(reference);
+    }) || records[0];
+    if (record) {
+      const id = String(record.ID || record.Id || record.id || "").trim();
+      if (id) return { id, record, lookup: result };
+    }
+  }
+  throw new Error(`Could not resolve a ${entity} id for ${reference}.`);
+}
+
+async function runCoreBridgeExplorerQuery(apiId, reference) {
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    const error = new Error("CoreBridge is not configured yet.");
+    error.statusCode = 503;
+    throw error;
+  }
+  const definition = getCoreBridgeExplorerDefinition(apiId, config);
+  if (!definition) {
+    const error = new Error("Choose a valid CoreBridge API.");
+    error.statusCode = 400;
+    throw error;
+  }
+  const query = String(reference || "").trim();
+  if (!query) {
+    const error = new Error("Enter a job reference or search value.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const attempts = [];
+  const run = async (url) => {
+    const result = await fetchCoreBridgeExplorerUrl(config, url);
+    attempts.push({ url: result.url, status: result.status, durationMs: result.durationMs, ok: result.ok });
+    return result;
+  };
+
+  if (definition.strategy === "collection") {
+    const formattednumber = getCoreBridgeExplorerReference(query, definition.entity);
+    return { apiId, reference: query, attempts, result: await run(buildCoreBridgeCollectionUrl(config, definition.paths[0], {
+      take: 200, sortBy: "-modifiedDT", companylevel: "full", contactlevel: "full", notelevel: "full", destinationlevel: "full", itemlevel: "full", formattednumber
+    })) };
+  }
+
+  if (definition.strategy === "detail" || definition.strategy === "subresource") {
+    const resolved = await resolveCoreBridgeExplorerEntity(config, definition.entity, query);
+    attempts.push({ url: resolved.lookup.url, status: resolved.lookup.status, durationMs: resolved.lookup.durationMs, ok: resolved.lookup.ok, purpose: "Resolve record id" });
+    const url = definition.strategy === "detail"
+      ? buildCoreBridgeDetailUrl(config, definition.paths[0], resolved.id)
+      : buildCoreBridgeCollectionUrl(config, `${definition.paths[0]}/${resolved.id}/${definition.suffix}`, { contactlevel: "full", itemlevel: "full" });
+    return { apiId, reference: query, resolvedId: resolved.id, attempts, result: await run(url) };
+  }
+
+  if (definition.strategy === "variant-search" || definition.strategy === "variant-collection") {
+    const formattednumber = getCoreBridgeExplorerReference(query, definition.entity);
+    for (const pathValue of definition.paths) {
+      const result = await run(buildCoreBridgeCollectionUrl(config, pathValue, definition.strategy === "variant-search"
+        ? { take: 200, search: query }
+        : { take: 200, sortBy: "-modifiedDT", formattednumber }));
+      if (result.ok) return { apiId, reference: query, attempts, result };
+    }
+  }
+
+  if (definition.strategy === "works-materials") {
+    const formattednumber = getCoreBridgeExplorerReference(query, "order");
+    for (const pathValue of definition.paths) {
+      const worksResult = await run(buildCoreBridgeCollectionUrl(config, pathValue, { take: 200, formattednumber }));
+      if (!worksResult.ok || typeof worksResult.body !== "object") continue;
+      const workRecord = extractCoreBridgeWorksOrderRecords(worksResult.body)[0];
+      const workId = String(workRecord?.ID || workRecord?.Id || workRecord?.id || "").trim();
+      if (!workId) continue;
+      for (const suffix of ["materialpart", "material", "materials"]) {
+        const result = await run(buildCoreBridgeCollectionUrl(config, `${pathValue}/${workId}/${suffix}`, { take: 500 }));
+        if (result.ok) return { apiId, reference: query, resolvedId: workId, attempts, result };
+      }
+    }
+  }
+
+  return { apiId, reference: query, attempts, result: null };
+}
+
 function buildCoreBridgeMaterialRequestPlans(config, pathValue, query = "", take = 200) {
   const baseParams = [
     { take },
@@ -10801,6 +10972,23 @@ app.get("/api/corebridge/orders", async (request, response) => {
             ? "CoreBridge is not configured yet."
             : "Could not reach CoreBridge order lookup yet.",
         detail: error.message
+      });
+    }
+  });
+
+  app.get("/api/corebridge-explorer/catalog", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    response.json({ apis: getCoreBridgeExplorerCatalog() });
+  });
+
+  app.post("/api/corebridge-explorer/query", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      response.json(await runCoreBridgeExplorerQuery(request.body?.apiId, request.body?.reference));
+    } catch (error) {
+      console.error("CoreBridge Explorer query failed.", error.message || error);
+      response.status(error.statusCode || 500).json({
+        error: error.message || "Could not query CoreBridge."
       });
     }
   });

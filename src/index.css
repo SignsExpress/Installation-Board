@@ -10925,6 +10925,301 @@ button {
   font-weight: 900;
 }
 
+.corebridge-explorer-page {
+  width: min(1600px, calc(100% - 24px));
+  gap: 12px;
+}
+
+.corebridge-explorer-panel {
+  display: grid;
+  gap: 12px;
+  min-height: calc(100vh - 96px);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.corebridge-explorer-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(250px, 0.7fr) auto;
+  align-items: end;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid #dce4ee;
+  border-radius: 9px;
+  background: #f8fafc;
+}
+
+.corebridge-explorer-toolbar label {
+  display: grid;
+  gap: 4px;
+}
+
+.corebridge-explorer-toolbar label span,
+.corebridge-explorer-result-head span {
+  color: #76529a;
+  font-size: 0.6rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.corebridge-explorer-toolbar input {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #d7e0ec;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.corebridge-explorer-toolbar .primary-button {
+  min-height: 38px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.corebridge-explorer-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.35fr) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+.corebridge-explorer-catalog,
+.corebridge-explorer-result {
+  min-height: 0;
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+  border: 1px solid #dce4ee;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.corebridge-explorer-catalog {
+  padding: 8px;
+}
+
+.corebridge-explorer-catalog-head,
+.corebridge-explorer-result-head,
+.corebridge-explorer-summary,
+.corebridge-explorer-attempts div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.corebridge-explorer-catalog-head {
+  position: sticky;
+  z-index: 2;
+  top: -8px;
+  padding: 8px 5px 9px;
+  background: #fff;
+}
+
+.corebridge-explorer-catalog-head strong {
+  color: #172033;
+  font-size: 0.78rem;
+}
+
+.corebridge-explorer-catalog-head span,
+.corebridge-explorer-category button span {
+  color: #718096;
+  font-size: 0.61rem;
+  font-weight: 700;
+}
+
+.corebridge-explorer-category {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.corebridge-explorer-category h3 {
+  margin: 0;
+  padding: 2px 5px;
+  color: #76529a;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.corebridge-explorer-category button {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+}
+
+.corebridge-explorer-category button:hover {
+  background: #f7f9fc;
+}
+
+.corebridge-explorer-category button.active {
+  border-color: #cdb7df;
+  background: #f8f4fb;
+}
+
+.corebridge-explorer-category button strong {
+  color: #172033;
+  font-size: 0.7rem;
+}
+
+.corebridge-explorer-category button code {
+  overflow: hidden;
+  color: #17705a;
+  font-size: 0.57rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.corebridge-explorer-result {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 11px;
+}
+
+.corebridge-explorer-result-head {
+  align-items: flex-start;
+  padding-bottom: 9px;
+  border-bottom: 1px solid #e8edf3;
+}
+
+.corebridge-explorer-result-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.corebridge-explorer-result-head .corebridge-explorer-copy-actions {
+  display: flex;
+  grid-auto-flow: column;
+  gap: 6px;
+}
+
+.corebridge-explorer-result-head h2,
+.corebridge-explorer-result-head p {
+  margin: 0;
+}
+
+.corebridge-explorer-result-head h2 {
+  color: #172033;
+  font-size: 0.92rem;
+}
+
+.corebridge-explorer-result-head p {
+  color: #667085;
+  font-size: 0.66rem;
+}
+
+.corebridge-explorer-summary {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: #f7f9fc;
+}
+
+.corebridge-explorer-summary span,
+.corebridge-explorer-summary strong,
+.corebridge-explorer-attempts small {
+  color: #536276;
+  font-size: 0.62rem;
+  font-weight: 750;
+}
+
+.corebridge-explorer-summary .is-success,
+.corebridge-explorer-attempts .is-success {
+  color: #167044;
+}
+
+.corebridge-explorer-summary .is-error,
+.corebridge-explorer-attempts .is-error {
+  color: #b42318;
+}
+
+.corebridge-explorer-attempts {
+  padding: 8px;
+  border: 1px solid #dce4ee;
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+
+.corebridge-explorer-attempts summary {
+  cursor: pointer;
+  color: #435168;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.corebridge-explorer-attempts div {
+  justify-content: flex-start;
+  margin-top: 6px;
+}
+
+.corebridge-explorer-attempts code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #435168;
+  font-size: 0.57rem;
+}
+
+.corebridge-explorer-json {
+  min-height: 420px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #ced9e6;
+  border-radius: 8px;
+  background: #111827;
+  color: #d7f9e8;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.65rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.corebridge-explorer-empty {
+  display: grid;
+  place-content: center;
+  gap: 5px;
+  min-height: 420px;
+  padding: 30px;
+  border: 1px dashed #ccd7e4;
+  border-radius: 8px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.corebridge-explorer-empty strong {
+  color: #172033;
+  font-size: 0.8rem;
+}
+
+.corebridge-explorer-empty p {
+  max-width: 60ch;
+  margin: 0;
+  color: #667085;
+  font-size: 0.68rem;
+}
+
+@media (max-width: 980px) {
+  .corebridge-explorer-toolbar,
+  .corebridge-explorer-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .corebridge-explorer-catalog,
+  .corebridge-explorer-result {
+    max-height: none;
+  }
+}
+
 .button-spinner-label {
   display: inline-flex;
   align-items: center;

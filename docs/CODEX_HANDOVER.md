@@ -99,6 +99,7 @@ The Design Board has recently been substantially redesigned:
 
 ### Other Recent Work
 
+- Added an admin-only CoreBridge Explorer at `/corebridge-explorer`. It groups known CoreBridge APIs by category, filters them by search, runs a selected API against a job reference/search value, and shows the untouched response plus attempted paths for mapping work. Credentials remain server-side.
 - Mileage rate was changed to `GBP 0.55` per mile.
 - RAMS first-aid facilities gained support for a custom hospital when postcode lookup is incomplete.
 - Design approval targets and progress bars were added.
