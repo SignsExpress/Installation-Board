@@ -2910,7 +2910,7 @@ function MainNavBar({
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
-    { key: "corebridge-explorer", label: "CoreBridge Explorer", path: coreBridgeExplorerPath, allowed: coreBridgeExplorerAllowed },
+    { key: "corebridge-explorer", label: "Corebridge APIs", path: coreBridgeExplorerPath, allowed: coreBridgeExplorerAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
   ].filter((item) => item.allowed);
@@ -4017,7 +4017,7 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const systemCards = [
-    canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="CoreBridge Explorer" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null,
+    canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="Corebridge APIs" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null,
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards].filter((items) => items.length).length;
