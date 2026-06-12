@@ -7966,6 +7966,28 @@ function formatDesignBoardJobType(value = "", itemName = "", description = "") {
   return String(value || "").trim();
 }
 
+function sanitizeWindowsFolderSegment(value = "", fallback = "Unknown") {
+  const cleaned = String(value || "")
+    .replace(/[<>:"/\\|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+  return cleaned || fallback;
+}
+
+function buildCoreBridgeArtworkFolderPath(card = {}) {
+  const customerName = sanitizeWindowsFolderSegment(card.customerName, "Unknown Customer");
+  const orderReference = sanitizeWindowsFolderSegment(card.orderReference, "Unknown Order");
+  return `X:\\Corebridge Artwork\\${customerName}\\${orderReference}`;
+}
+
+function buildCoreBridgeArtworkFolderUrl(card = {}) {
+  const rawPath = buildCoreBridgeArtworkFolderPath(card).replace(/\\/g, "/");
+  const parts = rawPath.split("/");
+  const drive = parts.shift() || "X:";
+  return `file:///${drive}/${parts.map((segment) => encodeURIComponent(segment)).join("/")}`;
+}
+
 function buildDesignBoardCopyText(card = {}, { dateField = "createdAt", dateLabel = "Date added" } = {}) {
   const lines = [
     `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
@@ -8017,6 +8039,7 @@ function DesignBoardColumn({
   onDeleteCard,
   onTogglePriority,
   onChaseCard,
+  onOpenFolder,
   onNoteCard,
   onToggleCard,
   showStatusBar = true,
@@ -8115,6 +8138,7 @@ function DesignBoardColumn({
                 </div>
                 <div className="design-board-card-tools">
                   <button type="button" className="design-board-tool-button" onClick={() => onChaseCard?.(card)}>Chased</button>
+                  <button type="button" className="design-board-tool-button" onClick={() => onOpenFolder?.(card)}>Open Folder</button>
                   <button type="button" className={`design-board-tool-button ${card.designerNote ? "has-note" : ""}`} onClick={() => onNoteCard?.(card)}>
                     {card.designerNote ? "Note added" : "Add note"}
                   </button>
@@ -8390,6 +8414,37 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     setChasingCardId("");
   }
 
+  async function handleOpenFolder(card) {
+    const folderPath = buildCoreBridgeArtworkFolderPath(card);
+    const folderUrl = buildCoreBridgeArtworkFolderUrl(card);
+    let copied = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(folderPath);
+        copied = true;
+      }
+    } catch {}
+    try {
+      const popup = window.open(folderUrl, "_blank", "noopener,noreferrer");
+      if (!popup) {
+        const anchor = document.createElement("a");
+        anchor.href = folderUrl;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      setInfo(copied
+        ? `Tried to open ${folderPath}. Folder path copied to clipboard too.`
+        : `Tried to open ${folderPath}.`);
+    } catch {
+      setInfo(copied
+        ? `Could not open the folder directly. The path ${folderPath} is copied to clipboard.`
+        : `Could not open the folder directly. Use ${folderPath}.`);
+    }
+  }
+
   function openCardNote(card) {
     setNotingCardId(card.id);
     setNoteDraft(card.designerNote || "");
@@ -8505,6 +8560,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onOpenFolder={handleOpenFolder}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8525,6 +8581,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onOpenFolder={handleOpenFolder}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8540,6 +8597,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onOpenFolder={handleOpenFolder}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8562,6 +8620,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                   onDeleteCard={handleDeleteCard}
                   onTogglePriority={handleTogglePriority}
                   onChaseCard={(card) => setChasingCardId(card.id)}
+                  onOpenFolder={handleOpenFolder}
                   onNoteCard={openCardNote}
                   onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                   draggingCardId={draggingDesignCardId}
@@ -8582,6 +8641,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onOpenFolder={handleOpenFolder}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
