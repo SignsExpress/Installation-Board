@@ -7966,25 +7966,6 @@ function formatDesignBoardJobType(value = "", itemName = "", description = "") {
   return String(value || "").trim();
 }
 
-function sanitizeWindowsFolderSegment(value = "", fallback = "Unknown") {
-  const cleaned = String(value || "")
-    .replace(/[<>:"/\\|?*]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/[. ]+$/g, "");
-  return cleaned || fallback;
-}
-
-function buildCoreBridgeArtworkFolderPath(card = {}) {
-  const customerName = sanitizeWindowsFolderSegment(card.customerName, "Unknown Customer");
-  const orderReference = sanitizeWindowsFolderSegment(card.orderReference, "Unknown Order");
-  return `X:\\Corebridge Artwork\\${customerName}\\${orderReference}`;
-}
-
-function buildCoreBridgeArtworkFolderUrl(card = {}) {
-  return `file:///${buildCoreBridgeArtworkFolderPath(card).replace(/\\/g, "/")}`;
-}
-
 function buildDesignBoardCopyText(card = {}, { dateField = "createdAt", dateLabel = "Date added" } = {}) {
   const lines = [
     `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
@@ -8134,15 +8115,6 @@ function DesignBoardColumn({
                 </div>
                 <div className="design-board-card-tools">
                   <button type="button" className="design-board-tool-button" onClick={() => onChaseCard?.(card)}>Chased</button>
-                  <a
-                    className="design-board-tool-button"
-                    href={buildCoreBridgeArtworkFolderUrl(card)}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    Open Folder
-                  </a>
                   <button type="button" className={`design-board-tool-button ${card.designerNote ? "has-note" : ""}`} onClick={() => onNoteCard?.(card)}>
                     {card.designerNote ? "Note added" : "Add note"}
                   </button>
