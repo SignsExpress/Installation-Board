@@ -8047,14 +8047,14 @@ function DesignBoardColumn({
           <article
             key={card.id}
             className={`${getDesignBoardCardClassName(card)} ${draggingCardId === card.id ? "is-dragging" : ""}`.trim()}
-            draggable={editable && !card.isAwaitingSignOff}
+            draggable={editable}
             onClick={() => onToggleCard?.(card)}
-            onDragStart={editable && !card.isAwaitingSignOff ? (event) => {
+            onDragStart={editable ? (event) => {
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", card.id);
               onDragCardStart?.(card.id);
             } : undefined}
-            onDragEnd={editable && !card.isAwaitingSignOff ? () => onDragCardStart?.("") : undefined}
+            onDragEnd={editable ? () => onDragCardStart?.("") : undefined}
           >
             {showStatusBar ? (
               <div className="design-board-card-status-bar">
