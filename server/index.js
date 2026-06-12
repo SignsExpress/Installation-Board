@@ -8919,7 +8919,9 @@ async function buildDesignBoardCardFromOrder(order = {}) {
 }
 
 async function fetchDesignBoardOrderByReference(orderReference = "") {
-  const lookupReferences = getCoreBridgeReferenceVariants(orderReference);
+  const lookupReferences = [...new Set(
+    getCoreBridgeReferenceFamily(orderReference).flatMap((reference) => getCoreBridgeReferenceVariants(reference))
+  )];
   const lookupAttempts = [];
   let lookup = null;
   let order = null;
@@ -8927,7 +8929,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
   for (const reference of lookupReferences) {
     try {
       const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
-      const expectedReferences = new Set(getCoreBridgeReferenceVariants(reference).map((value) => value.toLowerCase()));
+      const expectedReferences = new Set(getCoreBridgeReferenceFamily(orderReference).map((value) => value.toLowerCase()));
       const candidateOrder = (candidateLookup.orders || []).find((entry) =>
         expectedReferences.has(String(entry?.orderReference || "").trim().toLowerCase())
       );
@@ -9897,6 +9899,34 @@ async function refreshDesignBoardCardDetails(card = {}) {
     items: refreshed.items,
     jobTotalExVat: refreshed.jobTotalExVat,
     updatedAt: card.updatedAt || card.createdAt || new Date().toISOString()
+  });
+}
+
+async function repullDesignBoardCard(card = {}) {
+  const { order } = await fetchDesignBoardOrderByReference(card.orderReference);
+  if (!order) {
+    const error = new Error(`No CoreBridge order found for ${card.orderReference || "that card"}.`);
+    error.statusCode = 404;
+    throw error;
+  }
+  const refreshed = await buildDesignBoardCardFromOrder(order);
+  return sanitizeDesignBoardCard({
+    ...refreshed,
+    id: card.id,
+    createdAt: card.createdAt || refreshed.createdAt || new Date().toISOString(),
+    uploadedByUserId: card.uploadedByUserId || "",
+    uploadedByName: card.uploadedByName || "",
+    uploadedByPhotoDataUrl: card.uploadedByPhotoDataUrl || "",
+    scheduledDate: card.scheduledDate || "",
+    status: card.status || refreshed.status || "new",
+    signOffRequestedAt: card.signOffRequestedAt || "",
+    lastCustomerResponseAt: card.lastCustomerResponseAt || "",
+    lastAmendmentAt: card.lastAmendmentAt || "",
+    lastChasedAt: card.lastChasedAt || "",
+    lastChaseMethod: card.lastChaseMethod || "",
+    designerNote: card.designerNote || "",
+    isPriority: card.isPriority || false,
+    updatedAt: new Date().toISOString()
   });
 }
 
@@ -12019,7 +12049,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
       const store = await readStore();
       const state = sanitizeDesignBoardState(store.designBoard);
       const existingIndex = state.cards.findIndex(
-        (card) => String(card.orderReference || "").trim().toLowerCase() === String(order.orderReference || orderReference).trim().toLowerCase()
+        (card) => getCoreBridgeReferenceFamilyKey(card.orderReference || "") === getCoreBridgeReferenceFamilyKey(order.orderReference || orderReference)
       );
       const nextCard = await buildDesignBoardCardFromOrder(order);
       if (existingIndex >= 0) {
@@ -12130,6 +12160,28 @@ app.get("/api/corebridge/orders", async (request, response) => {
     store.designBoard = state;
     const savedStore = await writeStore(store);
     response.json(buildDesignBoardPayload(savedStore));
+  });
+
+  app.post("/api/design-board/cards/:id/repull", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const state = sanitizeDesignBoardState(store.designBoard);
+      const index = state.cards.findIndex((card) => String(card.id || "") === String(request.params.id || ""));
+      if (index === -1) {
+        response.status(404).json({ error: "Design card not found." });
+        return;
+      }
+      state.cards[index] = await repullDesignBoardCard(state.cards[index]);
+      store.designBoard = state;
+      const savedStore = await writeStore(store);
+      response.json(buildDesignBoardPayload(savedStore));
+    } catch (error) {
+      response.status(error.statusCode || 500).json({
+        error: error.statusCode === 404 ? (error.message || "No matching CoreBridge order was found.") : "Could not re-pull the Design Board card.",
+        detail: error.message
+      });
+    }
   });
 
   app.post("/api/design-board/cards/:id/amendments", async (request, response) => {

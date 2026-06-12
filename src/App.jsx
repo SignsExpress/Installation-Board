@@ -8017,6 +8017,7 @@ function DesignBoardColumn({
   onDeleteCard,
   onTogglePriority,
   onChaseCard,
+  onRepullCard,
   onNoteCard,
   onToggleCard,
   showStatusBar = true,
@@ -8121,6 +8122,7 @@ function DesignBoardColumn({
                   <details className="design-board-more-menu">
                     <summary>More</summary>
                     <div className="design-board-more-popover">
+                      <button type="button" onClick={() => onRepullCard?.(card)}>Re-Pull</button>
                       <button type="button" onClick={() => onTogglePriority?.(card)}>{card.isPriority ? "Remove priority" : "Mark as priority"}</button>
                       <button type="button" onClick={() => onEditCard?.(card)}>Edit card</button>
                       <button type="button" className="danger" onClick={() => onDeleteCard?.(card)}>Delete card</button>
@@ -8390,6 +8392,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     setChasingCardId("");
   }
 
+  async function handleRepullCard(card) {
+    await updateBoardRequest(`/api/design-board/cards/${card.id}/repull`, { method: "POST" }, `Re-pulled ${card.orderReference}`);
+  }
+
   function openCardNote(card) {
     setNotingCardId(card.id);
     setNoteDraft(card.designerNote || "");
@@ -8505,6 +8511,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onRepullCard={handleRepullCard}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8525,6 +8532,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onRepullCard={handleRepullCard}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8540,6 +8548,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onRepullCard={handleRepullCard}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
@@ -8562,6 +8571,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                   onDeleteCard={handleDeleteCard}
                   onTogglePriority={handleTogglePriority}
                   onChaseCard={(card) => setChasingCardId(card.id)}
+                  onRepullCard={handleRepullCard}
                   onNoteCard={openCardNote}
                   onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                   draggingCardId={draggingDesignCardId}
@@ -8582,6 +8592,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onDeleteCard={handleDeleteCard}
                 onTogglePriority={handleTogglePriority}
                 onChaseCard={(card) => setChasingCardId(card.id)}
+                onRepullCard={handleRepullCard}
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
