@@ -8024,6 +8024,7 @@ function DesignBoardColumn({
   cardDateField = "createdAt",
   cardDateLabel = "Date Added",
   draggingCardId = "",
+  repullingCardId = "",
   onDragCardStart
 }) {
   return (
@@ -8045,6 +8046,9 @@ function DesignBoardColumn({
       </header>
       <div className="design-board-column-body">
         {cards.length ? cards.map((card) => (
+          (() => {
+            const isRepulling = repullingCardId === card.id;
+            return (
           <article
             key={card.id}
             className={`${getDesignBoardCardClassName(card)} ${draggingCardId === card.id ? "is-dragging" : ""}`.trim()}
@@ -8122,7 +8126,9 @@ function DesignBoardColumn({
                   <details className="design-board-more-menu">
                     <summary>More</summary>
                     <div className="design-board-more-popover">
-                      <button type="button" onClick={() => onRepullCard?.(card)}>Re-Pull</button>
+                      <button type="button" onClick={() => onRepullCard?.(card)} disabled={isRepulling}>
+                        {isRepulling ? <span className="button-spinner-label"><span className="button-spinner" />Re-Pulling...</span> : "Re-Pull"}
+                      </button>
                       <button type="button" onClick={() => onTogglePriority?.(card)}>{card.isPriority ? "Remove priority" : "Mark as priority"}</button>
                       <button type="button" onClick={() => onEditCard?.(card)}>Edit card</button>
                       <button type="button" className="danger" onClick={() => onDeleteCard?.(card)}>Delete card</button>
@@ -8132,6 +8138,8 @@ function DesignBoardColumn({
               </div>
             ) : null}
           </article>
+            );
+          })()
         )) : <div className="design-board-empty">No cards here.</div>}
       </div>
     </section>
@@ -8432,6 +8440,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     { key: "week", label: "Approved this week" },
     { key: "month", label: "Approved this month" }
   ];
+  const repullingCardId = (() => {
+    const match = String(savingKey || "").match(/^\/api\/design-board\/cards\/(.+)\/repull$/);
+    return match?.[1] || "";
+  })();
 
   return (
     <div className="app-shell social-post-shell">
@@ -8515,6 +8527,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
+                repullingCardId={repullingCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
               <DesignBoardColumn
@@ -8536,6 +8549,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
+                repullingCardId={repullingCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
               <DesignBoardColumn
@@ -8552,6 +8566,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
+                repullingCardId={repullingCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
               {days.map((day) => (
@@ -8575,6 +8590,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                   onNoteCard={openCardNote}
                   onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                   draggingCardId={draggingDesignCardId}
+                  repullingCardId={repullingCardId}
                   onDragCardStart={setDraggingDesignCardId}
                 />
               ))}
@@ -8596,6 +8612,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 onNoteCard={openCardNote}
                 onToggleCard={(card) => { setDetailCardId(card.id); setDetailCopyStatus(""); }}
                 draggingCardId={draggingDesignCardId}
+                repullingCardId={repullingCardId}
                 onDragCardStart={setDraggingDesignCardId}
               />
             </div>
