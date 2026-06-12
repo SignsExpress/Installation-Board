@@ -5937,6 +5937,13 @@ function looksLikeEmail(value = "") {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 }
 
+function extractEmailAddress(value = "") {
+  const trimmed = String(value || "").trim();
+  if (looksLikeEmail(trimmed)) return trimmed;
+  const match = trimmed.match(/<([^<>@\s]+@[^<>@\s]+)>/);
+  return looksLikeEmail(match?.[1] || "") ? String(match[1]).trim() : "";
+}
+
 function sanitizeCreditApplicationText(value, maxLength = 400) {
   return String(value || "")
     .replace(/\r\n/g, "\n")
@@ -11270,14 +11277,33 @@ function createServer() {
         getMorningMeetingPeople(usersStore)
       );
       const transporter = nodemailer.createTransport(transportConfig);
-      await transporter.sendMail({
-        from: getCreditApplicationFromAddress(),
+      const fromAddress = getCreditApplicationFromAddress();
+      const visibleTo = extractEmailAddress(fromAddress) || recipients[0];
+      const sendInfo = await transporter.sendMail({
+        from: fromAddress,
+        to: visibleTo,
         bcc: recipients.join(", "),
         subject: email.subject,
         text: email.text,
         html: email.html
       });
-      response.json({ ok: true, recipientCount: recipients.length });
+      const acceptedCount = Array.isArray(sendInfo?.accepted) ? sendInfo.accepted.length : 0;
+      const rejectedCount = Array.isArray(sendInfo?.rejected) ? sendInfo.rejected.length : 0;
+      if (!acceptedCount) {
+        console.error("Morning Meeting email was not accepted by SMTP.", {
+          envelope: sendInfo?.envelope || null,
+          response: sendInfo?.response || "",
+          rejected: sendInfo?.rejected || []
+        });
+        response.status(502).json({ error: "The email server did not accept the Morning Meeting email." });
+        return;
+      }
+      response.json({
+        ok: true,
+        recipientCount: recipients.length,
+        acceptedCount,
+        rejectedCount
+      });
     } catch (error) {
       console.error("Could not email Morning Meeting notes.", error.message || error);
       response.status(500).json({ error: "Could not email the Morning Meeting notes." });
