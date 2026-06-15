@@ -8033,7 +8033,7 @@ function DesignBoardColumn({
       onDragOver={droppable ? (event) => event.preventDefault() : undefined}
       onDrop={droppable ? (event) => {
         event.preventDefault();
-        const cardId = event.dataTransfer.getData("text/plain");
+        const cardId = event.dataTransfer.getData("text/plain") || draggingCardId;
         if (cardId) onDropCard?.(cardId);
       } : undefined}
     >
@@ -8353,6 +8353,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     } else if (laneType === "order-with-salesperson") {
       patch.scheduledDate = "";
       patch.status = "order-with-salesperson";
+    } else if (laneType === "awaiting-sign-off") {
+      patch.scheduledDate = "";
+      patch.status = "awaiting-sign-off";
+      patch.signOffRequestedAt = card.signOffRequestedAt || new Date().toISOString();
     } else if (laneType === "day") {
       patch.scheduledDate = isoDate;
       if (card.status === "new" || card.status === "order-with-salesperson") patch.status = "scheduled";
@@ -8557,6 +8561,11 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 subtitle="Cards pulse red when follow-up is due."
                 cards={lanes.awaitingSignOff}
                 editable={editable}
+                droppable={editable}
+                onDropCard={async (cardId) => {
+                  const card = board?.cards?.find((entry) => entry.id === cardId);
+                  if (card) await moveCard(card, "awaiting-sign-off");
+                }}
                 onCardAction={handleCardAction}
                 onEditCard={(card) => setEditingCardId(card.id)}
                 onDeleteCard={handleDeleteCard}
