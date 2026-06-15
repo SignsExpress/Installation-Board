@@ -5142,6 +5142,31 @@ async function fetchCoreBridgeExplorerUrl(config, url) {
   };
 }
 
+async function fetchCoreBridgeJsonUrl(config, url) {
+  const startedAt = Date.now();
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // Operational callers can fall back cleanly when an endpoint returns HTML or invalid JSON.
+  }
+  return {
+    ok: response.ok && body !== null,
+    status: response.status,
+    durationMs: Date.now() - startedAt,
+    url,
+    contentType: String(response.headers.get("content-type") || ""),
+    body
+  };
+}
+
 function getCoreBridgeExplorerEntityPath(config, entity) {
   if (entity === "estimate") return config.estimatePath;
   if (entity === "invoice") return config.invoicePath;
@@ -6215,8 +6240,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "specialinstructions",
       "instructions"
     ]),
-    status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"]),
-    raw: record
+    status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"])
   };
 
   return normalized;
@@ -6284,6 +6308,29 @@ function pickBestCoreBridgeDestinationRecord(records) {
     records.find((record) => record?.IsDefault) ||
     records[0]
   );
+}
+
+function getCoreBridgeDebugOptions(includeDebug = false) {
+  if (includeDebug && typeof includeDebug === "object") {
+    return {
+      fields: includeDebug.fields !== false,
+      raw: includeDebug.raw === true
+    };
+  }
+  return {
+    fields: Boolean(includeDebug),
+    raw: Boolean(includeDebug)
+  };
+}
+
+function addCoreBridgeDebugData(normalized, record, includeDebug = false) {
+  const debug = getCoreBridgeDebugOptions(includeDebug);
+  if (debug.fields) {
+    normalized.debugFields = buildCoreBridgeDebugFields(record);
+  }
+  if (debug.raw) {
+    normalized.debugRaw = JSON.stringify(record, null, 2);
+  }
 }
 
 function pickBestOrderDestinationRecord(record) {
@@ -6424,21 +6471,16 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
   }
 
   const contentType = String(response.headers.get("content-type") || "");
-  const rawBody = await response.text();
-  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+  if (contentType.includes("text/html")) {
     throw new Error(`Detail lookup returned HTML for ${orderId}`);
   }
-
-  const body = JSON.parse(rawBody);
+  const body = await response.json();
   const record = extractCoreBridgeDetailRecord(body, orderId);
   const normalized = normalizeCoreBridgeOrder(record, 0);
   normalized._detailFetched = true;
   normalized._detailOrderId = orderId;
 
-  if (includeDebug) {
-    normalized.debugFields = buildCoreBridgeDebugFields(record);
-    normalized.debugRaw = JSON.stringify(record, null, 2);
-  }
+  addCoreBridgeDebugData(normalized, record, includeDebug);
 
   return normalized;
 }
@@ -6457,22 +6499,17 @@ async function fetchCoreBridgeEstimateDetail(config, orderId, includeDebug = fal
   }
 
   const contentType = String(response.headers.get("content-type") || "");
-  const rawBody = await response.text();
-  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+  if (contentType.includes("text/html")) {
     throw new Error(`Estimate detail lookup returned HTML for ${orderId}`);
   }
-
-  const body = JSON.parse(rawBody);
+  const body = await response.json();
   const record = extractCoreBridgeDetailRecord(body, orderId);
   const normalized = normalizeCoreBridgeOrder(record, 0);
   normalized._detailFetched = true;
   normalized._detailOrderId = orderId;
   normalized._detailEntity = "estimate";
 
-  if (includeDebug) {
-    normalized.debugFields = buildCoreBridgeDebugFields(record);
-    normalized.debugRaw = JSON.stringify(record, null, 2);
-  }
+  addCoreBridgeDebugData(normalized, record, includeDebug);
 
   return normalized;
 }
@@ -6491,22 +6528,17 @@ async function fetchCoreBridgeInvoiceDetail(config, invoiceId, includeDebug = fa
   }
 
   const contentType = String(response.headers.get("content-type") || "");
-  const rawBody = await response.text();
-  if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+  if (contentType.includes("text/html")) {
     throw new Error(`Invoice detail lookup returned HTML for ${invoiceId}`);
   }
-
-  const body = JSON.parse(rawBody);
+  const body = await response.json();
   const record = extractCoreBridgeDetailRecord(body, invoiceId);
   const normalized = normalizeCoreBridgeOrder(record, 0);
   normalized._detailFetched = true;
   normalized._detailOrderId = invoiceId;
   normalized._detailEntity = "invoice";
 
-  if (includeDebug) {
-    normalized.debugFields = buildCoreBridgeDebugFields(record);
-    normalized.debugRaw = JSON.stringify(record, null, 2);
-  }
+  addCoreBridgeDebugData(normalized, record, includeDebug);
 
   return normalized;
 }
@@ -6822,6 +6854,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   const formattedSearchVariants = looksLikeFormattedNumber ? getCoreBridgeReferenceVariants(normalizedSearch) : [normalizedSearch];
   const looksLikeEstimateReference = formattedSearchVariants.some((value) => /^ests?-/i.test(value));
   const looksLikeInvoiceReference = formattedSearchVariants.some((value) => /^invs?-/i.test(value));
+  const collectionTake = looksLikeFormattedNumber ? 10 : 100;
   const requestPlans = formattedSearchVariants.flatMap((formattedNumber) => [
     ...(looksLikeInvoiceReference
       ? [
@@ -6829,7 +6862,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             label: `invoice-detailed:${formattedNumber}`,
             entity: "invoice",
             url: buildCoreBridgeInvoiceUrl(config, {
-              take: 200,
+              take: collectionTake,
               sortBy: "-modifiedDT",
               companylevel: "full",
               contactlevel: "full",
@@ -6843,7 +6876,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             label: `invoice-basic:${formattedNumber}`,
             entity: "invoice",
             url: buildCoreBridgeInvoiceUrl(config, {
-              take: 200,
+              take: collectionTake,
               sortBy: "-modifiedDT",
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
@@ -6856,7 +6889,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             label: `estimate-detailed:${formattedNumber}`,
             entity: "estimate",
             url: buildCoreBridgeEstimateUrl(config, {
-              take: 200,
+              take: collectionTake,
               sortBy: "-modifiedDT",
               companylevel: "full",
               contactlevel: "full",
@@ -6870,7 +6903,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             label: `estimate-basic:${formattedNumber}`,
             entity: "estimate",
             url: buildCoreBridgeEstimateUrl(config, {
-              take: 200,
+              take: collectionTake,
               sortBy: "-modifiedDT",
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
@@ -6881,7 +6914,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
       label: `detailed:${formattedNumber}`,
       entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
-        take: 200,
+        take: collectionTake,
         sortBy: "-modifiedDT",
         companylevel: "full",
         contactlevel: "full",
@@ -6895,12 +6928,16 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
       label: `basic:${formattedNumber}`,
       entity: "order",
       url: buildCoreBridgeOrderUrl(config, {
-        take: 200,
+        take: collectionTake,
         sortBy: "-modifiedDT",
         formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
       })
     }
-  ]);
+  ]).sort((left, right) => {
+    const leftIsDetailed = left.label.includes("-detailed:") || left.label.startsWith("detailed:");
+    const rightIsDetailed = right.label.includes("-detailed:") || right.label.startsWith("detailed:");
+    return Number(leftIsDetailed) - Number(rightIsDetailed);
+  });
 
   for (const plan of requestPlans) {
     try {
@@ -6918,15 +6955,14 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
       }
 
       const contentType = String(response.headers.get("content-type") || "");
-      const rawBody = await response.text();
-      if (contentType.includes("text/html") || /^\s*</.test(rawBody)) {
+      if (contentType.includes("text/html")) {
         attempts.push(`HTML ${plan.url}`);
         continue;
       }
 
       let body;
       try {
-        body = contentType.includes("application/json") ? JSON.parse(rawBody) : JSON.parse(rawBody);
+        body = await response.json();
       } catch (error) {
         attempts.push(`NONJSON ${plan.url}`);
         continue;
@@ -6936,10 +6972,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
       let orders = filterCoreBridgeOrders(
         records.map((record, index) => {
           const normalized = normalizeCoreBridgeOrder(record, index);
-          if (includeDebug) {
-            normalized.debugFields = buildCoreBridgeDebugFields(record);
-            normalized.debugRaw = JSON.stringify(record, null, 2);
-          }
+          addCoreBridgeDebugData(normalized, record, includeDebug);
           return normalized;
         }),
         normalizedSearch,
@@ -6956,7 +6989,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
 
       if (looksLikeFormattedNumber && orders.length) {
           orders = await Promise.all(
-          orders.slice(0, 10).map(async (order) => {
+          orders.slice(0, 1).map(async (order) => {
             if (!order.id) return order;
 
             try {
@@ -8928,7 +8961,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
 
   for (const reference of lookupReferences) {
     try {
-      const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const candidateLookup = await fetchCoreBridgeOrders(reference, false, { includeClosed: true });
       const expectedReferences = new Set(getCoreBridgeReferenceFamily(orderReference).map((value) => value.toLowerCase()));
       const candidateOrder = (candidateLookup.orders || []).find((entry) =>
         expectedReferences.has(String(entry?.orderReference || "").trim().toLowerCase())
@@ -9211,7 +9244,7 @@ async function fetchProductionOrderByReference(orderReference = "") {
   ];
   for (const reference of preferredReferences) {
     try {
-      const lookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const lookup = await fetchCoreBridgeOrders(reference, { fields: true, raw: false }, { includeClosed: true });
       const order = (lookup.orders || []).find((entry) =>
         String(entry.orderReference || "").trim().toLowerCase() === reference.toLowerCase()
       ) || lookup.orders?.[0];
@@ -9707,7 +9740,7 @@ async function fetchCoreBridgeJobAssemblyDetail(order) {
   url.searchParams.set("childcomponentlevel", "full");
   url.searchParams.set("assemblylevel", "full");
   url.searchParams.set("materiallevel", "full");
-  const result = await fetchCoreBridgeExplorerUrl(config, url.toString());
+  const result = await fetchCoreBridgeJsonUrl(config, url.toString());
   if (!result.ok || typeof result.body !== "object") return order;
   const raw = extractCoreBridgeDetailRecord(result.body, id) || result.body;
   return { ...order, _assemblyRaw: raw };
@@ -10171,7 +10204,7 @@ async function fetchSocialPostOrderByReference(orderReference = "") {
 
   for (const reference of lookupReferences) {
     try {
-      const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+      const candidateLookup = await fetchCoreBridgeOrders(reference, { fields: true, raw: false }, { includeClosed: true });
       const candidateOrder = (candidateLookup.orders || [])[0];
       lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
       if (candidateOrder) {
@@ -11581,7 +11614,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         return;
       }
 
-      const order = await fetchCoreBridgeOrderDetail(config, orderId, true);
+      const order = await fetchCoreBridgeOrderDetail(config, orderId, includeDebug);
       try {
         const destinationAddress = await fetchCoreBridgeOrderDestinationAddress(config, orderId);
         if (destinationAddress) {
@@ -11830,7 +11863,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
       for (const reference of lookupReferences) {
         try {
-          const candidateLookup = await fetchCoreBridgeOrders(reference, true, { includeClosed: true });
+          const candidateLookup = await fetchCoreBridgeOrders(reference, { fields: true, raw: false }, { includeClosed: true });
           const candidateOrder = (candidateLookup.orders || [])[0];
           lookupAttempts.push({ reference, found: Boolean(candidateOrder), sourceUrl: candidateLookup.sourceUrl || "" });
           if (candidateOrder) {
