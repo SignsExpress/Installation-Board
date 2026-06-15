@@ -2494,6 +2494,22 @@ function buildMorningMeetingEmailV2(payload, notes, senderName, people = []) {
   };
 }
 
+function getMorningMeetingJobMatchKey(job = {}) {
+  const reference = String(job?.orderReference || "").trim();
+  const parsedReference = parseCoreBridgeReference(reference);
+  if (parsedReference) {
+    return getCoreBridgeReferenceFamilyKey(reference);
+  }
+
+  const normalizeIdentityPart = (value) => String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+  const customerName = normalizeIdentityPart(job?.customerName);
+  const description = normalizeIdentityPart(job?.description);
+  if (customerName && description) {
+    return `job-details:${customerName}|${description}`;
+  }
+  return `job:${String(job?.id || "").trim()}`;
+}
+
 function applyMorningMeetingJobNotes(store, entries = []) {
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
   const processedKeys = new Set();
@@ -2502,16 +2518,12 @@ function applyMorningMeetingJobNotes(store, entries = []) {
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
     const sourceJob = jobs.find((job) => String(job?.id || "") === String(entry?.jobId || ""));
     if (!sourceJob) return;
-    const referenceKey = getCoreBridgeReferenceFamilyKey(sourceJob.orderReference || "");
-    const updateKey = referenceKey || `job:${sourceJob.id}`;
+    const updateKey = getMorningMeetingJobMatchKey(sourceJob);
     if (processedKeys.has(updateKey)) return;
     processedKeys.add(updateKey);
     const note = String(entry?.note || "").trim();
     jobs.forEach((job, index) => {
-      const matches = referenceKey
-        ? getCoreBridgeReferenceFamilyKey(job?.orderReference || "") === referenceKey
-        : String(job?.id || "") === String(sourceJob.id || "");
-      if (!matches) return;
+      if (getMorningMeetingJobMatchKey(job) !== updateKey) return;
       jobs[index] = sanitizeJob({ ...job, morningMeetingNotes: note, createdAt: job.createdAt });
       updatedCount += 1;
     });
