@@ -10630,6 +10630,10 @@ function createServer() {
     });
   const app = express();
 
+  app.use((request, response, next) => {
+    response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
+    next();
+  });
   app.use(cors());
   app.use(express.json({ limit: "15mb" }));
   app.use(express.static(PUBLIC_DIR));
