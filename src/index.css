@@ -7995,7 +7995,21 @@ button {
 }
 
 .morning-meeting-talking-point textarea {
-  min-height: 66px;
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid #d8e0eb;
+  border-radius: 8px;
+  background: #fbfcfe;
+  color: #172033;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.morning-meeting-talking-point .morning-meeting-mention-field {
+  width: 100%;
+  min-width: 0;
 }
 
 .morning-meeting-talking-point-actions {
