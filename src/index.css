@@ -7946,6 +7946,77 @@ button {
   box-shadow: none;
 }
 
+.morning-meeting-talking-points {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+}
+
+.morning-meeting-talking-point {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #d9e0eb;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.morning-meeting-talking-point.is-today {
+  border-color: #c6e4d2;
+  background: #f3fbf6;
+}
+
+.morning-meeting-talking-point-head {
+  display: grid;
+  gap: 3px;
+}
+
+.morning-meeting-talking-point-head span {
+  color: #76529a;
+  font-size: 0.65rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.morning-meeting-talking-point-head strong {
+  color: #172033;
+  font-size: 0.8rem;
+}
+
+.morning-meeting-talking-point p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #42604d;
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.morning-meeting-talking-point textarea {
+  min-height: 66px;
+}
+
+.morning-meeting-talking-point-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.morning-meeting-talking-point-actions span {
+  color: #667085;
+  font-size: 0.68rem;
+}
+
+.morning-meeting-talking-point-actions .primary-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 12px;
+  font-size: 0.7rem;
+}
+
 .morning-meeting-notes-copy {
   display: grid;
   gap: 4px;
@@ -8898,6 +8969,7 @@ button {
 
   .morning-meeting-toolbar,
   .morning-meeting-notes-actions,
+  .morning-meeting-talking-point-actions,
   .morning-meeting-materials-head {
     align-items: stretch;
     flex-direction: column;
@@ -8917,6 +8989,10 @@ button {
     grid-template-columns: 1fr;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .morning-meeting-talking-points {
+    grid-template-columns: 1fr;
   }
 
   .host-landing-section .host-landing-actions,

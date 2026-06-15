@@ -17597,6 +17597,9 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   const [outline, setOutline] = useState(null);
   const [error, setError] = useState("");
   const [meetingNotes, setMeetingNotes] = useState("");
+  const [tomorrowTalkingPoints, setTomorrowTalkingPoints] = useState("");
+  const [talkingPointsSaving, setTalkingPointsSaving] = useState(false);
+  const [talkingPointsStatus, setTalkingPointsStatus] = useState("");
   const [sending, setSending] = useState(false);
   const [sendStatus, setSendStatus] = useState("");
   const [materialsPayload, setMaterialsPayload] = useState(null);
@@ -17621,6 +17624,7 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
         if (!response.ok) throw new Error(payload.error || "Could not load the Morning Meeting.");
         if (active) {
           setOutline(payload);
+          setTomorrowTalkingPoints(payload.tomorrowTalkingPoints || "");
           const existingNotes = {};
           const selected = new Set();
           (payload.yesterdayJobs || []).forEach((job) => {
@@ -17726,6 +17730,28 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
     }
   }
 
+  async function saveTomorrowTalkingPoints() {
+    if (!outline?.tomorrowMeetingIso || talkingPointsSaving) return;
+    setTalkingPointsSaving(true);
+    setTalkingPointsStatus("");
+    try {
+      const response = await fetch("/api/morning-meeting/talking-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: outline.tomorrowMeetingIso, notes: tomorrowTalkingPoints })
+      });
+      const payload = await readJsonResponse(response, "Could not reach the Morning Meeting talking-points service.");
+      if (!response.ok) throw new Error(payload.error || "Could not save the talking points.");
+      setOutline(payload);
+      setTomorrowTalkingPoints(payload.tomorrowTalkingPoints || "");
+      setTalkingPointsStatus("Saved for the next meeting.");
+    } catch (saveError) {
+      setTalkingPointsStatus(saveError.message || "Could not save the talking points.");
+    } finally {
+      setTalkingPointsSaving(false);
+    }
+  }
+
   async function sendMeetingEmail() {
     if (sending) return;
     setSending(true);
@@ -17791,6 +17817,38 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
             saving={jobNotesSaving}
             status={jobNotesStatus}
           />
+        ) : null}
+        {outline ? (
+          <section className="morning-meeting-talking-points">
+            <div className="morning-meeting-talking-point is-today">
+              <div className="morning-meeting-talking-point-head">
+                <span>{formatTvSectionDate(outline.todayIso)}</span>
+                <strong>Talking points for today's meeting</strong>
+              </div>
+              <p>{outline.todayTalkingPoints || "No talking points were carried into today."}</p>
+            </div>
+            <div className="morning-meeting-talking-point is-tomorrow">
+              <div className="morning-meeting-talking-point-head">
+                <span>{formatTvSectionDate(outline.tomorrowMeetingIso)}</span>
+                <strong>Talking points for tomorrow's meeting</strong>
+              </div>
+              <MorningMeetingMentionTextarea
+                value={tomorrowTalkingPoints}
+                people={outline.people || []}
+                onChange={(value) => {
+                  setTomorrowTalkingPoints(value);
+                  setTalkingPointsStatus("");
+                }}
+                placeholder="Add anything that needs raising at the next meeting..."
+              />
+              <div className="morning-meeting-talking-point-actions">
+                <span>{talkingPointsStatus || "These will appear as today's talking points at the next meeting."}</span>
+                <button className="primary-button" type="button" onClick={saveTomorrowTalkingPoints} disabled={talkingPointsSaving}>
+                  {talkingPointsSaving ? "Saving..." : "Save talking points"}
+                </button>
+              </div>
+            </div>
+          </section>
         ) : null}
         <section className="morning-meeting-notes-panel">
           <textarea

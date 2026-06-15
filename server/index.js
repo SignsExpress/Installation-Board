@@ -1152,6 +1152,7 @@ function mergeHolidaySeed(store) {
   const seed = readHolidaySeed();
       const nextStore = {
         jobs: Array.isArray(store.jobs) ? store.jobs : [],
+        morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
         designBoard: sanitizeDesignBoardState(store.designBoard),
         filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
@@ -1261,6 +1262,7 @@ async function readStore() {
     if (Array.isArray(parsed)) {
           const migrated = applyHolidayResetMigration({
             jobs: parsed,
+            morningMeetingTalkingPoints: {},
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
             holidays: [],
@@ -1291,6 +1293,7 @@ async function readStore() {
     }
         const migrated = applyHolidayResetMigration({
           jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
+          morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(parsed.morningMeetingTalkingPoints),
           designBoard: sanitizeDesignBoardState(parsed.designBoard),
           filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
@@ -1344,6 +1347,7 @@ async function writeStore(store) {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
       return String(left.customerName || "").localeCompare(String(right.customerName || ""));
     }),
+    morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
     designBoard: {
       cards: [...sanitizeDesignBoardState(store.designBoard).cards].sort((left, right) =>
         String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))
@@ -2297,11 +2301,46 @@ function buildBoardRowsFromStore(store, options = {}) {
   };
 }
 
+function sanitizeMorningMeetingTalkingPoints(payload = {}) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
+  return Object.fromEntries(
+    Object.entries(payload)
+      .filter(([date, value]) => /^\d{4}-\d{2}-\d{2}$/.test(date) && String(value || "").trim())
+      .map(([date, value]) => [date, String(value || "").trim().slice(0, 10000)])
+  );
+}
+
+function getNextWorkingDayIso(date) {
+  let candidate = addDays(date, 1);
+  while ([0, 6].includes(candidate.getUTCDay())) candidate = addDays(candidate, 1);
+  return toIsoDate(candidate);
+}
+
+function getMorningMeetingAdjacentInstallDate(jobs, today, direction) {
+  const immediate = addDays(today, direction);
+  const immediateIso = toIsoDate(immediate);
+  const hasJobs = (isoDate) => jobs.some((job) => String(job?.date || "") === isoDate);
+  if (hasJobs(immediateIso)) return immediateIso;
+
+  const todayDay = today.getUTCDay();
+  const shouldCrossWeekend = (direction > 0 && todayDay === 5) || (direction < 0 && todayDay === 1);
+  if (!shouldCrossWeekend) return immediateIso;
+
+  for (let offset = 2; offset <= 3; offset += 1) {
+    const candidate = addDays(today, direction * offset);
+    const candidateIso = toIsoDate(candidate);
+    if (hasJobs(candidateIso) || ![0, 6].includes(candidate.getUTCDay())) return candidateIso;
+  }
+  return immediateIso;
+}
+
 function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
   const todayIso = toIsoDate(today);
-  const yesterdayIso = toIsoDate(addDays(today, -1));
-  const tomorrowIso = toIsoDate(addDays(today, 1));
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
+  const yesterdayIso = getMorningMeetingAdjacentInstallDate(jobs, today, -1);
+  const tomorrowIso = getMorningMeetingAdjacentInstallDate(jobs, today, 1);
+  const tomorrowMeetingIso = getNextWorkingDayIso(today);
+  const talkingPoints = sanitizeMorningMeetingTalkingPoints(store?.morningMeetingTalkingPoints);
   const filteringCards = sanitizeFilteringBoardState(store?.filteringBoard).cards;
   const sortJobs = (items) => [...items].sort((left, right) =>
     String(left?.customerName || "").localeCompare(String(right?.customerName || ""))
@@ -2312,6 +2351,9 @@ function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
     todayIso,
     yesterdayIso,
     tomorrowIso,
+    tomorrowMeetingIso,
+    todayTalkingPoints: talkingPoints[todayIso] || "",
+    tomorrowTalkingPoints: talkingPoints[tomorrowMeetingIso] || "",
     yesterdayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === yesterdayIso))),
     todayJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === todayIso))),
     tomorrowJobs: toPublicJobs(sortJobs(jobs.filter((job) => String(job?.date || "") === tomorrowIso))),
@@ -2430,6 +2472,7 @@ function buildMorningMeetingEmailV2(payload, notes, senderName, people = []) {
       `Morning Meeting - ${todayLabel}`,
       `Sent by ${senderName}`,
       "",
+      ...(payload.todayTalkingPoints ? ["Talking points carried into today's meeting", payload.todayTalkingPoints, ""] : []),
       ...(notes ? ["Meeting notes and actions", notes, ""] : []),
       ...textSections
     ].join("\n"),
@@ -2437,6 +2480,10 @@ function buildMorningMeetingEmailV2(payload, notes, senderName, people = []) {
       <div style="font-family:Arial,sans-serif;max-width:760px;margin:auto;color:#172033;line-height:1.5;">
         <h1 style="margin:0 0 4px;font-size:22px;">Morning Meeting</h1>
         <p style="margin:0 0 16px;color:#667085;font-size:12px;">${escapeHtml(todayLabel)} - Sent by ${escapeHtml(senderName)}</p>
+        ${payload.todayTalkingPoints ? `<div style="margin-bottom:10px;padding:12px 14px;border:1px solid #b9dfca;border-radius:7px;background:#eefbf3;">
+          <strong style="color:#166534;font-size:13px;">Talking points carried into today's meeting</strong>
+          <p style="margin:6px 0 0;white-space:pre-wrap;font-size:12px;">${renderMorningMeetingMentions(payload.todayTalkingPoints, people)}</p>
+        </div>` : ""}
         ${notes ? `<div style="padding:12px 14px;border:1px solid #ded5e8;border-radius:7px;background:#f8f5fb;">
           <strong style="color:#4f2f72;font-size:13px;">Meeting notes and actions</strong>
           <p style="margin:6px 0 0;white-space:pre-wrap;font-size:12px;">${escapeHtml(notes)}</p>
@@ -11314,6 +11361,29 @@ function createServer() {
     } catch (error) {
       console.error("Could not save Morning Meeting job notes.", error.message || error);
       response.status(500).json({ error: "Could not save the job notes." });
+    }
+  });
+
+  app.post("/api/morning-meeting/talking-points", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const [store, usersStore] = await Promise.all([readStore(), readUsersStore()]);
+      const payload = buildMorningMeetingPayload(store);
+      const targetDate = String(request.body?.date || payload.tomorrowMeetingIso || "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        response.status(400).json({ error: "A valid meeting date is required." });
+        return;
+      }
+      const talkingPoints = sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints);
+      const note = String(request.body?.notes || "").trim().slice(0, 10000);
+      if (note) talkingPoints[targetDate] = note;
+      else delete talkingPoints[targetDate];
+      store.morningMeetingTalkingPoints = talkingPoints;
+      const savedStore = await writeStore(store);
+      response.json({ ...buildMorningMeetingPayload(savedStore), people: getMorningMeetingPeople(usersStore) });
+    } catch (error) {
+      console.error("Could not save Morning Meeting talking points.", error.message || error);
+      response.status(500).json({ error: "Could not save the talking points." });
     }
   });
 
