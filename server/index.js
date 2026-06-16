@@ -140,9 +140,56 @@ const MATERIAL_REQUEST_CATEGORIES = [
 ];
 const MATERIAL_REQUEST_CATEGORY_IDS = new Set(MATERIAL_REQUEST_CATEGORIES.map((category) => category.id));
 
+const DEFAULT_MUSTANG_SPEC = {
+  title: "1968 Ford Mustang Coupe",
+  details: [
+    { id: "built", label: "Built", value: "22 February 1968" },
+    { id: "colour", label: "Colour", value: "Highland Green Metallic" },
+    { id: "engine", label: "Engine", value: "Ford 302 Windsor V8" },
+    { id: "transmission", label: "Transmission", value: "4-Speed Manual" },
+    { id: "induction", label: "Induction", value: "Edelbrock Performer Intake & Carburettor" },
+    { id: "ignition", label: "Ignition", value: "Electronic Ignition Conversion" },
+    { id: "cooling", label: "Cooling", value: "Aluminium Radiator" },
+    { id: "chassis-bracing", label: "Chassis Bracing", value: "Export Brace & Monte Carlo Bar" },
+    { id: "power", label: "Power", value: "Estimated 240-280 bhp" },
+    { id: "torque", label: "Torque", value: "Estimated 290-320 lb-ft" },
+    { id: "fuel", label: "Fuel", value: "Shell V-Power" },
+    { id: "dash", label: "Dash", value: "Dakota Digital VFD3-68M (being fitted)" },
+    { id: "audio", label: "Audio", value: "Bluetooth Radio Conversion (being fitted)" },
+    { id: "lighting", label: "Lighting", value: "Sequential LED Tail Lights (being fitted)" }
+  ],
+  history: [
+    "Originally a T-Code six-cylinder car.",
+    "Converted to a 302 Windsor V8 at some point in its life.",
+    "Historic restoration carried out with some welding repairs to floors and bodywork.",
+    "Currently undergoing a reliability and usability refresh rather than a full concours restoration."
+  ].join("\n\n"),
+  parts: [
+    { part: "Rear Main Seal", partNumber: "Fel-Pro BS30136", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Sump Pan Gasket Set", partNumber: "Fel-Pro OS13260C", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Clutch Kit", partNumber: "07014", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Clutch Fork", partNumber: "Scott Drake C8OZ-7515-A", supplier: "Top Speed Automotive", dateOrdered: "Jun 2026", url: "" },
+    { part: "Indicator Relay", partNumber: "EP35 Electronic", supplier: "eBay", dateOrdered: "Jun 2026", url: "" },
+    { part: "Oil Filter", partNumber: "FL1A", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Spark Plugs x8", partNumber: "R83TS", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Engine Oil (5 Quart / 4.73L)", partNumber: "SAE 10W-30 Hot Rod & Classic 10679", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
+    { part: "Dakota Digital Dash (Teal)", partNumber: "VFD3-68M", supplier: "Dakota Digital", dateOrdered: "Jun 2026", url: "" },
+    { part: "Upper Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
+    { part: "Lower Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
+    { part: "Emergency Brake Handle Assembly", partNumber: "C8ZZ-2780-A Style", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
+    { part: "Bluetooth Radio", partNumber: "USA-740", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
+    { part: "Dual Voice Coil Dash Speaker", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
+    { part: "Door Latch Screw Set", partNumber: "356782-S", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
+    { part: "Interior LED Light Kit", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
+    { part: "Sequential LED Tail Light Kit", partNumber: "Scott Drake 14680", supplier: "Kentucky Mustang", dateOrdered: "Jun 2026", url: "" }
+  ]
+};
+
 function createEmptyBoardStore() {
   return {
     jobs: [],
+    morningMeetingTalkingPoints: {},
+    mustang: sanitizeMustangTracker(),
     designBoard: {
       cards: [],
       settings: {
@@ -1019,6 +1066,16 @@ function requirePermissionsManager(request, response) {
   return false;
 }
 
+function canAccessMustang(user) {
+  return canManagePermissions(user);
+}
+
+function requireMustangAccess(request, response) {
+  if (canAccessMustang(request.user)) return true;
+  response.status(403).json({ error: "Mustang access required." });
+  return false;
+}
+
 function requireHolidayAccess(request, response) {
   if (canAccessHolidays(request.user)) return true;
   response.status(403).json({ error: "Holiday access required." });
@@ -1153,6 +1210,7 @@ function mergeHolidaySeed(store) {
       const nextStore = {
         jobs: Array.isArray(store.jobs) ? store.jobs : [],
         morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
+        mustang: sanitizeMustangTracker(store.mustang),
         designBoard: sanitizeDesignBoardState(store.designBoard),
         filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
@@ -1263,6 +1321,7 @@ async function readStore() {
           const migrated = applyHolidayResetMigration({
             jobs: parsed,
             morningMeetingTalkingPoints: {},
+            mustang: sanitizeMustangTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
             holidays: [],
@@ -1294,6 +1353,7 @@ async function readStore() {
         const migrated = applyHolidayResetMigration({
           jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
           morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(parsed.morningMeetingTalkingPoints),
+          mustang: sanitizeMustangTracker(parsed.mustang),
           designBoard: sanitizeDesignBoardState(parsed.designBoard),
           filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
@@ -1348,6 +1408,7 @@ async function writeStore(store) {
       return String(left.customerName || "").localeCompare(String(right.customerName || ""));
     }),
     morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
+    mustang: sanitizeMustangTracker(store.mustang),
     designBoard: {
       cards: [...sanitizeDesignBoardState(store.designBoard).cards].sort((left, right) =>
         String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))
@@ -2363,6 +2424,59 @@ function buildMorningMeetingPayload(store, today = getTodayInLondon()) {
         return Number.isFinite(approvedAt.getTime()) && toIsoDate(approvedAt) === yesterdayIso;
       })
       .sort((left, right) => String(left?.approvedAt || "").localeCompare(String(right?.approvedAt || "")))
+  };
+}
+
+function sanitizeMustangText(value = "", limit = 600) {
+  return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, limit);
+}
+
+function sanitizeMustangUrl(value = "") {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url.slice(0, 2000);
+  return `https://${url}`.slice(0, 2000);
+}
+
+function sanitizeMustangSpecDetail(entry = {}, index = 0) {
+  return {
+    id: sanitizeMustangText(entry.id || `spec-${index + 1}`, 80) || `spec-${index + 1}`,
+    label: sanitizeMustangText(entry.label, 80),
+    value: sanitizeMustangText(entry.value, 300)
+  };
+}
+
+function sanitizeMustangPart(entry = {}) {
+  return {
+    id: sanitizeMustangText(entry.id || makeId(), 80) || makeId(),
+    part: sanitizeMustangText(entry.part, 160),
+    partNumber: sanitizeMustangText(entry.partNumber, 160),
+    supplier: sanitizeMustangText(entry.supplier, 160),
+    dateOrdered: sanitizeMustangText(entry.dateOrdered, 80),
+    url: sanitizeMustangUrl(entry.url)
+  };
+}
+
+function sanitizeMustangTracker(payload = {}) {
+  const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const defaultParts = DEFAULT_MUSTANG_SPEC.parts.map((part) => sanitizeMustangPart(part));
+  const hasSource = Boolean(payload && typeof payload === "object" && !Array.isArray(payload));
+  const details = Array.isArray(source.details)
+    ? source.details
+    : DEFAULT_MUSTANG_SPEC.details;
+  const parts = Array.isArray(source.parts)
+    ? source.parts
+    : defaultParts;
+  return {
+    title: sanitizeMustangText(hasSource && source.title !== undefined ? source.title : DEFAULT_MUSTANG_SPEC.title, 160),
+    details: details
+      .map((entry, index) => sanitizeMustangSpecDetail(entry, index))
+      .filter((entry) => entry.label || entry.value),
+    history: sanitizeMustangText(hasSource && source.history !== undefined ? source.history : DEFAULT_MUSTANG_SPEC.history, 6000),
+    parts: parts
+      .map((entry) => sanitizeMustangPart(entry))
+      .filter((entry) => entry.part || entry.partNumber || entry.supplier || entry.dateOrdered || entry.url),
+    updatedAt: sanitizeMustangText(source.updatedAt, 80)
   };
 }
 
@@ -11348,6 +11462,33 @@ function createServer() {
       return;
     }
     response.json(payload.board);
+  });
+
+  app.get("/api/mustang", async (request, response) => {
+    if (!requireMustangAccess(request, response)) return;
+    try {
+      const store = await readStore();
+      response.json(sanitizeMustangTracker(store.mustang));
+    } catch (error) {
+      console.error("Could not load Mustang tracker.", error.message || error);
+      response.status(500).json({ error: "Could not load the Mustang tracker." });
+    }
+  });
+
+  app.put("/api/mustang", async (request, response) => {
+    if (!requireMustangAccess(request, response)) return;
+    try {
+      const store = await readStore();
+      store.mustang = sanitizeMustangTracker({
+        ...(request.body || {}),
+        updatedAt: new Date().toISOString()
+      });
+      const savedStore = await writeStore(store);
+      response.json(sanitizeMustangTracker(savedStore.mustang));
+    } catch (error) {
+      console.error("Could not save Mustang tracker.", error.message || error);
+      response.status(500).json({ error: "Could not save the Mustang tracker." });
+    }
   });
 
   app.get("/api/morning-meeting", async (request, response) => {

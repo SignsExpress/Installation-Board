@@ -2577,10 +2577,14 @@ function canEditProForma(user) {
   return getPermissionForApp(user, "proForma") === "admin";
 }
 
+function canAccessMustang(user) {
+  return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
+}
+
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canEditDesignBoard(user) || canEditFiltering(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canEditDesignBoard(user) || canEditFiltering(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || canAccessMustang(user) || user.canManagePermissions)
   );
 }
 
@@ -2880,6 +2884,7 @@ function MainNavBar({
   const coreBridgeExplorerAllowed = canEditBoard(currentUser);
   const proFormaAllowed = canAccessProForma(currentUser);
   const installerAllowed = canAccessInstaller(currentUser);
+  const mustangAllowed = canAccessMustang(currentUser);
   const homePath = getHomePathForUser(currentUser);
   const boardPath = getBoardPathForUser(currentUser);
   const designBoardPath = getDesignBoardPathForUser(currentUser);
@@ -2895,6 +2900,7 @@ function MainNavBar({
   const coreBridgeExplorerPath = "/corebridge-explorer";
   const proFormaPath = getProFormaPathForUser(currentUser);
   const installerPath = "/installer";
+  const mustangPath = "/mustang";
   const notificationsPath = "/notifications";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
   const primaryNavItems = [
@@ -2912,7 +2918,8 @@ function MainNavBar({
     { key: "description-pull", label: "Description Pull", path: descriptionPullPath, allowed: descriptionPullAllowed },
     { key: "corebridge-explorer", label: "Corebridge APIs", path: coreBridgeExplorerPath, allowed: coreBridgeExplorerAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
-    { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed }
+    { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed },
+    { key: "mustang", label: "Mustang", path: mustangPath, allowed: mustangAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
   const navItems = [...primaryNavItems, notificationItem];
@@ -3915,6 +3922,9 @@ function HostLaunchIcon({ type }) {
     vehicle: (
       <svg {...iconProps}><path {...commonProps} d="M5 16h14l-1.3-5.2A2.4 2.4 0 0 0 15.4 9H8.6a2.4 2.4 0 0 0-2.3 1.8L5 16Z" /><path {...commonProps} d="M7 16v2M17 16v2M8 13h8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /></svg>
     ),
+    mustang: (
+      <svg {...iconProps}><path {...commonProps} d="M3.5 15.5h17l-1.8-4.2a3 3 0 0 0-2.8-1.8H9.2a3 3 0 0 0-2.5 1.3L3.5 15.5Z" /><path {...commonProps} d="M7.5 15.5v2M16.5 15.5v2M8.5 12.3h7.8" /><path {...commonProps} d="M7.5 18.5h.1M16.5 18.5h.1" /><path {...commonProps} d="M10 9.5 12 6l2.1 3.5" /></svg>
+    ),
     subcontractors: (
       <svg {...iconProps}><path {...commonProps} d="M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" /><path {...commonProps} d="M2.8 20a5.2 5.2 0 0 1 10.4 0" /><path {...commonProps} d="M17 10.5a2.5 2.5 0 1 0 0-5" /><path {...commonProps} d="M16 14.5a4.2 4.2 0 0 1 5.2 4" /></svg>
     ),
@@ -4020,7 +4030,10 @@ function HostLandingPage({
     canEditBoard(currentUser) ? <HostLaunchCard key="corebridge-explorer" icon="board" label="Corebridge APIs" description="Inspect live API responses" onClick={() => goTo("/corebridge-explorer")} /> : null, // Render redeploy nudge.
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
-  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards].filter((items) => items.length).length;
+  const personalCards = [
+    canAccessMustang(currentUser) ? <HostLaunchCard key="mustang" icon="mustang" label="Mustang" description="Spec and parts tracker" onClick={() => goTo("/mustang")} /> : null
+  ].filter(Boolean);
+  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards, personalCards].filter((items) => items.length).length;
 
   return (
     <div className="app-shell host-landing-shell">
@@ -4039,6 +4052,7 @@ function HostLandingPage({
             <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
             <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
             <HostLaunchSection title="System">{systemCards}</HostLaunchSection>
+            <HostLaunchSection title="Personal">{personalCards}</HostLaunchSection>
           </div>
         </section>
 
@@ -17907,6 +17921,233 @@ function MorningMeetingPage({ currentUser, onLogout, notifications }) {
   );
 }
 
+function createEmptyMustangDetail() {
+  return { id: `detail-${Date.now()}-${Math.random().toString(16).slice(2)}`, label: "", value: "" };
+}
+
+function createEmptyMustangPart() {
+  return {
+    id: `part-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    part: "",
+    partNumber: "",
+    supplier: "",
+    dateOrdered: "",
+    url: ""
+  };
+}
+
+function MustangPage({ currentUser, onLogout, notifications }) {
+  const [tracker, setTracker] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    async function loadMustang() {
+      try {
+        setLoading(true);
+        const response = await fetch("/api/mustang");
+        const payload = await readJsonResponse(response, "Could not load the Mustang tracker.");
+        if (!response.ok) throw new Error(payload.error || "Could not load the Mustang tracker.");
+        if (!active) return;
+        setTracker(payload);
+        setDraft(payload);
+      } catch (loadError) {
+        if (active) setError(loadError.message || "Could not load the Mustang tracker.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadMustang();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function updateDraftField(field, value) {
+    setDraft((current) => ({ ...(current || {}), [field]: value }));
+    setStatus("");
+  }
+
+  function updateDetail(index, field, value) {
+    setDraft((current) => ({
+      ...(current || {}),
+      details: (current?.details || []).map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )
+    }));
+    setStatus("");
+  }
+
+  function updatePart(index, field, value) {
+    setDraft((current) => ({
+      ...(current || {}),
+      parts: (current?.parts || []).map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )
+    }));
+    setStatus("");
+  }
+
+  function addDetail() {
+    setDraft((current) => ({ ...(current || {}), details: [...(current?.details || []), createEmptyMustangDetail()] }));
+    setStatus("");
+  }
+
+  function removeDetail(index) {
+    setDraft((current) => ({ ...(current || {}), details: (current?.details || []).filter((_, entryIndex) => entryIndex !== index) }));
+    setStatus("");
+  }
+
+  function addPart() {
+    setDraft((current) => ({ ...(current || {}), parts: [...(current?.parts || []), createEmptyMustangPart()] }));
+    setStatus("");
+  }
+
+  function removePart(index) {
+    setDraft((current) => ({ ...(current || {}), parts: (current?.parts || []).filter((_, entryIndex) => entryIndex !== index) }));
+    setStatus("");
+  }
+
+  async function saveMustang() {
+    if (!draft || saving) return;
+    setSaving(true);
+    setStatus("");
+    setError("");
+    try {
+      const response = await fetch("/api/mustang", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft)
+      });
+      const payload = await readJsonResponse(response, "Could not save the Mustang tracker.");
+      if (!response.ok) throw new Error(payload.error || "Could not save the Mustang tracker.");
+      setTracker(payload);
+      setDraft(payload);
+      setStatus("Saved.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save the Mustang tracker.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const current = draft || tracker;
+
+  return (
+    <div className="app-shell mustang-shell">
+      <div className="page mustang-page">
+        <MainNavBar currentUser={currentUser} active="mustang" onLogout={onLogout} notifications={notifications} />
+        <section className="mustang-hero">
+          <div>
+            <span>Personal garage tracker</span>
+            <input
+              value={current?.title || ""}
+              onChange={(event) => updateDraftField("title", event.target.value)}
+              placeholder="Mustang title"
+            />
+          </div>
+          <div className="mustang-hero-actions">
+            {status ? <small>{status}</small> : current?.updatedAt ? <small>Updated {formatDateTime(current.updatedAt)}</small> : null}
+            <button className="primary-button" type="button" onClick={saveMustang} disabled={saving || loading || !current}>
+              {saving ? "Saving..." : "Save Mustang"}
+            </button>
+          </div>
+        </section>
+
+        {error ? <p className="form-error">{error}</p> : null}
+        {loading ? <div className="board-loading">Loading Mustang tracker...</div> : null}
+
+        {current ? (
+          <>
+            <main className="mustang-layout">
+              <section className="mustang-card">
+                <div className="mustang-card-head">
+                  <div>
+                    <span>Overview</span>
+                    <h2>Specification</h2>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={addDetail}>Add spec line</button>
+                </div>
+                <div className="mustang-spec-grid">
+                  {(current.details || []).map((entry, index) => (
+                    <div key={entry.id || index} className="mustang-spec-row">
+                      <input value={entry.label || ""} onChange={(event) => updateDetail(index, "label", event.target.value)} placeholder="Label" />
+                      <input value={entry.value || ""} onChange={(event) => updateDetail(index, "value", event.target.value)} placeholder="Value" />
+                      <button className="icon-button" type="button" onClick={() => removeDetail(index)} title="Remove spec line">x</button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="mustang-card">
+                <div className="mustang-card-head">
+                  <div>
+                    <span>Known history</span>
+                    <h2>Story so far</h2>
+                  </div>
+                </div>
+                <textarea
+                  className="mustang-history-box"
+                  value={current.history || ""}
+                  onChange={(event) => updateDraftField("history", event.target.value)}
+                  rows={10}
+                />
+              </section>
+            </main>
+
+            <section className="mustang-card mustang-parts-card">
+              <div className="mustang-card-head">
+                <div>
+                  <span>EUG 382F</span>
+                  <h2>Ordered parts tracker</h2>
+                </div>
+                <button className="ghost-button" type="button" onClick={addPart}>Add part</button>
+              </div>
+              <div className="mustang-parts-table">
+                <div className="mustang-parts-head">
+                  <span>Part</span>
+                  <span>Part number</span>
+                  <span>Supplier</span>
+                  <span>Date ordered</span>
+                  <span>Link</span>
+                  <span />
+                </div>
+                {(current.parts || []).map((part, index) => (
+                  <div key={part.id || index} className="mustang-part-row">
+                    <input value={part.part || ""} onChange={(event) => updatePart(index, "part", event.target.value)} placeholder="Part" />
+                    <input value={part.partNumber || ""} onChange={(event) => updatePart(index, "partNumber", event.target.value)} placeholder="Part number" />
+                    <input value={part.supplier || ""} onChange={(event) => updatePart(index, "supplier", event.target.value)} placeholder="Supplier" />
+                    <input value={part.dateOrdered || ""} onChange={(event) => updatePart(index, "dateOrdered", event.target.value)} placeholder="Date" />
+                    <div className="mustang-link-cell">
+                      <input value={part.url || ""} onChange={(event) => updatePart(index, "url", event.target.value)} placeholder="Paste link" />
+                      <a className={`mustang-link-button ${part.url ? "" : "disabled"}`} href={part.url || undefined} target="_blank" rel="noreferrer" title={part.url ? "Open part link" : "No link added"} onClick={(event) => { if (!part.url) event.preventDefault(); }}>
+                        <span aria-hidden="true">↗</span>
+                      </a>
+                    </div>
+                    <button className="icon-button" type="button" onClick={() => removePart(index)} title="Remove part">x</button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="mustang-engine-placeholder">
+              <div>
+                <span>Future phase</span>
+                <h2>Engine bay map</h2>
+                <p>A 3D line drawing can live here later, with hover points for fitted parts, work notes, and photos.</p>
+              </div>
+            </section>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const pathname = typeof window !== "undefined" ? window.location.pathname.toLowerCase() : "/";
   const search = typeof window !== "undefined" ? window.location.search : "";
@@ -17933,6 +18174,7 @@ export default function App() {
   const isRamsRoute = pathname.startsWith("/rams");
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isMorningMeetingRoute = pathname.startsWith("/morning-meeting");
+  const isMustangRoute = pathname.startsWith("/mustang");
   const isBoardRoute = pathname.startsWith("/board");
   const isDesignBoardRoute = pathname.startsWith("/design-board");
   const isFilteringRoute = pathname.startsWith("/filtering");
@@ -18069,8 +18311,9 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showMustang = Boolean(currentUser && canAccessMustang(currentUser) && isMustangRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -18552,6 +18795,11 @@ export default function App() {
       return;
     }
 
+    if (isMustangRoute && !canAccessMustang(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if (isInstallerRoute && !canAccessInstaller(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -18577,7 +18825,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isMustangRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -18600,7 +18848,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -20498,6 +20746,16 @@ export default function App() {
   if (showMorningMeeting) {
     return (
       <MorningMeetingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showMustang) {
+    return (
+      <MustangPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
