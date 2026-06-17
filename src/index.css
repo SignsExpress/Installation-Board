@@ -11359,7 +11359,7 @@ button {
 .mustang-hero-car {
   position: absolute;
   left: clamp(300px, 48vw, 570px);
-  bottom: clamp(18px, 5.6vw, 68px);
+  bottom: clamp(-132px, calc(5.6vw - 150px), -82px);
   z-index: 2;
   width: min(92vw, 1040px);
   transform: translateX(-50%);
