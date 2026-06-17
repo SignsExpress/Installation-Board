@@ -17939,6 +17939,14 @@ function createEmptyMustangPart() {
   };
 }
 
+function createMustangPhoto(src = "", caption = "") {
+  return {
+    id: `photo-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    src,
+    caption
+  };
+}
+
 function normaliseMustangList(values = [], fallback = []) {
   const seen = new Set();
   const list = (Array.isArray(values) ? values : fallback)
@@ -18022,6 +18030,7 @@ function MustangPage({ currentUser }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const canEditMustang = canAccessMustang(currentUser);
@@ -18116,6 +18125,42 @@ function MustangPage({ currentUser }) {
     setStatus("");
   }
 
+  function updatePhoto(index, field, value) {
+    if (!editing) return;
+    setDraft((current) => ({
+      ...(current || {}),
+      photos: (current?.photos || []).map((entry, entryIndex) =>
+        entryIndex === index ? { ...entry, [field]: value } : entry
+      )
+    }));
+    setStatus("");
+  }
+
+  function removePhoto(index) {
+    if (!editing) return;
+    setDraft((current) => ({ ...(current || {}), photos: (current?.photos || []).filter((_, entryIndex) => entryIndex !== index) }));
+    setStatus("");
+  }
+
+  function addPhotos(files) {
+    if (!editing || !files?.length) return;
+    Array.from(files)
+      .filter((file) => /^image\//i.test(file.type))
+      .slice(0, 8)
+      .forEach(async (file) => {
+        try {
+          const prepared = await compressPhotoForUpload(file);
+          setDraft((current) => ({
+            ...(current || {}),
+            photos: [...(current?.photos || []), createMustangPhoto(prepared.dataUrl, file.name.replace(/\.[^.]+$/, ""))]
+          }));
+          setStatus("");
+        } catch (photoError) {
+          setError(photoError.message || "Could not prepare the selected photo.");
+        }
+      });
+  }
+
   function startEditing() {
     if (!canEditMustang) return;
     setDraft(tracker ? JSON.parse(JSON.stringify(tracker)) : draft);
@@ -18171,6 +18216,7 @@ function MustangPage({ currentUser }) {
     value: detailMap.get(label.toLowerCase()) || ""
   })).filter((entry) => entry.value);
   const specDetails = (current?.details || []).filter((entry) => !["built", "colour"].includes(String(entry.label || "").toLowerCase()));
+  const mustangPhotos = (current?.photos || []).filter((photo) => photo?.src);
   const wishlistStage = stages.find((stage) => stage.toLowerCase() === "wishlist") || "Wishlist";
   const wishlistParts = (current?.parts || []).filter((part) => getMustangPartStage(part, stages).toLowerCase() === wishlistStage.toLowerCase());
   const trackedParts = (current?.parts || []).filter((part) => getMustangPartStage(part, stages).toLowerCase() !== wishlistStage.toLowerCase());
@@ -18354,6 +18400,7 @@ function MustangPage({ currentUser }) {
                       </div>
                     ))}
                   </div>
+                  <button className="ghost-button mustang-add-part-bottom" type="button" onClick={addPart}>Add part</button>
                 </>
               ) : (
                 <div className="mustang-progress-board">
@@ -18432,13 +18479,55 @@ function MustangPage({ currentUser }) {
               )}
             </section>
 
-            <section className="mustang-engine-placeholder">
-              <div>
-                <span>Future phase</span>
-                <h2>Engine bay map</h2>
-                <p>A 3D line drawing can live here later, with hover points for fitted parts, work notes, and photos.</p>
+            <section className="mustang-section mustang-photos-section">
+              <div className="mustang-card-head">
+                <div>
+                  <span>Gallery</span>
+                  <h2>Photos</h2>
+                </div>
+                {editing ? (
+                  <label className="mustang-photo-upload">
+                    Upload photos
+                    <input type="file" accept="image/*" multiple onChange={(event) => { addPhotos(event.target.files); event.target.value = ""; }} />
+                  </label>
+                ) : null}
               </div>
+              {editing ? (
+                <div className="mustang-photo-admin-grid">
+                  {mustangPhotos.map((photo, index) => (
+                    <div key={photo.id || index} className="mustang-photo-admin-card">
+                      <button type="button" className="mustang-photo-thumb" onClick={() => setSelectedPhoto(photo)}>
+                        <img src={photo.src} alt={photo.caption || `Mustang photo ${index + 1}`} />
+                      </button>
+                      <input value={photo.caption || ""} onChange={(event) => updatePhoto(index, "caption", event.target.value)} placeholder="Photo caption" />
+                      <button type="button" className="ghost-button" onClick={() => removePhoto(index)}>Remove</button>
+                    </div>
+                  ))}
+                  {!mustangPhotos.length ? <p className="mustang-empty-note">Upload a few photos to build the public gallery.</p> : null}
+                </div>
+              ) : mustangPhotos.length ? (
+                <div className="mustang-photo-gallery" aria-label="Mustang photos">
+                  {mustangPhotos.map((photo, index) => (
+                    <button key={photo.id || index} type="button" className="mustang-photo-card" onClick={() => setSelectedPhoto(photo)}>
+                      <img src={photo.src} alt={photo.caption || `Mustang photo ${index + 1}`} />
+                      {photo.caption ? <span>{photo.caption}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="mustang-empty-note">Photos will appear here as the refresh progresses.</p>
+              )}
             </section>
+
+            {selectedPhoto ? (
+              <div className="mustang-photo-lightbox" role="dialog" aria-modal="true" aria-label={selectedPhoto.caption || "Mustang photo"} onClick={() => setSelectedPhoto(null)}>
+                <button type="button" className="mustang-photo-lightbox-close" onClick={() => setSelectedPhoto(null)}>Close</button>
+                <figure onClick={(event) => event.stopPropagation()}>
+                  <img src={selectedPhoto.src} alt={selectedPhoto.caption || "Mustang photo"} />
+                  {selectedPhoto.caption ? <figcaption>{selectedPhoto.caption}</figcaption> : null}
+                </figure>
+              </div>
+            ) : null}
           </>
         ) : null}
       </main>

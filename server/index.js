@@ -184,7 +184,8 @@ const DEFAULT_MUSTANG_SPEC = {
     { part: "Door Latch Screw Set", partNumber: "356782-S", supplier: "CJ Pony Parts", eta: "Jun 2026", category: "Body & Hardware", stage: "Ordered", highlight: false, url: "" },
     { part: "Interior LED Light Kit", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", eta: "Jun 2026", category: "Lighting", stage: "Ordered", highlight: false, url: "" },
     { part: "Sequential LED Tail Light Kit", partNumber: "Scott Drake 14680", supplier: "Kentucky Mustang", eta: "Jun 2026", category: "Lighting", stage: "Ordered", highlight: true, url: "" }
-  ]
+  ],
+  photos: []
 };
 
 function createEmptyBoardStore() {
@@ -2492,6 +2493,15 @@ function sanitizeMustangPart(entry = {}) {
   };
 }
 
+function sanitizeMustangPhoto(entry = {}, index = 0) {
+  const src = String(entry.src || "").trim();
+  return {
+    id: sanitizeMustangText(entry.id || `photo-${index + 1}`, 80) || `photo-${index + 1}`,
+    src: /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(src) || /^https?:\/\//i.test(src) ? src.slice(0, 3500000) : "",
+    caption: sanitizeMustangText(entry.caption, 160)
+  };
+}
+
 function sanitizeMustangTracker(payload = {}) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
   const defaultParts = DEFAULT_MUSTANG_SPEC.parts.map((part) => sanitizeMustangPart(part));
@@ -2522,6 +2532,9 @@ function sanitizeMustangTracker(payload = {}) {
       .filter((entry) => entry.label || entry.value),
     history: sanitizeMustangText(hasSource && source.history !== undefined ? source.history : DEFAULT_MUSTANG_SPEC.history, 6000),
     parts: sanitizedParts,
+    photos: (Array.isArray(source.photos) ? source.photos : DEFAULT_MUSTANG_SPEC.photos)
+      .map((entry, index) => sanitizeMustangPhoto(entry, index))
+      .filter((entry) => entry.src),
     updatedAt: sanitizeMustangText(source.updatedAt, 80)
   };
 }

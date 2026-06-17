@@ -11489,13 +11489,11 @@ button {
   margin-bottom: 16px;
 }
 
-.mustang-card-head span,
-.mustang-engine-placeholder span {
+.mustang-card-head span {
   display: none;
 }
 
-.mustang-card-head h2,
-.mustang-engine-placeholder h2 {
+.mustang-card-head h2 {
   margin: 4px 0 0;
   color: #101510;
   font-size: 1.55rem;
@@ -11757,19 +11755,16 @@ button {
   pointer-events: none;
 }
 
+.mustang-add-part-bottom {
+  margin-top: 14px;
+}
+
 .mustang-spec-row .icon-button,
 .mustang-part-row .icon-button {
   width: 32px;
   height: 32px;
   border-radius: 10px;
   color: #be123c;
-}
-
-.mustang-engine-placeholder {
-  margin-top: 64px;
-  padding-top: 30px;
-  border-top: 1px solid #dde4dd;
-  background: transparent;
 }
 
 .mustang-progress-board {
@@ -11919,12 +11914,171 @@ button {
     #f8faf7;
 }
 
-.mustang-engine-placeholder p {
-  margin: 6px 0 0;
-  max-width: 680px;
+.mustang-photos-section {
+  margin-top: 64px;
+  padding-top: 30px;
+  border-top: 1px solid #dde4dd;
+}
+
+.mustang-photo-upload {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #cfdccf;
+  border-radius: 999px;
+  background: #06281c;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mustang-photo-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mustang-photo-gallery,
+.mustang-photo-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.mustang-photo-card,
+.mustang-photo-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 18px;
+  background: #0b1e16;
+  cursor: pointer;
+}
+
+.mustang-photo-card {
+  aspect-ratio: 4 / 3;
+  box-shadow: 0 20px 42px rgba(6, 40, 28, 0.12);
+}
+
+.mustang-photo-thumb {
+  aspect-ratio: 16 / 10;
+}
+
+.mustang-photo-card img,
+.mustang-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.mustang-photo-card:hover img,
+.mustang-photo-thumb:hover img {
+  transform: scale(1.035);
+  opacity: 0.92;
+}
+
+.mustang-photo-card span {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(6, 40, 28, 0.78);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 850;
+  text-align: left;
+  backdrop-filter: blur(8px);
+}
+
+.mustang-photo-admin-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dde7dd;
+  border-radius: 18px;
+  background: #f8faf7;
+}
+
+.mustang-photo-admin-card input {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(55, 74, 55, 0.2);
+  border-radius: 9px;
+  padding: 6px 9px;
+  background: #fff;
+  color: #17231a;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.mustang-empty-note {
+  margin: 0;
+  padding: 18px 0;
   color: #526052;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.mustang-photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(2, 12, 8, 0.84);
+  backdrop-filter: blur(12px);
+}
+
+.mustang-photo-lightbox figure {
+  width: min(1040px, 96vw);
+  max-height: 88vh;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.mustang-photo-lightbox img {
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0 auto;
+  display: block;
+  border-radius: 18px;
+  object-fit: contain;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+}
+
+.mustang-photo-lightbox figcaption {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 850;
+  text-align: center;
+}
+
+.mustang-photo-lightbox-close {
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  min-height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
   font-size: 0.78rem;
-  line-height: 1.5;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .host-launch-card {
