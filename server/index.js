@@ -165,23 +165,23 @@ const DEFAULT_MUSTANG_SPEC = {
     "Currently undergoing a reliability and usability refresh rather than a full concours restoration."
   ].join("\n\n"),
   parts: [
-    { part: "Rear Main Seal", partNumber: "Fel-Pro BS30136", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Sump Pan Gasket Set", partNumber: "Fel-Pro OS13260C", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Clutch Kit", partNumber: "07014", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Clutch Fork", partNumber: "Scott Drake C8OZ-7515-A", supplier: "Top Speed Automotive", dateOrdered: "Jun 2026", url: "" },
-    { part: "Indicator Relay", partNumber: "EP35 Electronic", supplier: "eBay", dateOrdered: "Jun 2026", url: "" },
-    { part: "Oil Filter", partNumber: "FL1A", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Spark Plugs x8", partNumber: "R83TS", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Engine Oil (5 Quart / 4.73L)", partNumber: "SAE 10W-30 Hot Rod & Classic 10679", supplier: "Belcher Engineering", dateOrdered: "Jun 2026", url: "" },
-    { part: "Dakota Digital Dash (Teal)", partNumber: "VFD3-68M", supplier: "Dakota Digital", dateOrdered: "Jun 2026", url: "" },
-    { part: "Upper Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
-    { part: "Lower Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
-    { part: "Emergency Brake Handle Assembly", partNumber: "C8ZZ-2780-A Style", supplier: "Essex Mustang", dateOrdered: "Jun 2026", url: "" },
-    { part: "Bluetooth Radio", partNumber: "USA-740", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
-    { part: "Dual Voice Coil Dash Speaker", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
-    { part: "Door Latch Screw Set", partNumber: "356782-S", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
-    { part: "Interior LED Light Kit", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", dateOrdered: "Jun 2026", url: "" },
-    { part: "Sequential LED Tail Light Kit", partNumber: "Scott Drake 14680", supplier: "Kentucky Mustang", dateOrdered: "Jun 2026", url: "" }
+    { part: "Rear Main Seal", partNumber: "Fel-Pro BS30136", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Sump Pan Gasket Set", partNumber: "Fel-Pro OS13260C", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Clutch Kit", partNumber: "07014", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Clutch Fork", partNumber: "Scott Drake C8OZ-7515-A", supplier: "Top Speed Automotive", eta: "Jun 2026", url: "" },
+    { part: "Indicator Relay", partNumber: "EP35 Electronic", supplier: "eBay", eta: "Jun 2026", url: "" },
+    { part: "Oil Filter", partNumber: "FL1A", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Spark Plugs x8", partNumber: "R83TS", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Engine Oil (5 Quart / 4.73L)", partNumber: "SAE 10W-30 Hot Rod & Classic 10679", supplier: "Belcher Engineering", eta: "Jun 2026", url: "" },
+    { part: "Dakota Digital Dash (Teal)", partNumber: "VFD3-68M", supplier: "Dakota Digital", eta: "Jun 2026", url: "" },
+    { part: "Upper Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", eta: "Jun 2026", url: "" },
+    { part: "Lower Radiator Hose", partNumber: "OEM Style 390/428", supplier: "Essex Mustang", eta: "Jun 2026", url: "" },
+    { part: "Emergency Brake Handle Assembly", partNumber: "C8ZZ-2780-A Style", supplier: "Essex Mustang", eta: "Jun 2026", url: "" },
+    { part: "Bluetooth Radio", partNumber: "USA-740", supplier: "CJ Pony Parts", eta: "Jun 2026", url: "" },
+    { part: "Dual Voice Coil Dash Speaker", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", eta: "Jun 2026", url: "" },
+    { part: "Door Latch Screw Set", partNumber: "356782-S", supplier: "CJ Pony Parts", eta: "Jun 2026", url: "" },
+    { part: "Interior LED Light Kit", partNumber: "67-68 Mustang", supplier: "CJ Pony Parts", eta: "Jun 2026", url: "" },
+    { part: "Sequential LED Tail Light Kit", partNumber: "Scott Drake 14680", supplier: "Kentucky Mustang", eta: "Jun 2026", url: "" }
   ]
 };
 
@@ -2447,12 +2447,13 @@ function sanitizeMustangSpecDetail(entry = {}, index = 0) {
 }
 
 function sanitizeMustangPart(entry = {}) {
+  const eta = entry.eta !== undefined ? entry.eta : entry.dateOrdered;
   return {
     id: sanitizeMustangText(entry.id || makeId(), 80) || makeId(),
     part: sanitizeMustangText(entry.part, 160),
     partNumber: sanitizeMustangText(entry.partNumber, 160),
     supplier: sanitizeMustangText(entry.supplier, 160),
-    dateOrdered: sanitizeMustangText(entry.dateOrdered, 80),
+    eta: sanitizeMustangText(eta, 80),
     url: sanitizeMustangUrl(entry.url)
   };
 }
@@ -2475,7 +2476,7 @@ function sanitizeMustangTracker(payload = {}) {
     history: sanitizeMustangText(hasSource && source.history !== undefined ? source.history : DEFAULT_MUSTANG_SPEC.history, 6000),
     parts: parts
       .map((entry) => sanitizeMustangPart(entry))
-      .filter((entry) => entry.part || entry.partNumber || entry.supplier || entry.dateOrdered || entry.url),
+      .filter((entry) => entry.part || entry.partNumber || entry.supplier || entry.eta || entry.url),
     updatedAt: sanitizeMustangText(source.updatedAt, 80)
   };
 }

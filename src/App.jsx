@@ -17931,7 +17931,7 @@ function createEmptyMustangPart() {
     part: "",
     partNumber: "",
     supplier: "",
-    dateOrdered: "",
+    eta: "",
     url: ""
   };
 }
@@ -17941,6 +17941,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
 
@@ -17993,23 +17994,40 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   }
 
   function addDetail() {
+    if (!editing) return;
     setDraft((current) => ({ ...(current || {}), details: [...(current?.details || []), createEmptyMustangDetail()] }));
     setStatus("");
   }
 
   function removeDetail(index) {
+    if (!editing) return;
     setDraft((current) => ({ ...(current || {}), details: (current?.details || []).filter((_, entryIndex) => entryIndex !== index) }));
     setStatus("");
   }
 
   function addPart() {
+    if (!editing) return;
     setDraft((current) => ({ ...(current || {}), parts: [...(current?.parts || []), createEmptyMustangPart()] }));
     setStatus("");
   }
 
   function removePart(index) {
+    if (!editing) return;
     setDraft((current) => ({ ...(current || {}), parts: (current?.parts || []).filter((_, entryIndex) => entryIndex !== index) }));
     setStatus("");
+  }
+
+  function startEditing() {
+    setDraft(tracker ? JSON.parse(JSON.stringify(tracker)) : draft);
+    setEditing(true);
+    setStatus("");
+  }
+
+  function cancelEditing() {
+    setDraft(tracker);
+    setEditing(false);
+    setStatus("");
+    setError("");
   }
 
   async function saveMustang() {
@@ -18027,6 +18045,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
       if (!response.ok) throw new Error(payload.error || "Could not save the Mustang tracker.");
       setTracker(payload);
       setDraft(payload);
+      setEditing(false);
       setStatus("Saved.");
     } catch (saveError) {
       setError(saveError.message || "Could not save the Mustang tracker.");
@@ -18035,26 +18054,56 @@ function MustangPage({ currentUser, onLogout, notifications }) {
     }
   }
 
-  const current = draft || tracker;
+  const current = editing ? draft || tracker : tracker || draft;
+  const heroHighlights = current?.details?.filter((entry) =>
+    ["engine", "transmission", "colour", "power"].includes(String(entry.id || entry.label || "").toLowerCase().replace(/\s+/g, "-"))
+  ).slice(0, 4) || [];
+  const historyParagraphs = String(current?.history || "").split(/\n{2,}/).map((line) => line.trim()).filter(Boolean);
 
   return (
     <div className="app-shell mustang-shell">
       <div className="page mustang-page">
         <MainNavBar currentUser={currentUser} active="mustang" onLogout={onLogout} notifications={notifications} />
-        <section className="mustang-hero">
+        <section className={`mustang-hero ${editing ? "is-editing" : ""}`}>
           <div>
             <span>Personal garage tracker</span>
-            <input
-              value={current?.title || ""}
-              onChange={(event) => updateDraftField("title", event.target.value)}
-              placeholder="Mustang title"
-            />
+            {editing ? (
+              <input
+                value={current?.title || ""}
+                onChange={(event) => updateDraftField("title", event.target.value)}
+                placeholder="Mustang title"
+              />
+            ) : (
+              <>
+                <h1>{current?.title || "Mustang"}</h1>
+                <p>Spec, ordered parts and refresh notes for EUG 382F.</p>
+              </>
+            )}
           </div>
+          {!editing && heroHighlights.length ? (
+            <div className="mustang-hero-stats">
+              {heroHighlights.map((entry) => (
+                <div key={entry.id || entry.label}>
+                  <small>{entry.label}</small>
+                  <strong>{entry.value}</strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
           <div className="mustang-hero-actions">
             {status ? <small>{status}</small> : current?.updatedAt ? <small>Updated {formatDateTime(current.updatedAt)}</small> : null}
-            <button className="primary-button" type="button" onClick={saveMustang} disabled={saving || loading || !current}>
-              {saving ? "Saving..." : "Save Mustang"}
-            </button>
+            {editing ? (
+              <>
+                <button className="ghost-button" type="button" onClick={cancelEditing} disabled={saving}>Cancel</button>
+                <button className="primary-button" type="button" onClick={saveMustang} disabled={saving || loading || !current}>
+                  {saving ? "Saving..." : "Save Mustang"}
+                </button>
+              </>
+            ) : (
+              <button className="primary-button" type="button" onClick={startEditing} disabled={loading || !current}>
+                Edit Mustang
+              </button>
+            )}
           </div>
         </section>
 
@@ -18070,17 +18119,28 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                     <span>Overview</span>
                     <h2>Specification</h2>
                   </div>
-                  <button className="ghost-button" type="button" onClick={addDetail}>Add spec line</button>
+                  {editing ? <button className="ghost-button" type="button" onClick={addDetail}>Add spec line</button> : null}
                 </div>
-                <div className="mustang-spec-grid">
-                  {(current.details || []).map((entry, index) => (
-                    <div key={entry.id || index} className="mustang-spec-row">
-                      <input value={entry.label || ""} onChange={(event) => updateDetail(index, "label", event.target.value)} placeholder="Label" />
-                      <input value={entry.value || ""} onChange={(event) => updateDetail(index, "value", event.target.value)} placeholder="Value" />
-                      <button className="icon-button" type="button" onClick={() => removeDetail(index)} title="Remove spec line">x</button>
-                    </div>
-                  ))}
-                </div>
+                {editing ? (
+                  <div className="mustang-spec-grid">
+                    {(current.details || []).map((entry, index) => (
+                      <div key={entry.id || index} className="mustang-spec-row">
+                        <input value={entry.label || ""} onChange={(event) => updateDetail(index, "label", event.target.value)} placeholder="Label" />
+                        <input value={entry.value || ""} onChange={(event) => updateDetail(index, "value", event.target.value)} placeholder="Value" />
+                        <button className="icon-button" type="button" onClick={() => removeDetail(index)} title="Remove spec line">x</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mustang-spec-display">
+                    {(current.details || []).map((entry, index) => (
+                      <div key={entry.id || index} className="mustang-spec-card">
+                        <small>{entry.label}</small>
+                        <strong>{entry.value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </section>
 
               <section className="mustang-card">
@@ -18090,12 +18150,18 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                     <h2>Story so far</h2>
                   </div>
                 </div>
-                <textarea
-                  className="mustang-history-box"
-                  value={current.history || ""}
-                  onChange={(event) => updateDraftField("history", event.target.value)}
-                  rows={10}
-                />
+                {editing ? (
+                  <textarea
+                    className="mustang-history-box"
+                    value={current.history || ""}
+                    onChange={(event) => updateDraftField("history", event.target.value)}
+                    rows={10}
+                  />
+                ) : (
+                  <div className="mustang-history-display">
+                    {historyParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                  </div>
+                )}
               </section>
             </main>
 
@@ -18105,30 +18171,41 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                   <span>EUG 382F</span>
                   <h2>Ordered parts tracker</h2>
                 </div>
-                <button className="ghost-button" type="button" onClick={addPart}>Add part</button>
+                {editing ? <button className="ghost-button" type="button" onClick={addPart}>Add part</button> : null}
               </div>
               <div className="mustang-parts-table">
                 <div className="mustang-parts-head">
                   <span>Part</span>
                   <span>Part number</span>
                   <span>Supplier</span>
-                  <span>Date ordered</span>
+                  <span>ETA</span>
                   <span>Link</span>
-                  <span />
+                  {editing ? <span /> : null}
                 </div>
                 {(current.parts || []).map((part, index) => (
-                  <div key={part.id || index} className="mustang-part-row">
-                    <input value={part.part || ""} onChange={(event) => updatePart(index, "part", event.target.value)} placeholder="Part" />
-                    <input value={part.partNumber || ""} onChange={(event) => updatePart(index, "partNumber", event.target.value)} placeholder="Part number" />
-                    <input value={part.supplier || ""} onChange={(event) => updatePart(index, "supplier", event.target.value)} placeholder="Supplier" />
-                    <input value={part.dateOrdered || ""} onChange={(event) => updatePart(index, "dateOrdered", event.target.value)} placeholder="Date" />
+                  <div key={part.id || index} className={`mustang-part-row ${editing ? "is-editing" : ""}`}>
+                    {editing ? (
+                      <>
+                        <input value={part.part || ""} onChange={(event) => updatePart(index, "part", event.target.value)} placeholder="Part" />
+                        <input value={part.partNumber || ""} onChange={(event) => updatePart(index, "partNumber", event.target.value)} placeholder="Part number" />
+                        <input value={part.supplier || ""} onChange={(event) => updatePart(index, "supplier", event.target.value)} placeholder="Supplier" />
+                        <input value={part.eta || part.dateOrdered || ""} onChange={(event) => updatePart(index, "eta", event.target.value)} placeholder="ETA" />
+                      </>
+                    ) : (
+                      <>
+                        <strong>{part.part || "Unnamed part"}</strong>
+                        <span>{part.partNumber || "Not added"}</span>
+                        <span>{part.supplier || "Not added"}</span>
+                        <span>{part.eta || part.dateOrdered || "TBC"}</span>
+                      </>
+                    )}
                     <div className="mustang-link-cell">
-                      <input value={part.url || ""} onChange={(event) => updatePart(index, "url", event.target.value)} placeholder="Paste link" />
+                      {editing ? <input value={part.url || ""} onChange={(event) => updatePart(index, "url", event.target.value)} placeholder="Paste link" /> : null}
                       <a className={`mustang-link-button ${part.url ? "" : "disabled"}`} href={part.url || undefined} target="_blank" rel="noreferrer" title={part.url ? "Open part link" : "No link added"} onClick={(event) => { if (!part.url) event.preventDefault(); }}>
-                        <span aria-hidden="true">↗</span>
+                        <span aria-hidden="true">{editing ? "Open" : "Link"}</span>
                       </a>
                     </div>
-                    <button className="icon-button" type="button" onClick={() => removePart(index)} title="Remove part">x</button>
+                    {editing ? <button className="icon-button" type="button" onClick={() => removePart(index)} title="Remove part">x</button> : null}
                   </div>
                 ))}
               </div>
