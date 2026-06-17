@@ -11320,138 +11320,161 @@ button {
   font-size: 0.9rem;
 }
 
-.mustang-shell {
-  background:
-    radial-gradient(circle at 12% 8%, rgba(52, 80, 52, 0.18), transparent 28%),
-    radial-gradient(circle at 88% 12%, rgba(36, 45, 34, 0.13), transparent 24%),
-    linear-gradient(135deg, #f5f3eb 0%, #eef2ec 52%, #f6f7f4 100%);
-}
-
-.mustang-page {
-  width: min(100%, 1360px);
-}
-
-.mustang-hero,
-.mustang-card,
-.mustang-engine-placeholder {
-  border: 1px solid rgba(55, 74, 55, 0.18);
-  border-radius: 18px;
-  background: rgba(255, 253, 247, 0.94);
-  box-shadow: 0 18px 50px rgba(42, 48, 38, 0.08);
+.mustang-public-shell {
+  min-height: 100vh;
+  background: #fff;
+  color: #101510;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .mustang-hero {
-  display: grid;
-  grid-template-columns: minmax(300px, 1fr) minmax(320px, 0.9fr) auto;
-  align-items: stretch;
-  gap: 18px;
-  padding: 20px;
+  position: relative;
+  min-height: clamp(360px, 55vw, 620px);
   overflow: hidden;
+  background: #06281c;
+  color: #fff;
 }
 
-.mustang-hero > div:first-child {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
+.mustang-hero-inner {
+  position: relative;
+  width: min(1180px, calc(100% - 36px));
+  min-height: clamp(360px, 55vw, 620px);
+  margin: 0 auto;
 }
 
-.mustang-hero span,
-.mustang-card-head span,
-.mustang-engine-placeholder span {
-  color: #31543c;
-  font-size: 0.68rem;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.mustang-hero h1 {
-  margin: 0;
-  color: #17231a;
-  font-size: clamp(1.7rem, 3vw, 2.65rem);
-  font-weight: 900;
-  letter-spacing: -0.03em;
-}
-
-.mustang-hero p {
-  margin: 0;
-  max-width: 560px;
-  color: #5f6b60;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.mustang-hero input {
-  width: min(760px, 100%);
-  border: 0;
-  background: transparent;
-  color: #111827;
-  font-size: clamp(1.55rem, 3vw, 2.45rem);
-  font-weight: 850;
-  letter-spacing: -0.02em;
-}
-
-.mustang-hero input:focus {
-  outline: none;
-}
-
-.mustang-hero-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  flex: 0 0 auto;
-}
-
-.mustang-hero-actions small {
-  color: #657263;
-  font-size: 0.72rem;
-  font-weight: 700;
+.mustang-year {
+  position: absolute;
+  left: 50%;
+  top: clamp(34px, 8vw, 86px);
+  transform: translateX(-50%);
+  z-index: 1;
+  color: #fff;
+  font-size: clamp(7.2rem, 24vw, 20rem);
+  font-weight: 950;
+  letter-spacing: -0.09em;
+  line-height: 0.78;
+  opacity: 0.98;
   white-space: nowrap;
 }
 
-.mustang-hero-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.mustang-hero-car {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(18px, 5vw, 62px);
+  z-index: 2;
+  width: min(86vw, 980px);
+  transform: translateX(-50%);
+  filter: drop-shadow(0 34px 22px rgba(0, 0, 0, 0.34));
 }
 
-.mustang-hero-stats div {
+.mustang-hero-caption {
+  position: absolute;
+  left: 0;
+  bottom: clamp(24px, 4vw, 50px);
+  z-index: 3;
   display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(55, 74, 55, 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.72);
+  gap: 5px;
 }
 
-.mustang-hero-stats small,
-.mustang-spec-card small {
-  color: #697466;
-  font-size: 0.63rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
+.mustang-hero-caption p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.mustang-hero-stats strong {
-  color: #17231a;
-  font-size: 0.84rem;
-  line-height: 1.25;
+.mustang-hero-caption h1 {
+  margin: 0;
+  max-width: 520px;
+  color: #fff;
+  font-size: clamp(1.1rem, 2.5vw, 1.9rem);
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 
-.mustang-layout {
+.mustang-hero-admin {
+  position: absolute;
+  top: 18px;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mustang-hero-admin button {
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  min-height: 34px;
+  padding: 0 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mustang-public-main {
+  width: min(1180px, calc(100% - 36px));
+  margin: 0 auto;
+  padding: clamp(34px, 7vw, 72px) 0 76px;
+}
+
+.mustang-intro {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.75fr);
-  gap: 14px;
+  gap: 12px;
+  margin-bottom: 42px;
+}
+
+.mustang-intro h2,
+.mustang-title-input {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: #101510;
+  font-size: clamp(1.8rem, 4vw, 3.6rem);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.mustang-title-input {
+  width: 100%;
+}
+
+.mustang-title-input:focus {
+  outline: none;
+}
+
+.mustang-lead-facts {
+  display: grid;
+  gap: 3px;
   margin-top: 14px;
 }
 
-.mustang-card {
+.mustang-lead-facts p {
+  margin: 0;
+  color: #101510;
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.mustang-content-grid {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.72fr);
+  gap: clamp(28px, 5vw, 76px);
+  align-items: start;
+}
+
+.mustang-section {
+  min-width: 0;
 }
 
 .mustang-card-head {
@@ -11459,13 +11482,26 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mustang-card-head span,
+.mustang-engine-placeholder span {
+  color: #31543c;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
 .mustang-card-head h2,
 .mustang-engine-placeholder h2 {
   margin: 4px 0 0;
-  color: #17231a;
-  font-size: 1rem;
+  color: #101510;
+  font-size: 1.55rem;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
 }
 
 .mustang-card-head .ghost-button,
@@ -11485,23 +11521,31 @@ button {
 
 .mustang-spec-display {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0;
 }
 
 .mustang-spec-card {
   display: grid;
-  gap: 5px;
+  grid-template-columns: minmax(120px, 0.34fr) minmax(0, 1fr);
+  gap: 18px;
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(55, 74, 55, 0.13);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(247, 248, 242, 0.82));
+  padding: 10px 0;
+  border-bottom: 1px solid #dde4dd;
+  background: transparent;
+}
+
+.mustang-spec-card small {
+  color: #667066;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .mustang-spec-card strong {
-  color: #17231a;
-  font-size: 0.82rem;
+  color: #101510;
+  font-size: 0.92rem;
+  font-weight: 700;
   line-height: 1.32;
 }
 
@@ -11549,21 +11593,20 @@ button {
 .mustang-history-display {
   display: grid;
   gap: 10px;
-  padding: 12px;
-  border-left: 4px solid #31543c;
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(232, 239, 227, 0.72), rgba(255, 255, 255, 0.82));
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .mustang-history-display p {
   margin: 0;
-  color: #293528;
-  font-size: 0.82rem;
-  line-height: 1.55;
+  color: #303830;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .mustang-parts-card {
-  margin-top: 14px;
+  margin-top: 58px;
 }
 
 .mustang-parts-table {
@@ -11580,7 +11623,7 @@ button {
 }
 
 .mustang-parts-head {
-  padding: 0 8px;
+  padding: 0 0 8px;
   color: #6a7467;
   font-size: 0.64rem;
   font-weight: 850;
@@ -11589,12 +11632,13 @@ button {
 }
 
 .mustang-part-row {
-  padding: 10px 12px;
-  border: 1px solid rgba(55, 74, 55, 0.13);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.7);
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid #dde4dd;
+  border-radius: 0;
+  background: transparent;
   color: #293528;
-  font-size: 0.78rem;
+  font-size: 0.84rem;
 }
 
 .mustang-part-row:not(.is-editing) {
@@ -11627,7 +11671,7 @@ button {
   place-items: center;
   min-width: 46px;
   height: 34px;
-  border: 1px solid rgba(49, 84, 60, 0.22);
+  border: 1px solid rgba(49, 84, 60, 0.28);
   border-radius: 999px;
   background: #edf3e9;
   color: #31543c;
@@ -11650,11 +11694,10 @@ button {
 }
 
 .mustang-engine-placeholder {
-  margin-top: 14px;
-  padding: 16px;
-  background:
-    linear-gradient(135deg, rgba(49, 84, 60, 0.09), rgba(255, 255, 255, 0.92)),
-    #fff;
+  margin-top: 64px;
+  padding-top: 30px;
+  border-top: 1px solid #dde4dd;
+  background: transparent;
 }
 
 .mustang-engine-placeholder p {

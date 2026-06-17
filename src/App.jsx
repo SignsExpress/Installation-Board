@@ -4031,7 +4031,7 @@ function HostLandingPage({
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
   const personalCards = [
-    canAccessMustang(currentUser) ? <HostLaunchCard key="mustang" icon="mustang" label="Mustang" description="Spec and parts tracker" onClick={() => goTo("/mustang")} /> : null
+    canAccessMustang(currentUser) ? <HostLaunchCard key="mustang" icon="mustang" label="Mustang" description="Spec and parts tracker" onClick={() => window.open("/mustang", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards, personalCards].filter((items) => items.length).length;
 
@@ -17936,7 +17936,7 @@ function createEmptyMustangPart() {
   };
 }
 
-function MustangPage({ currentUser, onLogout, notifications }) {
+function MustangPage({ currentUser }) {
   const [tracker, setTracker] = useState(null);
   const [draft, setDraft] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17944,6 +17944,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const canEditMustang = canAccessMustang(currentUser);
 
   useEffect(() => {
     let active = true;
@@ -18018,6 +18019,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   }
 
   function startEditing() {
+    if (!canEditMustang) return;
     setDraft(tracker ? JSON.parse(JSON.stringify(tracker)) : draft);
     setEditing(true);
     setStatus("");
@@ -18031,7 +18033,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   }
 
   async function saveMustang() {
-    if (!draft || saving) return;
+    if (!draft || saving || !canEditMustang) return;
     setSaving(true);
     setStatus("");
     setError("");
@@ -18055,68 +18057,73 @@ function MustangPage({ currentUser, onLogout, notifications }) {
   }
 
   const current = editing ? draft || tracker : tracker || draft;
-  const heroHighlights = current?.details?.filter((entry) =>
-    ["engine", "transmission", "colour", "power"].includes(String(entry.id || entry.label || "").toLowerCase().replace(/\s+/g, "-"))
-  ).slice(0, 4) || [];
+  const title = current?.title || "1968 Ford Mustang Coupe";
+  const detailMap = new Map((current?.details || []).map((entry) => [String(entry.label || "").toLowerCase(), entry.value || ""]));
   const historyParagraphs = String(current?.history || "").split(/\n{2,}/).map((line) => line.trim()).filter(Boolean);
+  const leadDetails = ["Built", "Colour", "Engine", "Transmission"].map((label) => ({
+    label,
+    value: detailMap.get(label.toLowerCase()) || ""
+  })).filter((entry) => entry.value);
+  const specDetails = (current?.details || []).filter((entry) => !["built", "colour"].includes(String(entry.label || "").toLowerCase()));
 
   return (
-    <div className="app-shell mustang-shell">
-      <div className="page mustang-page">
-        <MainNavBar currentUser={currentUser} active="mustang" onLogout={onLogout} notifications={notifications} />
-        <section className={`mustang-hero ${editing ? "is-editing" : ""}`}>
-          <div>
-            <span>Personal garage tracker</span>
-            {editing ? (
-              <input
-                value={current?.title || ""}
-                onChange={(event) => updateDraftField("title", event.target.value)}
-                placeholder="Mustang title"
-              />
-            ) : (
-              <>
-                <h1>{current?.title || "Mustang"}</h1>
-                <p>Spec, ordered parts and refresh notes for EUG 382F.</p>
-              </>
-            )}
-          </div>
-          {!editing && heroHighlights.length ? (
-            <div className="mustang-hero-stats">
-              {heroHighlights.map((entry) => (
-                <div key={entry.id || entry.label}>
-                  <small>{entry.label}</small>
-                  <strong>{entry.value}</strong>
-                </div>
-              ))}
+    <div className="mustang-public-shell">
+      <section className="mustang-hero">
+        <div className="mustang-hero-inner">
+          {canEditMustang ? (
+            <div className="mustang-hero-admin">
+              {status ? <span>{status}</span> : current?.updatedAt ? <span>Updated {formatDateTime(current.updatedAt)}</span> : null}
+              {editing ? (
+                <>
+                  <button type="button" onClick={cancelEditing} disabled={saving}>Cancel</button>
+                  <button type="button" onClick={saveMustang} disabled={saving || loading || !current}>{saving ? "Saving..." : "Save"}</button>
+                </>
+              ) : (
+                <button type="button" onClick={startEditing} disabled={loading || !current}>+ Edit</button>
+              )}
             </div>
           ) : null}
-          <div className="mustang-hero-actions">
-            {status ? <small>{status}</small> : current?.updatedAt ? <small>Updated {formatDateTime(current.updatedAt)}</small> : null}
-            {editing ? (
-              <>
-                <button className="ghost-button" type="button" onClick={cancelEditing} disabled={saving}>Cancel</button>
-                <button className="primary-button" type="button" onClick={saveMustang} disabled={saving || loading || !current}>
-                  {saving ? "Saving..." : "Save Mustang"}
-                </button>
-              </>
-            ) : (
-              <button className="primary-button" type="button" onClick={startEditing} disabled={loading || !current}>
-                Edit Mustang
-              </button>
-            )}
-          </div>
-        </section>
 
+          <div className="mustang-year" aria-hidden="true">1968</div>
+          <img className="mustang-hero-car" src="/mustang/mustang-hero-green.png" alt="1968 Ford Mustang Coupe" />
+          <div className="mustang-hero-caption">
+            <p>Highland Green Metallic</p>
+            <h1>{title}</h1>
+          </div>
+        </div>
+      </section>
+
+      <main className="mustang-public-main">
         {error ? <p className="form-error">{error}</p> : null}
         {loading ? <div className="board-loading">Loading Mustang tracker...</div> : null}
 
         {current ? (
           <>
-            <main className="mustang-layout">
-              <section className="mustang-card">
+            <section className="mustang-intro">
+              <div>
+                {editing ? (
+                  <input
+                    className="mustang-title-input"
+                    value={current?.title || ""}
+                    onChange={(event) => updateDraftField("title", event.target.value)}
+                    placeholder="Mustang title"
+                  />
+                ) : (
+                  <h2>{title}</h2>
+                )}
+                <div className="mustang-lead-facts">
+                  {leadDetails.map((entry) => (
+                    <p key={entry.label}><b>{entry.label}:</b> {entry.value}</p>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="mustang-content-grid">
+              <div className="mustang-section">
                 <div className="mustang-card-head">
                   <div>
-                    <span>Overview</span>
+                    <span>Specification</span>
                     <h2>Specification</h2>
                   </div>
                   {editing ? <button className="ghost-button" type="button" onClick={addDetail}>Add spec line</button> : null}
@@ -18133,7 +18140,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                   </div>
                 ) : (
                   <div className="mustang-spec-display">
-                    {(current.details || []).map((entry, index) => (
+                    {specDetails.map((entry, index) => (
                       <div key={entry.id || index} className="mustang-spec-card">
                         <small>{entry.label}</small>
                         <strong>{entry.value}</strong>
@@ -18141,9 +18148,9 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                     ))}
                   </div>
                 )}
-              </section>
+              </div>
 
-              <section className="mustang-card">
+              <div className="mustang-section">
                 <div className="mustang-card-head">
                   <div>
                     <span>Known history</span>
@@ -18162,10 +18169,10 @@ function MustangPage({ currentUser, onLogout, notifications }) {
                     {historyParagraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
                   </div>
                 )}
-              </section>
-            </main>
+              </div>
+            </section>
 
-            <section className="mustang-card mustang-parts-card">
+            <section className="mustang-section mustang-parts-card">
               <div className="mustang-card-head">
                 <div>
                   <span>EUG 382F</span>
@@ -18220,7 +18227,7 @@ function MustangPage({ currentUser, onLogout, notifications }) {
             </section>
           </>
         ) : null}
-      </div>
+      </main>
     </div>
   );
 }
@@ -18388,7 +18395,7 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
-  const showMustang = Boolean(currentUser && canAccessMustang(currentUser) && isMustangRoute);
+  const showMustang = Boolean(isMustangRoute);
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
@@ -18869,11 +18876,6 @@ export default function App() {
 
     if (isNotificationsRoute && !currentUser) {
       window.location.replace("/");
-      return;
-    }
-
-    if (isMustangRoute && !canAccessMustang(currentUser)) {
-      window.location.replace(nextHomePath);
       return;
     }
 
@@ -20777,6 +20779,14 @@ export default function App() {
     );
   }
 
+  if (showMustang) {
+    return (
+      <MustangPage
+        currentUser={currentUser}
+      />
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="app-shell">
@@ -20823,16 +20833,6 @@ export default function App() {
   if (showMorningMeeting) {
     return (
       <MorningMeetingPage
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        notifications={notifications}
-      />
-    );
-  }
-
-  if (showMustang) {
-    return (
-      <MustangPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}

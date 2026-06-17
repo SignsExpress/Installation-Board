@@ -1067,7 +1067,7 @@ function requirePermissionsManager(request, response) {
 }
 
 function canAccessMustang(user) {
-  return canManagePermissions(user);
+  return String(user?.displayName || "").trim().toLowerCase() === "matt rutlidge";
 }
 
 function requireMustangAccess(request, response) {
@@ -11177,7 +11177,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessMaterials(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessMaterials(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser) && !canAccessMustang(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -11466,7 +11466,6 @@ function createServer() {
   });
 
   app.get("/api/mustang", async (request, response) => {
-    if (!requireMustangAccess(request, response)) return;
     try {
       const store = await readStore();
       response.json(sanitizeMustangTracker(store.mustang));
