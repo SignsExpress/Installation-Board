@@ -11461,6 +11461,10 @@ function createServer() {
       next();
       return;
     }
+    if (request.method === "GET" && request.path === "/mustang") {
+      next();
+      return;
+    }
 
     const session = getSessionFromRequest(request);
     if (request.path === "/morning-meeting/send") {

@@ -17984,10 +17984,10 @@ function groupMustangPartsByCategory(parts = [], categories = []) {
     .filter((group) => group.parts.length);
 }
 
-function MustangProgressBar({ stage, stages }) {
+function MustangProgressBar({ stage, stages, progressOverride = null }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
-  const progress = getMustangStageProgress(stage, stages);
+  const progress = Number.isFinite(Number(progressOverride)) ? Number(progressOverride) : getMustangStageProgress(stage, stages);
 
   useEffect(() => {
     const element = ref.current;
@@ -18171,7 +18171,10 @@ function MustangPage({ currentUser }) {
     value: detailMap.get(label.toLowerCase()) || ""
   })).filter((entry) => entry.value);
   const specDetails = (current?.details || []).filter((entry) => !["built", "colour"].includes(String(entry.label || "").toLowerCase()));
-  const partGroups = groupMustangPartsByCategory(current?.parts || [], categories);
+  const wishlistStage = stages.find((stage) => stage.toLowerCase() === "wishlist") || "Wishlist";
+  const wishlistParts = (current?.parts || []).filter((part) => getMustangPartStage(part, stages).toLowerCase() === wishlistStage.toLowerCase());
+  const trackedParts = (current?.parts || []).filter((part) => getMustangPartStage(part, stages).toLowerCase() !== wishlistStage.toLowerCase());
+  const partGroups = groupMustangPartsByCategory(trackedParts, categories);
 
   return (
     <div className="mustang-public-shell">
@@ -18357,8 +18360,8 @@ function MustangPage({ currentUser }) {
                   {partGroups.map((group) => {
                     const highlights = group.parts.filter((part) => part.highlight);
                     const otherParts = group.parts.filter((part) => !part.highlight);
-                    const visibleParts = highlights.length ? highlights : group.parts.slice(0, 1);
-                    const tuckedParts = highlights.length ? otherParts : group.parts.slice(1);
+                    const visibleParts = highlights;
+                    const tuckedParts = otherParts;
                     const averageProgress = group.parts.length
                       ? Math.round(group.parts.reduce((total, part) => total + getMustangStageProgress(getMustangPartStage(part, stages), stages), 0) / group.parts.length)
                       : 0;
@@ -18366,13 +18369,13 @@ function MustangPage({ currentUser }) {
                       <section key={group.category} className="mustang-progress-category">
                         <div className="mustang-progress-category-head">
                           <div>
-                            <span>{group.parts.length} item{group.parts.length === 1 ? "" : "s"}</span>
                             <h3>{group.category}</h3>
                           </div>
                           <strong>{averageProgress}%</strong>
                         </div>
+                        <MustangProgressBar stage={`${averageProgress}% complete`} stages={["0", "100"]} progressOverride={averageProgress} />
                         <div className="mustang-progress-list">
-                          {visibleParts.map((part) => (
+                          {visibleParts.length ? visibleParts.map((part) => (
                             <div key={part.id || part.part} className={`mustang-progress-item ${part.highlight ? "is-highlight" : ""}`}>
                               <div>
                                 <strong>{part.part || "Unnamed part"}</strong>
@@ -18380,11 +18383,11 @@ function MustangPage({ currentUser }) {
                               </div>
                               <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
                             </div>
-                          ))}
+                          )) : null}
                         </div>
                         {tuckedParts.length ? (
                           <details className="mustang-progress-more">
-                            <summary>Show {tuckedParts.length} more</summary>
+                            <summary>{tuckedParts.length} more {tuckedParts.length === 1 ? "item" : "items"}</summary>
                             <div className="mustang-progress-list">
                               {tuckedParts.map((part) => (
                                 <div key={part.id || part.part} className="mustang-progress-item">
@@ -18401,6 +18404,30 @@ function MustangPage({ currentUser }) {
                       </section>
                     );
                   })}
+                  {wishlistParts.length ? (
+                    <section className="mustang-progress-category mustang-wishlist-category">
+                      <div className="mustang-progress-category-head">
+                        <div>
+                          <h3>Wishlist</h3>
+                        </div>
+                        <strong>{wishlistParts.length}</strong>
+                      </div>
+                      <details className="mustang-progress-more" open>
+                        <summary>Ideas and future parts</summary>
+                        <div className="mustang-progress-list">
+                          {wishlistParts.map((part) => (
+                            <div key={part.id || part.part} className="mustang-progress-item">
+                              <div>
+                                <strong>{part.part || "Unnamed part"}</strong>
+                                <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Wishlist item"}</span>
+                              </div>
+                              <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </section>
+                  ) : null}
                 </div>
               )}
             </section>
