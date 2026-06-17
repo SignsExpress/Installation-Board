@@ -3659,6 +3659,7 @@ function sanitizeFilteringCard(payload = {}) {
       ...payload,
       status: "approved"
     }),
+    status: "approved",
     approvedAt: String(payload.approvedAt || new Date().toISOString()),
     sourceBoardId: String(payload.sourceBoardId || payload.id || "").trim()
   };
@@ -6472,7 +6473,17 @@ function normalizeCoreBridgeOrder(record, index) {
       "specialinstructions",
       "instructions"
     ]),
-    status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"])
+    status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"]),
+    jobTotalExVat: Number(pickFirst(flat, [
+      "pretax",
+      "pretaxtotal",
+      "pre-tax",
+      "taxexclusive",
+      "nettotal",
+      "subtotalafterdiscount",
+      "subtotallessdiscount",
+      "subtotal"
+    ]) || 0)
   };
 
   return normalized;
@@ -8712,6 +8723,21 @@ function extractProFormaTotals(order = {}, subtotal = 0, vatRate = 20) {
   };
 }
 
+function resolveCoreBridgeJobTotalExVat(order = {}, fallbackSubtotal = 0) {
+  const totals = extractProFormaTotals(order, fallbackSubtotal, pickProFormaVatRate(order));
+  const directValue = Number(order.jobTotalExVat || order.preTaxTotal || order.subtotal || 0);
+  const candidates = [
+    totals.preTaxTotal,
+    totals.subtotal,
+    fallbackSubtotal,
+    directValue,
+    totals.total && totals.vatAmount ? totals.total - totals.vatAmount : 0,
+    totals.total && Number(pickProFormaVatRate(order)) > 0 ? totals.total / (1 + (Number(pickProFormaVatRate(order)) / 100)) : 0
+  ];
+  const value = candidates.find((candidate) => Number.isFinite(Number(candidate)) && Number(candidate) > 0);
+  return value ? Math.round(Number(value) * 100) / 100 : 0;
+}
+
 function extractProFormaLineItems(order = {}) {
   const fields = Array.isArray(order.debugFields) ? order.debugFields : [];
   const groups = new Map();
@@ -9164,7 +9190,6 @@ async function buildDesignBoardItems(order = {}) {
 async function buildDesignBoardCardFromOrder(order = {}) {
   const lineItems = extractProFormaLineItems(order);
   const rawSubtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
-  const totals = extractProFormaTotals(order, rawSubtotal, pickProFormaVatRate(order));
   return sanitizeDesignBoardCard({
     coreBridgeOrderId: order.id || "",
     orderReference: order.orderReference || "",
@@ -9178,7 +9203,7 @@ async function buildDesignBoardCardFromOrder(order = {}) {
     billingAddress: order.billingAddress || order.address || "",
     notes: order.notes || "",
     items: await buildDesignBoardItems(order),
-    jobTotalExVat: totals.preTaxTotal || totals.subtotal || rawSubtotal || 0,
+    jobTotalExVat: resolveCoreBridgeJobTotalExVat(order, rawSubtotal),
     status: "new"
   });
 }
@@ -9193,7 +9218,7 @@ async function fetchDesignBoardOrderByReference(orderReference = "") {
 
   for (const reference of lookupReferences) {
     try {
-      const candidateLookup = await fetchCoreBridgeOrders(reference, false, { includeClosed: true });
+      const candidateLookup = await fetchCoreBridgeOrders(reference, { fields: true, raw: false }, { includeClosed: true });
       const expectedReferences = new Set(getCoreBridgeReferenceFamily(orderReference).map((value) => value.toLowerCase()));
       const candidateOrder = (candidateLookup.orders || []).find((entry) =>
         expectedReferences.has(String(entry?.orderReference || "").trim().toLowerCase())
@@ -10092,15 +10117,9 @@ async function backfillInstallationJobValues(store, options = {}) {
       for (const lookupReference of lookupReferences) {
         const result = await fetchDesignBoardOrderByReference(lookupReference);
         if (!result.order) continue;
-        const proForma = buildProFormaPayload(result.order);
-        const candidateValue = Number(
-          proForma.preTaxTotal ||
-          proForma.subtotal ||
-          result.order.jobTotalExVat ||
-          result.order.preTaxTotal ||
-          result.order.subtotal ||
-          0
-        );
+        const lineItems = extractProFormaLineItems(result.order);
+        const rawSubtotal = Math.round(lineItems.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
+        const candidateValue = resolveCoreBridgeJobTotalExVat(result.order, rawSubtotal);
         if (!Number.isFinite(candidateValue) || candidateValue <= 0) continue;
         value = Math.round(candidateValue * 100) / 100;
         break;
@@ -10197,12 +10216,17 @@ async function repullDesignBoardCard(card = {}) {
 
 async function backfillDesignBoardDetails(store) {
   const state = sanitizeDesignBoardState(store.designBoard);
+  const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
   const indexes = state.cards
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => needsDesignBoardCoreBridgeRefresh(card))
     .slice(0, 12);
+  const filteringIndexes = filteringState.cards
+    .map((card, index) => ({ card, index }))
+    .filter(({ card }) => needsDesignBoardCoreBridgeRefresh(card))
+    .slice(0, Math.max(0, 12 - indexes.length));
 
-  if (!indexes.length) return store;
+  if (!indexes.length && !filteringIndexes.length) return store;
 
   let changed = false;
   for (const { card, index } of indexes) {
@@ -10216,9 +10240,26 @@ async function backfillDesignBoardDetails(store) {
       console.error(`Could not refresh Design Board card ${card.orderReference}.`, error.message || error);
     }
   }
+  for (const { card, index } of filteringIndexes) {
+    try {
+      const refreshed = await refreshDesignBoardCardDetails(card);
+      if (JSON.stringify(refreshed.items) !== JSON.stringify(card.items) || Number(refreshed.jobTotalExVat || 0) !== Number(card.jobTotalExVat || 0)) {
+        filteringState.cards[index] = sanitizeFilteringCard({
+          ...card,
+          ...refreshed,
+          approvedAt: card.approvedAt,
+          sourceBoardId: card.sourceBoardId
+        });
+        changed = true;
+      }
+    } catch (error) {
+      console.error(`Could not refresh Filtering card ${card.orderReference}.`, error.message || error);
+    }
+  }
 
   if (!changed) return store;
   store.designBoard = state;
+  store.filteringBoard = filteringState;
   return writeStore(store);
 }
 
@@ -10248,6 +10289,14 @@ function isPastDesignDate(isoDate = "", todayIso = "") {
   return Boolean(isoDate && todayIso && isoDate < todayIso);
 }
 
+function getDesignBoardCardNetValue(card = {}) {
+  const storedValue = Number(card.jobTotalExVat || 0);
+  if (Number.isFinite(storedValue) && storedValue > 0) return Math.round(storedValue * 100) / 100;
+  if (!Array.isArray(card.items)) return 0;
+  const itemTotal = Math.round(card.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100;
+  return Number.isFinite(itemTotal) && itemTotal > 0 ? itemTotal : 0;
+}
+
 function buildDesignBoardApprovalSummary(filteringCards = [], settings = {}) {
   const today = getDesignBoardTodayIso();
   const todayDate = parseIsoDate(today);
@@ -10261,7 +10310,7 @@ function buildDesignBoardApprovalSummary(filteringCards = [], settings = {}) {
     if (!Number.isFinite(approvedDate.getTime())) return;
     const approvedIso = toIsoDate(approvedDate);
     if (!approvedIso) return;
-    const value = Number(card.jobTotalExVat || 0);
+    const value = getDesignBoardCardNetValue(card);
     if (approvedIso === today) totals.today += value;
     if (approvedIso >= weekStart && approvedIso <= today) totals.week += value;
     if (approvedIso >= monthStart && approvedIso <= today) totals.month += value;
@@ -10308,9 +10357,7 @@ function buildDesignBoardPayload(store) {
       ""
     ).trim();
     const activityBaseMs = activityBaseAt ? new Date(activityBaseAt).getTime() : 0;
-    const itemTotal = Array.isArray(card.items)
-      ? Math.round(card.items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) * 100) / 100
-      : 0;
+    const cardNetValue = getDesignBoardCardNetValue(card);
     const overdue = card.status !== "approved"
       && Number.isFinite(activityBaseMs)
       && activityBaseMs > 0
@@ -10322,7 +10369,7 @@ function buildDesignBoardPayload(store) {
       isAwaitingSignOff: card.status === "awaiting-sign-off",
       isOverdue: overdue,
       signOffAgeBaseAt: activityBaseAt,
-      jobTotalExVat: card.jobTotalExVat || itemTotal || 0
+      jobTotalExVat: cardNetValue
     };
 
     if (card.status === "awaiting-sign-off") {
@@ -11911,7 +11958,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
         }
       }
       const proFormaPayload = buildProFormaPayload(order);
-      order.jobTotalExVat = proFormaPayload.preTaxTotal || proFormaPayload.subtotal || 0;
+      order.jobTotalExVat = resolveCoreBridgeJobTotalExVat(order, proFormaPayload.subtotal || 0);
       if (!includeDebug) {
         delete order.debugFields;
         delete order.debugRaw;
@@ -12325,7 +12372,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.get("/api/design-board", async (request, response) => {
     if (!requireDesignBoardAccess(request, response)) return;
     try {
-      const store = await readStore();
+      const store = await backfillDesignBoardDetails(await readStore());
       response.json(buildDesignBoardPayload(store));
     } catch (error) {
       response.status(500).json({
@@ -12539,7 +12586,14 @@ app.get("/api/corebridge/orders", async (request, response) => {
       response.status(404).json({ error: "Design card not found." });
       return;
     }
-    const [approvedCard] = state.cards.splice(index, 1);
+    let [approvedCard] = state.cards.splice(index, 1);
+    if (needsDesignBoardCoreBridgeRefresh(approvedCard)) {
+      try {
+        approvedCard = await refreshDesignBoardCardDetails(approvedCard);
+      } catch (error) {
+        console.error(`Could not refresh Design Board card ${approvedCard.orderReference} before approval.`, error.message || error);
+      }
+    }
     filteringState.cards.unshift(
       sanitizeFilteringCard({
         ...approvedCard,
