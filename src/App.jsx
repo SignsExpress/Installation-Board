@@ -17932,8 +17932,88 @@ function createEmptyMustangPart() {
     partNumber: "",
     supplier: "",
     eta: "",
+    category: "Engine",
+    stage: "Wishlist",
+    highlight: false,
     url: ""
   };
+}
+
+function normaliseMustangList(values = [], fallback = []) {
+  const seen = new Set();
+  const list = (Array.isArray(values) ? values : fallback)
+    .map((value) => String(value || "").trim())
+    .filter((value) => {
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  return list.length ? list : fallback;
+}
+
+function getMustangPartCategory(part = {}, categories = []) {
+  const category = String(part.category || "").trim();
+  if (category) return category;
+  return categories[0] || "Uncategorised";
+}
+
+function getMustangPartStage(part = {}, stages = []) {
+  const stage = String(part.stage || "").trim();
+  if (stage) return stage;
+  return stages[0] || "Wishlist";
+}
+
+function getMustangStageProgress(stage, stages = []) {
+  const cleanStages = normaliseMustangList(stages, ["Wishlist", "Ordered", "Dispatched", "Arrived", "Installation in Progress", "Installed"]);
+  const index = Math.max(0, cleanStages.findIndex((entry) => entry.toLowerCase() === String(stage || "").toLowerCase()));
+  if (cleanStages.length <= 1) return 100;
+  return Math.round(((index + 1) / cleanStages.length) * 100);
+}
+
+function groupMustangPartsByCategory(parts = [], categories = []) {
+  const cleanCategories = normaliseMustangList(categories, ["Engine"]);
+  const groups = new Map(cleanCategories.map((category) => [category, []]));
+  parts.forEach((part) => {
+    const category = getMustangPartCategory(part, cleanCategories);
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(part);
+  });
+  return Array.from(groups.entries())
+    .map(([category, entries]) => ({ category, parts: entries }))
+    .filter((group) => group.parts.length);
+}
+
+function MustangProgressBar({ stage, stages }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  const progress = getMustangStageProgress(stage, stages);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return undefined;
+    if (!("IntersectionObserver" in window)) {
+      setVisible(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.35 }
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`mustang-progress ${visible ? "is-visible" : ""}`} style={{ "--mustang-progress": `${progress}%` }}>
+      <span>{stage || "Wishlist"}</span>
+    </div>
+  );
 }
 
 function MustangPage({ currentUser }) {
@@ -17991,6 +18071,24 @@ function MustangPage({ currentUser }) {
         entryIndex === index ? { ...entry, [field]: value } : entry
       )
     }));
+    setStatus("");
+  }
+
+  function updateMustangList(field, index, value) {
+    setDraft((current) => ({
+      ...(current || {}),
+      [field]: (current?.[field] || []).map((entry, entryIndex) => (entryIndex === index ? value : entry))
+    }));
+    setStatus("");
+  }
+
+  function addMustangListItem(field, value) {
+    setDraft((current) => ({ ...(current || {}), [field]: [...(current?.[field] || []), value] }));
+    setStatus("");
+  }
+
+  function removeMustangListItem(field, index) {
+    setDraft((current) => ({ ...(current || {}), [field]: (current?.[field] || []).filter((_, entryIndex) => entryIndex !== index) }));
     setStatus("");
   }
 
@@ -18057,6 +18155,14 @@ function MustangPage({ currentUser }) {
   }
 
   const current = editing ? draft || tracker : tracker || draft;
+  const categories = normaliseMustangList(
+    [...(current?.categories || []), ...((current?.parts || []).map((part) => part.category).filter(Boolean))],
+    ["Engine", "Transmission", "Electrical", "Cooling", "Interior", "Lighting", "Body & Hardware"]
+  );
+  const stages = normaliseMustangList(
+    [...(current?.stages || []), ...((current?.parts || []).map((part) => part.stage).filter(Boolean))],
+    ["Wishlist", "Ordered", "Dispatched", "Arrived", "Installation in Progress", "Installed"]
+  );
   const title = current?.title || "1968 Ford Mustang Coupe";
   const detailMap = new Map((current?.details || []).map((entry) => [String(entry.label || "").toLowerCase(), entry.value || ""]));
   const historyParagraphs = String(current?.history || "").split(/\n{2,}/).map((line) => line.trim()).filter(Boolean);
@@ -18065,6 +18171,7 @@ function MustangPage({ currentUser }) {
     value: detailMap.get(label.toLowerCase()) || ""
   })).filter((entry) => entry.value);
   const specDetails = (current?.details || []).filter((entry) => !["built", "colour"].includes(String(entry.label || "").toLowerCase()));
+  const partGroups = groupMustangPartsByCategory(current?.parts || [], categories);
 
   return (
     <div className="mustang-public-shell">
@@ -18180,42 +18287,122 @@ function MustangPage({ currentUser }) {
                 </div>
                 {editing ? <button className="ghost-button" type="button" onClick={addPart}>Add part</button> : null}
               </div>
-              <div className="mustang-parts-table">
-                <div className="mustang-parts-head">
-                  <span>Part</span>
-                  <span>Part number</span>
-                  <span>Supplier</span>
-                  <span>ETA</span>
-                  <span>Link</span>
-                  {editing ? <span /> : null}
-                </div>
-                {(current.parts || []).map((part, index) => (
-                  <div key={part.id || index} className={`mustang-part-row ${editing ? "is-editing" : ""}`}>
-                    {editing ? (
-                      <>
-                        <input value={part.part || ""} onChange={(event) => updatePart(index, "part", event.target.value)} placeholder="Part" />
-                        <input value={part.partNumber || ""} onChange={(event) => updatePart(index, "partNumber", event.target.value)} placeholder="Part number" />
-                        <input value={part.supplier || ""} onChange={(event) => updatePart(index, "supplier", event.target.value)} placeholder="Supplier" />
-                        <input value={part.eta || part.dateOrdered || ""} onChange={(event) => updatePart(index, "eta", event.target.value)} placeholder="ETA" />
-                      </>
-                    ) : (
-                      <>
-                        <strong>{part.part || "Unnamed part"}</strong>
-                        <span>{part.partNumber || "Not added"}</span>
-                        <span>{part.supplier || "Not added"}</span>
-                        <span>{part.eta || part.dateOrdered || "TBC"}</span>
-                      </>
-                    )}
-                    <div className="mustang-link-cell">
-                      {editing ? <input value={part.url || ""} onChange={(event) => updatePart(index, "url", event.target.value)} placeholder="Paste link" /> : null}
-                      <a className={`mustang-link-button ${part.url ? "" : "disabled"}`} href={part.url || undefined} target="_blank" rel="noreferrer" title={part.url ? "Open part link" : "No link added"} onClick={(event) => { if (!part.url) event.preventDefault(); }}>
-                        <span aria-hidden="true">{editing ? "Open" : "Link"}</span>
-                      </a>
+              {editing ? (
+                <>
+                  <details className="mustang-settings-panel">
+                    <summary>Settings</summary>
+                    <div className="mustang-settings-grid">
+                      <div>
+                        <h3>Categories</h3>
+                        {(current.categories || categories).map((category, index) => (
+                          <div key={`category-${index}`} className="mustang-settings-row">
+                            <input value={category || ""} onChange={(event) => updateMustangList("categories", index, event.target.value)} placeholder="Category" />
+                            <button className="icon-button" type="button" onClick={() => removeMustangListItem("categories", index)}>x</button>
+                          </div>
+                        ))}
+                        <button className="ghost-button" type="button" onClick={() => addMustangListItem("categories", "New category")}>Add category</button>
+                      </div>
+                      <div>
+                        <h3>Stages</h3>
+                        {(current.stages || stages).map((stage, index) => (
+                          <div key={`stage-${index}`} className="mustang-settings-row">
+                            <input value={stage || ""} onChange={(event) => updateMustangList("stages", index, event.target.value)} placeholder="Stage" />
+                            <button className="icon-button" type="button" onClick={() => removeMustangListItem("stages", index)}>x</button>
+                          </div>
+                        ))}
+                        <button className="ghost-button" type="button" onClick={() => addMustangListItem("stages", "New stage")}>Add stage</button>
+                      </div>
                     </div>
-                    {editing ? <button className="icon-button" type="button" onClick={() => removePart(index)} title="Remove part">x</button> : null}
+                  </details>
+
+                  <div className="mustang-parts-table is-admin">
+                    <div className="mustang-parts-head">
+                      <span>Part</span>
+                      <span>Category</span>
+                      <span>Stage</span>
+                      <span>ETA</span>
+                      <span>Highlight</span>
+                      <span>Link</span>
+                      <span />
+                    </div>
+                    {(current.parts || []).map((part, index) => (
+                      <div key={part.id || index} className="mustang-part-row is-editing">
+                        <input value={part.part || ""} onChange={(event) => updatePart(index, "part", event.target.value)} placeholder="Part" />
+                        <select value={getMustangPartCategory(part, categories)} onChange={(event) => updatePart(index, "category", event.target.value)}>
+                          {categories.map((category) => <option key={category} value={category}>{category}</option>)}
+                        </select>
+                        <select value={getMustangPartStage(part, stages)} onChange={(event) => updatePart(index, "stage", event.target.value)}>
+                          {stages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
+                        </select>
+                        <input value={part.eta || part.dateOrdered || ""} onChange={(event) => updatePart(index, "eta", event.target.value)} placeholder="ETA" />
+                        <label className="mustang-highlight-toggle">
+                          <input type="checkbox" checked={Boolean(part.highlight)} onChange={(event) => updatePart(index, "highlight", event.target.checked)} />
+                          Highlight
+                        </label>
+                        <div className="mustang-link-cell">
+                          <input value={part.url || ""} onChange={(event) => updatePart(index, "url", event.target.value)} placeholder="Paste link" />
+                          <a className={`mustang-link-button ${part.url ? "" : "disabled"}`} href={part.url || undefined} target="_blank" rel="noreferrer" title={part.url ? "Open part link" : "No link added"} onClick={(event) => { if (!part.url) event.preventDefault(); }}>
+                            <span aria-hidden="true">Open</span>
+                          </a>
+                        </div>
+                        <button className="icon-button" type="button" onClick={() => removePart(index)} title="Remove part">x</button>
+                        <input className="mustang-part-wide" value={part.partNumber || ""} onChange={(event) => updatePart(index, "partNumber", event.target.value)} placeholder="Part number" />
+                        <input className="mustang-part-wide" value={part.supplier || ""} onChange={(event) => updatePart(index, "supplier", event.target.value)} placeholder="Supplier" />
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </>
+              ) : (
+                <div className="mustang-progress-board">
+                  {partGroups.map((group) => {
+                    const highlights = group.parts.filter((part) => part.highlight);
+                    const otherParts = group.parts.filter((part) => !part.highlight);
+                    const visibleParts = highlights.length ? highlights : group.parts.slice(0, 1);
+                    const tuckedParts = highlights.length ? otherParts : group.parts.slice(1);
+                    const averageProgress = group.parts.length
+                      ? Math.round(group.parts.reduce((total, part) => total + getMustangStageProgress(getMustangPartStage(part, stages), stages), 0) / group.parts.length)
+                      : 0;
+                    return (
+                      <section key={group.category} className="mustang-progress-category">
+                        <div className="mustang-progress-category-head">
+                          <div>
+                            <span>{group.parts.length} item{group.parts.length === 1 ? "" : "s"}</span>
+                            <h3>{group.category}</h3>
+                          </div>
+                          <strong>{averageProgress}%</strong>
+                        </div>
+                        <div className="mustang-progress-list">
+                          {visibleParts.map((part) => (
+                            <div key={part.id || part.part} className={`mustang-progress-item ${part.highlight ? "is-highlight" : ""}`}>
+                              <div>
+                                <strong>{part.part || "Unnamed part"}</strong>
+                                <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Parts tracker"}</span>
+                              </div>
+                              <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
+                            </div>
+                          ))}
+                        </div>
+                        {tuckedParts.length ? (
+                          <details className="mustang-progress-more">
+                            <summary>Show {tuckedParts.length} more</summary>
+                            <div className="mustang-progress-list">
+                              {tuckedParts.map((part) => (
+                                <div key={part.id || part.part} className="mustang-progress-item">
+                                  <div>
+                                    <strong>{part.part || "Unnamed part"}</strong>
+                                    <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Parts tracker"}</span>
+                                  </div>
+                                  <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        ) : null}
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
             </section>
 
             <section className="mustang-engine-placeholder">
