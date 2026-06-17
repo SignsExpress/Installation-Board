@@ -11344,25 +11344,24 @@ button {
 
 .mustang-year {
   position: absolute;
-  left: 50%;
-  top: clamp(12px, 4.2vw, 44px);
-  transform: translateX(-50%);
+  left: clamp(-6px, 0.5vw, 8px);
+  top: clamp(24px, 6vw, 78px);
   z-index: 1;
   color: #fff;
-  font-size: clamp(7.6rem, 22vw, 18rem);
+  font-size: clamp(10rem, 26vw, 22rem);
   font-weight: 950;
-  letter-spacing: -0.075em;
-  line-height: 0.82;
+  letter-spacing: -0.085em;
+  line-height: 0.76;
   opacity: 0.98;
   white-space: nowrap;
 }
 
 .mustang-hero-car {
   position: absolute;
-  left: 50%;
-  bottom: clamp(4px, 3.2vw, 38px);
+  left: clamp(300px, 48vw, 570px);
+  bottom: clamp(18px, 5.6vw, 68px);
   z-index: 2;
-  width: min(88vw, 1000px);
+  width: min(92vw, 1040px);
   transform: translateX(-50%);
   filter: drop-shadow(0 34px 22px rgba(0, 0, 0, 0.34));
 }
