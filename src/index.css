@@ -11345,7 +11345,7 @@ button {
 .mustang-year {
   position: absolute;
   left: clamp(-6px, 0.5vw, 8px);
-  top: clamp(24px, 6vw, 78px);
+  top: clamp(-26px, 1.8vw, 18px);
   z-index: 1;
   color: #fff;
   font-size: clamp(10rem, 26vw, 22rem);
