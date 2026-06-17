@@ -10214,17 +10214,46 @@ async function repullDesignBoardCard(card = {}) {
   });
 }
 
-async function backfillDesignBoardDetails(store) {
+function getDesignBoardApprovedIso(card = {}) {
+  const approvedDate = new Date(card.approvedAt || "");
+  return Number.isFinite(approvedDate.getTime()) ? toIsoDate(approvedDate) : "";
+}
+
+async function backfillDesignBoardDetails(store, options = {}) {
   const state = sanitizeDesignBoardState(store.designBoard);
   const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
+  const limit = Math.max(1, Math.min(100, Number(options.limit || 36)));
+  const today = getDesignBoardTodayIso();
+  const todayDate = parseIsoDate(today);
+  const weekday = todayDate?.getUTCDay() || 0;
+  const weekStart = toIsoDate(addDays(todayDate, -(weekday === 0 ? 6 : weekday - 1)));
+  const getMissingValuePriority = (card) => (getDesignBoardCardNetValue(card) > 0 ? 1 : 0);
   const indexes = state.cards
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => needsDesignBoardCoreBridgeRefresh(card))
-    .slice(0, 12);
+    .sort((left, right) =>
+      getMissingValuePriority(left.card) - getMissingValuePriority(right.card) ||
+      String(right.card.updatedAt || right.card.createdAt || "").localeCompare(String(left.card.updatedAt || left.card.createdAt || ""))
+    )
+    .slice(0, limit);
   const filteringIndexes = filteringState.cards
     .map((card, index) => ({ card, index }))
     .filter(({ card }) => needsDesignBoardCoreBridgeRefresh(card))
-    .slice(0, Math.max(0, 12 - indexes.length));
+    .sort((left, right) => {
+      const leftIso = getDesignBoardApprovedIso(left.card);
+      const rightIso = getDesignBoardApprovedIso(right.card);
+      const leftToday = leftIso === today ? 0 : 1;
+      const rightToday = rightIso === today ? 0 : 1;
+      const leftThisWeek = leftIso >= weekStart && leftIso <= today ? 0 : 1;
+      const rightThisWeek = rightIso >= weekStart && rightIso <= today ? 0 : 1;
+      return (
+        getMissingValuePriority(left.card) - getMissingValuePriority(right.card) ||
+        leftToday - rightToday ||
+        leftThisWeek - rightThisWeek ||
+        String(right.card.approvedAt || right.card.updatedAt || "").localeCompare(String(left.card.approvedAt || left.card.updatedAt || ""))
+      );
+    })
+    .slice(0, Math.max(0, limit - indexes.length));
 
   if (!indexes.length && !filteringIndexes.length) return store;
 
@@ -12377,6 +12406,19 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(500).json({
         error: "Could not load the Design Board.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.post("/api/design-board/backfill-values", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    try {
+      const store = await backfillDesignBoardDetails(await readStore(), { limit: 100 });
+      response.json(buildDesignBoardPayload(store));
+    } catch (error) {
+      response.status(500).json({
+        error: "Could not back-fill Design Board values.",
         detail: error.message
       });
     }

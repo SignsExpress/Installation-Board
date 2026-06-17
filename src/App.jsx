@@ -8348,6 +8348,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     setSettingsOpen(false);
   }
 
+  async function handleBackfillValues() {
+    await updateBoardRequest("/api/design-board/backfill-values", { method: "POST" }, "Back-filled design values");
+  }
+
   async function patchCard(card, patch, nextInfo = "Updated card") {
     await updateBoardRequest(`/api/design-board/cards/${card.id}`, {
       method: "PATCH",
@@ -8681,6 +8685,9 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
               </label>
               <div className="design-board-edit-actions">
                 <button className="ghost-button" type="button" onClick={() => setSettingsOpen(false)}>Cancel</button>
+                <button className="ghost-button" type="button" onClick={handleBackfillValues} disabled={savingKey === "/api/design-board/backfill-values"}>
+                  {savingKey === "/api/design-board/backfill-values" ? "Back-filling..." : "Back-fill values"}
+                </button>
                 <button className="primary-button" type="button" onClick={handleSaveSettings} disabled={savingKey === "/api/design-board/settings"}>
                   {savingKey === "/api/design-board/settings" ? "Saving..." : "Save settings"}
                 </button>
