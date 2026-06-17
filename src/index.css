@@ -11345,14 +11345,14 @@ button {
 .mustang-year {
   position: absolute;
   left: 50%;
-  top: clamp(34px, 8vw, 86px);
+  top: clamp(12px, 4.2vw, 44px);
   transform: translateX(-50%);
   z-index: 1;
   color: #fff;
-  font-size: clamp(7.2rem, 24vw, 20rem);
+  font-size: clamp(7.6rem, 22vw, 18rem);
   font-weight: 950;
-  letter-spacing: -0.09em;
-  line-height: 0.78;
+  letter-spacing: -0.075em;
+  line-height: 0.82;
   opacity: 0.98;
   white-space: nowrap;
 }
@@ -11360,9 +11360,9 @@ button {
 .mustang-hero-car {
   position: absolute;
   left: 50%;
-  bottom: clamp(18px, 5vw, 62px);
+  bottom: clamp(4px, 3.2vw, 38px);
   z-index: 2;
-  width: min(86vw, 980px);
+  width: min(88vw, 1000px);
   transform: translateX(-50%);
   filter: drop-shadow(0 34px 22px rgba(0, 0, 0, 0.34));
 }
@@ -11398,11 +11398,12 @@ button {
 .mustang-hero-admin {
   position: absolute;
   top: 18px;
-  right: 0;
+  right: 18px;
   z-index: 4;
   display: flex;
   align-items: center;
   gap: 10px;
+  max-width: min(520px, calc(100% - 36px));
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.72rem;
   font-weight: 800;
