@@ -17986,6 +17986,54 @@ function getMustangStageProgress(stage, stages = []) {
   return Math.round(((index + 1) / cleanStages.length) * 100);
 }
 
+function getMustangEtaDate(value = "") {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+  const [year, month, day] = text.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function getMustangEtaInputValue(value = "") {
+  return getMustangEtaDate(value) ? String(value || "").trim() : "";
+}
+
+function getMustangEtaNotice(part = {}, stages = []) {
+  const stage = getMustangPartStage(part, stages).toLowerCase();
+  if (stage === "installed") return null;
+  const etaDate = getMustangEtaDate(part.eta || part.dateOrdered || "");
+  if (!etaDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysAway = Math.round((etaDate.getTime() - today.getTime()) / 86400000);
+  if (daysAway < 0) return { label: "Overdue", tone: "overdue" };
+  if (daysAway === 0) return { label: "Arriving Today", tone: "today" };
+  if (daysAway <= 2) return { label: "Arriving Soon", tone: "soon" };
+  return null;
+}
+
+function formatMustangEtaLabel(value = "") {
+  const date = getMustangEtaDate(value);
+  if (!date) return String(value || "").trim();
+  return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
+}
+
+function MustangPartIdentity({ part, stages, fallback = "Parts tracker" }) {
+  const notice = getMustangEtaNotice(part, stages);
+  const details = [part.partNumber, part.supplier, formatMustangEtaLabel(part.eta || part.dateOrdered || "")].filter(Boolean).join(" / ");
+  return (
+    <div>
+      <div className="mustang-part-title-line">
+        <strong>{part.part || "Unnamed part"}</strong>
+        {notice ? <span className={`mustang-eta-badge is-${notice.tone}`}>{notice.label}</span> : null}
+      </div>
+      <span>{details || fallback}</span>
+    </div>
+  );
+}
+
 function groupMustangPartsByCategory(parts = [], categories = []) {
   const cleanCategories = normaliseMustangList(categories, ["Engine"]);
   const groups = new Map(cleanCategories.map((category) => [category, []]));
@@ -18390,7 +18438,7 @@ function MustangPage({ currentUser }) {
                         <select value={getMustangPartStage(part, stages)} onChange={(event) => updatePart(index, "stage", event.target.value)}>
                           {stages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
                         </select>
-                        <input value={part.eta || part.dateOrdered || ""} onChange={(event) => updatePart(index, "eta", event.target.value)} placeholder="ETA" />
+                        <input type="date" value={getMustangEtaInputValue(part.eta || part.dateOrdered || "")} onChange={(event) => updatePart(index, "eta", event.target.value)} aria-label="ETA" />
                         <label className="mustang-highlight-toggle">
                           <input type="checkbox" checked={Boolean(part.highlight)} onChange={(event) => updatePart(index, "highlight", event.target.checked)} />
                           Highlight
@@ -18431,10 +18479,7 @@ function MustangPage({ currentUser }) {
                         <div className="mustang-progress-list">
                           {visibleParts.length ? visibleParts.map((part) => (
                             <div key={part.id || part.part} className={`mustang-progress-item ${part.highlight ? "is-highlight" : ""}`}>
-                              <div>
-                                <strong>{part.part || "Unnamed part"}</strong>
-                                <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Parts tracker"}</span>
-                              </div>
+                              <MustangPartIdentity part={part} stages={stages} />
                               <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
                             </div>
                           )) : null}
@@ -18445,10 +18490,7 @@ function MustangPage({ currentUser }) {
                             <div className="mustang-progress-list">
                               {tuckedParts.map((part) => (
                                 <div key={part.id || part.part} className="mustang-progress-item">
-                                  <div>
-                                    <strong>{part.part || "Unnamed part"}</strong>
-                                    <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Parts tracker"}</span>
-                                  </div>
+                                  <MustangPartIdentity part={part} stages={stages} />
                                   <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
                                 </div>
                               ))}
@@ -18471,10 +18513,7 @@ function MustangPage({ currentUser }) {
                         <div className="mustang-progress-list">
                           {wishlistParts.map((part) => (
                             <div key={part.id || part.part} className="mustang-progress-item">
-                              <div>
-                                <strong>{part.part || "Unnamed part"}</strong>
-                                <span>{[part.partNumber, part.supplier].filter(Boolean).join(" / ") || "Wishlist item"}</span>
-                              </div>
+                              <MustangPartIdentity part={part} stages={stages} fallback="Wishlist item" />
                               <MustangProgressBar stage={getMustangPartStage(part, stages)} stages={stages} />
                             </div>
                           ))}
