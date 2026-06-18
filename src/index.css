@@ -11715,6 +11715,16 @@ button {
   accent-color: #31543c;
 }
 
+.mustang-eta-edit-cell {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.mustang-eta-edit-cell .mustang-eta-badge {
+  justify-self: start;
+}
+
 .mustang-part-row > strong {
   color: #17231a;
   font-size: 0.82rem;
@@ -11857,7 +11867,7 @@ button {
   line-height: 1.35;
 }
 
-.mustang-progress-item .mustang-eta-badge {
+.mustang-eta-badge {
   display: inline-grid;
   place-items: center;
   margin: 0;
@@ -11868,6 +11878,10 @@ button {
   letter-spacing: 0.05em;
   line-height: 1;
   text-transform: uppercase;
+}
+
+.mustang-progress-item .mustang-eta-badge {
+  display: inline-grid;
 }
 
 .mustang-eta-badge.is-soon {

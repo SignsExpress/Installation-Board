@@ -17988,8 +17988,13 @@ function getMustangStageProgress(stage, stages = []) {
 
 function getMustangEtaDate(value = "") {
   const text = String(value || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
-  const [year, month, day] = text.split("-").map(Number);
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const ukMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (!isoMatch && !ukMatch) return null;
+  const [, first, second, third] = isoMatch || ukMatch;
+  const year = isoMatch ? Number(first) : Number(third);
+  const month = Number(second);
+  const day = isoMatch ? Number(third) : Number(first);
   const date = new Date(year, month - 1, day);
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
   date.setHours(0, 0, 0, 0);
@@ -17997,7 +18002,12 @@ function getMustangEtaDate(value = "") {
 }
 
 function getMustangEtaInputValue(value = "") {
-  return getMustangEtaDate(value) ? String(value || "").trim() : "";
+  const date = getMustangEtaDate(value);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function getMustangEtaNotice(part = {}, stages = []) {
@@ -18022,7 +18032,8 @@ function formatMustangEtaLabel(value = "") {
 
 function MustangPartIdentity({ part, stages, fallback = "Parts tracker" }) {
   const notice = getMustangEtaNotice(part, stages);
-  const details = [part.partNumber, part.supplier, formatMustangEtaLabel(part.eta || part.dateOrdered || "")].filter(Boolean).join(" / ");
+  const etaLabel = formatMustangEtaLabel(part.eta || part.dateOrdered || "");
+  const details = [part.partNumber, part.supplier, etaLabel ? `ETA ${etaLabel}` : ""].filter(Boolean).join(" / ");
   return (
     <div>
       <div className="mustang-part-title-line">
@@ -18438,7 +18449,14 @@ function MustangPage({ currentUser }) {
                         <select value={getMustangPartStage(part, stages)} onChange={(event) => updatePart(index, "stage", event.target.value)}>
                           {stages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}
                         </select>
-                        <input type="date" value={getMustangEtaInputValue(part.eta || part.dateOrdered || "")} onChange={(event) => updatePart(index, "eta", event.target.value)} aria-label="ETA" />
+                        <div className="mustang-eta-edit-cell">
+                          <input type="date" value={getMustangEtaInputValue(part.eta || part.dateOrdered || "")} onChange={(event) => updatePart(index, "eta", event.target.value)} aria-label="ETA" />
+                          {getMustangEtaNotice(part, stages) ? (
+                            <span className={`mustang-eta-badge is-${getMustangEtaNotice(part, stages).tone}`}>
+                              {getMustangEtaNotice(part, stages).label}
+                            </span>
+                          ) : null}
+                        </div>
                         <label className="mustang-highlight-toggle">
                           <input type="checkbox" checked={Boolean(part.highlight)} onChange={(event) => updatePart(index, "highlight", event.target.checked)} />
                           Highlight

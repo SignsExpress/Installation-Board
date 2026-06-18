@@ -480,6 +480,16 @@ async function ensureJobUploadsDir() {
   return directory;
 }
 
+function getMustangUploadsDir() {
+  return path.join(path.dirname(getDataFile()), "mustang-photos");
+}
+
+async function ensureMustangUploadsDir() {
+  const directory = getMustangUploadsDir();
+  await fsp.mkdir(directory, { recursive: true });
+  return directory;
+}
+
 function getRamsUploadsDir() {
   return path.join(path.dirname(getDataFile()), "rams-pdfs");
 }
@@ -1383,7 +1393,10 @@ async function readStore() {
           socialPostQueue: Array.isArray(parsed.socialPostQueue) ? parsed.socialPostQueue : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
-    if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
+    if (hasInlineMustangPhotos(migrated.mustang)) {
+      migrated.mustang = await prepareMustangTrackerForSave(migrated.mustang);
+      await writeStore(migrated);
+    } else if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
       await writeStore(migrated);
     }
     boardStoreCorruptionError = null;
@@ -2495,11 +2508,85 @@ function sanitizeMustangPart(entry = {}) {
 
 function sanitizeMustangPhoto(entry = {}, index = 0) {
   const src = String(entry.src || "").trim();
+  const storageName = path.basename(String(entry.storageName || "").trim());
   return {
     id: sanitizeMustangText(entry.id || `photo-${index + 1}`, 80) || `photo-${index + 1}`,
     src: /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(src) || /^https?:\/\//i.test(src) ? src.slice(0, 3500000) : "",
-    caption: sanitizeMustangText(entry.caption, 160)
+    storageName,
+    contentType: sanitizeMustangText(entry.contentType || "image/jpeg", 80) || "image/jpeg",
+    size: Math.max(0, Number(entry.size) || 0),
+    caption: sanitizeMustangText(entry.caption, 160),
+    uploadedAt: sanitizeMustangText(entry.uploadedAt || new Date().toISOString(), 80)
   };
+}
+
+function toPublicMustangPhoto(entry = {}, index = 0) {
+  const photo = sanitizeMustangPhoto(entry, index);
+  if (photo.storageName) {
+    return {
+      ...photo,
+      src: `/api/mustang/photos/${encodeURIComponent(photo.id)}`
+    };
+  }
+  return photo;
+}
+
+function toPublicMustangTracker(payload = {}) {
+  const tracker = sanitizeMustangTracker(payload);
+  return {
+    ...tracker,
+    photos: tracker.photos.map((entry, index) => toPublicMustangPhoto(entry, index)).filter((entry) => entry.src)
+  };
+}
+
+async function storeMustangPhotoUploads(photos = []) {
+  const uploadDirectory = getMustangUploadsDir();
+  const stored = [];
+  for (const [index, entry] of (Array.isArray(photos) ? photos : []).entries()) {
+    const photo = sanitizeMustangPhoto(entry, index);
+    const decoded = decodeDataUrl(photo.src);
+    const isSupportedImage = decoded && /^image\/(png|jpe?g|webp|gif)$/i.test(decoded.contentType || "");
+    if (isSupportedImage) {
+      const id = photo.id || makeId();
+      const extension = extensionForContentType(decoded.contentType) || ".jpg";
+      const storageName = `${id}-${Date.now()}${extension}`;
+      await fsp.mkdir(uploadDirectory, { recursive: true });
+      await fsp.writeFile(path.join(uploadDirectory, storageName), decoded.buffer);
+      stored.push({
+        id,
+        storageName,
+        contentType: decoded.contentType,
+        size: decoded.buffer.length,
+        caption: photo.caption,
+        uploadedAt: photo.uploadedAt || new Date().toISOString()
+      });
+      continue;
+    }
+    stored.push(photo);
+  }
+  return stored.filter((entry) => entry.storageName || /^https?:\/\//i.test(entry.src || ""));
+}
+
+async function prepareMustangTrackerForSave(payload = {}) {
+  const tracker = sanitizeMustangTracker({
+    ...(payload || {}),
+    photos: [],
+    updatedAt: payload.updatedAt
+  });
+  tracker.photos = await storeMustangPhotoUploads(Array.isArray(payload.photos) ? payload.photos : []);
+  return tracker;
+}
+
+function hasInlineMustangPhotos(payload = {}) {
+  return (Array.isArray(payload.photos) ? payload.photos : []).some((entry) =>
+    /^data:image\/(png|jpe?g|webp|gif);base64,/i.test(String(entry?.src || "").trim())
+  );
+}
+
+async function migrateMustangInlinePhotos(store) {
+  if (!store?.mustang || !hasInlineMustangPhotos(store.mustang)) return store;
+  store.mustang = await prepareMustangTrackerForSave(store.mustang);
+  return writeStore(store);
 }
 
 function sanitizeMustangTracker(payload = {}) {
@@ -2534,7 +2621,7 @@ function sanitizeMustangTracker(payload = {}) {
     parts: sanitizedParts,
     photos: (Array.isArray(source.photos) ? source.photos : DEFAULT_MUSTANG_SPEC.photos)
       .map((entry, index) => sanitizeMustangPhoto(entry, index))
-      .filter((entry) => entry.src),
+      .filter((entry) => entry.src || entry.storageName),
     updatedAt: sanitizeMustangText(source.updatedAt, 80)
   };
 }
@@ -11550,7 +11637,7 @@ function createServer() {
       next();
       return;
     }
-    if (request.method === "GET" && request.path === "/mustang") {
+    if (request.method === "GET" && (request.path === "/mustang" || request.path.startsWith("/mustang/photos/"))) {
       next();
       return;
     }
@@ -11605,11 +11692,33 @@ function createServer() {
 
   app.get("/api/mustang", async (request, response) => {
     try {
-      const store = await readStore();
-      response.json(sanitizeMustangTracker(store.mustang));
+      const store = await migrateMustangInlinePhotos(await readStore());
+      response.json(toPublicMustangTracker(store.mustang));
     } catch (error) {
       console.error("Could not load Mustang tracker.", error.message || error);
       response.status(500).json({ error: "Could not load the Mustang tracker." });
+    }
+  });
+
+  app.get("/api/mustang/photos/:photoId", async (request, response) => {
+    try {
+      const store = await migrateMustangInlinePhotos(await readStore());
+      const photos = Array.isArray(store.mustang?.photos) ? store.mustang.photos.map((entry, index) => sanitizeMustangPhoto(entry, index)) : [];
+      const photo = photos.find((entry) => String(entry.id || "") === String(request.params.photoId || ""));
+      if (!photo?.storageName) {
+        response.status(404).json({ error: "Photo not found." });
+        return;
+      }
+      const filePath = path.join(getMustangUploadsDir(), photo.storageName);
+      if (!fs.existsSync(filePath)) {
+        response.status(404).json({ error: "Photo not found." });
+        return;
+      }
+      response.setHeader("Content-Type", photo.contentType || "image/jpeg");
+      response.sendFile(filePath);
+    } catch (error) {
+      console.error("Could not load Mustang photo.", error.message || error);
+      response.status(500).json({ error: "Could not load the Mustang photo." });
     }
   });
 
@@ -11617,12 +11726,12 @@ function createServer() {
     if (!requireMustangAccess(request, response)) return;
     try {
       const store = await readStore();
-      store.mustang = sanitizeMustangTracker({
+      store.mustang = await prepareMustangTrackerForSave({
         ...(request.body || {}),
         updatedAt: new Date().toISOString()
       });
       const savedStore = await writeStore(store);
-      response.json(sanitizeMustangTracker(savedStore.mustang));
+      response.json(toPublicMustangTracker(savedStore.mustang));
     } catch (error) {
       console.error("Could not save Mustang tracker.", error.message || error);
       response.status(500).json({ error: "Could not save the Mustang tracker." });
