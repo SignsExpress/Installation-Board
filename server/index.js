@@ -88,6 +88,60 @@ let boardStoreWriteQueue = Promise.resolve();
 let boardStoreCorruptionError = null;
 let socialPostQueueProcessing = false;
 let socialPostQueueInterval = null;
+let memoryMonitorInterval = null;
+let lastHighMemoryLogAt = 0;
+let lastMemorySnapshot = null;
+
+function bytesToMegabytes(bytes = 0) {
+  return Math.round((Number(bytes) || 0) / 1024 / 1024);
+}
+
+function getFileSizeMegabytes(filePath) {
+  try {
+    return fs.existsSync(filePath) ? bytesToMegabytes(fs.statSync(filePath).size) : 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function getMemoryDiagnostics() {
+  const usage = process.memoryUsage();
+  const diagnostics = {
+    rssMb: bytesToMegabytes(usage.rss),
+    heapUsedMb: bytesToMegabytes(usage.heapUsed),
+    heapTotalMb: bytesToMegabytes(usage.heapTotal),
+    externalMb: bytesToMegabytes(usage.external),
+    arrayBuffersMb: bytesToMegabytes(usage.arrayBuffers),
+    uptimeSeconds: Math.round(process.uptime()),
+    dataFileMb: getFileSizeMegabytes(getDataFile()),
+    activeSseClients: streamClients.size,
+    activeSessions: sessions.size,
+    socialPostQueueProcessing
+  };
+  lastMemorySnapshot = { ...diagnostics, capturedAt: new Date().toISOString() };
+  return diagnostics;
+}
+
+function logMemoryDiagnostics(label, extra = {}, force = false) {
+  const diagnostics = getMemoryDiagnostics();
+  const now = Date.now();
+  const shouldLog = force || diagnostics.rssMb >= 700 || diagnostics.heapUsedMb >= 450 || now - lastHighMemoryLogAt > 10 * 60 * 1000;
+  if (!shouldLog) return diagnostics;
+  lastHighMemoryLogAt = now;
+  console.log(`[memory] ${label}`, JSON.stringify({ ...diagnostics, ...extra }));
+  return diagnostics;
+}
+
+function ensureMemoryMonitor() {
+  if (memoryMonitorInterval) return;
+  logMemoryDiagnostics("startup", {}, true);
+  memoryMonitorInterval = setInterval(() => {
+    logMemoryDiagnostics("heartbeat");
+  }, 60000);
+  if (typeof memoryMonitorInterval.unref === "function") {
+    memoryMonitorInterval.unref();
+  }
+}
 const MATERIAL_REQUEST_CATEGORIES = [
   {
     id: "consumables",
@@ -10762,7 +10816,17 @@ async function processSocialPostQueue() {
     store.socialPostQueue = queue.filter((entry) => String(entry.id || "") !== String(nextEntry.id || ""));
 
     try {
+      logMemoryDiagnostics("social-post-queue:start", {
+        queueLength: queue.length,
+        jobId: nextEntry.jobId,
+        orderReference: nextEntry.orderReference
+      }, true);
       await processQueuedSocialPostEntry(store, nextEntry);
+      logMemoryDiagnostics("social-post-queue:finish", {
+        queueLength: queue.length,
+        jobId: nextEntry.jobId,
+        orderReference: nextEntry.orderReference
+      }, true);
     } catch (error) {
       const attemptCount = Math.max(0, Number(nextEntry.attemptCount) || 0) + 1;
       if (attemptCount < 3) {
@@ -11047,6 +11111,7 @@ function createServer() {
   ensureInstallersFile();
   ensureRequestsFile();
   ensureUsersFile();
+  ensureMemoryMonitor();
   bootstrapPasswordsFromEnv()
     .then((result) => {
       if (result.updated) {
@@ -11057,6 +11122,35 @@ function createServer() {
       console.error("Could not bootstrap auth passwords.", error.message);
     });
   const app = express();
+
+  app.use((request, response, next) => {
+    const shouldTrack = request.path.startsWith("/api");
+    if (!shouldTrack) {
+      next();
+      return;
+    }
+
+    const startedAt = Date.now();
+    const startMemory = getMemoryDiagnostics();
+    response.on("finish", () => {
+      const endMemory = getMemoryDiagnostics();
+      const rssDeltaMb = endMemory.rssMb - startMemory.rssMb;
+      const heapDeltaMb = endMemory.heapUsedMb - startMemory.heapUsedMb;
+      const durationMs = Date.now() - startedAt;
+      if (endMemory.rssMb >= 700 || Math.abs(rssDeltaMb) >= 80 || durationMs >= 5000 || response.statusCode >= 500) {
+        console.log("[memory] request", JSON.stringify({
+          method: request.method,
+          path: request.originalUrl || request.path,
+          status: response.statusCode,
+          durationMs,
+          rssDeltaMb,
+          heapDeltaMb,
+          ...endMemory
+        }));
+      }
+    });
+    next();
+  });
 
   app.use((request, response, next) => {
     response.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet");
@@ -11664,6 +11758,21 @@ function createServer() {
 
   app.get("/healthz", (request, response) => {
     response.json({ ok: true });
+  });
+
+  app.get("/api/diagnostics/memory", (request, response) => {
+    if (!requirePermissionsManager(request, response)) return;
+    response.json({
+      ok: true,
+      capturedAt: new Date().toISOString(),
+      memory: getMemoryDiagnostics(),
+      lastMemorySnapshot,
+      process: {
+        pid: process.pid,
+        node: process.version,
+        platform: process.platform
+      }
+    });
   });
 
   app.get("/api/board", async (request, response) => {
