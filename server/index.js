@@ -10363,7 +10363,7 @@ function getDesignBoardApprovedIso(card = {}) {
 async function backfillDesignBoardDetails(store, options = {}) {
   const state = sanitizeDesignBoardState(store.designBoard);
   const filteringState = sanitizeFilteringBoardState(store.filteringBoard);
-  const limit = Math.max(1, Math.min(100, Number(options.limit || 36)));
+  const limit = Math.max(1, Math.min(12, Number(options.limit || 6)));
   const today = getDesignBoardTodayIso();
   const todayDate = parseIsoDate(today);
   const weekday = todayDate?.getUTCDay() || 0;
@@ -10576,8 +10576,7 @@ function buildDesignBoardPayload(store) {
     settings: state.settings,
     approvalSummary: buildDesignBoardApprovalSummary(filteringState.cards, state.settings),
     lanes,
-    cards,
-    filteringCards: filteringState.cards
+    cards
   };
 }
 
@@ -12619,7 +12618,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.get("/api/design-board", async (request, response) => {
     if (!requireDesignBoardAccess(request, response)) return;
     try {
-      const store = await backfillDesignBoardDetails(await readStore());
+      const store = await readStore();
       response.json(buildDesignBoardPayload(store));
     } catch (error) {
       response.status(500).json({
@@ -12632,7 +12631,7 @@ app.get("/api/corebridge/orders", async (request, response) => {
   app.post("/api/design-board/backfill-values", async (request, response) => {
     if (!requireDesignBoardAdmin(request, response)) return;
     try {
-      const store = await backfillDesignBoardDetails(await readStore(), { limit: 100 });
+      const store = await backfillDesignBoardDetails(await readStore(), { limit: 8 });
       response.json(buildDesignBoardPayload(store));
     } catch (error) {
       response.status(500).json({
