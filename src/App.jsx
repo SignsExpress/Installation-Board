@@ -8945,79 +8945,83 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 </div>
                 <button className="icon-button" type="button" onClick={() => setEditingCardId("")}>x</button>
               </div>
-              <div className="design-board-edit-grid">
-                <label>
-                  Customer
-                  <input value={editDraft.customerName} onChange={(event) => setEditDraft((current) => ({ ...current, customerName: event.target.value }))} />
-                </label>
-                <label>
-                  Contact
-                  <input value={editDraft.contact} onChange={(event) => setEditDraft((current) => ({ ...current, contact: event.target.value }))} />
-                </label>
-                <label>
-                  Contact number
-                  <input value={editDraft.number} onChange={(event) => setEditDraft((current) => ({ ...current, number: event.target.value }))} />
-                </label>
-                <label>
-                  Contact email
-                  <input value={editDraft.contactEmail} onChange={(event) => setEditDraft((current) => ({ ...current, contactEmail: event.target.value }))} />
-                </label>
-                <label className="span-2">
-                  Description
-                  <textarea rows={3} value={editDraft.description} onChange={(event) => setEditDraft((current) => ({ ...current, description: event.target.value }))} />
-                </label>
-                <label className="span-2">
-                  Address
-                  <textarea rows={3} value={editDraft.address} onChange={(event) => setEditDraft((current) => ({ ...current, address: event.target.value }))} />
-                </label>
-                <label className="span-2">
-                  {editingCard.cardType === "task" ? "Task details" : "Notes"}
-                  <textarea rows={3} value={editDraft.notes} onChange={(event) => setEditDraft((current) => ({ ...current, notes: event.target.value }))} />
-                </label>
-                <label className="span-2">
-                  Designer note
-                  <textarea rows={3} value={editDraft.designerNote} onChange={(event) => setEditDraft((current) => ({ ...current, designerNote: event.target.value }))} />
-                </label>
-              </div>
-              <div className="design-board-edit-items">
-                <h4>Individual items</h4>
-                {editDraft.items.map((item, index) => (
-                  <div key={item.id} className="design-board-edit-item">
-                    <input
-                      value={item.name}
-                      onChange={(event) => setEditDraft((current) => ({
-                        ...current,
-                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry)
-                      }))}
-                      placeholder="Item name"
-                    />
-                    <input
-                      value={item.quantity}
-                      onChange={(event) => setEditDraft((current) => ({
-                        ...current,
-                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, quantity: event.target.value } : entry)
-                      }))}
-                      placeholder="Qty"
-                    />
-                    <input
-                      value={item.jobType}
-                      onChange={(event) => setEditDraft((current) => ({
-                        ...current,
-                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, jobType: event.target.value } : entry)
-                      }))}
-                      placeholder="Category"
-                    />
-                    <textarea
-                      rows={2}
-                      value={item.description}
-                      onChange={(event) => setEditDraft((current) => ({
-                        ...current,
-                        items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, description: event.target.value } : entry)
-                      }))}
-                      placeholder="Item description"
-                    />
+              <div className="design-board-edit-scroll">
+                <div className="design-board-edit-grid">
+                  <label>
+                    Customer
+                    <input value={editDraft.customerName} onChange={(event) => setEditDraft((current) => ({ ...current, customerName: event.target.value }))} />
+                  </label>
+                  <label>
+                    Contact
+                    <input value={editDraft.contact} onChange={(event) => setEditDraft((current) => ({ ...current, contact: event.target.value }))} />
+                  </label>
+                  <label>
+                    Contact number
+                    <input value={editDraft.number} onChange={(event) => setEditDraft((current) => ({ ...current, number: event.target.value }))} />
+                  </label>
+                  <label>
+                    Contact email
+                    <input value={editDraft.contactEmail} onChange={(event) => setEditDraft((current) => ({ ...current, contactEmail: event.target.value }))} />
+                  </label>
+                  <label className="span-2">
+                    Description
+                    <textarea rows={3} value={editDraft.description} onChange={(event) => setEditDraft((current) => ({ ...current, description: event.target.value }))} />
+                  </label>
+                  <label className="span-2">
+                    Address
+                    <textarea rows={3} value={editDraft.address} onChange={(event) => setEditDraft((current) => ({ ...current, address: event.target.value }))} />
+                  </label>
+                  <label className="span-2">
+                    {editingCard.cardType === "task" ? "Task details" : "Notes"}
+                    <textarea rows={3} value={editDraft.notes} onChange={(event) => setEditDraft((current) => ({ ...current, notes: event.target.value }))} />
+                  </label>
+                  <label className="span-2">
+                    Designer note
+                    <textarea rows={3} value={editDraft.designerNote} onChange={(event) => setEditDraft((current) => ({ ...current, designerNote: event.target.value }))} />
+                  </label>
+                </div>
+                {editDraft.items.length ? (
+                  <div className="design-board-edit-items">
+                    <h4>Individual items</h4>
+                    {editDraft.items.map((item, index) => (
+                      <div key={item.id} className="design-board-edit-item">
+                        <input
+                          value={item.name}
+                          onChange={(event) => setEditDraft((current) => ({
+                            ...current,
+                            items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, name: event.target.value } : entry)
+                          }))}
+                          placeholder="Item name"
+                        />
+                        <input
+                          value={item.quantity}
+                          onChange={(event) => setEditDraft((current) => ({
+                            ...current,
+                            items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, quantity: event.target.value } : entry)
+                          }))}
+                          placeholder="Qty"
+                        />
+                        <input
+                          value={item.jobType}
+                          onChange={(event) => setEditDraft((current) => ({
+                            ...current,
+                            items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, jobType: event.target.value } : entry)
+                          }))}
+                          placeholder="Category"
+                        />
+                        <textarea
+                          rows={2}
+                          value={item.description}
+                          onChange={(event) => setEditDraft((current) => ({
+                            ...current,
+                            items: current.items.map((entry, entryIndex) => entryIndex === index ? { ...entry, description: event.target.value } : entry)
+                          }))}
+                          placeholder="Item description"
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : null}
               </div>
               <div className="design-board-edit-actions">
                 <button className="ghost-button" type="button" onClick={() => setEditingCardId("")}>Cancel</button>

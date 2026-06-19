@@ -7639,6 +7639,9 @@ button {
 
 .design-board-edit-modal {
   width: min(1000px, 92vw);
+  max-height: min(820px, calc(100dvh - 32px));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 
 .design-board-settings-modal {
@@ -7729,6 +7732,21 @@ button {
   gap: 12px;
 }
 
+.design-board-edit-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.design-board-edit-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.design-board-edit-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
 .design-board-edit-grid label,
 .design-board-edit-items {
   display: grid;
@@ -7759,6 +7777,9 @@ button {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #edf1f6;
+  background: rgba(255, 255, 255, 0.96);
 }
 
 @media (max-width: 900px) {
