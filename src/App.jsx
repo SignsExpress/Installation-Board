@@ -7937,6 +7937,18 @@ function getDesignBoardEditDraft(card) {
   };
 }
 
+function getEmptyDesignTaskDraft() {
+  return {
+    title: "",
+    customerName: "Internal task",
+    contact: "",
+    number: "",
+    contactEmail: "",
+    notes: "",
+    designerNote: ""
+  };
+}
+
 async function readJsonResponse(response, fallbackMessage) {
   const raw = await response.text();
   const contentType = String(response.headers.get("content-type") || "").toLowerCase();
@@ -7981,9 +7993,11 @@ function formatDesignBoardJobType(value = "", itemName = "", description = "") {
 }
 
 function buildDesignBoardCopyText(card = {}, { dateField = "createdAt", dateLabel = "Date added" } = {}) {
+  const isTask = card.cardType === "task";
   const lines = [
-    `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
+    isTask ? `TASK - ${card.customerName || "Internal task"}` : `${card.orderReference || ""} - ${card.customerName || ""}`.trim(),
     card.description || "",
+    isTask && card.notes ? `Details: ${card.notes}` : "",
     card.jobTotalExVat ? `Net total: ${formatProFormaMoney(card.jobTotalExVat)}` : "",
     [card.contact, card.number].filter(Boolean).length ? `Contact: ${[card.contact, card.number].filter(Boolean).join(" - ")}` : "",
     card.contactEmail ? `Email: ${card.contactEmail}` : "",
@@ -8010,6 +8024,7 @@ function buildDesignBoardCopyText(card = {}, { dateField = "createdAt", dateLabe
 
 function getDesignBoardCardClassName(card) {
   const classNames = ["design-board-card"];
+  if (card?.cardType === "task") classNames.push("is-task");
   if (card?.isPriority) classNames.push("is-priority");
   if (card?.isAmendments) classNames.push("is-amendments");
   else classNames.push("is-new-artwork");
@@ -8095,7 +8110,10 @@ function DesignBoardColumn({
                   )}
                 </div>
                 <div className="design-board-card-identity-copy">
-                  <strong>{card.orderReference}</strong>
+                  <strong>
+                    {card.cardType === "task" ? <span className="design-board-task-pill">Task</span> : null}
+                    {card.cardType === "task" ? card.description || "Task" : card.orderReference}
+                  </strong>
                   <span>{card.customerName || "Customer not set"}</span>
                   {card.contact || card.number ? <span>{[card.contact, card.number].filter(Boolean).join(" - ")}</span> : null}
                 </div>
@@ -8109,12 +8127,20 @@ function DesignBoardColumn({
             </div>
 
             <div className="design-board-card-body">
-              <p className="design-board-card-description">{card.description || "No design description added yet."}</p>
+              {card.cardType === "task" ? (
+                card.notes ? <p className="design-board-card-description">{card.notes}</p> : null
+              ) : (
+                <p className="design-board-card-description">{card.description || "No design description added yet."}</p>
+              )}
               {card.jobTotalExVat ? <p className="design-board-card-total">Net total: {formatProFormaMoney(card.jobTotalExVat)}</p> : null}
-              <dl className="design-board-card-meta">
-                <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
-                {card.contactEmail ? <div><dt>Email</dt><dd>{card.contactEmail}</dd></div> : null}
-              </dl>
+              {card.cardType === "task" ? (
+                card.contactEmail ? <dl className="design-board-card-meta"><div><dt>Email</dt><dd>{card.contactEmail}</dd></div></dl> : null
+              ) : (
+                <dl className="design-board-card-meta">
+                  <div><dt>Address</dt><dd>{card.address || card.siteAddress || "No address"}</dd></div>
+                  {card.contactEmail ? <div><dt>Email</dt><dd>{card.contactEmail}</dd></div> : null}
+                </dl>
+              )}
               {card.designerNote ? <p className="design-board-designer-note">{card.designerNote}</p> : null}
               {Array.isArray(card.items) && card.items.length ? (
                 <p className="design-board-card-more">Click card to view and copy {card.items.length} item{card.items.length === 1 ? "" : "s"}.</p>
@@ -8140,9 +8166,11 @@ function DesignBoardColumn({
                   <details className="design-board-more-menu">
                     <summary>More</summary>
                     <div className="design-board-more-popover">
-                      <button type="button" onClick={() => onRepullCard?.(card)} disabled={isRepulling}>
-                        {isRepulling ? <span className="button-spinner-label"><span className="button-spinner" />Re-Pulling...</span> : "Re-Pull"}
-                      </button>
+                      {card.cardType === "task" ? null : (
+                        <button type="button" onClick={() => onRepullCard?.(card)} disabled={isRepulling}>
+                          {isRepulling ? <span className="button-spinner-label"><span className="button-spinner" />Re-Pulling...</span> : "Re-Pull"}
+                        </button>
+                      )}
                       <button type="button" onClick={() => onTogglePriority?.(card)}>{card.isPriority ? "Remove priority" : "Mark as priority"}</button>
                       <button type="button" onClick={() => onEditCard?.(card)}>Edit card</button>
                       <button type="button" className="danger" onClick={() => onDeleteCard?.(card)}>Delete card</button>
@@ -8169,6 +8197,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
   const [settingsHours, setSettingsHours] = useState("48");
   const [approvalTargets, setApprovalTargets] = useState({ today: "2500", week: "12500", month: "50000" });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [taskDraft, setTaskDraft] = useState(getEmptyDesignTaskDraft);
   const [savingKey, setSavingKey] = useState("");
   const [editingCardId, setEditingCardId] = useState("");
   const [chasingCardId, setChasingCardId] = useState("");
@@ -8334,6 +8364,30 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
     setOrderReference("");
   }
 
+  async function handleCreateTask(event) {
+    event.preventDefault();
+    const title = String(taskDraft.title || "").trim();
+    if (!title) {
+      setError("Add a task title.");
+      return;
+    }
+    await updateBoardRequest("/api/design-board/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        customerName: taskDraft.customerName,
+        contact: taskDraft.contact,
+        number: taskDraft.number,
+        contactEmail: taskDraft.contactEmail,
+        notes: taskDraft.notes,
+        designerNote: taskDraft.designerNote
+      })
+    }, "Added task card");
+    setTaskDraft(getEmptyDesignTaskDraft());
+    setTaskModalOpen(false);
+  }
+
   async function handleSaveSettings() {
     await updateBoardRequest("/api/design-board/settings", {
       method: "PATCH",
@@ -8403,7 +8457,8 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
   }
 
   async function handleDeleteCard(card) {
-    if (!window.confirm(`Delete ${card.orderReference}?`)) return;
+    const label = card.cardType === "task" ? (card.description || "this task") : card.orderReference;
+    if (!window.confirm(`Delete ${label}?`)) return;
     await updateBoardRequest(`/api/design-board/cards/${card.id}`, { method: "DELETE" }, "Deleted card");
     if (editingCardId === card.id) setEditingCardId("");
   }
@@ -8423,6 +8478,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
   }
 
   async function handleRepullCard(card) {
+    if (card.cardType === "task") return;
     await updateBoardRequest(`/api/design-board/cards/${card.id}/repull`, { method: "POST" }, `Re-pulled ${card.orderReference}`);
   }
 
@@ -8517,6 +8573,9 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                     ) : "Pull"}
                   </button>
                 </div>
+                <button className="design-board-add-task-button" type="button" onClick={() => setTaskModalOpen(true)}>
+                  Add task
+                </button>
                 <button className="design-board-settings-button" type="button" onClick={() => setSettingsOpen(true)}>
                   Settings
                 </button>
@@ -8646,6 +8705,87 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
           )}
         </section>
 
+        {editable && taskModalOpen ? (
+          <div className="modal-backdrop" onClick={() => setTaskModalOpen(false)}>
+            <form className="modal design-board-task-modal" onSubmit={handleCreateTask} onClick={(event) => event.stopPropagation()}>
+              <div className="modal-head">
+                <div>
+                  <h3>Add task card</h3>
+                  <p>For internal design work, catalogue amendments, redraws, or anything that is not a CoreBridge job.</p>
+                </div>
+                <button className="icon-button" type="button" onClick={() => setTaskModalOpen(false)}>x</button>
+              </div>
+              <div className="design-board-edit-grid">
+                <label className="span-2">
+                  Task title
+                  <input
+                    value={taskDraft.title}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="e.g. Redesign internal price guide"
+                    autoFocus
+                  />
+                </label>
+                <label>
+                  For
+                  <input
+                    value={taskDraft.customerName}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, customerName: event.target.value }))}
+                    placeholder="Internal task or customer name"
+                  />
+                </label>
+                <label>
+                  Contact
+                  <input
+                    value={taskDraft.contact}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, contact: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label>
+                  Contact number
+                  <input
+                    value={taskDraft.number}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, number: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label>
+                  Contact email
+                  <input
+                    value={taskDraft.contactEmail}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, contactEmail: event.target.value }))}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label className="span-2">
+                  Details
+                  <textarea
+                    rows={4}
+                    value={taskDraft.notes}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, notes: event.target.value }))}
+                    placeholder="What needs doing?"
+                  />
+                </label>
+                <label className="span-2">
+                  Red card note
+                  <textarea
+                    rows={2}
+                    value={taskDraft.designerNote}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, designerNote: event.target.value }))}
+                    placeholder="Optional note shown on the card"
+                  />
+                </label>
+              </div>
+              <div className="design-board-edit-actions">
+                <button className="ghost-button" type="button" onClick={() => setTaskModalOpen(false)}>Cancel</button>
+                <button className="primary-button" type="submit" disabled={savingKey === "/api/design-board/tasks"}>
+                  {savingKey === "/api/design-board/tasks" ? "Adding..." : "Add task"}
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
+
         {editable && settingsOpen ? (
           <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
             <div className="modal design-board-settings-modal" onClick={(event) => event.stopPropagation()}>
@@ -8749,21 +8889,22 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
             <div className="modal design-board-detail-modal" onClick={(event) => event.stopPropagation()}>
               <div className="modal-head">
                 <div>
-                  <h3>{detailCard.orderReference}</h3>
+                  <h3>{detailCard.cardType === "task" ? detailCard.description || "Task" : detailCard.orderReference}</h3>
                   <p>{detailCard.customerName || "Customer not set"}</p>
                 </div>
                 <button className="icon-button" type="button" onClick={() => setDetailCardId("")}>x</button>
               </div>
               <div className="design-board-detail-grid">
                 <section>
-                  <h4>Job Details</h4>
+                  <h4>{detailCard.cardType === "task" ? "Task Details" : "Job Details"}</h4>
                   <dl className="design-board-card-meta">
                     {detailCard.jobTotalExVat ? <div><dt>Net total</dt><dd>{formatProFormaMoney(detailCard.jobTotalExVat)}</dd></div> : null}
                     <div><dt>Contact</dt><dd>{[detailCard.contact, detailCard.number].filter(Boolean).join(" - ") || "No contact"}</dd></div>
                     {detailCard.contactEmail ? <div><dt>Email</dt><dd>{detailCard.contactEmail}</dd></div> : null}
-                    <div><dt>Address</dt><dd>{detailCard.address || detailCard.siteAddress || "No address"}</dd></div>
+                    {detailCard.cardType === "task" ? null : <div><dt>Address</dt><dd>{detailCard.address || detailCard.siteAddress || "No address"}</dd></div>}
                     {detailCard.createdAt ? <div><dt>Date added</dt><dd>{formatProFormaDate(detailCard.createdAt)}</dd></div> : null}
                   </dl>
+                  {detailCard.cardType === "task" && detailCard.notes ? <p className="design-board-task-detail-note">{detailCard.notes}</p> : null}
                   {Array.isArray(detailCard.items) && detailCard.items.length ? (
                     <ul className="design-board-items design-board-detail-items">
                       {detailCard.items.map((item, index) => {
@@ -8828,6 +8969,10 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 <label className="span-2">
                   Address
                   <textarea rows={3} value={editDraft.address} onChange={(event) => setEditDraft((current) => ({ ...current, address: event.target.value }))} />
+                </label>
+                <label className="span-2">
+                  {editingCard.cardType === "task" ? "Task details" : "Notes"}
+                  <textarea rows={3} value={editDraft.notes} onChange={(event) => setEditDraft((current) => ({ ...current, notes: event.target.value }))} />
                 </label>
                 <label className="span-2">
                   Designer note

@@ -3759,10 +3759,12 @@ function sanitizeDesignBoardCard(payload = {}) {
   const safeStatus = ["new", "scheduled", "awaiting-sign-off", "amendments", "order-with-salesperson"].includes(status)
     ? status
     : "new";
+  const cardType = String(payload.cardType || payload.type || "").trim().toLowerCase() === "task" ? "task" : "job";
   return {
     id: String(payload.id || makeId()),
+    cardType,
     coreBridgeOrderId: String(payload.coreBridgeOrderId || "").trim(),
-    orderReference: String(payload.orderReference || "").trim(),
+    orderReference: String(payload.orderReference || "").trim() || (cardType === "task" ? "TASK" : ""),
     customerName: String(payload.customerName || "").trim(),
     description: String(payload.description || "").trim(),
     contact: String(payload.contact || "").trim(),
@@ -10299,6 +10301,7 @@ async function backfillInstallationJobValues(store, options = {}) {
 }
 
 function needsDesignBoardCoreBridgeRefresh(card = {}) {
+  if (card.cardType === "task") return false;
   if (!String(card.orderReference || "").trim()) return false;
   if (!Number(card.jobTotalExVat || 0)) return true;
   const items = Array.isArray(card.items) ? card.items : [];
@@ -12711,6 +12714,50 @@ app.get("/api/corebridge/orders", async (request, response) => {
     } catch (error) {
       response.status(error.statusCode || 500).json({
         error: error.statusCode === 503 ? "CoreBridge is not configured yet." : "Could not pull the design-board job.",
+        detail: error.message
+      });
+    }
+  });
+
+  app.post("/api/design-board/tasks", async (request, response) => {
+    if (!requireDesignBoardAdmin(request, response)) return;
+    try {
+      const title = String(request.body?.title || request.body?.description || "").trim();
+      if (!title) {
+        response.status(400).json({ error: "Add a task title." });
+        return;
+      }
+      const store = await readStore();
+      const state = sanitizeDesignBoardState(store.designBoard);
+      const nowIso = new Date().toISOString();
+      const nextTask = sanitizeDesignBoardCard({
+        cardType: "task",
+        orderReference: "TASK",
+        customerName: String(request.body?.customerName || request.body?.owner || "Internal task").trim() || "Internal task",
+        description: title,
+        contact: String(request.body?.contact || "").trim(),
+        number: String(request.body?.number || request.body?.contactNumber || "").trim(),
+        contactEmail: String(request.body?.contactEmail || request.body?.email || "").trim(),
+        address: String(request.body?.address || "").trim(),
+        notes: String(request.body?.notes || "").trim(),
+        designerNote: String(request.body?.designerNote || "").trim(),
+        uploadedByUserId: request.user?.id || "",
+        uploadedByName: request.user?.displayName || "",
+        uploadedByPhotoDataUrl: request.user?.photoDataUrl || "",
+        status: "new",
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+      state.cards.unshift(nextTask);
+      store.designBoard = state;
+      const savedStore = await writeStore(store);
+      response.json({
+        card: nextTask,
+        board: buildDesignBoardPayload(savedStore)
+      });
+    } catch (error) {
+      response.status(500).json({
+        error: "Could not add the task card.",
         detail: error.message
       });
     }

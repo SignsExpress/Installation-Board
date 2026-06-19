@@ -7012,7 +7012,8 @@ button {
 }
 
 .design-board-pull-group button,
-.design-board-settings-button {
+.design-board-settings-button,
+.design-board-add-task-button {
   min-height: 32px;
   border-radius: 6px;
   font-size: 0.7rem;
@@ -7051,8 +7052,17 @@ button {
   color: #435168;
 }
 
+.design-board-add-task-button {
+  padding: 0 12px;
+  border: 1px solid rgba(25, 111, 112, 0.24);
+  background: #ecfbfa;
+  color: #196f70;
+  font-weight: 850;
+}
+
 .design-board-pull-group button:hover,
-.design-board-settings-button:hover {
+.design-board-settings-button:hover,
+.design-board-add-task-button:hover {
   transform: translateY(-1px);
 }
 
@@ -7223,6 +7233,19 @@ button {
   background: #fff7cf;
 }
 
+.design-board-card.is-task {
+  border-color: #99d7d4;
+  border-top-color: #1f9a9a;
+  background:
+    linear-gradient(180deg, rgba(236, 251, 250, 0.95) 0%, #ffffff 62%);
+}
+
+.design-board-card.is-task .design-board-card-avatar {
+  border-color: #a9ddda;
+  background: #dff7f5;
+  color: #196f70;
+}
+
 .design-board-card.is-overdue {
   border-color: #ef4444;
   border-top-color: #dc2626;
@@ -7310,10 +7333,27 @@ button {
 }
 
 .design-board-card-head strong {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   font-size: 0.84rem;
   line-height: 1.2;
   color: #172033;
+}
+
+.design-board-task-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #d8f4f2;
+  color: #196f70;
+  font-size: 0.56rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .design-board-card-head span {
@@ -7321,6 +7361,12 @@ button {
   margin-top: 2px;
   font-size: 0.7rem;
   color: #475569;
+}
+
+.design-board-card-head .design-board-task-pill {
+  display: inline-flex;
+  margin-top: 0;
+  color: #196f70;
 }
 
 .design-board-card-date {
@@ -7599,6 +7645,10 @@ button {
   width: min(620px, 92vw);
 }
 
+.design-board-task-modal {
+  width: min(760px, 92vw);
+}
+
 .design-board-detail-modal {
   width: min(1100px, 94vw);
 }
@@ -7639,6 +7689,17 @@ button {
   font: 0.78rem/1.45 "FARICYNEW", Arial, sans-serif;
   color: #0f172a;
   resize: vertical;
+}
+
+.design-board-task-detail-note {
+  margin: 12px 0 0;
+  padding: 12px;
+  border: 1px solid #cbeae8;
+  border-radius: 10px;
+  background: #f1fbfa;
+  color: #20595b;
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .design-board-setting-modal-field {
