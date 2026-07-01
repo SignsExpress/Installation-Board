@@ -19423,20 +19423,6 @@ export default function App() {
     };
   }, [currentUser, showBoard, boardRange.endIso, boardRange.startIso]);
 
-  useEffect(() => {
-    if (!currentUser || !showBoard || historyRecoveryAttemptedRef.current) return;
-    historyRecoveryAttemptedRef.current = true;
-    fetch("/api/board/recover-history", { method: "POST" })
-      .then(async (response) => {
-        if (!response.ok) return;
-        const result = await response.json();
-        if (result.changed) {
-          setMessage(createMessage(`${result.restored} historical jobs restored from backup.`, "success"));
-          setHistoryRecoveryVersion((current) => current + 1);
-        }
-      })
-      .catch((error) => console.error(error));
-  }, [currentUser, showBoard]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;

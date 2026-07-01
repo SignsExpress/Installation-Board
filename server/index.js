@@ -115,6 +115,7 @@ let socialPostQueueInterval = null;
 let memoryMonitorInterval = null;
 let lastHighMemoryLogAt = 0;
 let lastMemorySnapshot = null;
+let boardStoreCache = null;
 
 function bytesToMegabytes(bytes = 0) {
   return Math.round((Number(bytes) || 0) / 1024 / 1024);
@@ -1029,6 +1030,33 @@ function getSiteOrigin(request = null) {
   return "https://www.sxpreston.com";
 }
 
+function getBoardStoreFileSignature() {
+  try {
+    const dataFile = getDataFile();
+    const stat = fs.statSync(dataFile);
+    return { file: dataFile, size: stat.size, mtimeMs: stat.mtimeMs };
+  } catch (error) {
+    return null;
+  }
+}
+
+function isBoardStoreCacheFresh(signature) {
+  return Boolean(
+    boardStoreCache?.signature &&
+      signature &&
+      boardStoreCache.signature.file === signature.file &&
+      boardStoreCache.signature.size === signature.size &&
+      boardStoreCache.signature.mtimeMs === signature.mtimeMs
+  );
+}
+
+function setBoardStoreCache(store) {
+  const signature = getBoardStoreFileSignature();
+  if (!signature) return store;
+  boardStoreCache = { signature, store };
+  return store;
+}
+
 function safeParseStoreJson(raw) {
   try {
     return JSON.parse(raw);
@@ -1463,6 +1491,10 @@ function ensureRequestsFile() {
 
 async function readStore() {
   ensureStoreFile();
+  const signature = getBoardStoreFileSignature();
+  if (!boardStoreCorruptionError && isBoardStoreCacheFresh(signature)) {
+    return boardStoreCache.store;
+  }
   const raw = await fsp.readFile(getDataFile(), "utf8");
 
   try {
@@ -1499,7 +1531,7 @@ async function readStore() {
         await writeStore(migrated);
       }
       boardStoreCorruptionError = null;
-      return mergeHolidaySeed(migrated);
+      return setBoardStoreCache(mergeHolidaySeed(migrated));
     }
         const migrated = applyHolidayResetMigration({
           jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
@@ -1539,8 +1571,9 @@ async function readStore() {
       await writeStore(migrated);
     }
     boardStoreCorruptionError = null;
-    return mergeHolidaySeed(migrated);
+    return setBoardStoreCache(mergeHolidaySeed(migrated));
   } catch (error) {
+    boardStoreCache = null;
     boardStoreCorruptionError = new Error(
       "Board store JSON is invalid. Refusing to overwrite live data automatically."
     );
@@ -1660,6 +1693,7 @@ async function writeStore(store) {
         await writeTextFileAtomically(dataFile, `${JSON.stringify(updatedStore, null, 2)}\n`);
       }
       boardStoreCorruptionError = null;
+      setBoardStoreCache(updatedStore);
       return updatedStore;
     });
   return boardStoreWriteQueue;
