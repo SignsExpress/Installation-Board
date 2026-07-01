@@ -4018,7 +4018,8 @@ function HostLandingPage({
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
-    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null
+    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null,
+    canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Customer order tracker" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
 
   const operationsCards = [
@@ -18239,6 +18240,250 @@ function MustangProgressBar({ stage, stages, progressOverride = null }) {
   );
 }
 
+const IGLOO_STATUS_LABELS = {
+  artwork: "Artwork received",
+  printed: "Printed",
+  applied: "Applied",
+  ready: "Ready",
+  "sent-collected": "Sent / collected"
+};
+
+function getIglooStatusProgress(status = "artwork") {
+  const order = ["artwork", "printed", "applied", "ready", "sent-collected"];
+  const index = Math.max(0, order.indexOf(String(status || "").toLowerCase()));
+  return Math.round(((index + 1) / order.length) * 100);
+}
+
+function createEmptyIglooJob() {
+  return { id: "", orderReference: "", customerName: "IGLOO", dueDate: "", notes: "", lines: [] };
+}
+
+function createEmptyIglooLine(cooler = null) {
+  return {
+    id: `line-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    coolerId: cooler?.id || "",
+    family: cooler?.family || "",
+    model: cooler?.model || "",
+    quantity: 1,
+    artwork: "",
+    status: "artwork",
+    notes: ""
+  };
+}
+
+function IglooCoolerImage({ cooler }) {
+  const initials = String(cooler?.model || "IG").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  return cooler?.imageUrl ? <img src={cooler.imageUrl} alt={cooler.model} loading="lazy" /> : <span>{initials}</span>;
+}
+
+function IglooProgress({ status }) {
+  const progress = getIglooStatusProgress(status);
+  return (
+    <div className="igloo-progress" aria-label={IGLOO_STATUS_LABELS[status] || status}>
+      <span style={{ width: `${progress}%` }} />
+      <strong>{IGLOO_STATUS_LABELS[status] || status}</strong>
+    </div>
+  );
+}
+
+function IglooCustomerPage() {
+  const [data, setData] = useState(null);
+  const [accessCode, setAccessCode] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [error, setError] = useState("");
+
+  async function loadCustomerTracker() {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/igloo/customer");
+      if (response.status === 401) {
+        setData(null);
+        return;
+      }
+      const payload = await readJsonResponse(response, "Could not load IGLOO.");
+      if (!response.ok) throw new Error(payload.error || "Could not load IGLOO.");
+      setData(payload);
+    } catch (loadError) {
+      setError(loadError.message || "Could not load IGLOO.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadCustomerTracker();
+  }, []);
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    setLoggingIn(true);
+    setError("");
+    try {
+      const response = await fetch("/api/igloo/customer/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accessCode })
+      });
+      const payload = await readJsonResponse(response, "Could not log in.");
+      if (!response.ok) throw new Error(payload.error || "Could not log in.");
+      setData(payload);
+      setAccessCode("");
+    } catch (loginError) {
+      setError(loginError.message || "Could not log in.");
+    } finally {
+      setLoggingIn(false);
+      setLoading(false);
+    }
+  }
+
+  if (loading) return <div className="igloo-public-shell"><div className="igloo-loading">Loading IGLOO tracker...</div></div>;
+
+  if (!data) {
+    return (
+      <div className="igloo-public-shell">
+        <section className="igloo-login-card">
+          <p>Signs Express Preston</p>
+          <h1>IGLOO order tracker</h1>
+          <form onSubmit={handleLogin}>
+            <label>Customer access code<input type="password" value={accessCode} onChange={(event) => setAccessCode(event.target.value)} autoFocus /></label>
+            {error ? <span className="form-error">{error}</span> : null}
+            <button type="submit" disabled={loggingIn || !accessCode}>{loggingIn ? "Opening..." : "Open tracker"}</button>
+          </form>
+        </section>
+      </div>
+    );
+  }
+
+  const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+  const coolers = Array.isArray(data.coolers) ? data.coolers : [];
+
+  return (
+    <div className="igloo-public-shell">
+      <header className="igloo-hero"><div><p>IGLOO x Signs Express Preston</p><h1>Order tracker</h1><span>{jobs.length} live {jobs.length === 1 ? "order" : "orders"}</span></div></header>
+      <main className="igloo-public-main">
+        <section className="igloo-section-head"><h2>Current orders</h2><p>Artwork, print, application and dispatch progress for your active cooler jobs.</p></section>
+        <div className="igloo-order-grid">
+          {jobs.length ? jobs.map((job) => (
+            <article className="igloo-order-card" key={job.id || job.orderReference}>
+              <div className="igloo-order-head"><div><span>{job.orderReference || "Order pending"}</span><h3>{job.customerName || "IGLOO"}</h3></div>{job.dueDate ? <time>{formatDisplayDate(job.dueDate)}</time> : null}</div>
+              {job.notes ? <p className="igloo-note">{job.notes}</p> : null}
+              <div className="igloo-line-list">
+                {(job.lines || []).map((line) => <div className="igloo-line-card" key={line.id}><div><strong>{line.quantity} x {line.model || "Cooler"}</strong><span>{line.artwork || "Artwork to be confirmed"}</span></div><IglooProgress status={line.status} /></div>)}
+              </div>
+            </article>
+          )) : <p className="igloo-empty">No live IGLOO orders are showing yet.</p>}
+        </div>
+        <section className="igloo-section-head"><h2>Cooler templates</h2><p>Template status, notes and downloadable PDF files for each IGLOO model.</p></section>
+        <div className="igloo-catalogue-grid">
+          {coolers.map((cooler) => (
+            <article className="igloo-cooler-card" key={cooler.id}>
+              <div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div>
+              <div><span>{cooler.family}</span><h3>{cooler.model}</h3><p className={cooler.templateTested ? "igloo-ok" : "igloo-pending"}>{cooler.templateTested ? "Template tested and OK" : "Template test pending"}</p>{cooler.notes ? <p>{cooler.notes}</p> : null}<div className="igloo-cooler-actions">{cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Download template</a> : null}{cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer">Product page</a> : null}</div></div>
+            </article>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function IglooAdminPage({ currentUser, onLogout, notifications }) {
+  const [data, setData] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [newJob, setNewJob] = useState(createEmptyIglooJob());
+
+  async function loadIglooAdmin() {
+    try {
+      const response = await fetch("/api/igloo/admin");
+      const payload = await readJsonResponse(response, "Could not load IGLOO.");
+      if (!response.ok) throw new Error(payload.error || "Could not load IGLOO.");
+      setData(payload);
+      setDraft(JSON.parse(JSON.stringify(payload)));
+    } catch (loadError) {
+      setError(loadError.message || "Could not load IGLOO.");
+    }
+  }
+
+  useEffect(() => { loadIglooAdmin(); }, []);
+
+  async function saveDraft(nextDraft = draft) {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextDraft) });
+      const payload = await readJsonResponse(response, "Could not save IGLOO.");
+      if (!response.ok) throw new Error(payload.error || "Could not save IGLOO.");
+      setData(payload);
+      setDraft(JSON.parse(JSON.stringify(payload)));
+      setMessage("Saved.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save IGLOO.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateDraft(updater) {
+    setDraft((current) => {
+      const next = JSON.parse(JSON.stringify(current || data || {}));
+      updater(next);
+      return next;
+    });
+  }
+
+  function addJob() {
+    const job = { ...newJob, id: `igloo-job-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), lines: [] };
+    updateDraft((next) => { next.jobs = [job, ...(next.jobs || [])]; });
+    setNewJob(createEmptyIglooJob());
+  }
+
+  function addLine(jobIndex) {
+    const cooler = (draft?.coolers || [])[0] || null;
+    updateDraft((next) => { next.jobs[jobIndex].lines = [...(next.jobs[jobIndex].lines || []), createEmptyIglooLine(cooler)]; next.jobs[jobIndex].updatedAt = new Date().toISOString(); });
+  }
+
+  async function uploadTemplate(cooler, file) {
+    if (!file) return;
+    setSaving(true);
+    setError("");
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch(`/api/igloo/admin/coolers/${encodeURIComponent(cooler.id)}/template`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl, fileName: file.name }) });
+      const payload = await readJsonResponse(response, "Could not upload template.");
+      if (!response.ok) throw new Error(payload.error || "Could not upload template.");
+      setData(payload);
+      setDraft(JSON.parse(JSON.stringify(payload)));
+      setMessage("Template uploaded.");
+    } catch (uploadError) {
+      setError(uploadError.message || "Could not upload template.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const current = draft || data;
+  const coolers = Array.isArray(current?.coolers) ? current.coolers : [];
+  const jobs = Array.isArray(current?.jobs) ? current.jobs : [];
+  const statuses = Array.isArray(current?.statuses) ? current.statuses : Object.entries(IGLOO_STATUS_LABELS).map(([id, label]) => ({ id, label }));
+
+  return (
+    <div className="app-shell igloo-admin-shell"><div className="page"><MainNavBar currentUser={currentUser} active="igloo" onLogout={onLogout} notifications={notifications} />
+      <section className="panel igloo-admin-panel">
+        <div className="igloo-admin-header"><div><p>External customer module</p><h1>IGLOO</h1><span>Manage order progress, cooler templates and customer-facing downloads.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Open customer view</a><button type="button" onClick={() => saveDraft()} disabled={saving || !current}>{saving ? "Saving..." : "Save changes"}</button></div></div>
+        {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{!current ? <div className="board-loading">Loading IGLOO...</div> : null}
+        {current ? <><section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Customer access</h2><span>Separate from the main portal login.</span></div><label>Access code<input value={current.customerAccessCode || ""} onChange={(event) => updateDraft((next) => { next.customerAccessCode = event.target.value; })} /></label></section>
+        <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Order tracker</h2><span>Add an order, then add each cooler type and artwork set.</span></div><div className="igloo-new-job-row"><input placeholder="ORD-XXXX" value={newJob.orderReference} onChange={(event) => setNewJob((job) => ({ ...job, orderReference: event.target.value }))} /><input placeholder="Customer" value={newJob.customerName} onChange={(event) => setNewJob((job) => ({ ...job, customerName: event.target.value }))} /><input type="date" value={newJob.dueDate} onChange={(event) => setNewJob((job) => ({ ...job, dueDate: event.target.value }))} /><button type="button" onClick={addJob} disabled={!newJob.orderReference}>Add job</button></div>
+        <div className="igloo-admin-orders">{jobs.map((job, jobIndex) => <article className="igloo-admin-order" key={job.id || jobIndex}><div className="igloo-admin-order-head"><input value={job.orderReference || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].orderReference = event.target.value; })} /><input value={job.customerName || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].customerName = event.target.value; })} /><input type="date" value={job.dueDate || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].dueDate = event.target.value; })} /><button type="button" onClick={() => addLine(jobIndex)}>Add cooler</button><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs.splice(jobIndex, 1); })}>Delete</button></div><textarea placeholder="Order notes" value={job.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].notes = event.target.value; })} /><div className="igloo-admin-lines">{(job.lines || []).map((line, lineIndex) => <div className="igloo-admin-line" key={line.id || lineIndex}><select value={line.coolerId || ""} onChange={(event) => updateDraft((next) => { const cooler = coolers.find((item) => item.id === event.target.value); next.jobs[jobIndex].lines[lineIndex] = { ...next.jobs[jobIndex].lines[lineIndex], coolerId: cooler?.id || "", family: cooler?.family || "", model: cooler?.model || "" }; })}>{coolers.map((cooler) => <option key={cooler.id} value={cooler.id}>{cooler.family} - {cooler.model}</option>)}</select><input type="number" min="1" value={line.quantity || 1} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].quantity = event.target.value; })} /><input placeholder="Artwork e.g. Wrexham FC" value={line.artwork || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].artwork = event.target.value; })} /><select value={line.status || "artwork"} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].status = event.target.value; })}>{statuses.map((status) => <option key={status.id} value={status.id}>{status.label}</option>)}</select><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs[jobIndex].lines.splice(lineIndex, 1); })}>Remove</button><textarea placeholder="Line notes" value={line.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].notes = event.target.value; })} /></div>)}</div></article>)}</div></section>
+        <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Cooler catalogue</h2><span>Photos, product links, tested templates, PDF files and notes.</span></div><div className="igloo-admin-catalogue">{coolers.map((cooler, coolerIndex) => <article className="igloo-admin-cooler" key={cooler.id}><div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div><div className="igloo-admin-cooler-fields"><strong>{cooler.family} - {cooler.model}</strong><input placeholder="Image URL" value={cooler.imageUrl || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].imageUrl = event.target.value; })} /><input placeholder="Product page URL" value={cooler.productUrl || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].productUrl = event.target.value; })} /><label className="igloo-checkbox"><input type="checkbox" checked={Boolean(cooler.templateTested)} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].templateTested = event.target.checked; })} /> Template tested and OK</label><textarea placeholder="Template notes" value={cooler.notes || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].notes = event.target.value; })} /><div className="igloo-template-row"><label className="ghost-button">Upload PDF<input type="file" accept="application/pdf" onChange={(event) => { uploadTemplate(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label>{cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Download current PDF</a> : <span>No PDF uploaded</span>}</div></div></article>)}</div></section></> : null}
+      </section></div></div>
+  );
+}
+
 function MustangPage({ currentUser }) {
   const [tracker, setTracker] = useState(null);
   const [draft, setDraft] = useState(null);
@@ -18775,6 +19020,8 @@ export default function App() {
   const isNotificationsRoute = pathname.startsWith("/notifications");
   const isMorningMeetingRoute = pathname.startsWith("/morning-meeting");
   const isMustangRoute = pathname.startsWith("/mustang");
+  const isIglooCustomerRoute = pathname.startsWith("/igloo") && !pathname.startsWith("/igloo-admin");
+  const isIglooAdminRoute = pathname.startsWith("/igloo-admin");
   const isBoardRoute = pathname.startsWith("/board");
   const isDesignBoardRoute = pathname.startsWith("/design-board");
   const isFilteringRoute = pathname.startsWith("/filtering");
@@ -18912,8 +19159,9 @@ export default function App() {
   );
   const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
   const showMustang = Boolean(isMustangRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -21283,6 +21531,10 @@ export default function App() {
     return <CreditApplicationPage />;
   }
 
+  if (isIglooCustomerRoute) {
+    return <IglooCustomerPage />;
+  }
+
   if (!authChecked) {
     return (
       <div className="app-shell">
@@ -21299,6 +21551,16 @@ export default function App() {
     return (
       <MustangPage
         currentUser={currentUser}
+      />
+    );
+  }
+
+  if (showIglooAdmin) {
+    return (
+      <IglooAdminPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
       />
     );
   }

@@ -46,6 +46,9 @@ const coreBridgeLineItemCategoryCache = new Map();
 const SESSION_COOKIE_NAME = "installation_board_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const sessions = new Map();
+const IGLOO_SESSION_COOKIE_NAME = "igloo_customer_session";
+const IGLOO_SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14;
+const iglooCustomerSessions = new Map();
 const TIMEMOTO_WEBHOOK_TOKEN = String(process.env.TIMEMOTO_WEBHOOK_TOKEN || "").trim();
 const PUSH_VAPID_SUBJECT = String(process.env.PUSH_VAPID_SUBJECT || "mailto:portal@sxpreston.com").trim();
 const PUSH_VAPID_PUBLIC_KEY_ENV = String(process.env.PUSH_VAPID_PUBLIC_KEY || "").trim();
@@ -84,6 +87,27 @@ const HOLIDAY_STAFF = [
   { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" }
 ];
 const HOLIDAY_RESET_VERSION = 1;
+const IGLOO_STATUS_OPTIONS = [
+  { id: "artwork", label: "Artwork received" },
+  { id: "printed", label: "Printed" },
+  { id: "applied", label: "Applied" },
+  { id: "ready", label: "Ready" },
+  { id: "sent-collected", label: "Sent / collected" }
+];
+const IGLOO_COOLER_FAMILIES = [
+  ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
+  ["Legacy", ["Legacy 20", "Legacy 54"]],
+  ["Gripper", ["Gripper 10"]],
+  ["BMX", ["BMX 25", "BMX 52", "BMX 72"]],
+  ["IMX", ["IMX 24", "IMX 70"]],
+  ["Latitude", ["Latitude 30", "Latitude 52", "Latitude 62 Roller", "Latitude 90 Roller"]],
+  ["MaxCold", ["MaxCold 70", "MaxCold 100", "MaxCold 150", "MaxCold 165"]],
+  ["Marine Ultra", ["Marine Ultra 30", "Marine Ultra 54", "Marine Ultra 70"]],
+  ["Trailmate", ["Trailmate 25", "Trailmate 50", "Trailmate 52 Roller", "Trailmate Journey (70 qt)", "Trailmate Marine"]],
+  ["Party Bar", ["Party Bar 125"]],
+  ["Electric (ICF Compressor)", ["ICF18", "ICF32", "ICF40", "ICF60", "ICF80DZ"]],
+  ["Beverage Coolers", ["Half Gallon Jug", "1 Gallon Jug", "2 Gallon Jug", "3 Gallon Beverage Cooler", "5 Gallon Beverage Cooler", "10 Gallon Beverage Cooler"]]
+];
 let boardStoreWriteQueue = Promise.resolve();
 let boardStoreCorruptionError = null;
 let socialPostQueueProcessing = false;
@@ -247,6 +271,7 @@ function createEmptyBoardStore() {
     jobs: [],
     morningMeetingTalkingPoints: {},
     mustang: sanitizeMustangTracker(),
+    igloo: sanitizeIglooTracker(),
     designBoard: {
       cards: [],
       settings: {
@@ -544,6 +569,16 @@ async function ensureMustangUploadsDir() {
   return directory;
 }
 
+function getIglooTemplateUploadsDir() {
+  return path.join(path.dirname(getDataFile()), "igloo-templates");
+}
+
+async function ensureIglooTemplateUploadsDir() {
+  const directory = getIglooTemplateUploadsDir();
+  await fsp.mkdir(directory, { recursive: true });
+  return directory;
+}
+
 function getRamsUploadsDir() {
   return path.join(path.dirname(getDataFile()), "rams-pdfs");
 }
@@ -589,6 +624,54 @@ function serializeSessionCookie(sessionId, { expiresAt, clear = false } = {}) {
   }
 
   return parts.join("; ");
+}
+
+function serializeIglooSessionCookie(sessionId, { expiresAt, clear = false } = {}) {
+  const parts = [
+    `${IGLOO_SESSION_COOKIE_NAME}=${clear ? "" : encodeURIComponent(sessionId)}`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax"
+  ];
+
+  if (process.env.NODE_ENV === "production") {
+    parts.push("Secure");
+  }
+
+  if (clear) {
+    parts.push("Max-Age=0");
+    parts.push("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  } else if (expiresAt) {
+    parts.push(`Expires=${new Date(expiresAt).toUTCString()}`);
+  }
+
+  return parts.join("; ");
+}
+
+function createIglooCustomerSession() {
+  const sessionId = crypto.randomUUID();
+  const expiresAt = Date.now() + IGLOO_SESSION_TTL_MS;
+  iglooCustomerSessions.set(sessionId, { expiresAt });
+  return { sessionId, expiresAt };
+}
+
+function getIglooCustomerSessionFromRequest(request) {
+  const cookies = parseCookies(request.headers.cookie);
+  const sessionId = cookies[IGLOO_SESSION_COOKIE_NAME];
+  if (!sessionId) return null;
+  const session = iglooCustomerSessions.get(sessionId);
+  if (!session) return null;
+  if (session.expiresAt <= Date.now()) {
+    iglooCustomerSessions.delete(sessionId);
+    return null;
+  }
+  return { sessionId, ...session };
+}
+
+function requireIglooCustomerAccess(request, response) {
+  if (getIglooCustomerSessionFromRequest(request)) return true;
+  response.status(401).json({ error: "IGLOO login required." });
+  return false;
 }
 
 function createSession(user) {
@@ -1389,6 +1472,7 @@ async function readStore() {
             jobs: parsed,
             morningMeetingTalkingPoints: {},
             mustang: sanitizeMustangTracker(),
+            igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
             holidays: [],
@@ -1421,6 +1505,7 @@ async function readStore() {
           jobs: Array.isArray(parsed.jobs) ? parsed.jobs : [],
           morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(parsed.morningMeetingTalkingPoints),
           mustang: sanitizeMustangTracker(parsed.mustang),
+          igloo: sanitizeIglooTracker(parsed.igloo),
           designBoard: sanitizeDesignBoardState(parsed.designBoard),
           filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
@@ -1479,6 +1564,7 @@ async function writeStore(store) {
     }),
     morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
     mustang: sanitizeMustangTracker(store.mustang),
+    igloo: sanitizeIglooTracker(store.igloo),
     designBoard: {
       cards: [...sanitizeDesignBoardState(store.designBoard).cards].sort((left, right) =>
         String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""))
@@ -2677,6 +2763,179 @@ function sanitizeMustangTracker(payload = {}) {
       .map((entry, index) => sanitizeMustangPhoto(entry, index))
       .filter((entry) => entry.src || entry.storageName),
     updatedAt: sanitizeMustangText(source.updatedAt, 80)
+  };
+}
+
+function sanitizeIglooText(value = "", limit = 600) {
+  return String(value || "").replace(/\r\n/g, "\n").trim().slice(0, limit);
+}
+
+function toIglooId(value = "") {
+  return sanitizeIglooText(value, 120)
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function sanitizeIglooUrl(value = "") {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url.slice(0, 2000);
+  return ("https://" + url).slice(0, 2000);
+}
+
+function getIglooProductUrl(model = "") {
+  const cleanModel = String(model || "").replace(/\s*\([^)]*\)/g, "").trim();
+  const known = {
+    "Legacy 54": "https://www.igloocoolers.com/products/legacy-54-qt-cooler",
+    "Playmate Mini": "https://www.campingworld.com/igloo-retro-playmate-mini-4-quart-cooler-728206.html",
+    "Trailmate 52 Roller": "https://www.dickssportinggoods.com/p/igloo-trailmate-52-quart-roller-cooler-23iglu52qttrlmtrlrec/23iglu52qttrlmtrlrec"
+  };
+  return known[cleanModel] || ("https://www.igloocoolers.com/search?q=" + encodeURIComponent(cleanModel));
+}
+
+function createDefaultIglooCoolers() {
+  return IGLOO_COOLER_FAMILIES.flatMap(([family, models]) =>
+    models.map((model) => ({
+      id: toIglooId(family + "-" + model),
+      family,
+      model,
+      imageUrl: "",
+      productUrl: getIglooProductUrl(model),
+      templateTested: false,
+      templatePdfStorageName: "",
+      templatePdfFileName: "",
+      templatePdfContentType: "application/pdf",
+      templatePdfSize: 0,
+      notes: "",
+      updatedAt: ""
+    }))
+  );
+}
+
+function sanitizeIglooStatus(value = "") {
+  const status = sanitizeIglooText(value, 80).toLowerCase();
+  return IGLOO_STATUS_OPTIONS.some((entry) => entry.id === status) ? status : IGLOO_STATUS_OPTIONS[0].id;
+}
+
+function sanitizeIglooCooler(entry = {}, index = 0) {
+  const family = sanitizeIglooText(entry.family, 120);
+  const model = sanitizeIglooText(entry.model, 180);
+  const fallbackId = toIglooId((family || "cooler") + "-" + (model || index + 1));
+  const storageName = path.basename(sanitizeIglooText(entry.templatePdfStorageName || entry.storageName, 240));
+  return {
+    id: sanitizeIglooText(entry.id || fallbackId || "cooler-" + (index + 1), 120),
+    family,
+    model,
+    imageUrl: sanitizeIglooUrl(entry.imageUrl),
+    productUrl: sanitizeIglooUrl(entry.productUrl),
+    templateTested: Boolean(entry.templateTested),
+    templatePdfStorageName: storageName,
+    templatePdfFileName: sanitizeIglooText(entry.templatePdfFileName || entry.fileName, 240),
+    templatePdfContentType: sanitizeIglooText(entry.templatePdfContentType || "application/pdf", 80) || "application/pdf",
+    templatePdfSize: Math.max(0, Number(entry.templatePdfSize || entry.size) || 0),
+    notes: sanitizeIglooText(entry.notes, 2000),
+    updatedAt: sanitizeIglooText(entry.updatedAt, 80)
+  };
+}
+
+function mergeIglooCoolerCatalogue(coolers = []) {
+  const defaults = createDefaultIglooCoolers();
+  const byId = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
+  (Array.isArray(coolers) ? coolers : []).forEach((entry, index) => {
+    const sanitized = sanitizeIglooCooler(entry, index);
+    const existing = byId.get(sanitized.id);
+    byId.set(sanitized.id, { ...(existing || {}), ...sanitized });
+  });
+  return [...byId.values()].sort((left, right) => {
+    if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
+    return String(left.model || "").localeCompare(String(right.model || ""));
+  });
+}
+
+function sanitizeIglooLine(entry = {}, index = 0, coolers = []) {
+  const coolerId = sanitizeIglooText(entry.coolerId, 120);
+  const cooler = coolers.find((item) => item.id === coolerId) || null;
+  return {
+    id: sanitizeIglooText(entry.id || makeId(), 80) || makeId(),
+    coolerId: cooler?.id || coolerId,
+    family: sanitizeIglooText(entry.family || cooler?.family, 120),
+    model: sanitizeIglooText(entry.model || cooler?.model, 180),
+    quantity: Math.max(1, Math.round(Number(entry.quantity || 1) || 1)),
+    artwork: sanitizeIglooText(entry.artwork, 500),
+    status: sanitizeIglooStatus(entry.status),
+    notes: sanitizeIglooText(entry.notes, 1000),
+    updatedAt: sanitizeIglooText(entry.updatedAt || new Date().toISOString(), 80)
+  };
+}
+
+function sanitizeIglooJob(entry = {}, coolers = []) {
+  const now = new Date().toISOString();
+  return {
+    id: sanitizeIglooText(entry.id || makeId(), 80) || makeId(),
+    orderReference: sanitizeIglooText(entry.orderReference, 80).toUpperCase(),
+    customerName: sanitizeIglooText(entry.customerName || "IGLOO", 160),
+    dueDate: sanitizeIglooText(entry.dueDate, 20),
+    notes: sanitizeIglooText(entry.notes, 2000),
+    lines: (Array.isArray(entry.lines) ? entry.lines : [])
+      .map((line, index) => sanitizeIglooLine(line, index, coolers))
+      .filter((line) => line.model || line.artwork || line.coolerId),
+    createdAt: sanitizeIglooText(entry.createdAt || now, 80),
+    updatedAt: sanitizeIglooText(entry.updatedAt || now, 80)
+  };
+}
+
+function sanitizeIglooTracker(payload = {}) {
+  const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const coolers = mergeIglooCoolerCatalogue(source.coolers);
+  const accessCode = sanitizeIglooText(process.env.IGLOO_CUSTOMER_PASSWORD || source.customerAccessCode || "igloo2026", 160);
+  return {
+    customerAccessCode: accessCode || "igloo2026",
+    statuses: IGLOO_STATUS_OPTIONS,
+    coolers,
+    jobs: (Array.isArray(source.jobs) ? source.jobs : [])
+      .map((job) => sanitizeIglooJob(job, coolers))
+      .sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))
+  };
+}
+
+function toPublicIglooCooler(entry = {}, index = 0) {
+  const cooler = sanitizeIglooCooler(entry, index);
+  return {
+    ...cooler,
+    templatePdfUrl: cooler.templatePdfStorageName ? "/api/igloo/templates/" + encodeURIComponent(cooler.id) : ""
+  };
+}
+
+function toPublicIglooTracker(payload = {}, { includeAccessCode = false } = {}) {
+  const tracker = sanitizeIglooTracker(payload);
+  const publicTracker = {
+    statuses: tracker.statuses,
+    coolers: tracker.coolers.map((entry, index) => toPublicIglooCooler(entry, index)),
+    jobs: tracker.jobs
+  };
+  if (includeAccessCode) publicTracker.customerAccessCode = tracker.customerAccessCode;
+  return publicTracker;
+}
+
+async function storeIglooTemplateUpload(cooler, upload = {}) {
+  const dataUrl = String(upload.dataUrl || "").trim();
+  if (!dataUrl) return cooler;
+  const decoded = decodeDataUrl(dataUrl);
+  if (!decoded || String(decoded.contentType || "").toLowerCase() !== "application/pdf") {
+    throw new Error("Please upload a PDF template.");
+  }
+  const directory = await ensureIglooTemplateUploadsDir();
+  const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + (extensionForContentType(decoded.contentType) || ".pdf");
+  await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
+  return {
+    ...cooler,
+    templatePdfStorageName: storedName,
+    templatePdfFileName: sanitizeIglooText(upload.fileName || upload.originalName || (cooler.model || "igloo-template") + ".pdf", 240),
+    templatePdfContentType: decoded.contentType,
+    templatePdfSize: decoded.buffer.length,
+    updatedAt: new Date().toISOString()
   };
 }
 
@@ -11737,6 +11996,10 @@ function createServer() {
       next();
       return;
     }
+    if (request.path.startsWith("/igloo/customer") || request.path.startsWith("/igloo/templates/")) {
+      next();
+      return;
+    }
 
     const session = getSessionFromRequest(request);
     if (request.path === "/morning-meeting/send") {
@@ -11775,6 +12038,111 @@ function createServer() {
         platform: process.platform
       }
     });
+  });
+
+  app.post("/api/igloo/customer/login", async (request, response) => {
+    try {
+      const tracker = sanitizeIglooTracker((await readStore()).igloo);
+      const supplied = sanitizeIglooText(request.body?.accessCode, 160);
+      if (!supplied || supplied !== tracker.customerAccessCode) {
+        response.status(401).json({ error: "Access code not recognised." });
+        return;
+      }
+      const session = createIglooCustomerSession();
+      response.setHeader("Set-Cookie", serializeIglooSessionCookie(session.sessionId, { expiresAt: session.expiresAt }));
+      response.json(toPublicIglooTracker(tracker));
+    } catch (error) {
+      console.error("Could not log in to IGLOO tracker.", error.message || error);
+      response.status(500).json({ error: "Could not open the IGLOO tracker." });
+    }
+  });
+
+  app.post("/api/igloo/customer/logout", (request, response) => {
+    const session = getIglooCustomerSessionFromRequest(request);
+    if (session?.sessionId) iglooCustomerSessions.delete(session.sessionId);
+    response.setHeader("Set-Cookie", serializeIglooSessionCookie("", { clear: true }));
+    response.json({ ok: true });
+  });
+
+  app.get("/api/igloo/customer", async (request, response) => {
+    if (!requireIglooCustomerAccess(request, response)) return;
+    try {
+      response.json(toPublicIglooTracker((await readStore()).igloo));
+    } catch (error) {
+      console.error("Could not load IGLOO customer tracker.", error.message || error);
+      response.status(500).json({ error: "Could not load the IGLOO tracker." });
+    }
+  });
+
+  app.get("/api/igloo/templates/:coolerId", async (request, response) => {
+    const portalSession = getSessionFromRequest(request);
+    if (!portalSession && !getIglooCustomerSessionFromRequest(request)) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+    try {
+      const tracker = sanitizeIglooTracker((await readStore()).igloo);
+      const cooler = tracker.coolers.find((entry) => entry.id === String(request.params.coolerId || ""));
+      if (!cooler?.templatePdfStorageName) {
+        response.status(404).json({ error: "Template not found." });
+        return;
+      }
+      const filePath = path.join(getIglooTemplateUploadsDir(), cooler.templatePdfStorageName);
+      if (!fs.existsSync(filePath)) {
+        response.status(404).json({ error: "Template not found." });
+        return;
+      }
+      response.setHeader("Content-Type", cooler.templatePdfContentType || "application/pdf");
+      response.setHeader("Content-Disposition", "inline; filename=\"" + (cooler.templatePdfFileName || cooler.model + " template.pdf").replace(/[\r\n\"]/g, "") + "\"");
+      response.sendFile(filePath);
+    } catch (error) {
+      console.error("Could not load IGLOO template.", error.message || error);
+      response.status(500).json({ error: "Could not load the template." });
+    }
+  });
+
+  app.get("/api/igloo/admin", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      response.json(toPublicIglooTracker((await readStore()).igloo, { includeAccessCode: true }));
+    } catch (error) {
+      console.error("Could not load IGLOO admin tracker.", error.message || error);
+      response.status(500).json({ error: "Could not load IGLOO." });
+    }
+  });
+
+  app.put("/api/igloo/admin", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      store.igloo = sanitizeIglooTracker(request.body || {});
+      store.igloo.jobs = store.igloo.jobs.map((job) => ({ ...job, updatedAt: job.updatedAt || new Date().toISOString() }));
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo, { includeAccessCode: true }));
+    } catch (error) {
+      console.error("Could not save IGLOO tracker.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not save IGLOO." });
+    }
+  });
+
+  app.post("/api/igloo/admin/coolers/:coolerId/template", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = await storeIglooTemplateUpload(tracker.coolers[coolerIndex], request.body || {});
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo, { includeAccessCode: true }));
+    } catch (error) {
+      console.error("Could not upload IGLOO template.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not upload template." });
+    }
   });
 
   app.get("/api/board", async (request, response) => {
