@@ -2785,6 +2785,16 @@ function sanitizeIglooUrl(value = "") {
   return ("https://" + url).slice(0, 2000);
 }
 
+function getIglooImageUrl(model = "") {
+  const cleanModel = String(model || "").replace(/\s*\([^)]*\)/g, "").trim();
+  const known = {
+    "Legacy 54": "https://www.igloocoolers.com/cdn/shop/files/00050655-F.jpg?v=1711034797&width=400",
+    "Trailmate 25": "https://www.igloocoolers.com/cdn/shop/files/00033130-F.jpg?v=1770966739&width=400",
+    "Party Bar 125": "https://www.igloocoolers.com/cdn/shop/files/00035144-F.jpg?v=1742419718&width=400"
+  };
+  return known[cleanModel] || "";
+}
+
 function getIglooProductUrl(model = "") {
   const cleanModel = String(model || "").replace(/\s*\([^)]*\)/g, "").trim();
   const known = {
@@ -2801,7 +2811,7 @@ function createDefaultIglooCoolers() {
       id: toIglooId(family + "-" + model),
       family,
       model,
-      imageUrl: "",
+      imageUrl: getIglooImageUrl(model),
       productUrl: getIglooProductUrl(model),
       templateTested: false,
       templatePdfStorageName: "",
@@ -2846,7 +2856,12 @@ function mergeIglooCoolerCatalogue(coolers = []) {
   (Array.isArray(coolers) ? coolers : []).forEach((entry, index) => {
     const sanitized = sanitizeIglooCooler(entry, index);
     const existing = byId.get(sanitized.id);
-    byId.set(sanitized.id, { ...(existing || {}), ...sanitized });
+    byId.set(sanitized.id, {
+      ...(existing || {}),
+      ...sanitized,
+      imageUrl: sanitized.imageUrl || existing?.imageUrl || getIglooImageUrl(sanitized.model),
+      productUrl: sanitized.productUrl || existing?.productUrl || getIglooProductUrl(sanitized.model)
+    });
   });
   return [...byId.values()].sort((left, right) => {
     if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
@@ -2917,6 +2932,24 @@ function toPublicIglooTracker(payload = {}, { includeAccessCode = false } = {}) 
   };
   if (includeAccessCode) publicTracker.customerAccessCode = tracker.customerAccessCode;
   return publicTracker;
+}
+
+async function findIglooProductImage(productUrl = "") {
+  const url = sanitizeIglooUrl(productUrl);
+  if (!url) return "";
+  const result = await fetch(url, { headers: { "User-Agent": "SX Portal IGLOO catalogue" } });
+  if (!result.ok) return "";
+  const html = await result.text();
+  const patterns = [
+    /https:\/\/www\.igloocoolers\.com\/cdn\/shop\/files\/[^"'\s<]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\s<]*)?/i,
+    /https:\/\/cdn\.shopify\.com\/[^"'\s<]+?\.(?:jpg|jpeg|png|webp)(?:\?[^"'\s<]*)?/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i
+  ];
+  for (const pattern of patterns) {
+    const match = html.match(pattern);
+    if (match) return sanitizeIglooUrl(match[1] || match[0]);
+  }
+  return "";
 }
 
 async function storeIglooTemplateUpload(cooler, upload = {}) {
@@ -12122,6 +12155,32 @@ function createServer() {
     } catch (error) {
       console.error("Could not save IGLOO tracker.", error.message || error);
       response.status(400).json({ error: error.message || "Could not save IGLOO." });
+    }
+  });
+
+  app.post("/api/igloo/admin/coolers/:coolerId/image-lookup", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      const cooler = tracker.coolers[coolerIndex];
+      const imageUrl = getIglooImageUrl(cooler.model) || await findIglooProductImage(cooler.productUrl);
+      if (!imageUrl) {
+        response.status(404).json({ error: "No product image found on that page." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = { ...cooler, imageUrl, updatedAt: new Date().toISOString() };
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo, { includeAccessCode: true }));
+    } catch (error) {
+      console.error("Could not find IGLOO image.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not find product image." });
     }
   });
 

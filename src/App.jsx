@@ -18291,6 +18291,7 @@ function IglooCustomerPage() {
   const [accessCode, setAccessCode] = useState("");
   const [loading, setLoading] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
+  const [activeView, setActiveView] = useState("orders");
   const [error, setError] = useState("");
 
   async function loadCustomerTracker() {
@@ -18311,9 +18312,7 @@ function IglooCustomerPage() {
     }
   }
 
-  useEffect(() => {
-    loadCustomerTracker();
-  }, []);
+  useEffect(() => { loadCustomerTracker(); }, []);
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -18360,31 +18359,69 @@ function IglooCustomerPage() {
 
   return (
     <div className="igloo-public-shell">
-      <header className="igloo-hero"><div><p>IGLOO x Signs Express Preston</p><h1>Order tracker</h1><span>{jobs.length} live {jobs.length === 1 ? "order" : "orders"}</span></div></header>
+      <header className="igloo-hero">
+        <div>
+          <p>IGLOO x Signs Express Preston</p>
+          <h1>Order tracker</h1>
+          <span>{jobs.length} live {jobs.length === 1 ? "order" : "orders"}</span>
+        </div>
+      </header>
       <main className="igloo-public-main">
-        <section className="igloo-section-head"><h2>Current orders</h2><p>Artwork, print, application and dispatch progress for your active cooler jobs.</p></section>
-        <div className="igloo-order-grid">
-          {jobs.length ? jobs.map((job) => (
-            <article className="igloo-order-card" key={job.id || job.orderReference}>
-              <div className="igloo-order-head"><div><span>{job.orderReference || "Order pending"}</span><h3>{job.customerName || "IGLOO"}</h3></div>{job.dueDate ? <time>{formatDisplayDate(job.dueDate)}</time> : null}</div>
-              {job.notes ? <p className="igloo-note">{job.notes}</p> : null}
-              <div className="igloo-line-list">
-                {(job.lines || []).map((line) => <div className="igloo-line-card" key={line.id}><div><strong>{line.quantity} x {line.model || "Cooler"}</strong><span>{line.artwork || "Artwork to be confirmed"}</span></div><IglooProgress status={line.status} /></div>)}
-              </div>
-            </article>
-          )) : <p className="igloo-empty">No live IGLOO orders are showing yet.</p>}
+        <div className="igloo-tabs">
+          <button type="button" className={activeView === "orders" ? "active" : ""} onClick={() => setActiveView("orders")}>Orders</button>
+          <button type="button" className={activeView === "coolers" ? "active" : ""} onClick={() => setActiveView("coolers")}>Cooler templates</button>
         </div>
-        <section className="igloo-section-head"><h2>Cooler templates</h2><p>Template status, notes and downloadable PDF files for each IGLOO model.</p></section>
-        <div className="igloo-catalogue-grid">
-          {coolers.map((cooler) => (
-            <article className="igloo-cooler-card" key={cooler.id}>
-              <div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div>
-              <div><span>{cooler.family}</span><h3>{cooler.model}</h3><p className={cooler.templateTested ? "igloo-ok" : "igloo-pending"}>{cooler.templateTested ? "Template tested and OK" : "Template test pending"}</p>{cooler.notes ? <p>{cooler.notes}</p> : null}<div className="igloo-cooler-actions">{cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Download template</a> : null}{cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer">Product page</a> : null}</div></div>
-            </article>
-          ))}
-        </div>
+
+        {activeView === "orders" ? (
+          <>
+            <section className="igloo-section-head"><h2>Current orders</h2><p>Artwork, print, application and dispatch progress.</p></section>
+            <div className="igloo-order-grid">
+              {jobs.length ? jobs.map((job) => (
+                <article className="igloo-order-card" key={job.id || job.orderReference}>
+                  <div className="igloo-order-head"><div><span>{job.orderReference || "Order pending"}</span><h3>{job.customerName || "IGLOO"}</h3></div>{job.dueDate ? <time>{formatDisplayDate(job.dueDate)}</time> : null}</div>
+                  {job.notes ? <p className="igloo-note">{job.notes}</p> : null}
+                  <div className="igloo-line-list">{(job.lines || []).map((line) => <div className="igloo-line-card" key={line.id}><div><strong>{line.quantity} x {line.model || "Cooler"}</strong><span>{line.artwork || "Artwork to be confirmed"}</span></div><IglooProgress status={line.status} /></div>)}</div>
+                </article>
+              )) : <p className="igloo-empty">No live IGLOO orders are showing yet.</p>}
+            </div>
+          </>
+        ) : (
+          <>
+            <section className="igloo-section-head"><h2>Cooler templates</h2><p>Template status, PDF downloads and notes for each cooler model.</p></section>
+            <div className="igloo-catalogue-list">
+              {coolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} />)}
+            </div>
+          </>
+        )}
       </main>
     </div>
+  );
+}
+
+function IglooCatalogueRow({ cooler, admin = false, onChange, onUpload, onFindImage, busy = false }) {
+  return (
+    <article className="igloo-catalogue-row">
+      <div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div>
+      <div className="igloo-catalogue-main">
+        <div className="igloo-catalogue-title"><span>{cooler.family}</span><strong>{cooler.model}</strong></div>
+        <p className={cooler.templateTested ? "igloo-ok" : "igloo-pending"}>{cooler.templateTested ? "Template tested and OK" : "Template test pending"}</p>
+        {!admin && cooler.notes ? <p className="igloo-catalogue-note">{cooler.notes}</p> : null}
+      </div>
+      {admin ? (
+        <div className="igloo-catalogue-edit">
+          <input placeholder="Image URL" value={cooler.imageUrl || ""} onChange={(event) => onChange?.("imageUrl", event.target.value)} />
+          <input placeholder="Product page URL" value={cooler.productUrl || ""} onChange={(event) => onChange?.("productUrl", event.target.value)} />
+          <label className="igloo-checkbox"><input type="checkbox" checked={Boolean(cooler.templateTested)} onChange={(event) => onChange?.("templateTested", event.target.checked)} /> Tested OK</label>
+          <textarea placeholder="Template notes" value={cooler.notes || ""} onChange={(event) => onChange?.("notes", event.target.value)} />
+        </div>
+      ) : null}
+      <div className="igloo-catalogue-actions">
+        {admin ? <button type="button" className="ghost-button" onClick={onFindImage} disabled={busy}>{busy ? "Finding..." : "Find image"}</button> : null}
+        {cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer">Product</a> : null}
+        {admin ? <label className="ghost-button">PDF<input type="file" accept="application/pdf" onChange={(event) => { onUpload?.(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
+        {cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Template</a> : <span>No PDF</span>}
+      </div>
+    </article>
   );
 }
 
@@ -18395,6 +18432,8 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [newJob, setNewJob] = useState(createEmptyIglooJob());
+  const [activeView, setActiveView] = useState("orders");
+  const [imageLookupId, setImageLookupId] = useState("");
 
   async function loadIglooAdmin() {
     try {
@@ -18466,6 +18505,23 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
     }
   }
 
+  async function findImage(cooler) {
+    setImageLookupId(cooler.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/igloo/admin/coolers/${encodeURIComponent(cooler.id)}/image-lookup`, { method: "POST" });
+      const payload = await readJsonResponse(response, "Could not find image.");
+      if (!response.ok) throw new Error(payload.error || "Could not find image.");
+      setData(payload);
+      setDraft(JSON.parse(JSON.stringify(payload)));
+      setMessage("Image added.");
+    } catch (lookupError) {
+      setError(lookupError.message || "Could not find image.");
+    } finally {
+      setImageLookupId("");
+    }
+  }
+
   const current = draft || data;
   const coolers = Array.isArray(current?.coolers) ? current.coolers : [];
   const jobs = Array.isArray(current?.jobs) ? current.jobs : [];
@@ -18474,16 +18530,16 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
   return (
     <div className="app-shell igloo-admin-shell"><div className="page"><MainNavBar currentUser={currentUser} active="igloo" onLogout={onLogout} notifications={notifications} />
       <section className="panel igloo-admin-panel">
-        <div className="igloo-admin-header"><div><p>External customer module</p><h1>IGLOO</h1><span>Manage order progress, cooler templates and customer-facing downloads.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Open customer view</a><button type="button" onClick={() => saveDraft()} disabled={saving || !current}>{saving ? "Saving..." : "Save changes"}</button></div></div>
+        <div className="igloo-admin-header"><div><p>External customer module</p><h1>IGLOO</h1><span>Manage order progress, cooler templates and customer-facing downloads.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Customer view</a><button type="button" onClick={() => saveDraft()} disabled={saving || !current}>{saving ? "Saving..." : "Save changes"}</button></div></div>
+        <div className="igloo-tabs"><button type="button" className={activeView === "orders" ? "active" : ""} onClick={() => setActiveView("orders")}>Orders</button><button type="button" className={activeView === "coolers" ? "active" : ""} onClick={() => setActiveView("coolers")}>Coolers & templates</button></div>
         {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{!current ? <div className="board-loading">Loading IGLOO...</div> : null}
-        {current ? <><section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Customer access</h2><span>Separate from the main portal login.</span></div><label>Access code<input value={current.customerAccessCode || ""} onChange={(event) => updateDraft((next) => { next.customerAccessCode = event.target.value; })} /></label></section>
+        {current && activeView === "orders" ? <><section className="igloo-admin-card is-compact"><div className="igloo-admin-card-head"><h2>Customer access</h2><span>Separate from the main portal login.</span></div><label>Access code<input value={current.customerAccessCode || ""} onChange={(event) => updateDraft((next) => { next.customerAccessCode = event.target.value; })} /></label></section>
         <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Order tracker</h2><span>Add an order, then add each cooler type and artwork set.</span></div><div className="igloo-new-job-row"><input placeholder="ORD-XXXX" value={newJob.orderReference} onChange={(event) => setNewJob((job) => ({ ...job, orderReference: event.target.value }))} /><input placeholder="Customer" value={newJob.customerName} onChange={(event) => setNewJob((job) => ({ ...job, customerName: event.target.value }))} /><input type="date" value={newJob.dueDate} onChange={(event) => setNewJob((job) => ({ ...job, dueDate: event.target.value }))} /><button type="button" onClick={addJob} disabled={!newJob.orderReference}>Add job</button></div>
-        <div className="igloo-admin-orders">{jobs.map((job, jobIndex) => <article className="igloo-admin-order" key={job.id || jobIndex}><div className="igloo-admin-order-head"><input value={job.orderReference || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].orderReference = event.target.value; })} /><input value={job.customerName || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].customerName = event.target.value; })} /><input type="date" value={job.dueDate || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].dueDate = event.target.value; })} /><button type="button" onClick={() => addLine(jobIndex)}>Add cooler</button><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs.splice(jobIndex, 1); })}>Delete</button></div><textarea placeholder="Order notes" value={job.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].notes = event.target.value; })} /><div className="igloo-admin-lines">{(job.lines || []).map((line, lineIndex) => <div className="igloo-admin-line" key={line.id || lineIndex}><select value={line.coolerId || ""} onChange={(event) => updateDraft((next) => { const cooler = coolers.find((item) => item.id === event.target.value); next.jobs[jobIndex].lines[lineIndex] = { ...next.jobs[jobIndex].lines[lineIndex], coolerId: cooler?.id || "", family: cooler?.family || "", model: cooler?.model || "" }; })}>{coolers.map((cooler) => <option key={cooler.id} value={cooler.id}>{cooler.family} - {cooler.model}</option>)}</select><input type="number" min="1" value={line.quantity || 1} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].quantity = event.target.value; })} /><input placeholder="Artwork e.g. Wrexham FC" value={line.artwork || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].artwork = event.target.value; })} /><select value={line.status || "artwork"} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].status = event.target.value; })}>{statuses.map((status) => <option key={status.id} value={status.id}>{status.label}</option>)}</select><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs[jobIndex].lines.splice(lineIndex, 1); })}>Remove</button><textarea placeholder="Line notes" value={line.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].notes = event.target.value; })} /></div>)}</div></article>)}</div></section>
-        <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Cooler catalogue</h2><span>Photos, product links, tested templates, PDF files and notes.</span></div><div className="igloo-admin-catalogue">{coolers.map((cooler, coolerIndex) => <article className="igloo-admin-cooler" key={cooler.id}><div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div><div className="igloo-admin-cooler-fields"><strong>{cooler.family} - {cooler.model}</strong><input placeholder="Image URL" value={cooler.imageUrl || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].imageUrl = event.target.value; })} /><input placeholder="Product page URL" value={cooler.productUrl || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].productUrl = event.target.value; })} /><label className="igloo-checkbox"><input type="checkbox" checked={Boolean(cooler.templateTested)} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].templateTested = event.target.checked; })} /> Template tested and OK</label><textarea placeholder="Template notes" value={cooler.notes || ""} onChange={(event) => updateDraft((next) => { next.coolers[coolerIndex].notes = event.target.value; })} /><div className="igloo-template-row"><label className="ghost-button">Upload PDF<input type="file" accept="application/pdf" onChange={(event) => { uploadTemplate(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label>{cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Download current PDF</a> : <span>No PDF uploaded</span>}</div></div></article>)}</div></section></> : null}
+        <div className="igloo-admin-orders">{jobs.map((job, jobIndex) => <article className="igloo-admin-order" key={job.id || jobIndex}><div className="igloo-admin-order-head"><input value={job.orderReference || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].orderReference = event.target.value; })} /><input value={job.customerName || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].customerName = event.target.value; })} /><input type="date" value={job.dueDate || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].dueDate = event.target.value; })} /><button type="button" onClick={() => addLine(jobIndex)}>Add cooler</button><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs.splice(jobIndex, 1); })}>Delete</button></div><textarea placeholder="Order notes" value={job.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].notes = event.target.value; })} /><div className="igloo-admin-lines">{(job.lines || []).map((line, lineIndex) => <div className="igloo-admin-line" key={line.id || lineIndex}><select value={line.coolerId || ""} onChange={(event) => updateDraft((next) => { const cooler = coolers.find((item) => item.id === event.target.value); next.jobs[jobIndex].lines[lineIndex] = { ...next.jobs[jobIndex].lines[lineIndex], coolerId: cooler?.id || "", family: cooler?.family || "", model: cooler?.model || "" }; })}>{coolers.map((cooler) => <option key={cooler.id} value={cooler.id}>{cooler.family} - {cooler.model}</option>)}</select><input type="number" min="1" value={line.quantity || 1} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].quantity = event.target.value; })} /><input placeholder="Artwork e.g. Wrexham FC" value={line.artwork || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].artwork = event.target.value; })} /><select value={line.status || "artwork"} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].status = event.target.value; })}>{statuses.map((status) => <option key={status.id} value={status.id}>{status.label}</option>)}</select><button type="button" className="ghost-button" onClick={() => updateDraft((next) => { next.jobs[jobIndex].lines.splice(lineIndex, 1); })}>Remove</button><textarea placeholder="Line notes" value={line.notes || ""} onChange={(event) => updateDraft((next) => { next.jobs[jobIndex].lines[lineIndex].notes = event.target.value; })} /></div>)}</div></article>)}</div></section></> : null}
+        {current && activeView === "coolers" ? <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Coolers & templates</h2><span>A compact list of product photos, product pages, PDFs and template notes.</span></div><div className="igloo-catalogue-list is-admin">{coolers.map((cooler, coolerIndex) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={imageLookupId === cooler.id} onFindImage={() => findImage(cooler)} onUpload={(file) => uploadTemplate(cooler, file)} onChange={(field, value) => updateDraft((next) => { next.coolers[coolerIndex][field] = value; })} />)}</div></section> : null}
       </section></div></div>
   );
 }
-
 function MustangPage({ currentUser }) {
   const [tracker, setTracker] = useState(null);
   const [draft, setDraft] = useState(null);

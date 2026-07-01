@@ -17813,3 +17813,178 @@ button {
   .igloo-admin-card-head { display: grid; }
   .igloo-admin-actions { flex-wrap: wrap; }
 }
+
+/* IGLOO compact catalogue pass */
+.igloo-tabs {
+  display: inline-flex;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 0 18px;
+  padding: 5px;
+  border: 1px solid #d8e5ee;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 35, 52, 0.08);
+}
+
+.igloo-tabs button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #52677a;
+  padding: 9px 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.igloo-tabs button.active {
+  background: #00539b;
+  color: #ffffff;
+}
+
+.igloo-catalogue-list {
+  display: grid;
+  gap: 10px;
+}
+
+.igloo-catalogue-row {
+  display: grid;
+  grid-template-columns: 74px minmax(210px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #d6e3ec;
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 10px 12px;
+  box-shadow: 0 10px 26px rgba(15, 35, 52, 0.055);
+}
+
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  grid-template-columns: 66px minmax(180px, 0.85fr) minmax(360px, 1.5fr) auto;
+}
+
+.igloo-catalogue-row .igloo-cooler-photo {
+  width: 66px;
+  min-height: 56px;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+}
+
+.igloo-catalogue-title {
+  display: grid;
+  gap: 2px;
+}
+
+.igloo-catalogue-title span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.igloo-catalogue-title strong {
+  color: #10192b;
+  font-size: 0.95rem;
+}
+
+.igloo-catalogue-row .igloo-ok,
+.igloo-catalogue-row .igloo-pending {
+  margin: 6px 0 0;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+}
+
+.igloo-catalogue-note {
+  margin: 6px 0 0;
+  color: #53677a;
+  font-size: 0.84rem;
+}
+
+.igloo-catalogue-edit {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.igloo-catalogue-edit input,
+.igloo-catalogue-edit textarea {
+  border-radius: 10px;
+  padding: 8px 9px;
+  font-size: 0.82rem;
+}
+
+.igloo-catalogue-edit textarea {
+  grid-column: 1 / -1;
+  min-height: 38px;
+  resize: vertical;
+}
+
+.igloo-catalogue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.igloo-catalogue-actions a,
+.igloo-catalogue-actions button,
+.igloo-catalogue-actions .ghost-button,
+.igloo-catalogue-actions span {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #c9d9e5;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #00539b;
+  padding: 7px 10px;
+  font-size: 0.76rem;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.igloo-catalogue-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.igloo-catalogue-actions input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.igloo-admin-card.is-compact {
+  max-width: 520px;
+}
+
+@media (max-width: 980px) {
+  .igloo-catalogue-row,
+  .igloo-catalogue-list.is-admin .igloo-catalogue-row {
+    grid-template-columns: 58px 1fr;
+  }
+
+  .igloo-catalogue-edit,
+  .igloo-catalogue-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .igloo-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .igloo-catalogue-edit {
+    grid-template-columns: 1fr;
+  }
+}
