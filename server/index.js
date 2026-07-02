@@ -7066,7 +7066,7 @@ function extractCoreBridgeDetailRecord(payload, orderId) {
 }
 
 async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false) {
-  const response = await fetch(buildCoreBridgeOrderDetailUrl(config, orderId), {
+  const response = await fetchWithTimeout(buildCoreBridgeOrderDetailUrl(config, orderId), {
     headers: {
       Authorization: `Bearer ${config.token}`,
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -7094,7 +7094,7 @@ async function fetchCoreBridgeOrderDetail(config, orderId, includeDebug = false)
 }
 
 async function fetchCoreBridgeEstimateDetail(config, orderId, includeDebug = false) {
-  const response = await fetch(buildCoreBridgeEstimateDetailUrl(config, orderId), {
+  const response = await fetchWithTimeout(buildCoreBridgeEstimateDetailUrl(config, orderId), {
     headers: {
       Authorization: `Bearer ${config.token}`,
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -7123,7 +7123,7 @@ async function fetchCoreBridgeEstimateDetail(config, orderId, includeDebug = fal
 }
 
 async function fetchCoreBridgeInvoiceDetail(config, invoiceId, includeDebug = false) {
-  const response = await fetch(buildCoreBridgeInvoiceDetailUrl(config, invoiceId), {
+  const response = await fetchWithTimeout(buildCoreBridgeInvoiceDetailUrl(config, invoiceId), {
     headers: {
       Authorization: `Bearer ${config.token}`,
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -7152,7 +7152,7 @@ async function fetchCoreBridgeInvoiceDetail(config, invoiceId, includeDebug = fa
 }
 
 async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
-  const response = await fetch(buildCoreBridgeOrderDestinationsUrl(config, orderId), {
+  const response = await fetchWithTimeout(buildCoreBridgeOrderDestinationsUrl(config, orderId), {
     headers: {
       Authorization: `Bearer ${config.token}`,
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -7178,7 +7178,7 @@ async function fetchCoreBridgeOrderDestinationAddress(config, orderId) {
   const destinationLookupId = pickDestinationLookupId(destinationRecord);
   if (!destinationLookupId) return inlineAddress;
 
-  const detailResponse = await fetch(buildCoreBridgeDestinationDetailUrl(config, destinationLookupId), {
+  const detailResponse = await fetchWithTimeout(buildCoreBridgeDestinationDetailUrl(config, destinationLookupId), {
     headers: {
       Authorization: `Bearer ${config.token}`,
       "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -7549,7 +7549,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
 
   for (const plan of requestPlans) {
     try {
-      const response = await fetch(plan.url, {
+      const response = await fetchWithTimeout(plan.url, {
         headers: {
           Authorization: `Bearer ${config.token}`,
           "Ocp-Apim-Subscription-Key": config.subscriptionKey,
@@ -10425,8 +10425,30 @@ async function buildMorningMeetingMaterialsPayload(store) {
 }
 
 const attemptedInstallationValueReferences = new Map();
+let installationValueBackfillInFlight = false;
+
+function createFetchTimeoutSignal(timeoutMs = 12000) {
+  const safeTimeout = Math.max(1000, Number(timeoutMs) || 12000);
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(safeTimeout);
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), safeTimeout);
+  if (typeof timer.unref === "function") timer.unref();
+  return controller.signal;
+}
+
+function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  return fetch(url, {
+    ...options,
+    signal: options.signal || createFetchTimeoutSignal(timeoutMs)
+  });
+}
 
 async function backfillInstallationJobValues(store, options = {}) {
+  const startedAt = Date.now();
+  const maxDurationMs = Math.max(3000, Math.min(20000, Number(options.maxDurationMs || 12000)));
+  const batchLimit = Math.max(1, Math.min(4, Number(options.limit || 2)));
   const jobs = Array.isArray(store?.jobs) ? store.jobs : [];
   const resolvedValues = new Map();
   const linkedValues = new Map();
@@ -10472,14 +10494,16 @@ async function backfillInstallationJobValues(store, options = {}) {
       const attemptedAt = attemptedInstallationValueReferences.get(reference.toLowerCase()) || 0;
       return Date.now() - attemptedAt > 1000 * 60 * 2;
     });
-  const batchReferences = unresolvedReferences.slice(0, 24);
+  const batchReferences = unresolvedReferences.slice(0, batchLimit);
 
   for (const reference of batchReferences) {
+    if (Date.now() - startedAt > maxDurationMs) break;
     attemptedInstallationValueReferences.set(reference.toLowerCase(), Date.now());
     try {
       const lookupReferences = getCoreBridgeReferenceFamily(reference);
       let value = 0;
       for (const lookupReference of lookupReferences) {
+        if (Date.now() - startedAt > maxDurationMs) break;
         const result = await fetchDesignBoardOrderByReference(lookupReference);
         if (!result.order) continue;
         const lineItems = extractProFormaLineItems(result.order);
@@ -10503,7 +10527,7 @@ async function backfillInstallationJobValues(store, options = {}) {
     }
   }
 
-  const hasMore = unresolvedReferences.length > batchReferences.length;
+  const hasMore = unresolvedReferences.length > batchReferences.length || Date.now() - startedAt > maxDurationMs;
   if (!resolvedValues.size) return { changed: false, hasMore };
   const latestStore = await readStore();
   let changed = false;
@@ -10519,7 +10543,7 @@ async function backfillInstallationJobValues(store, options = {}) {
   });
   if (!changed) return { changed: false, hasMore };
   await writeStore(latestStore);
-  return { changed: true, hasMore };
+  return { changed: true, hasMore, processed: batchReferences.length };
 }
 
 function needsDesignBoardCoreBridgeRefresh(card = {}) {
@@ -12296,7 +12320,12 @@ function createServer() {
   });
 
   app.post("/api/board/value-backfill", async (request, response) => {
-    if (!requireBoardAccess(request, response)) return;
+    if (!requireBoardAdmin(request, response)) return;
+    if (installationValueBackfillInFlight) {
+      response.json({ changed: false, hasMore: true, busy: true });
+      return;
+    }
+    installationValueBackfillInFlight = true;
     try {
       const result = await backfillInstallationJobValues(await readStore(), request.body || {});
       if (result.changed) broadcast("installation-values-updated", { ok: true });
@@ -12304,6 +12333,8 @@ function createServer() {
     } catch (error) {
       console.error("Could not complete Installation Board value backfill.", error.message || error);
       response.status(500).json({ error: "Could not update historic Installation Board values." });
+    } finally {
+      installationValueBackfillInFlight = false;
     }
   });
 

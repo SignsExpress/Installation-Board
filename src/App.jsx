@@ -19301,24 +19301,26 @@ export default function App() {
 
 
   useEffect(() => {
-    if (!currentUser || !showBoard) return undefined;
+    if (!currentUser || !showBoard || !canEditBoard(currentUser)) return undefined;
     let active = true;
 
     async function fillHistoricInstallationValues() {
-      for (let batch = 0; batch < 30 && active; batch += 1) {
+      for (let batch = 0; batch < 6 && active; batch += 1) {
         try {
           const response = await fetch("/api/board/value-backfill", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               start: boardRange.startIso,
-              end: boardRange.endIso
+              end: boardRange.endIso,
+              limit: 2,
+              maxDurationMs: 12000
             })
           });
           if (!response.ok) return;
           const result = await response.json();
           if (!result.hasMore) return;
-          await new Promise((resolve) => window.setTimeout(resolve, 500));
+          await new Promise((resolve) => window.setTimeout(resolve, result.busy ? 5000 : 3000));
         } catch (error) {
           console.error(error);
           return;
