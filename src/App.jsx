@@ -19030,6 +19030,8 @@ export default function App() {
   const [historyRecoveryVersion, setHistoryRecoveryVersion] = useState(0);
   const [boardSearchQuery, setBoardSearchQuery] = useState("");
   const [boardSearchOpen, setBoardSearchOpen] = useState(false);
+  const [installationReportOpen, setInstallationReportOpen] = useState(false);
+  const [installationReportCopied, setInstallationReportCopied] = useState(false);
   const boardNotificationJobId = useMemo(() => {
     const params = new URLSearchParams(search);
     return params.get("job") || "";
@@ -19753,6 +19755,59 @@ export default function App() {
       .slice(0, 8);
   }, [board?.today, jobs]);
 
+  const installationExcelReportRows = useMemo(() => {
+    const today = board?.today || getLocalTodayIso();
+    const reportRows = new Map();
+
+    [...jobs]
+      .filter((job) => String(job?.date || "") >= today)
+      .sort((left, right) => {
+        const dateCompare = String(left?.date || "").localeCompare(String(right?.date || ""));
+        if (dateCompare !== 0) return dateCompare;
+        return String(left?.customerName || "").localeCompare(String(right?.customerName || ""));
+      })
+      .forEach((job) => {
+        const orderReference = String(job?.orderReference || "").trim() || "N/A";
+        const company = String(job?.customerName || "").trim();
+        const description = String(job?.description || "").trim();
+        const value = Number(job?.jobTotalExVat || 0);
+        const groupingKey = [
+          orderReference.toLowerCase(),
+          company.toLowerCase(),
+          description.toLowerCase(),
+          Number.isFinite(value) ? value.toFixed(2) : "0.00"
+        ].join("|");
+        const existing = reportRows.get(groupingKey) || {
+          dates: [],
+          orderReference,
+          company,
+          description,
+          preTaxTotal: Number.isFinite(value) && value > 0 ? value : 0
+        };
+
+        const displayDate = formatJobDate(job?.date);
+        if (displayDate && !existing.dates.includes(displayDate)) {
+          existing.dates.push(displayDate);
+        }
+        reportRows.set(groupingKey, existing);
+      });
+
+    return Array.from(reportRows.values());
+  }, [board?.today, jobs]);
+
+  const installationExcelReportText = useMemo(() => {
+    const escapeCell = (value) => String(value ?? "").replace(/\t/g, " ").replace(/\r?\n/g, " ").trim();
+    const header = ["Installation Date", "Order Number", "Company", "Description", "Pre-Tax Total"];
+    const lines = installationExcelReportRows.map((row) => [
+      row.dates.join(", "),
+      row.orderReference,
+      row.company,
+      row.description,
+      row.preTaxTotal > 0 ? row.preTaxTotal.toFixed(2) : ""
+    ].map(escapeCell).join("\t"));
+    return [header.join("\t"), ...lines].join("\n");
+  }, [installationExcelReportRows]);
+
   const jobsById = useMemo(() => {
     return new Map(jobs.map((job) => [job.id, job]));
   }, [jobs]);
@@ -19791,6 +19846,21 @@ export default function App() {
     setForm(nextForm);
     setJobModalDate(nextDate);
     preserveScrollPosition();
+  }
+
+  async function copyInstallationExcelReport() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(installationExcelReportText);
+      } else {
+        throw new Error("Clipboard unavailable");
+      }
+      setInstallationReportCopied(true);
+      window.setTimeout(() => setInstallationReportCopied(false), 1800);
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage("Select the report text and copy it manually.", "error"));
+    }
   }
 
   function handleBackdropPointerDown(event) {
@@ -21884,6 +21954,13 @@ export default function App() {
                     <button className="ghost-button board-history-button" type="button" onClick={resetBoardWindow}>
                       Current view
                     </button>
+                    <button
+                      className="ghost-button board-history-button installation-report-button"
+                      type="button"
+                      onClick={() => setInstallationReportOpen(true)}
+                    >
+                      Excel list
+                    </button>
                     <div className="board-history-search">
                       <input
                         type="search"
@@ -22208,6 +22285,40 @@ export default function App() {
           <span>Morning Meeting</span>
           <small>Open daily outline</small>
         </button>
+      ) : null}
+      {!isClientMode && installationReportOpen ? (
+        <div
+          className="modal-backdrop installation-report-backdrop"
+          onPointerDown={handleBackdropPointerDown}
+          onClick={(event) => handleBackdropClick(event, () => setInstallationReportOpen(false))}
+        >
+          <div className="modal installation-report-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head installation-report-head">
+              <div>
+                <span className="job-modal-kicker">Installation Board</span>
+                <h3>Excel installation list</h3>
+                <p>{installationExcelReportRows.length} order{installationExcelReportRows.length === 1 ? "" : "s"} from today forward.</p>
+              </div>
+              <button className="icon-button" type="button" onClick={() => setInstallationReportOpen(false)} aria-label="Close installation report">
+                x
+              </button>
+            </div>
+            <div className="installation-report-body">
+              <textarea
+                value={installationExcelReportText}
+                readOnly
+                onFocus={(event) => event.target.select()}
+                aria-label="Copyable installation report for Excel"
+              />
+              <div className="installation-report-actions">
+                <small>Paste into Excel and it will split into columns.</small>
+                <button className="primary-button" type="button" onClick={copyInstallationExcelReport}>
+                  {installationReportCopied ? "Copied" : "Copy for Excel"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
       {!isClientMode && jobModalDate ? (
         <div

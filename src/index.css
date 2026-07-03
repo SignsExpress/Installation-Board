@@ -17996,3 +17996,77 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+.installation-report-button {
+  color: #5c3a7e;
+}
+
+.installation-report-backdrop {
+  z-index: 95;
+}
+
+.installation-report-modal {
+  width: min(920px, calc(100vw - 40px));
+  max-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.installation-report-head {
+  border-bottom: 1px solid #e5ebf3;
+}
+
+.installation-report-body {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+  padding: 18px;
+}
+
+.installation-report-body textarea {
+  width: 100%;
+  min-height: 360px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #cfd9e6;
+  border-radius: 10px;
+  background: #f8fbff;
+  color: #172033;
+  font: 650 0.82rem/1.45 Consolas, "Liberation Mono", monospace;
+  white-space: pre;
+}
+
+.installation-report-body textarea:focus {
+  outline: 2px solid rgba(103, 66, 139, 0.22);
+  border-color: #8f72aa;
+  background: #fff;
+}
+
+.installation-report-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.installation-report-actions small {
+  color: #6b7789;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+@media (max-width: 720px) {
+  .installation-report-modal {
+    width: calc(100vw - 20px);
+  }
+
+  .installation-report-body {
+    padding: 14px;
+  }
+
+  .installation-report-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
