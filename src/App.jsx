@@ -19863,6 +19863,53 @@ export default function App() {
     }
   }
 
+  async function refreshBoardView() {
+    const response = await fetch(buildBoardUrl(boardRange.startIso, boardRange.endIso));
+    if (!response.ok) throw new Error("Could not refresh the installation board.");
+    const nextBoard = await response.json();
+    setBoard(nextBoard);
+  }
+
+  async function addSubcontractorEvent(date) {
+    if (isClientMode) return;
+    const label = window.prompt("Who is working for us?", "Chad in Production");
+    const trimmedLabel = String(label || "").trim();
+    if (!trimmedLabel) return;
+
+    try {
+      const response = await fetch("/api/subcontractor-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, label: trimmedLabel })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not add the subcontractor note.");
+      }
+      await refreshBoardView();
+      setMessage(createMessage("Subcontractor note added.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not add the subcontractor note.", "error"));
+    }
+  }
+
+  async function deleteSubcontractorEvent(eventId) {
+    if (isClientMode || !eventId) return;
+    try {
+      const response = await fetch(`/api/subcontractor-events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.error || "Could not remove the subcontractor note.");
+      }
+      await refreshBoardView();
+      setMessage(createMessage("Subcontractor note removed.", "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not remove the subcontractor note.", "error"));
+    }
+  }
+
   function handleBackdropPointerDown(event) {
     backdropPointerStartedRef.current = event.target === event.currentTarget;
   }
@@ -22138,6 +22185,37 @@ export default function App() {
                         </div>
 
                         <div className="jobs-cell">
+                          {!isClientMode ? (
+                            <button
+                              type="button"
+                              className="subcontractor-add-button"
+                              onClick={() => addSubcontractorEvent(row.isoDate)}
+                            >
+                              + Subcontractor
+                            </button>
+                          ) : null}
+
+                          {Array.isArray(row.subcontractorEvents) && row.subcontractorEvents.length ? (
+                            <div className="subcontractor-event-stack">
+                              {row.subcontractorEvents.map((event) => (
+                                <div key={event.id} className="subcontractor-event-bar">
+                                  <span>{event.label}</span>
+                                  {!isClientMode ? (
+                                    <button
+                                      type="button"
+                                      onClick={(clickEvent) => {
+                                        clickEvent.stopPropagation();
+                                        deleteSubcontractorEvent(event.id);
+                                      }}
+                                      aria-label={`Remove ${event.label}`}
+                                    >
+                                      x
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
                           <button
                             type="button"
                             className={`jobs-lane-button ${row.jobs.length === 0 ? "is-empty" : ""}`}

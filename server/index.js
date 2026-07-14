@@ -273,6 +273,7 @@ function createEmptyBoardStore() {
       cards: []
     },
     holidays: [],
+    subcontractorEvents: [],
     holidayRequests: [],
     holidayAllowances: [],
     holidayEvents: [],
@@ -1335,6 +1336,7 @@ function mergeHolidaySeed(store) {
         designBoard: sanitizeDesignBoardState(store.designBoard),
         filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
+        subcontractorEvents: Array.isArray(store.subcontractorEvents) ? store.subcontractorEvents.map((entry) => sanitizeSubcontractorEvent(entry)) : [],
         holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
         holidayAllowances: Array.isArray(store.holidayAllowances) ? [...store.holidayAllowances] : [],
         holidayEvents: Array.isArray(store.holidayEvents) ? [...store.holidayEvents] : [],
@@ -1451,6 +1453,7 @@ async function readStore() {
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
             holidays: [],
+            subcontractorEvents: [],
             holidayRequests: [],
             holidayAllowances: [],
             holidayEvents: [],
@@ -1484,6 +1487,7 @@ async function readStore() {
           designBoard: sanitizeDesignBoardState(parsed.designBoard),
           filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
+          subcontractorEvents: Array.isArray(parsed.subcontractorEvents) ? parsed.subcontractorEvents.map((entry) => sanitizeSubcontractorEvent(entry)) : [],
           holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
           holidayAllowances: Array.isArray(parsed.holidayAllowances) ? parsed.holidayAllowances : [],
           holidayEvents: Array.isArray(parsed.holidayEvents) ? parsed.holidayEvents : [],
@@ -1556,6 +1560,12 @@ async function writeStore(store) {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
       return String(left.person || "").localeCompare(String(right.person || ""));
     }),
+    subcontractorEvents: [...(store.subcontractorEvents || [])]
+      .map((entry) => sanitizeSubcontractorEvent(entry))
+      .sort((left, right) => {
+        if (left.date !== right.date) return String(left.date || "").localeCompare(String(right.date || ""));
+        return String(left.label || "").localeCompare(String(right.label || ""));
+      }),
     holidayRequests: [...(store.holidayRequests || [])].sort((left, right) => {
       if (left.startDate !== right.startDate) return String(left.startDate || "").localeCompare(String(right.startDate || ""));
       return String(left.person || "").localeCompare(String(right.person || ""));
@@ -2191,6 +2201,10 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     const eventDate = String(event?.date || "");
     return eventDate >= toIsoDate(start) && eventDate <= toIsoDate(end);
   });
+  const displaySubcontractorEvents = (options.subcontractorEvents || []).filter((event) => {
+    const eventDate = String(event?.date || "");
+    return eventDate >= toIsoDate(start) && eventDate <= toIsoDate(end);
+  });
 
   const jobsByDate = jobs.reduce((map, job) => {
     if (!isValidIsoDate(job.date)) {
@@ -2218,6 +2232,12 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
     map.set(entry.date, existing);
     return map;
   }, new Map());
+  const subcontractorEventsByDate = displaySubcontractorEvents.reduce((map, entry) => {
+    const existing = map.get(entry.date) || [];
+    existing.push(entry);
+    map.set(entry.date, existing);
+    return map;
+  }, new Map());
 
   const rows = weekdayDates.map((date) => {
     const isoDate = toIsoDate(date);
@@ -2230,6 +2250,9 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
       const sameDayHolidayEvents = (holidayEventsByDate.get(isoDate) || []).sort((left, right) =>
         String(left.title || "").localeCompare(String(right.title || ""))
       );
+      const sameDaySubcontractorEvents = (subcontractorEventsByDate.get(isoDate) || []).sort((left, right) =>
+        String(left.label || "").localeCompare(String(right.label || ""))
+      );
 
       return {
         isoDate,
@@ -2239,6 +2262,7 @@ function buildBoardRows(jobs, staffHolidays, options = {}) {
         bankHoliday: holidayMap.get(isoDate) || "",
         staffHolidays: sameDayStaffHolidays,
         holidayEvents: sameDayHolidayEvents,
+        subcontractorEvents: sameDaySubcontractorEvents,
         isToday: isoDate === todayIso,
         isPast: isoDate < todayIso,
         jobs: sameDayJobs
@@ -2489,7 +2513,8 @@ function buildBoardRowsFromStore(store, options = {}) {
       start: rangeStart,
       end: rangeEnd,
       birthdayEntries,
-      holidayEvents: store.holidayEvents || []
+      holidayEvents: store.holidayEvents || [],
+      subcontractorEvents: store.subcontractorEvents || []
     }),
     valueSummary: buildInstallationValueSummary(store, today)
   };
@@ -3689,6 +3714,17 @@ async function deleteRamsPdfFiles(job) {
         }
       })
   );
+}
+
+function sanitizeSubcontractorEvent(payload) {
+  return {
+    id: String(payload?.id || makeId()),
+    date: String(payload?.date || "").trim(),
+    label: String(payload?.label || "").replace(/\s+/g, " ").trim().slice(0, 120),
+    color: String(payload?.color || "production").trim() || "production",
+    createdAt: String(payload?.createdAt || new Date().toISOString()),
+    updatedAt: new Date().toISOString()
+  };
 }
 
 function sanitizeStaffHoliday(payload) {
@@ -12126,6 +12162,43 @@ function createServer() {
       console.error("Could not upload IGLOO template.", error.message || error);
       response.status(400).json({ error: error.message || "Could not upload template." });
     }
+  });
+
+  app.post("/api/subcontractor-events", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const nextEvent = sanitizeSubcontractorEvent(request.body || {});
+    if (!nextEvent.label || !isValidIsoDate(nextEvent.date)) {
+      response.status(400).json({ error: "A valid date and subcontractor note are required." });
+      return;
+    }
+
+    const store = await readStore();
+    store.subcontractorEvents = Array.isArray(store.subcontractorEvents) ? store.subcontractorEvents : [];
+    const existingIndex = store.subcontractorEvents.findIndex((entry) => String(entry.id || "") === String(nextEvent.id || ""));
+    if (existingIndex >= 0) {
+      nextEvent.createdAt = store.subcontractorEvents[existingIndex].createdAt || nextEvent.createdAt;
+      store.subcontractorEvents[existingIndex] = nextEvent;
+    } else {
+      store.subcontractorEvents.push(nextEvent);
+    }
+
+    const savedStore = await writeStore(store);
+    broadcast("board-updated", { source: "subcontractor-event", id: nextEvent.id });
+    response.json(buildBoardRowsFromStore(savedStore));
+  });
+
+  app.delete("/api/subcontractor-events/:id", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const store = await readStore();
+    const beforeCount = Array.isArray(store.subcontractorEvents) ? store.subcontractorEvents.length : 0;
+    store.subcontractorEvents = (store.subcontractorEvents || []).filter((entry) => String(entry.id || "") !== String(request.params.id || ""));
+    if (store.subcontractorEvents.length === beforeCount) {
+      response.status(404).json({ error: "Subcontractor note not found." });
+      return;
+    }
+    const savedStore = await writeStore(store);
+    broadcast("board-updated", { source: "subcontractor-event", id: request.params.id });
+    response.json(buildBoardRowsFromStore(savedStore));
   });
 
   app.get("/api/board", async (request, response) => {
