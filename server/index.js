@@ -2936,6 +2936,8 @@ function createDefaultIglooCoolers() {
       imageStorageName: "",
       imageFileName: "",
       imageContentType: "",
+      material: "",
+      startingPrice: "",
       templateStatus: "untested",
       templateTested: false,
       clientNote: "",
@@ -2966,6 +2968,8 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
     imageStorageName,
     imageFileName: sanitizeIglooText(entry.imageFileName, 240),
     imageContentType: sanitizeIglooText(entry.imageContentType, 80),
+    material: sanitizeIglooText(entry.material, 80),
+    startingPrice: sanitizeIglooText(entry.startingPrice, 80),
     templateStatus: sanitizeIglooTemplateStatus(entry.templateStatus, Boolean(entry.templateTested)),
     templateTested: sanitizeIglooTemplateStatus(entry.templateStatus, Boolean(entry.templateTested)) === "good",
     clientNote: sanitizeIglooText(entry.clientNote, 1200),
@@ -2999,6 +3003,8 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManua
       imageStorageName: sanitized.imageStorageName || existing?.imageStorageName || fallback?.imageStorageName || "",
       imageFileName: sanitized.imageFileName || existing?.imageFileName || fallback?.imageFileName || "",
       imageContentType: sanitized.imageContentType || existing?.imageContentType || fallback?.imageContentType || "",
+      material: sanitized.material || existing?.material || fallback?.material || "",
+      startingPrice: sanitized.startingPrice || existing?.startingPrice || fallback?.startingPrice || "",
       completionPhotos: sanitized.completionPhotos?.length ? sanitized.completionPhotos : existing?.completionPhotos || fallback?.completionPhotos || [],
       productUrl: sanitized.productUrl || existing?.productUrl || fallback?.productUrl || getIglooProductUrl(sanitized.model)
     });
@@ -12467,6 +12473,8 @@ function createServer() {
         family,
         model,
         productUrl: sanitizeIglooUrl(request.body?.productUrl),
+        material: sanitizeIglooText(request.body?.material, 80),
+        startingPrice: sanitizeIglooText(request.body?.startingPrice, 80),
         sortOrder: tracker.coolers.length * 10,
         templateStatus: "untested",
         updatedAt: new Date().toISOString()
@@ -12525,6 +12533,8 @@ function createServer() {
         ...tracker.coolers[coolerIndex],
         family,
         model,
+        material: request.body?.material === undefined ? tracker.coolers[coolerIndex].material : sanitizeIglooText(request.body?.material, 80),
+        startingPrice: request.body?.startingPrice === undefined ? tracker.coolers[coolerIndex].startingPrice : sanitizeIglooText(request.body?.startingPrice, 80),
         updatedAt: new Date().toISOString()
       };
       store.igloo = tracker;

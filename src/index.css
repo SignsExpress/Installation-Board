@@ -19433,3 +19433,54 @@ button {
     transform: none;
   }
 }
+
+/* IGLOO admin material and price fields */
+.igloo-commercial-cell {
+  display: grid;
+  grid-template-columns: minmax(105px, 1fr) 78px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.igloo-commercial-cell select,
+.igloo-commercial-cell input {
+  min-width: 0;
+  height: 26px;
+  border: 1px solid #d5e3ed;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  padding: 0 7px;
+  font-size: 0.65rem;
+  font-weight: 850;
+}
+
+.igloo-commercial-cell input::placeholder {
+  color: #8090a3;
+}
+
+.igloo-catalogue-list.is-admin .igloo-catalogue-row,
+.igloo-admin-shell .igloo-list-head {
+  grid-template-columns: 44px minmax(132px, 0.82fr) minmax(150px, 0.72fr) minmax(190px, 0.95fr) 50px minmax(104px, 0.56fr) minmax(160px, 0.78fr) minmax(108px, 0.48fr) 116px;
+}
+
+.igloo-gallery-arrow svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.igloo-gallery-foot {
+  justify-content: flex-start;
+}
+
+@media (max-width: 1080px) {
+  .igloo-commercial-cell {
+    grid-column: 2 / -1;
+    width: min(360px, 100%);
+  }
+}

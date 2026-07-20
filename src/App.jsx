@@ -18270,6 +18270,7 @@ const IGLOO_STATUS_OPTIONS = [
   { value: "good", label: "Good" },
   { value: "wrong", label: "Wrong" }
 ];
+const IGLOO_MATERIAL_OPTIONS = ["", "Mactac WW 300", "Metamark MD3-AB"];
 
 function getIglooStatusLabel(status) {
   if (status === "good") return "Template good";
@@ -18338,6 +18339,15 @@ function IglooStatusButtons({ status, disabled, onChange }) {
   );
 }
 
+function IglooChevronIcon({ direction = "next" }) {
+  const pathData = direction === "prev" ? "M15 18l-6-6 6-6" : "M9 6l6 6-6 6";
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={pathData} />
+    </svg>
+  );
+}
+
 function IglooCompletionPhotoModal({ cooler, photos, index, onIndex, onClose }) {
   const safePhotos = Array.isArray(photos) ? photos : [];
   const activeIndex = Math.min(Math.max(index || 0, 0), Math.max(safePhotos.length - 1, 0));
@@ -18358,20 +18368,19 @@ function IglooCompletionPhotoModal({ cooler, photos, index, onIndex, onClose }) 
           <button type="button" onClick={onClose} aria-label="Close photo viewer">x</button>
         </div>
         <div className="igloo-gallery-stage">
-          {safePhotos.length > 1 ? <button className="igloo-gallery-arrow prev" type="button" onClick={() => step(-1)} aria-label="Previous photo">‹</button> : null}
+          {safePhotos.length > 1 ? <button className="igloo-gallery-arrow prev" type="button" onClick={() => step(-1)} aria-label="Previous photo"><IglooChevronIcon direction="prev" /></button> : null}
           <img src={activePhoto.url} alt={activePhoto.fileName || "Completion photo"} />
-          {safePhotos.length > 1 ? <button className="igloo-gallery-arrow next" type="button" onClick={() => step(1)} aria-label="Next photo">›</button> : null}
+          {safePhotos.length > 1 ? <button className="igloo-gallery-arrow next" type="button" onClick={() => step(1)} aria-label="Next photo"><IglooChevronIcon /></button> : null}
         </div>
         <div className="igloo-gallery-foot">
           <span>{activeIndex + 1} of {safePhotos.length}</span>
-          <strong>{activePhoto.fileName || "Completion photo"}</strong>
         </div>
       </div>
     </div>
   );
 }
 
-function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = false, canMoveUp = false, canMoveDown = false, onTemplateUpload, onPhotoUpload, onStatusChange, onCompletionUpload, onCompletionPhotosOpen, onLinkEdit, onDetailsEdit, onClientNoteSave, onRemove, onMoveUp, onMoveDown }) {
+function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = false, canMoveUp = false, canMoveDown = false, onTemplateUpload, onPhotoUpload, onStatusChange, onCompletionUpload, onCompletionPhotosOpen, onLinkEdit, onDetailsEdit, onCommercialChange, onClientNoteSave, onRemove, onMoveUp, onMoveDown }) {
   const hasTemplate = Boolean(cooler.templatePdfUrl);
   const templateStatus = cooler.templateStatus || (cooler.templateTested ? "good" : "untested");
   const isGood = templateStatus === "good";
@@ -18379,8 +18388,10 @@ function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = fal
   const completionPhotos = Array.isArray(cooler.completionPhotos) ? cooler.completionPhotos : [];
   const canUploadTemplate = Boolean(onTemplateUpload);
   const [clientNote, setClientNote] = useState(cooler.clientNote || "");
+  const [startingPrice, setStartingPrice] = useState(cooler.startingPrice || "");
 
   useEffect(() => { setClientNote(cooler.clientNote || ""); }, [cooler.clientNote]);
+  useEffect(() => { setStartingPrice(cooler.startingPrice || ""); }, [cooler.startingPrice]);
 
   return (
     <article className={"igloo-catalogue-row" + (isGood ? " is-good" : isWrong ? " is-wrong" : "")}>
@@ -18389,6 +18400,7 @@ function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = fal
       <div className="igloo-note-cell">
         {!admin ? <div className="igloo-client-note"><input value={clientNote} onChange={(event) => setClientNote(event.target.value)} placeholder="Add a note" /><button type="button" onClick={() => onClientNoteSave?.(cooler, clientNote)} disabled={noteBusy || clientNote === (cooler.clientNote || "")}>{noteBusy ? "Saving" : "Save"}</button></div> : cooler.clientNote ? <small>{cooler.clientNote}</small> : <span className="igloo-muted">None</span>}
       </div>
+      {admin ? <div className="igloo-commercial-cell"><select value={cooler.material || ""} onChange={(event) => onCommercialChange?.(cooler, { material: event.target.value, startingPrice })} disabled={busy}>{IGLOO_MATERIAL_OPTIONS.map((entry) => <option key={entry || "none"} value={entry}>{entry || "Select material"}</option>)}</select><input value={startingPrice} onChange={(event) => setStartingPrice(event.target.value)} onBlur={() => onCommercialChange?.(cooler, { material: cooler.material || "", startingPrice })} placeholder="Starting price" disabled={busy} /></div> : null}
       <div className="igloo-link-cell">
         {cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer" aria-label={'Open product page for ' + cooler.model}><IglooLinkIcon /></a> : <span>-</span>}
         {admin ? <button type="button" onClick={() => onLinkEdit?.(cooler)} aria-label={'Edit product link for ' + cooler.model}>Edit</button> : null}
@@ -18675,7 +18687,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
       const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/details", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ family: nextFamily, model })
+        body: JSON.stringify({ family: nextFamily, model, material: cooler.material || "", startingPrice: cooler.startingPrice || "" })
       });
       const payload = await readJsonResponse(response, "Could not update product.");
       if (!response.ok) throw new Error(payload.error || "Could not update product.");
@@ -18683,6 +18695,32 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
       setMessage("Product updated.");
     } catch (detailsError) {
       setError(detailsError.message || "Could not update product.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function updateProductCommercials(cooler, updates) {
+    setBusyId(cooler.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/details", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          family: cooler.family || "Custom",
+          model: cooler.model || "Product",
+          material: updates.material ?? cooler.material ?? "",
+          startingPrice: updates.startingPrice ?? cooler.startingPrice ?? ""
+        })
+      });
+      const payload = await readJsonResponse(response, "Could not update material details.");
+      if (!response.ok) throw new Error(payload.error || "Could not update material details.");
+      setData(payload);
+      setMessage("Material details updated.");
+    } catch (commercialError) {
+      setError(commercialError.message || "Could not update material details.");
     } finally {
       setBusyId("");
     }
@@ -18769,7 +18807,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
       <section className="panel igloo-admin-panel">
         <IglooHeader admin signedOffCount={signedOffCount} totalCount={coolers.length} />
         {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{loading ? <div className="board-loading">Loading IGLOO...</div> : null}
-        {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-add-row"><input value={newProduct.family} onChange={(event) => setNewProduct((current) => ({ ...current, family: event.target.value }))} placeholder="Family" /><input value={newProduct.model} onChange={(event) => setNewProduct((current) => ({ ...current, model: event.target.value }))} placeholder="Product name" /><input value={newProduct.productUrl} onChange={(event) => setNewProduct((current) => ({ ...current, productUrl: event.target.value }))} placeholder="Product link" /><button type="button" onClick={addProduct} disabled={busyId === "new-product"}>{busyId === "new-product" ? "Adding..." : "Add line"}</button></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Note</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span><span></span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => { const orderIndex = coolers.findIndex((entry) => entry.id === cooler.id); return <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id || busyId === "reorder"} canMoveUp={orderIndex > 0} canMoveDown={orderIndex >= 0 && orderIndex < coolers.length - 1} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onCompletionPhotosOpen={(entry, index) => setGallery({ cooler: entry, index })} onLinkEdit={editProductLink} onDetailsEdit={editProductDetails} onRemove={removeProduct} onMoveUp={(entry) => moveProduct(entry, -1)} onMoveDown={(entry) => moveProduct(entry, 1)} />; })}</div></section> : null}
+        {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-add-row"><input value={newProduct.family} onChange={(event) => setNewProduct((current) => ({ ...current, family: event.target.value }))} placeholder="Family" /><input value={newProduct.model} onChange={(event) => setNewProduct((current) => ({ ...current, model: event.target.value }))} placeholder="Product name" /><input value={newProduct.productUrl} onChange={(event) => setNewProduct((current) => ({ ...current, productUrl: event.target.value }))} placeholder="Product link" /><button type="button" onClick={addProduct} disabled={busyId === "new-product"}>{busyId === "new-product" ? "Adding..." : "Add line"}</button></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Note</span><span>Material</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span><span></span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => { const orderIndex = coolers.findIndex((entry) => entry.id === cooler.id); return <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id || busyId === "reorder"} canMoveUp={orderIndex > 0} canMoveDown={orderIndex >= 0 && orderIndex < coolers.length - 1} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onCompletionPhotosOpen={(entry, index) => setGallery({ cooler: entry, index })} onLinkEdit={editProductLink} onCommercialChange={updateProductCommercials} onDetailsEdit={editProductDetails} onRemove={removeProduct} onMoveUp={(entry) => moveProduct(entry, -1)} onMoveDown={(entry) => moveProduct(entry, 1)} />; })}</div></section> : null}
       </section>{gallery ? <IglooCompletionPhotoModal cooler={gallery.cooler} photos={gallery.cooler?.completionPhotos} index={gallery.index} onIndex={(index) => setGallery((current) => ({ ...current, index }))} onClose={() => setGallery(null)} /> : null}</div></div>
   );
 }
