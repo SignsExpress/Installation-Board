@@ -18219,6 +18219,277 @@ button {
   }
 }
 
+/* IGLOO table-style sign-off override */
+.igloo-admin-shell .panel.igloo-admin-panel,
+.igloo-public-shell .igloo-public-main {
+  font-size: 12px;
+}
+
+.igloo-admin-panel {
+  padding: 18px 22px;
+}
+
+.igloo-admin-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 0 0 12px;
+}
+
+.igloo-admin-header p {
+  margin: 0 0 3px;
+  font-size: 0.68rem;
+  letter-spacing: 0.11em;
+}
+
+.igloo-admin-header h1 {
+  margin: 0;
+  font-size: 1.28rem;
+  line-height: 1.05;
+}
+
+.igloo-admin-header span {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.72rem;
+}
+
+.igloo-admin-actions a,
+.igloo-admin-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-size: 0.75rem;
+}
+
+.igloo-admin-card.is-compact-list {
+  padding: 10px;
+  border-radius: 13px;
+}
+
+.igloo-catalogue-toolbar {
+  grid-template-columns: minmax(180px, 1fr) 190px;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+
+.igloo-catalogue-toolbar input,
+.igloo-catalogue-toolbar select {
+  height: 30px;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 0.72rem;
+}
+
+.igloo-list-head,
+.igloo-catalogue-row,
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  display: grid;
+  grid-template-columns: 46px minmax(180px, 1fr) 46px minmax(135px, 0.8fr) minmax(125px, 0.65fr) minmax(130px, 0.75fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.igloo-list-head {
+  padding: 0 8px 5px;
+  color: #6a7a8d;
+  font-size: 0.63rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.igloo-catalogue-list {
+  gap: 4px;
+}
+
+.igloo-catalogue-row,
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  min-height: 48px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.igloo-catalogue-row.is-good {
+  border-color: #90cea7;
+  background: #effaf2;
+}
+
+.igloo-photo-cell,
+.igloo-photo-cell.igloo-cooler-photo,
+.igloo-photo-cell .igloo-cooler-photo {
+  width: 38px;
+  height: 38px;
+}
+
+.igloo-photo-cell {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: #edf7fb;
+  color: #00539b;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+.igloo-photo-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.igloo-photo-cell input,
+.igloo-small-action input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.igloo-photo-cell.is-upload {
+  cursor: pointer;
+}
+
+.igloo-photo-cell.is-upload::after {
+  content: "+";
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: #00539b;
+  color: #fff;
+  font-size: 0.6rem;
+}
+
+.igloo-product-cell {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.igloo-product-cell span {
+  color: #66778a;
+  font-size: 0.6rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.igloo-product-cell strong {
+  color: #111827;
+  font-size: 0.76rem;
+  line-height: 1.16;
+  white-space: normal;
+}
+
+.igloo-link-cell a,
+.igloo-link-cell span {
+  display: inline-grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 999px;
+  border: 1px solid #cddce8;
+  color: #00539b;
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.igloo-template-cell,
+.igloo-approved-cell,
+.igloo-completion-cell {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.igloo-small-action,
+.igloo-approved-pill,
+.igloo-approve-toggle,
+.igloo-muted {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 25px;
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.igloo-small-action {
+  border: 1px solid #cbdbe7;
+  background: #ffffff;
+  color: #00539b;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.igloo-approved-pill,
+.igloo-muted {
+  border: 1px solid #e3eaf0;
+  background: #f4f7fa;
+  color: #66778a;
+}
+
+.igloo-approved-pill.is-good,
+.igloo-approve-toggle {
+  border: 1px solid #1d8b52;
+  background: #1d8b52;
+  color: #ffffff;
+}
+
+.igloo-approve-toggle:disabled {
+  border-color: #9dd6b4;
+  background: #dff3e7;
+  color: #207a48;
+}
+
+.igloo-public-shell .igloo-hero {
+  padding: 18px 28px;
+}
+
+.igloo-public-shell .igloo-hero h1 {
+  font-size: 1.35rem;
+}
+
+@media (max-width: 920px) {
+  .igloo-list-head {
+    display: none;
+  }
+
+  .igloo-catalogue-row,
+  .igloo-catalogue-list.is-admin .igloo-catalogue-row {
+    grid-template-columns: 42px 1fr;
+    align-items: start;
+  }
+
+  .igloo-link-cell,
+  .igloo-template-cell,
+  .igloo-approved-cell,
+  .igloo-completion-cell {
+    grid-column: 2;
+  }
+}
+
 .installation-report-button {
   color: #5c3a7e;
 }
