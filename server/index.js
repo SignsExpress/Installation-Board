@@ -1402,6 +1402,7 @@ function mergeHolidaySeed(store) {
         jobs: Array.isArray(store.jobs) ? store.jobs : [],
         morningMeetingTalkingPoints: sanitizeMorningMeetingTalkingPoints(store.morningMeetingTalkingPoints),
         mustang: sanitizeMustangTracker(store.mustang),
+        igloo: sanitizeIglooTracker(store.igloo),
         designBoard: sanitizeDesignBoardState(store.designBoard),
         filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
@@ -1542,7 +1543,9 @@ async function readStore() {
             socialPostSuggestions: [],
             socialPostQueue: []
           });
-      if (Number(migrated.holidayResetVersion || 0) !== 0) {
+      const iglooRecovery = await recoverIglooTrackerFromBackupsIfReset(migrated.igloo);
+      migrated.igloo = iglooRecovery.tracker;
+      if (Number(migrated.holidayResetVersion || 0) !== 0 || iglooRecovery.recovered) {
         await writeStore(migrated);
       }
       boardStoreCorruptionError = null;
@@ -1580,10 +1583,12 @@ async function readStore() {
           socialPostQueue: Array.isArray(parsed.socialPostQueue) ? parsed.socialPostQueue : [],
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
+    const iglooRecovery = await recoverIglooTrackerFromBackupsIfReset(migrated.igloo);
+    migrated.igloo = iglooRecovery.tracker;
     if (hasInlineMustangPhotos(migrated.mustang)) {
       migrated.mustang = await prepareMustangTrackerForSave(migrated.mustang);
       await writeStore(migrated);
-    } else if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0)) {
+    } else if (Number(migrated.holidayResetVersion || 0) !== Number(parsed.holidayResetVersion || 0) || iglooRecovery.recovered) {
       await writeStore(migrated);
     }
     boardStoreCorruptionError = null;
@@ -1708,6 +1713,9 @@ async function writeStore(store) {
     .then(async () => {
       const previousRaw = fs.existsSync(dataFile) ? await fsp.readFile(dataFile, "utf8") : "";
       const previousStore = safeParseStoreJson(previousRaw) || createEmptyBoardStore();
+      if (store.igloo === undefined && previousStore.igloo !== undefined) {
+        nextStore.igloo = sanitizeIglooTracker(previousStore.igloo);
+      }
       await snapshotFile(dataFile, "jobs-store");
       await writeTextFileAtomically(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`);
       const updatedStore = await dispatchPushNotifications(previousStore, nextStore);
@@ -2971,6 +2979,52 @@ function hasIglooUserData(cooler = {}, fallback = {}) {
     (sanitizeIglooUrl(cooler.imageUrl) && sanitizeIglooUrl(cooler.imageUrl) !== sanitizeIglooUrl(fallback.imageUrl)) ||
     (sanitizeIglooUrl(cooler.productUrl) && sanitizeIglooUrl(cooler.productUrl) !== sanitizeIglooUrl(fallback.productUrl))
   );
+}
+function getIglooRecoveryScore(payload = {}) {
+  const tracker = sanitizeIglooTracker(payload);
+  const defaults = createDefaultIglooCoolers();
+  const defaultLookup = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
+  const userDataScore = tracker.coolers.reduce((score, cooler) => {
+    const fallback = defaultLookup.get(cooler.id) || {};
+    let nextScore = score;
+    if (hasIglooUserData(cooler, fallback)) nextScore += 100;
+    if (sanitizeIglooStorageName(cooler.imageStorageName)) nextScore += 25;
+    if (sanitizeIglooStorageName(cooler.templatePdfStorageName || cooler.storageName)) nextScore += 25;
+    if (Array.isArray(cooler.completionPhotos)) nextScore += cooler.completionPhotos.filter((photo) => sanitizeIglooStorageName(photo?.storageName)).length * 10;
+    if (!defaultLookup.has(cooler.id)) nextScore += 8;
+    return nextScore;
+  }, 0);
+  const deletedScore = (Array.isArray(tracker.deletedCoolerIds) ? tracker.deletedCoolerIds.length : 0) * 8;
+  const manualOrderScore = Number(tracker.orderVersion || 0) >= 2 ? 5 : 0;
+  const missingDefaultCount = defaults.filter((entry) => !tracker.coolers.some((cooler) => cooler.id === entry.id)).length;
+  const missingDefaultScore = Number(tracker.orderVersion || 0) >= 2 ? Math.min(20, missingDefaultCount) : 0;
+  return userDataScore + deletedScore + manualOrderScore + missingDefaultScore;
+}
+
+async function recoverIglooTrackerFromBackupsIfReset(currentIgloo) {
+  const currentTracker = sanitizeIglooTracker(currentIgloo);
+  const currentScore = getIglooRecoveryScore(currentTracker);
+  if (currentScore > 0) return { tracker: currentTracker, recovered: false };
+  const backupDirectory = path.join(path.dirname(getDataFile()), "backups");
+  if (!fs.existsSync(backupDirectory)) return { tracker: currentTracker, recovered: false };
+  const names = (await fsp.readdir(backupDirectory)).filter((name) => /^jobs-store-\d+.*\.json$/i.test(name));
+  let best = null;
+  for (const name of names) {
+    try {
+      const parsed = JSON.parse(await fsp.readFile(path.join(backupDirectory, name), "utf8"));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || parsed.igloo === undefined) continue;
+      const tracker = sanitizeIglooTracker(parsed.igloo);
+      const score = getIglooRecoveryScore(tracker);
+      if (score > 0 && (!best || score > best.score || (score === best.score && name > best.name))) {
+        best = { name, score, tracker };
+      }
+    } catch (error) {
+      console.error(`Could not inspect IGLOO recovery backup ${name}.`, error.message || error);
+    }
+  }
+  if (!best) return { tracker: currentTracker, recovered: false };
+  console.warn(`[igloo] Restoring catalogue from backup ${best.name} because current IGLOO state looked reset.`);
+  return { tracker: best.tracker, recovered: true, source: best.name, score: best.score };
 }
 
 async function updateIglooTracker(mutator) {
