@@ -111,6 +111,7 @@ let memoryMonitorInterval = null;
 let lastHighMemoryLogAt = 0;
 let lastMemorySnapshot = null;
 let boardStoreCache = null;
+let iglooUpdateQueue = Promise.resolve();
 
 function bytesToMegabytes(bytes = 0) {
   return Math.round((Number(bytes) || 0) / 1024 / 1024);
@@ -2953,6 +2954,36 @@ function createDefaultIglooCoolers() {
 }
 
 
+function hasIglooUserData(cooler = {}, fallback = {}) {
+  const status = sanitizeIglooTemplateStatus(cooler.templateStatus, Boolean(cooler.templateTested));
+  return Boolean(
+    sanitizeIglooStorageName(cooler.imageStorageName) ||
+    sanitizeIglooStorageName(cooler.templatePdfStorageName || cooler.storageName) ||
+    (Array.isArray(cooler.completionPhotos) && cooler.completionPhotos.some((photo) => sanitizeIglooStorageName(photo?.storageName))) ||
+    sanitizeIglooText(cooler.clientNote, 1200) ||
+    sanitizeIglooText(cooler.notes, 2000) ||
+    sanitizeIglooText(cooler.material, 80) ||
+    sanitizeIglooText(cooler.startingPrice, 80) ||
+    status !== "untested" ||
+    (sanitizeIglooUrl(cooler.imageUrl) && sanitizeIglooUrl(cooler.imageUrl) !== sanitizeIglooUrl(fallback.imageUrl)) ||
+    (sanitizeIglooUrl(cooler.productUrl) && sanitizeIglooUrl(cooler.productUrl) !== sanitizeIglooUrl(fallback.productUrl))
+  );
+}
+
+async function updateIglooTracker(mutator) {
+  iglooUpdateQueue = iglooUpdateQueue
+    .catch(() => {})
+    .then(async () => {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const result = await mutator(tracker, store);
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      return { updated, result };
+    });
+  return iglooUpdateQueue;
+}
+
 function sanitizeIglooCooler(entry = {}, index = 0) {
   const family = sanitizeIglooText(entry.family, 120);
   const model = sanitizeIglooText(entry.model, 180);
@@ -3010,7 +3041,12 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManua
     });
   });
   const sorted = [...byId.values()]
-    .filter((entry) => !deletedIds.has(entry.id))
+    .filter((entry) => {
+      if (deletedIds.has(entry.id)) return false;
+      const fallback = defaultLookup.get(entry.id);
+      if (useManualOrder && suppliedCoolers.length && fallback && !hasIglooUserData(entry, fallback)) return false;
+      return true;
+    })
     .sort((left, right) => {
       if (useManualOrder) {
         const leftOrder = Number.isFinite(Number(left.sortOrder)) ? Number(left.sortOrder) : 999999;
@@ -12516,33 +12552,34 @@ function createServer() {
   app.patch("/api/igloo/admin/coolers/:coolerId/details", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
-      const store = await readStore();
-      const tracker = sanitizeIglooTracker(store.igloo);
-      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
-      if (coolerIndex === -1) {
-        response.status(404).json({ error: "Cooler not found." });
-        return;
-      }
-      const family = sanitizeIglooText(request.body?.family, 120) || tracker.coolers[coolerIndex].family || "Custom";
-      const model = sanitizeIglooText(request.body?.model, 180);
-      if (!model) {
-        response.status(400).json({ error: "Product name is required." });
-        return;
-      }
-      tracker.coolers[coolerIndex] = {
-        ...tracker.coolers[coolerIndex],
-        family,
-        model,
-        material: request.body?.material === undefined ? tracker.coolers[coolerIndex].material : sanitizeIglooText(request.body?.material, 80),
-        startingPrice: request.body?.startingPrice === undefined ? tracker.coolers[coolerIndex].startingPrice : sanitizeIglooText(request.body?.startingPrice, 80),
-        updatedAt: new Date().toISOString()
-      };
-      store.igloo = tracker;
-      const updated = await writeStore(store);
-      response.json(toPublicIglooTracker(updated.igloo));
+      const coolerId = String(request.params.coolerId || "");
+      const result = await updateIglooTracker(async (tracker) => {
+        const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === coolerId);
+        if (coolerIndex === -1) {
+          const error = new Error("Cooler not found.");
+          error.statusCode = 404;
+          throw error;
+        }
+        const family = sanitizeIglooText(request.body?.family, 120) || tracker.coolers[coolerIndex].family || "Custom";
+        const model = sanitizeIglooText(request.body?.model, 180);
+        if (!model) {
+          const error = new Error("Product name is required.");
+          error.statusCode = 400;
+          throw error;
+        }
+        tracker.coolers[coolerIndex] = {
+          ...tracker.coolers[coolerIndex],
+          family,
+          model,
+          material: request.body?.material === undefined ? tracker.coolers[coolerIndex].material : sanitizeIglooText(request.body?.material, 80),
+          startingPrice: request.body?.startingPrice === undefined ? tracker.coolers[coolerIndex].startingPrice : sanitizeIglooText(request.body?.startingPrice, 80),
+          updatedAt: new Date().toISOString()
+        };
+      });
+      response.json(toPublicIglooTracker(result.updated.igloo));
     } catch (error) {
       console.error("Could not update IGLOO cooler details.", error.message || error);
-      response.status(400).json({ error: error.message || "Could not update product." });
+      response.status(error.statusCode || 400).json({ error: error.message || "Could not update product." });
     }
   });
 
@@ -12640,26 +12677,26 @@ function createServer() {
   app.patch("/api/igloo/admin/coolers/:coolerId/template-status", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
-      const store = await readStore();
-      const tracker = sanitizeIglooTracker(store.igloo);
-      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
-      if (coolerIndex === -1) {
-        response.status(404).json({ error: "Cooler not found." });
-        return;
-      }
+      const coolerId = String(request.params.coolerId || "");
       const templateStatus = sanitizeIglooTemplateStatus(request.body?.templateStatus, false);
-      tracker.coolers[coolerIndex] = {
-        ...tracker.coolers[coolerIndex],
-        templateStatus,
-        templateTested: templateStatus === "good",
-        updatedAt: new Date().toISOString()
-      };
-      store.igloo = tracker;
-      const updated = await writeStore(store);
-      response.json(toPublicIglooTracker(updated.igloo));
+      const result = await updateIglooTracker(async (tracker) => {
+        const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === coolerId);
+        if (coolerIndex === -1) {
+          const error = new Error("Cooler not found.");
+          error.statusCode = 404;
+          throw error;
+        }
+        tracker.coolers[coolerIndex] = {
+          ...tracker.coolers[coolerIndex],
+          templateStatus,
+          templateTested: templateStatus === "good",
+          updatedAt: new Date().toISOString()
+        };
+      });
+      response.json(toPublicIglooTracker(result.updated.igloo));
     } catch (error) {
       console.error("Could not update IGLOO template status.", error.message || error);
-      response.status(400).json({ error: error.message || "Could not update template status." });
+      response.status(error.statusCode || 400).json({ error: error.message || "Could not update template status." });
     }
   });
 
