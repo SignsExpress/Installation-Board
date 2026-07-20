@@ -2950,7 +2950,7 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
   };
 }
 
-function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = []) {
+function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManualOrder = false) {
   const deletedIds = new Set((Array.isArray(deletedCoolerIds) ? deletedCoolerIds : []).map((entry) => sanitizeIglooText(entry, 120)).filter(Boolean));
   const defaults = createDefaultIglooCoolers();
   const byId = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
@@ -2968,15 +2968,18 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = []) {
       productUrl: sanitized.productUrl || existing?.productUrl || getIglooProductUrl(sanitized.model)
     });
   });
-  return [...byId.values()]
+  const sorted = [...byId.values()]
     .filter((entry) => !deletedIds.has(entry.id))
     .sort((left, right) => {
-      const leftOrder = Number.isFinite(Number(left.sortOrder)) ? Number(left.sortOrder) : 999999;
-      const rightOrder = Number.isFinite(Number(right.sortOrder)) ? Number(right.sortOrder) : 999999;
-      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      if (useManualOrder) {
+        const leftOrder = Number.isFinite(Number(left.sortOrder)) ? Number(left.sortOrder) : 999999;
+        const rightOrder = Number.isFinite(Number(right.sortOrder)) ? Number(right.sortOrder) : 999999;
+        if (leftOrder !== rightOrder) return leftOrder - rightOrder;
+      }
       if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
       return String(left.model || "").localeCompare(String(right.model || ""));
     });
+  return sorted.map((entry, index) => ({ ...entry, sortOrder: useManualOrder ? entry.sortOrder : index * 10 }));
 }
 
 function sanitizeIglooTracker(payload = {}) {
@@ -2984,9 +2987,11 @@ function sanitizeIglooTracker(payload = {}) {
   const deletedCoolerIds = (Array.isArray(source.deletedCoolerIds) ? source.deletedCoolerIds : [])
     .map((entry) => sanitizeIglooText(entry, 120))
     .filter(Boolean);
+  const orderVersion = Number(source.orderVersion || 0) >= 2 ? 2 : 0;
   return {
     deletedCoolerIds,
-    coolers: mergeIglooCoolerCatalogue(source.coolers, deletedCoolerIds)
+    orderVersion,
+    coolers: mergeIglooCoolerCatalogue(source.coolers, deletedCoolerIds, orderVersion >= 2)
   };
 }
 
@@ -3005,6 +3010,7 @@ function toPublicIglooTracker(payload = {}) {
   const tracker = sanitizeIglooTracker(payload);
   return {
     deletedCoolerIds: tracker.deletedCoolerIds || [],
+    orderVersion: tracker.orderVersion || 0,
     coolers: tracker.coolers.map((entry, index) => toPublicIglooCooler(entry, index))
   };
 }
@@ -12492,6 +12498,7 @@ function createServer() {
         ...cooler,
         sortOrder: orderLookup.has(cooler.id) ? orderLookup.get(cooler.id) : (requestedIds.length + index) * 10
       }));
+      tracker.orderVersion = 2;
       store.igloo = tracker;
       const updated = await writeStore(store);
       response.json(toPublicIglooTracker(updated.igloo));

@@ -19101,15 +19101,22 @@ button {
 .igloo-row-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: nowrap;
 }
 
 .igloo-row-actions button {
+  color: #00539b;
+  padding: 0 8px;
+}
+
+.igloo-row-actions button:last-child {
   color: #b42323;
 }
 
 .igloo-admin-shell .igloo-list-head,
 .igloo-catalogue-list.is-admin .igloo-catalogue-row {
-  grid-template-columns: 44px minmax(150px, 0.9fr) minmax(190px, 0.9fr) 58px minmax(120px, 0.68fr) minmax(180px, 0.9fr) minmax(120px, 0.62fr) 72px;
+  grid-template-columns: 44px minmax(150px, 0.9fr) minmax(190px, 0.9fr) 58px minmax(120px, 0.68fr) minmax(180px, 0.9fr) minmax(120px, 0.62fr) 132px;
 }
 
 @media (max-width: 1080px) {
@@ -19123,19 +19130,6 @@ button {
   }
 }
 
-.igloo-catalogue-row[draggable="true"] {
-  cursor: grab;
-}
-
-.igloo-catalogue-row[draggable="true"]:active {
-  cursor: grabbing;
-}
-
-.igloo-catalogue-row.is-dragging {
-  opacity: 0.58;
-  border-style: dashed;
-  transform: scale(0.995);
-}
 
 .igloo-product-cell {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -19166,20 +19160,11 @@ button {
   background: #f4f8fb;
 }
 
-.igloo-catalogue-list.is-admin .igloo-catalogue-row::before {
-  content: "::";
-  align-self: center;
-  justify-self: center;
-  color: #8aa0b5;
-  font-size: 0.78rem;
-  letter-spacing: -0.12em;
-  transform: rotate(90deg);
-}
 
 .igloo-catalogue-list.is-admin .igloo-catalogue-row {
-  grid-template-columns: 16px 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 72px;
+  grid-template-columns: 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 132px;
 }
 
 .igloo-admin-shell .igloo-list-head {
-  grid-template-columns: 16px 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 72px;
+  grid-template-columns: 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 132px;
 }
