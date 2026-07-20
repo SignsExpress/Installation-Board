@@ -18247,14 +18247,40 @@ function IglooCoolerImage({ cooler }) {
 
 const IGLOO_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 const IGLOO_TEMPLATE_ACCEPT = ".pdf,.ai,.eps,.svg,.doc,.docx,.zip,.png,.jpg,.jpeg,application/pdf,image/*";
+const IGLOO_STATUS_OPTIONS = [
+  { value: "untested", label: "Template untested" },
+  { value: "good", label: "Template good" },
+  { value: "wrong", label: "Template wrong" }
+];
+
+function getIglooStatusLabel(status) {
+  return IGLOO_STATUS_OPTIONS.find((entry) => entry.value === status)?.label || "Template untested";
+}
 
 function filterIglooCoolers(coolers, search, family) {
   const query = String(search || "").trim().toLowerCase();
   return (Array.isArray(coolers) ? coolers : []).filter((cooler) => {
     const matchesFamily = !family || cooler.family === family;
-    const haystack = String((cooler.family || "") + " " + (cooler.model || "")).toLowerCase();
+    const haystack = String((cooler.family || "") + " " + (cooler.model || "") + " " + (cooler.clientNote || "")).toLowerCase();
     return matchesFamily && (!query || haystack.includes(query));
   });
+}
+
+function IglooHeader({ signedOffCount, totalCount, admin = false, loading = false, onRefresh }) {
+  return (
+    <div className="igloo-brand-header">
+      <div className="igloo-brand-lockup">
+        <img className="igloo-logo" src="/branding/igloo-logo.svg" alt="IGLOO" />
+        <span />
+        <img className="igloo-sx-logo" src="/branding/signs-express-logo.svg" alt="Signs Express" />
+      </div>
+      <div className="igloo-header-actions">
+        <span>{signedOffCount} of {totalCount} approved</span>
+        {admin ? <a className="igloo-customer-view-button" href="/igloo" target="_blank" rel="noreferrer">Customer view</a> : null}
+        {onRefresh ? <button type="button" onClick={onRefresh} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button> : null}
+      </div>
+    </div>
+  );
 }
 
 function IglooCatalogueToolbar({ coolers, search, family, onSearch, onFamily }) {
@@ -18281,25 +18307,42 @@ function IglooPhotoUpload({ cooler, admin, busy, onPhotoUpload }) {
   );
 }
 
-function IglooCatalogueRow({ cooler, admin = false, busy = false, onTemplateUpload, onPhotoUpload, onTemplateGood, onCompletionUpload }) {
+function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = false, onTemplateUpload, onPhotoUpload, onStatusChange, onCompletionUpload, onLinkEdit, onClientNoteSave }) {
   const hasTemplate = Boolean(cooler.templatePdfUrl);
-  const isGood = Boolean(cooler.templateTested);
+  const templateStatus = cooler.templateStatus || (cooler.templateTested ? "good" : "untested");
+  const isGood = templateStatus === "good";
+  const isWrong = templateStatus === "wrong";
   const completionPhotos = Array.isArray(cooler.completionPhotos) ? cooler.completionPhotos : [];
   const canUploadTemplate = Boolean(onTemplateUpload);
+  const [clientNote, setClientNote] = useState(cooler.clientNote || "");
+
+  useEffect(() => { setClientNote(cooler.clientNote || ""); }, [cooler.clientNote]);
+
   return (
-    <article className={"igloo-catalogue-row" + (isGood ? " is-good" : "")}>
+    <article className={"igloo-catalogue-row" + (isGood ? " is-good" : isWrong ? " is-wrong" : "")}>
       <IglooPhotoUpload cooler={cooler} admin={admin} busy={busy} onPhotoUpload={onPhotoUpload} />
-      <div className="igloo-product-cell"><span>{cooler.family}</span><strong>{cooler.model}</strong></div>
-      <div className="igloo-link-cell">{cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer" aria-label={'Open product page for ' + cooler.model}>?</a> : <span>-</span>}</div>
+      <div className="igloo-product-cell">
+        <span>{cooler.family}</span>
+        <strong>{cooler.model}</strong>
+        {!admin ? <div className="igloo-client-note"><input value={clientNote} onChange={(event) => setClientNote(event.target.value)} placeholder="Add a note" /><button type="button" onClick={() => onClientNoteSave?.(cooler, clientNote)} disabled={noteBusy || clientNote === (cooler.clientNote || "")}>{noteBusy ? "Saving" : "Save"}</button></div> : cooler.clientNote ? <small>{cooler.clientNote}</small> : null}
+      </div>
+      <div className="igloo-link-cell">
+        {cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer" aria-label={'Open product page for ' + cooler.model}>??</a> : <span>-</span>}
+        {admin ? <button type="button" onClick={() => onLinkEdit?.(cooler)} aria-label={'Edit product link for ' + cooler.model}>Edit</button> : null}
+      </div>
       <div className="igloo-template-cell">
-        {canUploadTemplate ? <label className="igloo-small-action">{hasTemplate ? "Replace" : "Upload"}<input type="file" accept={IGLOO_TEMPLATE_ACCEPT} disabled={busy} onChange={(event) => { onTemplateUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
-        {hasTemplate ? <a className="igloo-small-action" href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">View</a> : <span className="igloo-muted">No template</span>}
+        {canUploadTemplate ? <label className="igloo-small-action is-upload-action">{busy ? "Uploading" : hasTemplate ? "Replace" : "Upload"}<input type="file" accept={IGLOO_TEMPLATE_ACCEPT} disabled={busy} onChange={(event) => { onTemplateUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
+        {hasTemplate ? <a className="igloo-small-action" href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">View</a> : <span className="igloo-muted">-</span>}
       </div>
       <div className="igloo-approved-cell">
-        {admin ? <button type="button" className="igloo-approve-toggle" onClick={() => onTemplateGood?.(cooler)} disabled={busy || isGood || !hasTemplate}>{isGood ? "Approved" : "Template Good"}</button> : <span className={isGood ? "igloo-approved-pill is-good" : "igloo-approved-pill"}>{isGood ? "Approved" : "Pending"}</span>}
+        {admin ? (
+          <select className={"igloo-status-select " + templateStatus} value={templateStatus} onChange={(event) => onStatusChange?.(cooler, event.target.value)} disabled={busy}>
+            {IGLOO_STATUS_OPTIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+          </select>
+        ) : <span className={"igloo-approved-pill " + templateStatus}>{getIglooStatusLabel(templateStatus)}</span>}
       </div>
       <div className="igloo-completion-cell">
-        {admin ? <label className="igloo-small-action">Upload<input type="file" accept="image/*" disabled={busy} onChange={(event) => { onCompletionUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
+        {admin ? <label className="igloo-small-action is-upload-action">Upload<input type="file" accept="image/*" disabled={busy} onChange={(event) => { onCompletionUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
         {completionPhotos.length ? <a className="igloo-small-action" href={completionPhotos[completionPhotos.length - 1].url} target="_blank" rel="noreferrer">{completionPhotos.length} photo{completionPhotos.length === 1 ? "" : "s"}</a> : <span className="igloo-muted">None</span>}
       </div>
     </article>
@@ -18310,6 +18353,7 @@ function IglooCustomerPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [uploadingId, setUploadingId] = useState("");
+  const [noteSavingId, setNoteSavingId] = useState("");
   const [search, setSearch] = useState("");
   const [family, setFamily] = useState("");
   const [message, setMessage] = useState("");
@@ -18359,18 +18403,39 @@ function IglooCustomerPage() {
     }
   }
 
+  async function saveClientNote(cooler, clientNote) {
+    setNoteSavingId(cooler.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/customer/coolers/" + encodeURIComponent(cooler.id) + "/note", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientNote })
+      });
+      const payload = await readJsonResponse(response, "Could not save note.");
+      if (!response.ok) throw new Error(payload.error || "Could not save note.");
+      setData(payload);
+      setMessage("Note saved.");
+    } catch (noteError) {
+      setError(noteError.message || "Could not save note.");
+    } finally {
+      setNoteSavingId("");
+    }
+  }
+
   const coolers = Array.isArray(data?.coolers) ? data.coolers : [];
   const visibleCoolers = filterIglooCoolers(coolers, search, family);
-  const signedOffCount = coolers.filter((cooler) => cooler.templateTested).length;
+  const signedOffCount = coolers.filter((cooler) => (cooler.templateStatus || (cooler.templateTested ? "good" : "untested")) === "good").length;
 
   return (
     <div className="igloo-public-shell">
-      <header className="igloo-hero"><div><p>IGLOO</p><h1>Template sign-off</h1><span>{signedOffCount} of {coolers.length} approved</span></div></header>
+      <IglooHeader signedOffCount={signedOffCount} totalCount={coolers.length} />
       <main className="igloo-public-main">
         {loading ? <div className="igloo-loading">Loading IGLOO...</div> : null}
         {error ? <div className="flash error">{error}</div> : null}
         {message ? <div className="flash success">{message}</div> : null}
-        {!loading && !error ? <section className="igloo-admin-card is-compact-list"><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span></div><div className="igloo-catalogue-list">{visibleCoolers.length ? visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} busy={uploadingId === cooler.id} onTemplateUpload={uploadTemplate} />) : <p className="igloo-empty">No products match that search.</p>}</div></section> : null}
+        {!loading && !error ? <section className="igloo-admin-card is-compact-list"><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span></div><div className="igloo-catalogue-list">{visibleCoolers.length ? visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} busy={uploadingId === cooler.id} noteBusy={noteSavingId === cooler.id} onTemplateUpload={uploadTemplate} onClientNoteSave={saveClientNote} />) : <p className="igloo-empty">No products match that search.</p>}</div></section> : null}
       </main>
     </div>
   );
@@ -18441,18 +18506,45 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
     return uploadIglooFile(cooler, file, "/completion-photo", "Completion photo uploaded.", "Completion photos must be 10MB or under.");
   }
 
-  async function markTemplateGood(cooler) {
+  async function updateTemplateStatus(cooler, templateStatus) {
     setBusyId(cooler.id);
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/template-good", { method: "PATCH" });
-      const payload = await readJsonResponse(response, "Could not sign off template.");
-      if (!response.ok) throw new Error(payload.error || "Could not sign off template.");
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/template-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateStatus })
+      });
+      const payload = await readJsonResponse(response, "Could not update template status.");
+      if (!response.ok) throw new Error(payload.error || "Could not update template status.");
       setData(payload);
-      setMessage("Template approved.");
-    } catch (signOffError) {
-      setError(signOffError.message || "Could not sign off template.");
+      setMessage("Template status updated.");
+    } catch (statusError) {
+      setError(statusError.message || "Could not update template status.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function editProductLink(cooler) {
+    const nextLink = window.prompt("Product link", cooler.productUrl || "");
+    if (nextLink === null) return;
+    setBusyId(cooler.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/product-link", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productUrl: nextLink })
+      });
+      const payload = await readJsonResponse(response, "Could not update product link.");
+      if (!response.ok) throw new Error(payload.error || "Could not update product link.");
+      setData(payload);
+      setMessage("Product link updated.");
+    } catch (linkError) {
+      setError(linkError.message || "Could not update product link.");
     } finally {
       setBusyId("");
     }
@@ -18460,14 +18552,14 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
 
   const coolers = Array.isArray(data?.coolers) ? data.coolers : [];
   const visibleCoolers = filterIglooCoolers(coolers, search, family);
-  const signedOffCount = coolers.filter((cooler) => cooler.templateTested).length;
+  const signedOffCount = coolers.filter((cooler) => (cooler.templateStatus || (cooler.templateTested ? "good" : "untested")) === "good").length;
 
   return (
     <div className="app-shell igloo-admin-shell"><div className="page"><MainNavBar currentUser={currentUser} active="igloo" onLogout={onLogout} notifications={notifications} />
       <section className="panel igloo-admin-panel">
-        <div className="igloo-admin-header"><div><p>IGLOO</p><h1>Template sign-off</h1><span>{signedOffCount} of {coolers.length} approved.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Customer view</a><button type="button" onClick={loadIglooAdmin} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button></div></div>
+        <IglooHeader admin signedOffCount={signedOffCount} totalCount={coolers.length} loading={loading} onRefresh={loadIglooAdmin} />
         {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{loading ? <div className="board-loading">Loading IGLOO...</div> : null}
-        {!loading ? <section className="igloo-admin-card is-compact-list"><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onTemplateGood={markTemplateGood} onCompletionUpload={uploadCompletionPhoto} />)}</div></section> : null}
+        {!loading ? <section className="igloo-admin-card is-compact-list"><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onLinkEdit={editProductLink} />)}</div></section> : null}
       </section></div></div>
   );
 }

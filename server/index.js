@@ -2809,6 +2809,12 @@ function sanitizeIglooUrl(value = "") {
   return ("https://" + url).slice(0, 2000);
 }
 
+function sanitizeIglooTemplateStatus(value = "", fallbackTested = false) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["good", "wrong", "untested"].includes(normalized)) return normalized;
+  return fallbackTested ? "good" : "untested";
+}
+
 function sanitizeIglooStorageName(value = "") {
   return path.basename(sanitizeIglooText(value, 240));
 }
@@ -2861,7 +2867,9 @@ function createDefaultIglooCoolers() {
       imageStorageName: "",
       imageFileName: "",
       imageContentType: "",
+      templateStatus: "untested",
       templateTested: false,
+      clientNote: "",
       templatePdfStorageName: "",
       templatePdfFileName: "",
       templatePdfContentType: "application/pdf",
@@ -2889,7 +2897,9 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
     imageStorageName,
     imageFileName: sanitizeIglooText(entry.imageFileName, 240),
     imageContentType: sanitizeIglooText(entry.imageContentType, 80),
-    templateTested: Boolean(entry.templateTested),
+    templateStatus: sanitizeIglooTemplateStatus(entry.templateStatus, Boolean(entry.templateTested)),
+    templateTested: sanitizeIglooTemplateStatus(entry.templateStatus, Boolean(entry.templateTested)) === "good",
+    clientNote: sanitizeIglooText(entry.clientNote, 1200),
     templatePdfStorageName: storageName,
     templatePdfFileName: sanitizeIglooText(entry.templatePdfFileName || entry.fileName, 240),
     templatePdfContentType: sanitizeIglooText(entry.templatePdfContentType || "application/pdf", 80) || "application/pdf",
@@ -2983,6 +2993,7 @@ async function storeIglooTemplateUpload(cooler, upload = {}) {
   await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
   return {
     ...cooler,
+    templateStatus: "untested",
     templateTested: false,
     templatePdfStorageName: storedName,
     templatePdfFileName: originalName,
@@ -12275,6 +12286,29 @@ function createServer() {
     }
   });
 
+  app.patch("/api/igloo/customer/coolers/:coolerId/note", async (request, response) => {
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = {
+        ...tracker.coolers[coolerIndex],
+        clientNote: sanitizeIglooText(request.body?.clientNote, 1200),
+        updatedAt: new Date().toISOString()
+      };
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not save IGLOO client note.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not save note." });
+    }
+  });
+
   app.get("/api/igloo/admin", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
@@ -12364,7 +12398,7 @@ function createServer() {
     }
   });
 
-  app.patch("/api/igloo/admin/coolers/:coolerId/template-good", async (request, response) => {
+  app.patch("/api/igloo/admin/coolers/:coolerId/template-status", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
       const store = await readStore();
@@ -12374,13 +12408,43 @@ function createServer() {
         response.status(404).json({ error: "Cooler not found." });
         return;
       }
-      tracker.coolers[coolerIndex] = { ...tracker.coolers[coolerIndex], templateTested: true, updatedAt: new Date().toISOString() };
+      const templateStatus = sanitizeIglooTemplateStatus(request.body?.templateStatus, false);
+      tracker.coolers[coolerIndex] = {
+        ...tracker.coolers[coolerIndex],
+        templateStatus,
+        templateTested: templateStatus === "good",
+        updatedAt: new Date().toISOString()
+      };
       store.igloo = tracker;
       const updated = await writeStore(store);
       response.json(toPublicIglooTracker(updated.igloo));
     } catch (error) {
-      console.error("Could not sign off IGLOO template.", error.message || error);
-      response.status(400).json({ error: error.message || "Could not sign off template." });
+      console.error("Could not update IGLOO template status.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not update template status." });
+    }
+  });
+
+  app.patch("/api/igloo/admin/coolers/:coolerId/product-link", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = {
+        ...tracker.coolers[coolerIndex],
+        productUrl: sanitizeIglooUrl(request.body?.productUrl),
+        updatedAt: new Date().toISOString()
+      };
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not update IGLOO product link.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not update product link." });
     }
   });
 
