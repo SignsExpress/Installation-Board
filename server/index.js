@@ -2867,9 +2867,10 @@ function sanitizeIglooStorageName(value = "") {
 }
 
 function getIglooStoredImageUrl(cooler = {}) {
+  if (!cooler?.id) return "";
   const storageName = sanitizeIglooStorageName(cooler?.imageStorageName);
-  if (!cooler?.id || !storageName) return "";
-  return "/api/igloo/images/" + encodeURIComponent(cooler.id) + "?v=" + encodeURIComponent(storageName);
+  const version = storageName || sanitizeIglooText(cooler?.updatedAt, 80) || String(cooler?.sortOrder || "");
+  return "/api/igloo/images/" + encodeURIComponent(cooler.id) + (version ? "?v=" + encodeURIComponent(version) : "");
 }
 
 async function findLatestIglooUploadForCooler(directory, coolerId) {
@@ -3181,13 +3182,8 @@ async function storeIglooImageUpload(cooler, upload = {}) {
   }
   const directory = await ensureIglooImageUploadsDir();
   const originalName = sanitizeIglooText(upload.fileName || upload.originalName || cooler.model || "igloo-photo", 240);
-  const previousStorageName = sanitizeIglooStorageName(cooler.imageStorageName);
   const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + (extensionForContentType(contentType) || path.extname(originalName) || ".img");
   await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
-  if (previousStorageName && previousStorageName !== storedName) {
-    const previousPath = path.join(directory, previousStorageName);
-    try { await fsp.unlink(previousPath); } catch (error) { if (error.code !== "ENOENT") console.error("Could not delete old IGLOO product photo.", error.message || error); }
-  }
   return {
     ...cooler,
     imageStorageName: storedName,
