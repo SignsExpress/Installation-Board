@@ -3020,7 +3020,7 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManua
   const suppliedCoolers = Array.isArray(coolers) ? coolers : [];
   const defaults = createDefaultIglooCoolers();
   const defaultLookup = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
-  const sourceCoolers = suppliedCoolers.length ? suppliedCoolers : defaults;
+  const sourceCoolers = useManualOrder ? suppliedCoolers : (suppliedCoolers.length ? suppliedCoolers : defaults);
   const byId = new Map();
   sourceCoolers.forEach((entry, index) => {
     const sanitized = sanitizeIglooCooler(entry, index);
@@ -3043,8 +3043,6 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManua
   const sorted = [...byId.values()]
     .filter((entry) => {
       if (deletedIds.has(entry.id)) return false;
-      const fallback = defaultLookup.get(entry.id);
-      if (useManualOrder && suppliedCoolers.length && fallback && !hasIglooUserData(entry, fallback)) return false;
       return true;
     })
     .sort((left, right) => {
@@ -3056,19 +3054,23 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManua
       if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
       return String(left.model || "").localeCompare(String(right.model || ""));
     });
-  return sorted.map((entry, index) => ({ ...entry, sortOrder: useManualOrder ? entry.sortOrder : index * 10 }));
+  return sorted.map((entry, index) => ({
+    ...entry,
+    sortOrder: useManualOrder ? (Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index * 10) : index * 10
+  }));
 }
 
 function sanitizeIglooTracker(payload = {}) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const hasSavedCoolerList = Array.isArray(source.coolers);
   const deletedCoolerIds = (Array.isArray(source.deletedCoolerIds) ? source.deletedCoolerIds : [])
     .map((entry) => sanitizeIglooText(entry, 120))
     .filter(Boolean);
-  const orderVersion = Number(source.orderVersion || 0) >= 2 ? 2 : 0;
+  const orderVersion = hasSavedCoolerList || Number(source.orderVersion || 0) >= 2 ? 2 : 0;
   return {
     deletedCoolerIds,
     orderVersion,
-    coolers: mergeIglooCoolerCatalogue(source.coolers, deletedCoolerIds, orderVersion >= 2)
+    coolers: mergeIglooCoolerCatalogue(hasSavedCoolerList ? source.coolers : undefined, deletedCoolerIds, orderVersion >= 2)
   };
 }
 
