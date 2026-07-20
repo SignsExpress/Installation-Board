@@ -2982,20 +2982,25 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
 
 function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = [], useManualOrder = false) {
   const deletedIds = new Set((Array.isArray(deletedCoolerIds) ? deletedCoolerIds : []).map((entry) => sanitizeIglooText(entry, 120)).filter(Boolean));
+  const suppliedCoolers = Array.isArray(coolers) ? coolers : [];
   const defaults = createDefaultIglooCoolers();
-  const byId = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
-  (Array.isArray(coolers) ? coolers : []).forEach((entry, index) => {
+  const defaultLookup = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
+  const sourceCoolers = suppliedCoolers.length ? suppliedCoolers : defaults;
+  const byId = new Map();
+  sourceCoolers.forEach((entry, index) => {
     const sanitized = sanitizeIglooCooler(entry, index);
+    const fallback = defaultLookup.get(sanitized.id);
     const existing = byId.get(sanitized.id);
     byId.set(sanitized.id, {
+      ...(fallback || {}),
       ...(existing || {}),
       ...sanitized,
-      imageUrl: sanitized.imageUrl || existing?.imageUrl || getIglooImageUrl(sanitized.model),
-      imageStorageName: sanitized.imageStorageName || existing?.imageStorageName || "",
-      imageFileName: sanitized.imageFileName || existing?.imageFileName || "",
-      imageContentType: sanitized.imageContentType || existing?.imageContentType || "",
-      completionPhotos: sanitized.completionPhotos?.length ? sanitized.completionPhotos : existing?.completionPhotos || [],
-      productUrl: sanitized.productUrl || existing?.productUrl || getIglooProductUrl(sanitized.model)
+      imageUrl: sanitized.imageUrl || existing?.imageUrl || fallback?.imageUrl || getIglooImageUrl(sanitized.model),
+      imageStorageName: sanitized.imageStorageName || existing?.imageStorageName || fallback?.imageStorageName || "",
+      imageFileName: sanitized.imageFileName || existing?.imageFileName || fallback?.imageFileName || "",
+      imageContentType: sanitized.imageContentType || existing?.imageContentType || fallback?.imageContentType || "",
+      completionPhotos: sanitized.completionPhotos?.length ? sanitized.completionPhotos : existing?.completionPhotos || fallback?.completionPhotos || [],
+      productUrl: sanitized.productUrl || existing?.productUrl || fallback?.productUrl || getIglooProductUrl(sanitized.model)
     });
   });
   const sorted = [...byId.values()]

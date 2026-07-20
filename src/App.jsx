@@ -18250,7 +18250,7 @@ function IglooCoolerImage({ cooler }) {
   }, [uploadedImageUrl, cooler?.imageUrl]);
 
   if (!imageSrc) return <span>{initials}</span>;
-  return <img src={imageSrc} alt={cooler.model} loading="lazy" onError={() => setImageSrc((current) => current === uploadedImageUrl ? (cooler?.fallbackImageUrl || "") : "")} />;
+  return <><img className="igloo-photo-thumb" src={imageSrc} alt={cooler.model} loading="lazy" onError={() => setImageSrc((current) => current === uploadedImageUrl ? (cooler?.fallbackImageUrl || "") : "")} /><img className="igloo-photo-preview" src={imageSrc} alt="" aria-hidden="true" loading="lazy" /></>;
 }
 
 function IglooLinkIcon() {
