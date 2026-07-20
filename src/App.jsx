@@ -18348,7 +18348,7 @@ function IglooChevronIcon({ direction = "next" }) {
   );
 }
 
-function IglooCompletionPhotoModal({ cooler, photos, index, onIndex, onClose }) {
+function IglooCompletionPhotoModal({ cooler, photos, index, admin = false, deleting = false, onIndex, onDelete, onClose }) {
   const safePhotos = Array.isArray(photos) ? photos : [];
   const activeIndex = Math.min(Math.max(index || 0, 0), Math.max(safePhotos.length - 1, 0));
   const activePhoto = safePhotos[activeIndex];
@@ -18374,6 +18374,7 @@ function IglooCompletionPhotoModal({ cooler, photos, index, onIndex, onClose }) 
         </div>
         <div className="igloo-gallery-foot">
           <span>{activeIndex + 1} of {safePhotos.length}</span>
+          {admin ? <button className="igloo-gallery-delete" type="button" onClick={() => onDelete?.(cooler, activePhoto)} disabled={deleting}>{deleting ? "Deleting..." : "Delete photo"}</button> : null}
         </div>
       </div>
     </div>
@@ -18567,6 +18568,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [gallery, setGallery] = useState(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState("");
   const [newProduct, setNewProduct] = useState({ family: "", model: "", productUrl: "" });
 
   async function loadIglooAdmin() {
@@ -18623,6 +18625,28 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
 
   function uploadCompletionPhoto(cooler, file) {
     return uploadIglooFile(cooler, file, "/completion-photo", "Completion photo uploaded.", "Completion photos must be 10MB or under.");
+  }
+  async function deleteCompletionPhoto(cooler, photo) {
+    if (!photo?.id) return;
+    if (!window.confirm("Delete this completion photo?")) return;
+    setDeletingPhotoId(photo.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/completion-photos/" + encodeURIComponent(photo.id), { method: "DELETE" });
+      const payload = await readJsonResponse(response, "Could not delete completion photo.");
+      if (!response.ok) throw new Error(payload.error || "Could not delete completion photo.");
+      setData(payload);
+      const updatedCooler = (payload.coolers || []).find((entry) => entry.id === cooler.id);
+      const photos = Array.isArray(updatedCooler?.completionPhotos) ? updatedCooler.completionPhotos : [];
+      if (!photos.length) setGallery(null);
+      else setGallery((current) => current ? { cooler: updatedCooler, index: Math.min(current.index || 0, photos.length - 1) } : null);
+      setMessage("Completion photo deleted.");
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete completion photo.");
+    } finally {
+      setDeletingPhotoId("");
+    }
   }
 
   async function updateTemplateStatus(cooler, templateStatus) {
@@ -18808,7 +18832,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
         <IglooHeader admin signedOffCount={signedOffCount} totalCount={coolers.length} />
         {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{loading ? <div className="board-loading">Loading IGLOO...</div> : null}
         {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-add-row"><input value={newProduct.family} onChange={(event) => setNewProduct((current) => ({ ...current, family: event.target.value }))} placeholder="Family" /><input value={newProduct.model} onChange={(event) => setNewProduct((current) => ({ ...current, model: event.target.value }))} placeholder="Product name" /><input value={newProduct.productUrl} onChange={(event) => setNewProduct((current) => ({ ...current, productUrl: event.target.value }))} placeholder="Product link" /><button type="button" onClick={addProduct} disabled={busyId === "new-product"}>{busyId === "new-product" ? "Adding..." : "Add line"}</button></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Note</span><span>Material</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span><span></span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => { const orderIndex = coolers.findIndex((entry) => entry.id === cooler.id); return <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id || busyId === "reorder"} canMoveUp={orderIndex > 0} canMoveDown={orderIndex >= 0 && orderIndex < coolers.length - 1} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onCompletionPhotosOpen={(entry, index) => setGallery({ cooler: entry, index })} onLinkEdit={editProductLink} onCommercialChange={updateProductCommercials} onDetailsEdit={editProductDetails} onRemove={removeProduct} onMoveUp={(entry) => moveProduct(entry, -1)} onMoveDown={(entry) => moveProduct(entry, 1)} />; })}</div></section> : null}
-      </section>{gallery ? <IglooCompletionPhotoModal cooler={gallery.cooler} photos={gallery.cooler?.completionPhotos} index={gallery.index} onIndex={(index) => setGallery((current) => ({ ...current, index }))} onClose={() => setGallery(null)} /> : null}</div></div>
+      </section>{gallery ? <IglooCompletionPhotoModal cooler={gallery.cooler} photos={gallery.cooler?.completionPhotos} index={gallery.index} admin deleting={deletingPhotoId === (gallery.cooler?.completionPhotos || [])[gallery.index]?.id} onDelete={deleteCompletionPhoto} onIndex={(index) => setGallery((current) => ({ ...current, index }))} onClose={() => setGallery(null)} /> : null}</div></div>
   );
 }
 function MustangPage({ currentUser }) {

@@ -12674,6 +12674,42 @@ function createServer() {
     }
   });
 
+  app.delete("/api/igloo/admin/coolers/:coolerId/completion-photos/:photoId", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const coolerId = String(request.params.coolerId || "");
+      const photoId = String(request.params.photoId || "");
+      let removedPhoto = null;
+      const result = await updateIglooTracker(async (tracker) => {
+        const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === coolerId);
+        if (coolerIndex === -1) {
+          const error = new Error("Cooler not found.");
+          error.statusCode = 404;
+          throw error;
+        }
+        const currentPhotos = Array.isArray(tracker.coolers[coolerIndex].completionPhotos) ? tracker.coolers[coolerIndex].completionPhotos : [];
+        removedPhoto = currentPhotos.find((entry) => entry.id === photoId) || null;
+        if (!removedPhoto) {
+          const error = new Error("Completion photo not found.");
+          error.statusCode = 404;
+          throw error;
+        }
+        tracker.coolers[coolerIndex] = {
+          ...tracker.coolers[coolerIndex],
+          completionPhotos: currentPhotos.filter((entry) => entry.id !== photoId),
+          updatedAt: new Date().toISOString()
+        };
+      });
+      if (removedPhoto?.storageName) {
+        const filePath = path.join(getIglooCompletionUploadsDir(), sanitizeIglooStorageName(removedPhoto.storageName));
+        try { await fsp.unlink(filePath); } catch (error) { if (error.code !== "ENOENT") console.error("Could not delete IGLOO completion photo file.", error.message || error); }
+      }
+      response.json(toPublicIglooTracker(result.updated.igloo));
+    } catch (error) {
+      console.error("Could not delete IGLOO completion photo.", error.message || error);
+      response.status(error.statusCode || 400).json({ error: error.message || "Could not delete completion photo." });
+    }
+  });
   app.patch("/api/igloo/admin/coolers/:coolerId/template-status", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
