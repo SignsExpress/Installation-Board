@@ -17997,6 +17997,228 @@ button {
   }
 }
 
+/* IGLOO simple template sign-off */
+.igloo-public-shell {
+  background: #f4f8fb;
+  min-height: 100vh;
+}
+
+.igloo-hero {
+  min-height: auto;
+  padding: 24px clamp(20px, 5vw, 56px);
+  background: linear-gradient(135deg, #00539b 0%, #063f74 100%);
+}
+
+.igloo-hero h1 {
+  margin: 2px 0 4px;
+  font-size: clamp(1.45rem, 3vw, 2.25rem);
+  letter-spacing: -0.03em;
+}
+
+.igloo-hero p,
+.igloo-hero span {
+  font-size: 0.78rem;
+}
+
+.igloo-public-main {
+  width: min(100% - 28px, 1180px);
+  margin: 18px auto 36px;
+}
+
+.igloo-admin-panel {
+  font-size: 0.84rem;
+}
+
+.igloo-admin-header {
+  gap: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+}
+
+.igloo-admin-header h1 {
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.igloo-admin-header p,
+.igloo-admin-header span,
+.igloo-admin-card-head span {
+  font-size: 0.78rem;
+}
+
+.igloo-admin-card.is-compact-list {
+  padding: 14px;
+  border-radius: 16px;
+  box-shadow: none;
+}
+
+.igloo-admin-card-head.compact {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e1ebf2;
+}
+
+.igloo-admin-card-head.compact h2 {
+  margin: 0 0 2px;
+  font-size: 1rem;
+}
+
+.igloo-catalogue-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 220px;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.igloo-catalogue-toolbar input,
+.igloo-catalogue-toolbar select {
+  height: 34px;
+  border: 1px solid #ccdae5;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #172033;
+  padding: 0 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.igloo-catalogue-list {
+  gap: 6px;
+}
+
+.igloo-catalogue-row,
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  grid-template-columns: 50px minmax(190px, 1fr) auto;
+  gap: 10px;
+  min-height: 58px;
+  padding: 7px 8px;
+  border-radius: 12px;
+  border-color: #dbe7ef;
+  box-shadow: none;
+}
+
+.igloo-catalogue-row.is-good {
+  border-color: #9fd7b7;
+  background: #effaf3;
+}
+
+.igloo-catalogue-row .igloo-cooler-photo {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+}
+
+.igloo-catalogue-title span {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+}
+
+.igloo-catalogue-title strong {
+  font-size: 0.84rem;
+  line-height: 1.15;
+}
+
+.igloo-catalogue-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  color: #617286;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.igloo-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eef3f7;
+  color: #56677a;
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
+.igloo-status.is-uploaded {
+  background: #fff2d9;
+  color: #8a5900;
+}
+
+.igloo-status.is-good {
+  background: #d9f4e5;
+  color: #08713f;
+}
+
+.igloo-catalogue-actions {
+  gap: 5px;
+  flex-wrap: nowrap;
+}
+
+.igloo-catalogue-actions a,
+.igloo-catalogue-actions button,
+.igloo-catalogue-actions .igloo-file-button {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid #c9d9e5;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #00539b;
+  padding: 0 9px;
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.igloo-catalogue-actions .igloo-good-button {
+  border-color: #0e7d47;
+  background: #0e7d47;
+  color: #ffffff;
+}
+
+.igloo-catalogue-actions .igloo-good-button:disabled {
+  border-color: #b7d9c6;
+  background: #dff3e7;
+  color: #27784d;
+  cursor: default;
+}
+
+.igloo-file-button input[type="file"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .igloo-catalogue-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .igloo-catalogue-row,
+  .igloo-catalogue-list.is-admin .igloo-catalogue-row {
+    grid-template-columns: 44px 1fr;
+    align-items: start;
+  }
+
+  .igloo-catalogue-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 .installation-report-button {
   color: #5c3a7e;
 }

@@ -18245,9 +18245,73 @@ function IglooCoolerImage({ cooler }) {
   return cooler?.imageUrl ? <img src={cooler.imageUrl} alt={cooler.model} loading="lazy" /> : <span>{initials}</span>;
 }
 
+const IGLOO_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
+const IGLOO_TEMPLATE_ACCEPT = ".pdf,.ai,.eps,.svg,.doc,.docx,.zip,.png,.jpg,.jpeg,application/pdf,image/*";
+
+function formatIglooFileSize(bytes = 0) {
+  const value = Number(bytes || 0);
+  if (!value) return "";
+  if (value < 1024 * 1024) return String(Math.max(1, Math.round(value / 1024))) + "KB";
+  return (value / 1024 / 1024).toFixed(1) + "MB";
+}
+
+function filterIglooCoolers(coolers, search, family) {
+  const query = String(search || "").trim().toLowerCase();
+  return (Array.isArray(coolers) ? coolers : []).filter((cooler) => {
+    const matchesFamily = !family || cooler.family === family;
+    const haystack = String((cooler.family || "") + " " + (cooler.model || "")).toLowerCase();
+    return matchesFamily && (!query || haystack.includes(query));
+  });
+}
+
+function IglooCatalogueToolbar({ coolers, search, family, onSearch, onFamily }) {
+  const families = Array.from(new Set((Array.isArray(coolers) ? coolers : []).map((cooler) => cooler.family).filter(Boolean)));
+  return (
+    <div className="igloo-catalogue-toolbar">
+      <input value={search} onChange={(event) => onSearch(event.target.value)} placeholder="Search cooler" />
+      <select value={family} onChange={(event) => onFamily(event.target.value)}>
+        <option value="">All families</option>
+        {families.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
+      </select>
+    </div>
+  );
+}
+
+function IglooCatalogueRow({ cooler, admin = false, busy = false, onTemplateUpload, onPhotoUpload, onTemplateGood }) {
+  const hasTemplate = Boolean(cooler.templatePdfUrl);
+  const isGood = Boolean(cooler.templateTested);
+  const uploadLabel = busy ? "Uploading..." : hasTemplate ? "Replace template" : "Upload template";
+  const fileLabel = cooler.templatePdfFileName ? cooler.templatePdfFileName + (cooler.templatePdfSize ? " - " + formatIglooFileSize(cooler.templatePdfSize) : "") : "";
+  return (
+    <article className={"igloo-catalogue-row" + (isGood ? " is-good" : "")}>
+      <div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div>
+      <div className="igloo-catalogue-main">
+        <div className="igloo-catalogue-title"><span>{cooler.family}</span><strong>{cooler.model}</strong></div>
+        <div className="igloo-catalogue-meta">
+          <span className={isGood ? "igloo-status is-good" : hasTemplate ? "igloo-status is-uploaded" : "igloo-status"}>{isGood ? "Template good" : hasTemplate ? "Template uploaded" : "Awaiting template"}</span>
+          {fileLabel ? <span>{fileLabel}</span> : null}
+        </div>
+      </div>
+      <div className="igloo-catalogue-actions">
+        {admin ? (
+          <label className="igloo-file-button">Photo<input type="file" accept="image/*" disabled={busy} onChange={(event) => { onPhotoUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label>
+        ) : (
+          <label className="igloo-file-button">{uploadLabel}<input type="file" accept={IGLOO_TEMPLATE_ACCEPT} disabled={busy} onChange={(event) => { onTemplateUpload?.(cooler, event.target.files?.[0]); event.target.value = ""; }} /></label>
+        )}
+        {hasTemplate ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Download</a> : null}
+        {admin ? <button type="button" className="igloo-good-button" onClick={() => onTemplateGood?.(cooler)} disabled={busy || isGood || !hasTemplate}>{busy ? "Saving..." : isGood ? "Good" : "Template Good"}</button> : null}
+      </div>
+    </article>
+  );
+}
+
 function IglooCustomerPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [uploadingId, setUploadingId] = useState("");
+  const [search, setSearch] = useState("");
+  const [family, setFamily] = useState("");
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   async function loadTemplateCatalogue() {
@@ -18267,152 +18331,144 @@ function IglooCustomerPage() {
 
   useEffect(() => { loadTemplateCatalogue(); }, []);
 
+  async function uploadTemplate(cooler, file) {
+    if (!file) return;
+    if (file.size > IGLOO_UPLOAD_LIMIT_BYTES) {
+      setError("Template documents must be 10MB or under.");
+      return;
+    }
+    setUploadingId(cooler.id);
+    setError("");
+    setMessage("");
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const response = await fetch("/api/igloo/customer/coolers/" + encodeURIComponent(cooler.id) + "/template", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl, fileName: file.name })
+      });
+      const payload = await readJsonResponse(response, "Could not upload template.");
+      if (!response.ok) throw new Error(payload.error || "Could not upload template.");
+      setData(payload);
+      setMessage("Template uploaded for review.");
+    } catch (uploadError) {
+      setError(uploadError.message || "Could not upload template.");
+    } finally {
+      setUploadingId("");
+    }
+  }
+
   const coolers = Array.isArray(data?.coolers) ? data.coolers : [];
+  const visibleCoolers = filterIglooCoolers(coolers, search, family);
+  const signedOffCount = coolers.filter((cooler) => cooler.templateTested).length;
 
   return (
     <div className="igloo-public-shell">
       <header className="igloo-hero">
         <div>
           <p>IGLOO x Signs Express Preston</p>
-          <h1>Template catalogue</h1>
-          <span>{coolers.length} cooler templates</span>
+          <h1>Template sign-off</h1>
+          <span>{signedOffCount} of {coolers.length} templates approved</span>
         </div>
       </header>
       <main className="igloo-public-main">
         {loading ? <div className="igloo-loading">Loading IGLOO templates...</div> : null}
         {error ? <div className="flash error">{error}</div> : null}
+        {message ? <div className="flash success">{message}</div> : null}
         {!loading && !error ? (
-          <>
-            <section className="igloo-section-head"><h2>Cooler templates</h2><p>Template status, PDF downloads and notes for each cooler model.</p></section>
+          <section className="igloo-admin-card is-compact-list">
+            <div className="igloo-admin-card-head compact"><div><h2>Cooler templates</h2><span>Upload each artwork template here. Files are capped at 10MB.</span></div></div>
+            <IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} />
             <div className="igloo-catalogue-list">
-              {coolers.length ? coolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} />) : <p className="igloo-empty">No IGLOO templates are showing yet.</p>}
+              {visibleCoolers.length ? visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} busy={uploadingId === cooler.id} onTemplateUpload={uploadTemplate} />) : <p className="igloo-empty">No coolers match that search.</p>}
             </div>
-          </>
+          </section>
         ) : null}
       </main>
     </div>
   );
 }
-function IglooCatalogueRow({ cooler, admin = false, onChange, onUpload, onFindImage, busy = false }) {
-  return (
-    <article className="igloo-catalogue-row">
-      <div className="igloo-cooler-photo"><IglooCoolerImage cooler={cooler} /></div>
-      <div className="igloo-catalogue-main">
-        <div className="igloo-catalogue-title"><span>{cooler.family}</span><strong>{cooler.model}</strong></div>
-        <p className={cooler.templateTested ? "igloo-ok" : "igloo-pending"}>{cooler.templateTested ? "Template tested and OK" : "Template test pending"}</p>
-        {!admin && cooler.notes ? <p className="igloo-catalogue-note">{cooler.notes}</p> : null}
-      </div>
-      {admin ? (
-        <div className="igloo-catalogue-edit">
-          <input placeholder="Image URL" value={cooler.imageUrl || ""} onChange={(event) => onChange?.("imageUrl", event.target.value)} />
-          <input placeholder="Product page URL" value={cooler.productUrl || ""} onChange={(event) => onChange?.("productUrl", event.target.value)} />
-          <label className="igloo-checkbox"><input type="checkbox" checked={Boolean(cooler.templateTested)} onChange={(event) => onChange?.("templateTested", event.target.checked)} /> Tested OK</label>
-          <textarea placeholder="Template notes" value={cooler.notes || ""} onChange={(event) => onChange?.("notes", event.target.value)} />
-        </div>
-      ) : null}
-      <div className="igloo-catalogue-actions">
-        {admin ? <button type="button" className="ghost-button" onClick={onFindImage} disabled={busy}>{busy ? "Finding..." : "Find image"}</button> : null}
-        {cooler.productUrl ? <a href={cooler.productUrl} target="_blank" rel="noreferrer">Product</a> : null}
-        {admin ? <label className="ghost-button">PDF<input type="file" accept="application/pdf" onChange={(event) => { onUpload?.(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
-        {cooler.templatePdfUrl ? <a href={cooler.templatePdfUrl} target="_blank" rel="noreferrer">Template</a> : <span>No PDF</span>}
-      </div>
-    </article>
-  );
-}
 
 function IglooAdminPage({ currentUser, onLogout, notifications }) {
   const [data, setData] = useState(null);
-  const [draft, setDraft] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState("");
+  const [search, setSearch] = useState("");
+  const [family, setFamily] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [imageLookupId, setImageLookupId] = useState("");
 
   async function loadIglooAdmin() {
+    setLoading(true);
+    setError("");
     try {
       const response = await fetch("/api/igloo/admin");
       const payload = await readJsonResponse(response, "Could not load IGLOO.");
       if (!response.ok) throw new Error(payload.error || "Could not load IGLOO.");
       setData(payload);
-      setDraft(JSON.parse(JSON.stringify(payload)));
     } catch (loadError) {
       setError(loadError.message || "Could not load IGLOO.");
+    } finally {
+      setLoading(false);
     }
   }
 
   useEffect(() => { loadIglooAdmin(); }, []);
 
-  async function saveDraft(nextDraft = draft) {
-    setSaving(true);
+  async function uploadPhoto(cooler, file) {
+    if (!file) return;
+    if (file.size > IGLOO_UPLOAD_LIMIT_BYTES) {
+      setError("Product photos must be 10MB or under.");
+      return;
+    }
+    setBusyId(cooler.id);
     setError("");
     setMessage("");
     try {
-      const response = await fetch("/api/igloo/admin", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nextDraft) });
-      const payload = await readJsonResponse(response, "Could not save IGLOO.");
-      if (!response.ok) throw new Error(payload.error || "Could not save IGLOO.");
-      setData(payload);
-      setDraft(JSON.parse(JSON.stringify(payload)));
-      setMessage("Saved.");
-    } catch (saveError) {
-      setError(saveError.message || "Could not save IGLOO.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function updateDraft(updater) {
-    setDraft((current) => {
-      const next = JSON.parse(JSON.stringify(current || data || {}));
-      updater(next);
-      return next;
-    });
-  }
-
-  async function uploadTemplate(cooler, file) {
-    if (!file) return;
-    setSaving(true);
-    setError("");
-    try {
       const dataUrl = await readFileAsDataUrl(file);
-      const response = await fetch(`/api/igloo/admin/coolers/${encodeURIComponent(cooler.id)}/template`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dataUrl, fileName: file.name }) });
-      const payload = await readJsonResponse(response, "Could not upload template.");
-      if (!response.ok) throw new Error(payload.error || "Could not upload template.");
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl, fileName: file.name })
+      });
+      const payload = await readJsonResponse(response, "Could not upload photo.");
+      if (!response.ok) throw new Error(payload.error || "Could not upload photo.");
       setData(payload);
-      setDraft(JSON.parse(JSON.stringify(payload)));
-      setMessage("Template uploaded.");
+      setMessage("Photo uploaded.");
     } catch (uploadError) {
-      setError(uploadError.message || "Could not upload template.");
+      setError(uploadError.message || "Could not upload photo.");
     } finally {
-      setSaving(false);
+      setBusyId("");
     }
   }
 
-  async function findImage(cooler) {
-    setImageLookupId(cooler.id);
+  async function markTemplateGood(cooler) {
+    setBusyId(cooler.id);
     setError("");
+    setMessage("");
     try {
-      const response = await fetch(`/api/igloo/admin/coolers/${encodeURIComponent(cooler.id)}/image-lookup`, { method: "POST" });
-      const payload = await readJsonResponse(response, "Could not find image.");
-      if (!response.ok) throw new Error(payload.error || "Could not find image.");
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/template-good", { method: "PATCH" });
+      const payload = await readJsonResponse(response, "Could not sign off template.");
+      if (!response.ok) throw new Error(payload.error || "Could not sign off template.");
       setData(payload);
-      setDraft(JSON.parse(JSON.stringify(payload)));
-      setMessage("Image added.");
-    } catch (lookupError) {
-      setError(lookupError.message || "Could not find image.");
+      setMessage("Template marked good.");
+    } catch (signOffError) {
+      setError(signOffError.message || "Could not sign off template.");
     } finally {
-      setImageLookupId("");
+      setBusyId("");
     }
   }
 
-  const current = draft || data;
-  const coolers = Array.isArray(current?.coolers) ? current.coolers : [];
+  const coolers = Array.isArray(data?.coolers) ? data.coolers : [];
+  const visibleCoolers = filterIglooCoolers(coolers, search, family);
+  const signedOffCount = coolers.filter((cooler) => cooler.templateTested).length;
 
   return (
     <div className="app-shell igloo-admin-shell"><div className="page"><MainNavBar currentUser={currentUser} active="igloo" onLogout={onLogout} notifications={notifications} />
       <section className="panel igloo-admin-panel">
-        <div className="igloo-admin-header"><div><p>External customer module</p><h1>IGLOO</h1><span>Manage cooler templates, product photos, notes and customer-facing downloads.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Customer view</a><button type="button" onClick={() => saveDraft()} disabled={saving || !current}>{saving ? "Saving..." : "Save changes"}</button></div></div>
-        {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{!current ? <div className="board-loading">Loading IGLOO...</div> : null}
-        {current ? <section className="igloo-admin-card"><div className="igloo-admin-card-head"><h2>Coolers & templates</h2><span>A compact list of product photos, product pages, PDFs and template notes.</span></div><div className="igloo-catalogue-list is-admin">{coolers.map((cooler, coolerIndex) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={imageLookupId === cooler.id} onFindImage={() => findImage(cooler)} onUpload={(file) => uploadTemplate(cooler, file)} onChange={(field, value) => updateDraft((next) => { next.coolers[coolerIndex][field] = value; })} />)}</div></section> : null}
+        <div className="igloo-admin-header"><div><p>External customer module</p><h1>IGLOO template sign-off</h1><span>{signedOffCount} of {coolers.length} templates approved.</span></div><div className="igloo-admin-actions"><a href="/igloo" target="_blank" rel="noreferrer">Customer view</a><button type="button" onClick={loadIglooAdmin} disabled={loading}>{loading ? "Refreshing..." : "Refresh"}</button></div></div>
+        {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{loading ? <div className="board-loading">Loading IGLOO...</div> : null}
+        {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-admin-card-head compact"><div><h2>Coolers</h2><span>Upload product photos, download customer templates and mark approved lines green.</span></div></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id} onPhotoUpload={uploadPhoto} onTemplateGood={markTemplateGood} />)}</div></section> : null}
       </section></div></div>
   );
 }

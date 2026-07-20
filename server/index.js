@@ -84,6 +84,8 @@ const HOLIDAY_STAFF = [
   { code: "KC", name: "Keilan Curtis", person: "Keilan C", birthDate: "" }
 ];
 const HOLIDAY_RESET_VERSION = 1;
+const IGLOO_TEMPLATE_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
+const IGLOO_IMAGE_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 const IGLOO_COOLER_FAMILIES = [
   ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
   ["Legacy", ["Legacy 20", "Legacy 54"]],
@@ -567,6 +569,16 @@ function getIglooTemplateUploadsDir() {
 
 async function ensureIglooTemplateUploadsDir() {
   const directory = getIglooTemplateUploadsDir();
+  await fsp.mkdir(directory, { recursive: true });
+  return directory;
+}
+
+function getIglooImageUploadsDir() {
+  return path.join(path.dirname(getDataFile()), "igloo-images");
+}
+
+async function ensureIglooImageUploadsDir() {
+  const directory = getIglooImageUploadsDir();
   await fsp.mkdir(directory, { recursive: true });
   return directory;
 }
@@ -2787,6 +2799,14 @@ function sanitizeIglooUrl(value = "") {
   return ("https://" + url).slice(0, 2000);
 }
 
+function sanitizeIglooStorageName(value = "") {
+  return path.basename(sanitizeIglooText(value, 240));
+}
+
+function getIglooStoredImageUrl(cooler = {}) {
+  return cooler.imageStorageName ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
+}
+
 function getIglooImageUrl(model = "") {
   const cleanModel = String(model || "").replace(/\s*\([^)]*\)/g, "").trim();
   const known = {
@@ -2815,6 +2835,9 @@ function createDefaultIglooCoolers() {
       model,
       imageUrl: getIglooImageUrl(model),
       productUrl: getIglooProductUrl(model),
+      imageStorageName: "",
+      imageFileName: "",
+      imageContentType: "",
       templateTested: false,
       templatePdfStorageName: "",
       templatePdfFileName: "",
@@ -2831,13 +2854,17 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
   const family = sanitizeIglooText(entry.family, 120);
   const model = sanitizeIglooText(entry.model, 180);
   const fallbackId = toIglooId((family || "cooler") + "-" + (model || index + 1));
-  const storageName = path.basename(sanitizeIglooText(entry.templatePdfStorageName || entry.storageName, 240));
+  const storageName = sanitizeIglooStorageName(entry.templatePdfStorageName || entry.storageName);
+  const imageStorageName = sanitizeIglooStorageName(entry.imageStorageName);
   return {
     id: sanitizeIglooText(entry.id || fallbackId || "cooler-" + (index + 1), 120),
     family,
     model,
     imageUrl: sanitizeIglooUrl(entry.imageUrl),
     productUrl: sanitizeIglooUrl(entry.productUrl),
+    imageStorageName,
+    imageFileName: sanitizeIglooText(entry.imageFileName, 240),
+    imageContentType: sanitizeIglooText(entry.imageContentType, 80),
     templateTested: Boolean(entry.templateTested),
     templatePdfStorageName: storageName,
     templatePdfFileName: sanitizeIglooText(entry.templatePdfFileName || entry.fileName, 240),
@@ -2858,6 +2885,9 @@ function mergeIglooCoolerCatalogue(coolers = []) {
       ...(existing || {}),
       ...sanitized,
       imageUrl: sanitized.imageUrl || existing?.imageUrl || getIglooImageUrl(sanitized.model),
+      imageStorageName: sanitized.imageStorageName || existing?.imageStorageName || "",
+      imageFileName: sanitized.imageFileName || existing?.imageFileName || "",
+      imageContentType: sanitized.imageContentType || existing?.imageContentType || "",
       productUrl: sanitized.productUrl || existing?.productUrl || getIglooProductUrl(sanitized.model)
     });
   });
@@ -2878,6 +2908,7 @@ function toPublicIglooCooler(entry = {}, index = 0) {
   const cooler = sanitizeIglooCooler(entry, index);
   return {
     ...cooler,
+    imageUrl: getIglooStoredImageUrl(cooler) || cooler.imageUrl,
     templatePdfUrl: cooler.templatePdfStorageName ? "/api/igloo/templates/" + encodeURIComponent(cooler.id) : ""
   };
 }
@@ -2911,18 +2942,50 @@ async function storeIglooTemplateUpload(cooler, upload = {}) {
   const dataUrl = String(upload.dataUrl || "").trim();
   if (!dataUrl) return cooler;
   const decoded = decodeDataUrl(dataUrl);
-  if (!decoded || String(decoded.contentType || "").toLowerCase() !== "application/pdf") {
-    throw new Error("Please upload a PDF template.");
+  if (!decoded) {
+    throw new Error("Please upload a valid template document.");
+  }
+  if (decoded.buffer.length > IGLOO_TEMPLATE_UPLOAD_LIMIT_BYTES) {
+    throw new Error("Template documents must be 10MB or under.");
   }
   const directory = await ensureIglooTemplateUploadsDir();
-  const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + (extensionForContentType(decoded.contentType) || ".pdf");
+  const contentType = sanitizeIglooText(decoded.contentType || "application/octet-stream", 80) || "application/octet-stream";
+  const originalName = sanitizeIglooText(upload.fileName || upload.originalName || cooler.model || "igloo-template", 240);
+  const fallbackExtension = extensionForContentType(contentType) || path.extname(originalName) || ".bin";
+  const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + fallbackExtension;
   await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
   return {
     ...cooler,
+    templateTested: false,
     templatePdfStorageName: storedName,
-    templatePdfFileName: sanitizeIglooText(upload.fileName || upload.originalName || (cooler.model || "igloo-template") + ".pdf", 240),
-    templatePdfContentType: decoded.contentType,
+    templatePdfFileName: originalName,
+    templatePdfContentType: contentType,
     templatePdfSize: decoded.buffer.length,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function storeIglooImageUpload(cooler, upload = {}) {
+  const dataUrl = String(upload.dataUrl || "").trim();
+  if (!dataUrl) return cooler;
+  const decoded = decodeDataUrl(dataUrl);
+  const contentType = String(decoded?.contentType || "").toLowerCase();
+  if (!decoded || !contentType.startsWith("image/")) {
+    throw new Error("Please upload a valid image.");
+  }
+  if (decoded.buffer.length > IGLOO_IMAGE_UPLOAD_LIMIT_BYTES) {
+    throw new Error("Product photos must be 10MB or under.");
+  }
+  const directory = await ensureIglooImageUploadsDir();
+  const originalName = sanitizeIglooText(upload.fileName || upload.originalName || cooler.model || "igloo-photo", 240);
+  const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + (extensionForContentType(contentType) || path.extname(originalName) || ".img");
+  await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
+  return {
+    ...cooler,
+    imageStorageName: storedName,
+    imageFileName: originalName,
+    imageContentType: contentType,
+    imageUrl: "",
     updatedAt: new Date().toISOString()
   };
 }
@@ -12019,7 +12082,7 @@ function createServer() {
       next();
       return;
     }
-    if (request.path.startsWith("/igloo/customer") || request.path.startsWith("/igloo/templates/")) {
+    if (request.path.startsWith("/igloo/customer") || request.path.startsWith("/igloo/templates/") || request.path.startsWith("/igloo/images/")) {
       next();
       return;
     }
@@ -12073,6 +12136,28 @@ function createServer() {
     }
   });
 
+  app.get("/api/igloo/images/:coolerId", async (request, response) => {
+    try {
+      const tracker = sanitizeIglooTracker((await readStore()).igloo);
+      const cooler = tracker.coolers.find((entry) => entry.id === String(request.params.coolerId || ""));
+      if (!cooler?.imageStorageName) {
+        response.status(404).json({ error: "Image not found." });
+        return;
+      }
+      const filePath = path.join(getIglooImageUploadsDir(), cooler.imageStorageName);
+      if (!fs.existsSync(filePath)) {
+        response.status(404).json({ error: "Image not found." });
+        return;
+      }
+      response.setHeader("Content-Type", cooler.imageContentType || "image/jpeg");
+      response.setHeader("Cache-Control", "public, max-age=3600");
+      response.sendFile(filePath);
+    } catch (error) {
+      console.error("Could not load IGLOO image.", error.message || error);
+      response.status(500).json({ error: "Could not load the image." });
+    }
+  });
+
   app.get("/api/igloo/templates/:coolerId", async (request, response) => {
     try {
       const tracker = sanitizeIglooTracker((await readStore()).igloo);
@@ -12092,6 +12177,25 @@ function createServer() {
     } catch (error) {
       console.error("Could not load IGLOO template.", error.message || error);
       response.status(500).json({ error: "Could not load the template." });
+    }
+  });
+
+  app.post("/api/igloo/customer/coolers/:coolerId/template", async (request, response) => {
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = await storeIglooTemplateUpload(tracker.coolers[coolerIndex], request.body || {});
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not upload IGLOO customer template.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not upload template." });
     }
   });
 
@@ -12141,6 +12245,46 @@ function createServer() {
     } catch (error) {
       console.error("Could not find IGLOO image.", error.message || error);
       response.status(400).json({ error: error.message || "Could not find product image." });
+    }
+  });
+
+  app.post("/api/igloo/admin/coolers/:coolerId/image", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = await storeIglooImageUpload(tracker.coolers[coolerIndex], request.body || {});
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not upload IGLOO image.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not upload product photo." });
+    }
+  });
+
+  app.patch("/api/igloo/admin/coolers/:coolerId/template-good", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = { ...tracker.coolers[coolerIndex], templateTested: true, updatedAt: new Date().toISOString() };
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not sign off IGLOO template.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not sign off template." });
     }
   });
 
