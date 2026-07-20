@@ -2904,6 +2904,7 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
     templatePdfFileName: sanitizeIglooText(entry.templatePdfFileName || entry.fileName, 240),
     templatePdfContentType: sanitizeIglooText(entry.templatePdfContentType || "application/pdf", 80) || "application/pdf",
     templatePdfSize: Math.max(0, Number(entry.templatePdfSize || entry.size) || 0),
+    sortOrder: Number.isFinite(Number(entry.sortOrder)) ? Number(entry.sortOrder) : index,
     completionPhotos: (Array.isArray(entry.completionPhotos) ? entry.completionPhotos : []).map((photo, photoIndex) => sanitizeIglooCompletionPhoto(photo, photoIndex)).filter((photo) => photo.storageName),
     notes: sanitizeIglooText(entry.notes, 2000),
     updatedAt: sanitizeIglooText(entry.updatedAt, 80)
@@ -2931,6 +2932,9 @@ function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = []) {
   return [...byId.values()]
     .filter((entry) => !deletedIds.has(entry.id))
     .sort((left, right) => {
+      const leftOrder = Number.isFinite(Number(left.sortOrder)) ? Number(left.sortOrder) : 999999;
+      const rightOrder = Number.isFinite(Number(right.sortOrder)) ? Number(right.sortOrder) : 999999;
+      if (leftOrder !== rightOrder) return leftOrder - rightOrder;
       if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
       return String(left.model || "").localeCompare(String(right.model || ""));
     });
@@ -12358,6 +12362,7 @@ function createServer() {
         family,
         model,
         productUrl: sanitizeIglooUrl(request.body?.productUrl),
+        sortOrder: tracker.coolers.length * 10,
         templateStatus: "untested",
         updatedAt: new Date().toISOString()
       }, tracker.coolers.length);
@@ -12392,6 +12397,61 @@ function createServer() {
     } catch (error) {
       console.error("Could not remove IGLOO cooler.", error.message || error);
       response.status(400).json({ error: error.message || "Could not remove product." });
+    }
+  });
+
+  app.patch("/api/igloo/admin/coolers/:coolerId/details", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const coolerIndex = tracker.coolers.findIndex((entry) => entry.id === String(request.params.coolerId || ""));
+      if (coolerIndex === -1) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      const family = sanitizeIglooText(request.body?.family, 120) || tracker.coolers[coolerIndex].family || "Custom";
+      const model = sanitizeIglooText(request.body?.model, 180);
+      if (!model) {
+        response.status(400).json({ error: "Product name is required." });
+        return;
+      }
+      tracker.coolers[coolerIndex] = {
+        ...tracker.coolers[coolerIndex],
+        family,
+        model,
+        updatedAt: new Date().toISOString()
+      };
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not update IGLOO cooler details.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not update product." });
+    }
+  });
+
+  app.patch("/api/igloo/admin/coolers/order", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const requestedIds = Array.isArray(request.body?.coolerIds) ? request.body.coolerIds.map((entry) => sanitizeIglooText(entry, 120)).filter(Boolean) : [];
+      if (!requestedIds.length) {
+        response.status(400).json({ error: "No product order was supplied." });
+        return;
+      }
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const orderLookup = new Map(requestedIds.map((id, index) => [id, index * 10]));
+      tracker.coolers = tracker.coolers.map((cooler, index) => ({
+        ...cooler,
+        sortOrder: orderLookup.has(cooler.id) ? orderLookup.get(cooler.id) : (requestedIds.length + index) * 10
+      }));
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not reorder IGLOO coolers.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not reorder products." });
     }
   });
 

@@ -18330,7 +18330,7 @@ function IglooStatusButtons({ status, disabled, onChange }) {
   );
 }
 
-function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = false, onTemplateUpload, onPhotoUpload, onStatusChange, onCompletionUpload, onLinkEdit, onClientNoteSave, onRemove }) {
+function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = false, dragging = false, onTemplateUpload, onPhotoUpload, onStatusChange, onCompletionUpload, onLinkEdit, onDetailsEdit, onClientNoteSave, onRemove, onDragStart, onDragOver, onDrop }) {
   const hasTemplate = Boolean(cooler.templatePdfUrl);
   const templateStatus = cooler.templateStatus || (cooler.templateTested ? "good" : "untested");
   const isGood = templateStatus === "good";
@@ -18342,9 +18342,9 @@ function IglooCatalogueRow({ cooler, admin = false, busy = false, noteBusy = fal
   useEffect(() => { setClientNote(cooler.clientNote || ""); }, [cooler.clientNote]);
 
   return (
-    <article className={"igloo-catalogue-row" + (isGood ? " is-good" : isWrong ? " is-wrong" : "")}>
+    <article className={"igloo-catalogue-row" + (isGood ? " is-good" : isWrong ? " is-wrong" : "") + (dragging ? " is-dragging" : "")} draggable={admin} onDragStart={(event) => onDragStart?.(event, cooler)} onDragOver={(event) => onDragOver?.(event, cooler)} onDrop={(event) => onDrop?.(event, cooler)}>
       <IglooPhotoUpload cooler={cooler} admin={admin} busy={busy} onPhotoUpload={onPhotoUpload} />
-      <div className="igloo-product-cell"><span>{cooler.family}</span><strong>{cooler.model}</strong></div>
+      <div className="igloo-product-cell"><div><span>{cooler.family}</span><strong>{cooler.model}</strong></div>{admin ? <button type="button" onClick={() => onDetailsEdit?.(cooler)} disabled={busy}>Edit</button> : null}</div>
       <div className="igloo-note-cell">
         {!admin ? <div className="igloo-client-note"><input value={clientNote} onChange={(event) => setClientNote(event.target.value)} placeholder="Add a note" /><button type="button" onClick={() => onClientNoteSave?.(cooler, clientNote)} disabled={noteBusy || clientNote === (cooler.clientNote || "")}>{noteBusy ? "Saving" : "Save"}</button></div> : cooler.clientNote ? <small>{cooler.clientNote}</small> : <span className="igloo-muted">None</span>}
       </div>
@@ -18469,6 +18469,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [newProduct, setNewProduct] = useState({ family: "", model: "", productUrl: "" });
+  const [draggedCoolerId, setDraggedCoolerId] = useState("");
 
   async function loadIglooAdmin() {
     setLoading(true);
@@ -18571,6 +18572,68 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
   }
 
 
+  async function editProductDetails(cooler) {
+    const nextFamily = window.prompt("Product family", cooler.family || "");
+    if (nextFamily === null) return;
+    const nextModel = window.prompt("Product name", cooler.model || "");
+    if (nextModel === null) return;
+    const model = String(nextModel || "").trim();
+    if (!model) {
+      setError("Product name is required.");
+      return;
+    }
+    setBusyId(cooler.id);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin/coolers/" + encodeURIComponent(cooler.id) + "/details", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ family: nextFamily, model })
+      });
+      const payload = await readJsonResponse(response, "Could not update product.");
+      if (!response.ok) throw new Error(payload.error || "Could not update product.");
+      setData(payload);
+      setMessage("Product updated.");
+    } catch (detailsError) {
+      setError(detailsError.message || "Could not update product.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function reorderProducts(targetCooler) {
+    if (!draggedCoolerId || draggedCoolerId === targetCooler.id) return;
+    const visibleIds = visibleCoolers.map((cooler) => cooler.id);
+    const fromIndex = visibleIds.indexOf(draggedCoolerId);
+    const toIndex = visibleIds.indexOf(targetCooler.id);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const reorderedVisibleIds = [...visibleIds];
+    const [movedId] = reorderedVisibleIds.splice(fromIndex, 1);
+    reorderedVisibleIds.splice(toIndex, 0, movedId);
+    const visibleQueue = [...reorderedVisibleIds];
+    const nextCoolerIds = coolers.map((cooler) => visibleIds.includes(cooler.id) ? visibleQueue.shift() : cooler.id);
+    setDraggedCoolerId("");
+    setBusyId("reorder");
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/igloo/admin/coolers/order", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ coolerIds: nextCoolerIds })
+      });
+      const payload = await readJsonResponse(response, "Could not reorder products.");
+      if (!response.ok) throw new Error(payload.error || "Could not reorder products.");
+      setData(payload);
+      setMessage("Product order saved.");
+    } catch (orderError) {
+      setError(orderError.message || "Could not reorder products.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   async function addProduct() {
     const familyValue = String(newProduct.family || "").trim() || "Custom";
     const modelValue = String(newProduct.model || "").trim();
@@ -18625,7 +18688,7 @@ function IglooAdminPage({ currentUser, onLogout, notifications }) {
       <section className="panel igloo-admin-panel">
         <IglooHeader admin signedOffCount={signedOffCount} totalCount={coolers.length} />
         {error ? <div className="flash error">{error}</div> : null}{message ? <div className="flash success">{message}</div> : null}{loading ? <div className="board-loading">Loading IGLOO...</div> : null}
-        {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-add-row"><input value={newProduct.family} onChange={(event) => setNewProduct((current) => ({ ...current, family: event.target.value }))} placeholder="Family" /><input value={newProduct.model} onChange={(event) => setNewProduct((current) => ({ ...current, model: event.target.value }))} placeholder="Product name" /><input value={newProduct.productUrl} onChange={(event) => setNewProduct((current) => ({ ...current, productUrl: event.target.value }))} placeholder="Product link" /><button type="button" onClick={addProduct} disabled={busyId === "new-product"}>{busyId === "new-product" ? "Adding..." : "Add line"}</button></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span>Photo</span><span>Product name</span><span>Note</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span><span></span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onLinkEdit={editProductLink} onRemove={removeProduct} />)}</div></section> : null}
+        {!loading ? <section className="igloo-admin-card is-compact-list"><div className="igloo-add-row"><input value={newProduct.family} onChange={(event) => setNewProduct((current) => ({ ...current, family: event.target.value }))} placeholder="Family" /><input value={newProduct.model} onChange={(event) => setNewProduct((current) => ({ ...current, model: event.target.value }))} placeholder="Product name" /><input value={newProduct.productUrl} onChange={(event) => setNewProduct((current) => ({ ...current, productUrl: event.target.value }))} placeholder="Product link" /><button type="button" onClick={addProduct} disabled={busyId === "new-product"}>{busyId === "new-product" ? "Adding..." : "Add line"}</button></div><IglooCatalogueToolbar coolers={coolers} search={search} family={family} onSearch={setSearch} onFamily={setFamily} /><div className="igloo-list-head"><span></span><span>Photo</span><span>Product name</span><span>Note</span><span>Link</span><span>Template</span><span>Template approved</span><span>Completion photos</span><span></span></div><div className="igloo-catalogue-list is-admin">{visibleCoolers.map((cooler) => <IglooCatalogueRow key={cooler.id} cooler={cooler} admin busy={busyId === cooler.id} onPhotoUpload={uploadPhoto} onTemplateUpload={uploadTemplate} onStatusChange={updateTemplateStatus} onCompletionUpload={uploadCompletionPhoto} onLinkEdit={editProductLink} onDetailsEdit={editProductDetails} onRemove={removeProduct} dragging={draggedCoolerId === cooler.id} onDragStart={(event, draggedCooler) => { event.dataTransfer.effectAllowed = "move"; setDraggedCoolerId(draggedCooler.id); }} onDragOver={(event) => event.preventDefault()} onDrop={(event, droppedCooler) => { event.preventDefault(); reorderProducts(droppedCooler); }} />)}</div></section> : null}
       </section></div></div>
   );
 }

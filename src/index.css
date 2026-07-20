@@ -1,4 +1,4 @@
-@font-face {
+﻿@font-face {
   font-family: "Faricy New";
   src: url("/fonts/FARICYNEW-LIGHT.TTF") format("truetype");
   font-weight: 300;
@@ -19121,4 +19121,65 @@ button {
     grid-column: 2 / -1;
     justify-content: flex-start;
   }
+}
+
+.igloo-catalogue-row[draggable="true"] {
+  cursor: grab;
+}
+
+.igloo-catalogue-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.igloo-catalogue-row.is-dragging {
+  opacity: 0.58;
+  border-style: dashed;
+  transform: scale(0.995);
+}
+
+.igloo-product-cell {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+}
+
+.igloo-product-cell > div {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.igloo-product-cell button {
+  min-height: 24px;
+  border: 1px solid #cbdbe7;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #00539b;
+  padding: 0 8px;
+  font-size: 0.62rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.igloo-product-cell button:hover,
+.igloo-row-actions button:hover {
+  background: #f4f8fb;
+}
+
+.igloo-catalogue-list.is-admin .igloo-catalogue-row::before {
+  content: "::";
+  align-self: center;
+  justify-self: center;
+  color: #8aa0b5;
+  font-size: 0.78rem;
+  letter-spacing: -0.12em;
+  transform: rotate(90deg);
+}
+
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  grid-template-columns: 16px 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 72px;
+}
+
+.igloo-admin-shell .igloo-list-head {
+  grid-template-columns: 16px 44px minmax(145px, 0.9fr) minmax(175px, 0.85fr) 56px minmax(118px, 0.62fr) minmax(176px, 0.85fr) minmax(115px, 0.58fr) 72px;
 }
