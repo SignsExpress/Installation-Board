@@ -19048,3 +19048,77 @@ button {
 .client-mode .subcontractor-event-stack {
   margin-top: 0;
 }
+
+.igloo-add-row {
+  display: grid;
+  grid-template-columns: 145px minmax(180px, 0.8fr) minmax(240px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid #d7e4ee;
+  border-radius: 12px;
+  background: #f8fbfd;
+}
+
+.igloo-add-row input {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #cbddea;
+  border-radius: 9px;
+  padding: 0 10px;
+  font-size: 0.74rem;
+  font-weight: 750;
+  background: #ffffff;
+  color: #102033;
+}
+
+.igloo-add-row button,
+.igloo-row-actions button {
+  min-height: 30px;
+  border: 1px solid #cbddea;
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #ffffff;
+  color: #00539b;
+  font-size: 0.68rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.igloo-add-row button {
+  background: #00539b;
+  border-color: #00539b;
+  color: #ffffff;
+}
+
+.igloo-add-row button:disabled,
+.igloo-row-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.igloo-row-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.igloo-row-actions button {
+  color: #b42323;
+}
+
+.igloo-admin-shell .igloo-list-head,
+.igloo-catalogue-list.is-admin .igloo-catalogue-row {
+  grid-template-columns: 44px minmax(150px, 0.9fr) minmax(190px, 0.9fr) 58px minmax(120px, 0.68fr) minmax(180px, 0.9fr) minmax(120px, 0.62fr) 72px;
+}
+
+@media (max-width: 1080px) {
+  .igloo-add-row {
+    grid-template-columns: 1fr;
+  }
+
+  .igloo-row-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+}

@@ -2910,7 +2910,8 @@ function sanitizeIglooCooler(entry = {}, index = 0) {
   };
 }
 
-function mergeIglooCoolerCatalogue(coolers = []) {
+function mergeIglooCoolerCatalogue(coolers = [], deletedCoolerIds = []) {
+  const deletedIds = new Set((Array.isArray(deletedCoolerIds) ? deletedCoolerIds : []).map((entry) => sanitizeIglooText(entry, 120)).filter(Boolean));
   const defaults = createDefaultIglooCoolers();
   const byId = new Map(defaults.map((entry, index) => [entry.id, sanitizeIglooCooler(entry, index)]));
   (Array.isArray(coolers) ? coolers : []).forEach((entry, index) => {
@@ -2927,16 +2928,22 @@ function mergeIglooCoolerCatalogue(coolers = []) {
       productUrl: sanitized.productUrl || existing?.productUrl || getIglooProductUrl(sanitized.model)
     });
   });
-  return [...byId.values()].sort((left, right) => {
-    if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
-    return String(left.model || "").localeCompare(String(right.model || ""));
-  });
+  return [...byId.values()]
+    .filter((entry) => !deletedIds.has(entry.id))
+    .sort((left, right) => {
+      if (left.family !== right.family) return String(left.family || "").localeCompare(String(right.family || ""));
+      return String(left.model || "").localeCompare(String(right.model || ""));
+    });
 }
 
 function sanitizeIglooTracker(payload = {}) {
   const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const deletedCoolerIds = (Array.isArray(source.deletedCoolerIds) ? source.deletedCoolerIds : [])
+    .map((entry) => sanitizeIglooText(entry, 120))
+    .filter(Boolean);
   return {
-    coolers: mergeIglooCoolerCatalogue(source.coolers)
+    deletedCoolerIds,
+    coolers: mergeIglooCoolerCatalogue(source.coolers, deletedCoolerIds)
   };
 }
 
@@ -2953,6 +2960,7 @@ function toPublicIglooCooler(entry = {}, index = 0) {
 function toPublicIglooTracker(payload = {}) {
   const tracker = sanitizeIglooTracker(payload);
   return {
+    deletedCoolerIds: tracker.deletedCoolerIds || [],
     coolers: tracker.coolers.map((entry, index) => toPublicIglooCooler(entry, index))
   };
 }
@@ -12329,6 +12337,61 @@ function createServer() {
     } catch (error) {
       console.error("Could not save IGLOO tracker.", error.message || error);
       response.status(400).json({ error: error.message || "Could not save IGLOO." });
+    }
+  });
+
+  app.post("/api/igloo/admin/coolers", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const family = sanitizeIglooText(request.body?.family || "Custom", 120) || "Custom";
+      const model = sanitizeIglooText(request.body?.model, 180);
+      if (!model) {
+        response.status(400).json({ error: "Product name is required." });
+        return;
+      }
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      const id = toIglooId(family + "-" + model) || "igloo-" + crypto.randomUUID();
+      const existingIndex = tracker.coolers.findIndex((entry) => entry.id === id);
+      const nextCooler = sanitizeIglooCooler({
+        id,
+        family,
+        model,
+        productUrl: sanitizeIglooUrl(request.body?.productUrl),
+        templateStatus: "untested",
+        updatedAt: new Date().toISOString()
+      }, tracker.coolers.length);
+      tracker.deletedCoolerIds = (tracker.deletedCoolerIds || []).filter((entry) => entry !== id);
+      if (existingIndex >= 0) tracker.coolers[existingIndex] = { ...tracker.coolers[existingIndex], ...nextCooler };
+      else tracker.coolers.push(nextCooler);
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not add IGLOO cooler.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not add product." });
+    }
+  });
+
+  app.delete("/api/igloo/admin/coolers/:coolerId", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const coolerId = sanitizeIglooText(request.params.coolerId, 120);
+      const store = await readStore();
+      const tracker = sanitizeIglooTracker(store.igloo);
+      if (!tracker.coolers.some((entry) => entry.id === coolerId)) {
+        response.status(404).json({ error: "Cooler not found." });
+        return;
+      }
+      const deletedIds = new Set([...(tracker.deletedCoolerIds || []), coolerId]);
+      tracker.deletedCoolerIds = [...deletedIds];
+      tracker.coolers = tracker.coolers.filter((entry) => entry.id !== coolerId);
+      store.igloo = tracker;
+      const updated = await writeStore(store);
+      response.json(toPublicIglooTracker(updated.igloo));
+    } catch (error) {
+      console.error("Could not remove IGLOO cooler.", error.message || error);
+      response.status(400).json({ error: error.message || "Could not remove product." });
     }
   });
 
