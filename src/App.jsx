@@ -18242,15 +18242,16 @@ function MustangProgressBar({ stage, stages, progressOverride = null }) {
 
 function IglooCoolerImage({ cooler }) {
   const initials = String(cooler?.model || "IG").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-  const uploadedImageUrl = cooler?.id ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
-  const [imageSrc, setImageSrc] = useState(uploadedImageUrl || cooler?.imageUrl || "");
+  const imageUrl = cooler?.imageUrl || "";
+  const fallbackUrl = cooler?.fallbackImageUrl || "";
+  const [imageSrc, setImageSrc] = useState(imageUrl);
 
   useEffect(() => {
-    setImageSrc(uploadedImageUrl || cooler?.imageUrl || "");
-  }, [uploadedImageUrl, cooler?.imageUrl]);
+    setImageSrc(imageUrl);
+  }, [imageUrl]);
 
   if (!imageSrc) return <span>{initials}</span>;
-  return <><img className="igloo-photo-thumb" src={imageSrc} alt={cooler.model} loading="lazy" onError={() => setImageSrc((current) => current === uploadedImageUrl ? (cooler?.fallbackImageUrl || "") : "")} /><img className="igloo-photo-preview" src={imageSrc} alt="" aria-hidden="true" loading="lazy" /></>;
+  return <><img className="igloo-photo-thumb" src={imageSrc} alt={cooler.model} loading="lazy" onError={() => setImageSrc((current) => current !== fallbackUrl ? fallbackUrl : "")} /><img className="igloo-photo-preview" src={imageSrc} alt="" aria-hidden="true" loading="lazy" /></>;
 }
 
 function IglooLinkIcon() {

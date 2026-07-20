@@ -2867,7 +2867,9 @@ function sanitizeIglooStorageName(value = "") {
 }
 
 function getIglooStoredImageUrl(cooler = {}) {
-  return cooler?.id ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
+  const storageName = sanitizeIglooStorageName(cooler?.imageStorageName);
+  if (!cooler?.id || !storageName) return "";
+  return "/api/igloo/images/" + encodeURIComponent(cooler.id) + "?v=" + encodeURIComponent(storageName);
 }
 
 async function findLatestIglooUploadForCooler(directory, coolerId) {
@@ -3179,8 +3181,13 @@ async function storeIglooImageUpload(cooler, upload = {}) {
   }
   const directory = await ensureIglooImageUploadsDir();
   const originalName = sanitizeIglooText(upload.fileName || upload.originalName || cooler.model || "igloo-photo", 240);
+  const previousStorageName = sanitizeIglooStorageName(cooler.imageStorageName);
   const storedName = cooler.id + "-" + Date.now() + "-" + crypto.randomUUID() + (extensionForContentType(contentType) || path.extname(originalName) || ".img");
   await fsp.writeFile(path.join(directory, storedName), decoded.buffer);
+  if (previousStorageName && previousStorageName !== storedName) {
+    const previousPath = path.join(directory, previousStorageName);
+    try { await fsp.unlink(previousPath); } catch (error) { if (error.code !== "ENOENT") console.error("Could not delete old IGLOO product photo.", error.message || error); }
+  }
   return {
     ...cooler,
     imageStorageName: storedName,
@@ -12375,7 +12382,7 @@ function createServer() {
         return;
       }
       response.setHeader("Content-Type", cooler.imageContentType || contentTypeForExtension(path.extname(storageName)) || "image/jpeg");
-      response.setHeader("Cache-Control", "public, max-age=3600");
+      response.setHeader("Cache-Control", "no-store");
       response.sendFile(filePath);
     } catch (error) {
       console.error("Could not load IGLOO image.", error.message || error);
@@ -12398,7 +12405,7 @@ function createServer() {
         return;
       }
       response.setHeader("Content-Type", photo.contentType || "image/jpeg");
-      response.setHeader("Cache-Control", "public, max-age=3600");
+      response.setHeader("Cache-Control", "no-store");
       response.sendFile(filePath);
     } catch (error) {
       console.error("Could not load IGLOO completion photo.", error.message || error);
