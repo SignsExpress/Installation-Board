@@ -486,6 +486,22 @@ function extensionForContentType(contentType = "") {
   }
 }
 
+function contentTypeForExtension(extension = "") {
+  switch (String(extension).toLowerCase()) {
+    case ".png":
+      return "image/png";
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".svg":
+      return "image/svg+xml";
+    case ".webp":
+      return "image/webp";
+    default:
+      return "";
+  }
+}
+
 async function writeProFormaAssetUpload(asset, prefix) {
   if (!asset || typeof asset !== "object" || Array.isArray(asset)) {
     return null;
@@ -2820,7 +2836,30 @@ function sanitizeIglooStorageName(value = "") {
 }
 
 function getIglooStoredImageUrl(cooler = {}) {
-  return cooler.imageStorageName ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
+  return cooler?.id ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
+}
+
+async function findLatestIglooUploadForCooler(directory, coolerId) {
+  const safeCoolerId = sanitizeIglooText(coolerId, 120);
+  if (!safeCoolerId) return "";
+  try {
+    const entries = await fsp.readdir(directory, { withFileTypes: true });
+    const candidates = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.startsWith(safeCoolerId + "-")) continue;
+      const filePath = path.join(directory, entry.name);
+      try {
+        const stat = await fsp.stat(filePath);
+        candidates.push({ name: entry.name, mtimeMs: stat.mtimeMs });
+      } catch {
+        // Ignore files that disappear during lookup.
+      }
+    }
+    candidates.sort((left, right) => right.mtimeMs - left.mtimeMs);
+    return candidates[0]?.name || "";
+  } catch {
+    return "";
+  }
 }
 
 function sanitizeIglooCompletionPhoto(entry = {}, index = 0) {
@@ -2956,6 +2995,7 @@ function toPublicIglooCooler(entry = {}, index = 0) {
   return {
     ...cooler,
     imageUrl: getIglooStoredImageUrl(cooler) || cooler.imageUrl,
+    fallbackImageUrl: cooler.imageUrl,
     completionPhotos: (cooler.completionPhotos || []).map((photo) => ({ ...photo, url: "/api/igloo/completion-photos/" + encodeURIComponent(cooler.id) + "/" + encodeURIComponent(photo.id) })),
     templatePdfUrl: cooler.templatePdfStorageName ? "/api/igloo/templates/" + encodeURIComponent(cooler.id) : ""
   };
@@ -12216,16 +12256,22 @@ function createServer() {
     try {
       const tracker = sanitizeIglooTracker((await readStore()).igloo);
       const cooler = tracker.coolers.find((entry) => entry.id === String(request.params.coolerId || ""));
-      if (!cooler?.imageStorageName) {
+      if (!cooler) {
         response.status(404).json({ error: "Image not found." });
         return;
       }
-      const filePath = path.join(getIglooImageUploadsDir(), cooler.imageStorageName);
+      const directory = getIglooImageUploadsDir();
+      const storageName = cooler.imageStorageName || await findLatestIglooUploadForCooler(directory, cooler.id);
+      if (!storageName) {
+        response.status(404).json({ error: "Image not found." });
+        return;
+      }
+      const filePath = path.join(directory, storageName);
       if (!fs.existsSync(filePath)) {
         response.status(404).json({ error: "Image not found." });
         return;
       }
-      response.setHeader("Content-Type", cooler.imageContentType || "image/jpeg");
+      response.setHeader("Content-Type", cooler.imageContentType || contentTypeForExtension(path.extname(storageName)) || "image/jpeg");
       response.setHeader("Cache-Control", "public, max-age=3600");
       response.sendFile(filePath);
     } catch (error) {
@@ -15582,4 +15628,3 @@ module.exports = {
   normalizeCoreBridgeOrder,
   startServer
 };
-

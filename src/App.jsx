@@ -18242,7 +18242,15 @@ function MustangProgressBar({ stage, stages, progressOverride = null }) {
 
 function IglooCoolerImage({ cooler }) {
   const initials = String(cooler?.model || "IG").split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase();
-  return cooler?.imageUrl ? <img src={cooler.imageUrl} alt={cooler.model} loading="lazy" /> : <span>{initials}</span>;
+  const uploadedImageUrl = cooler?.id ? "/api/igloo/images/" + encodeURIComponent(cooler.id) : "";
+  const [imageSrc, setImageSrc] = useState(uploadedImageUrl || cooler?.imageUrl || "");
+
+  useEffect(() => {
+    setImageSrc(uploadedImageUrl || cooler?.imageUrl || "");
+  }, [uploadedImageUrl, cooler?.imageUrl]);
+
+  if (!imageSrc) return <span>{initials}</span>;
+  return <img src={imageSrc} alt={cooler.model} loading="lazy" onError={() => setImageSrc((current) => current === uploadedImageUrl ? (cooler?.fallbackImageUrl || "") : "")} />;
 }
 
 function IglooLinkIcon() {
