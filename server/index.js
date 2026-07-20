@@ -86,6 +86,9 @@ const HOLIDAY_STAFF = [
 const HOLIDAY_RESET_VERSION = 1;
 const IGLOO_TEMPLATE_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 const IGLOO_IMAGE_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
+const IGLOO_CUSTOMER_PASSWORD = String(process.env.IGLOO_CUSTOMER_PASSWORD || "SX123");
+const IGLOO_CUSTOMER_COOKIE_NAME = "igloo_customer_access";
+const IGLOO_CUSTOMER_COOKIE_VALUE = crypto.createHash("sha256").update("igloo:" + IGLOO_CUSTOMER_PASSWORD).digest("hex");
 const IGLOO_COOLER_FAMILIES = [
   ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
   ["Legacy", ["Legacy 20", "Legacy 54"]],
@@ -632,6 +635,33 @@ function parseCookies(headerValue) {
       accumulator[key] = value;
       return accumulator;
     }, {});
+}
+
+function serializeIglooCustomerCookie({ clear = false } = {}) {
+  const parts = [
+    `${IGLOO_CUSTOMER_COOKIE_NAME}=${clear ? "" : encodeURIComponent(IGLOO_CUSTOMER_COOKIE_VALUE)}`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax"
+  ];
+
+  if (process.env.NODE_ENV === "production") {
+    parts.push("Secure");
+  }
+
+  if (clear) {
+    parts.push("Max-Age=0");
+    parts.push("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  } else {
+    parts.push("Max-Age=" + (60 * 60 * 24 * 14));
+  }
+
+  return parts.join("; ");
+}
+
+function hasIglooCustomerAccess(request) {
+  const cookies = parseCookies(request.headers.cookie);
+  return cookies[IGLOO_CUSTOMER_COOKIE_NAME] === IGLOO_CUSTOMER_COOKIE_VALUE;
 }
 
 function serializeSessionCookie(sessionId, { expiresAt, clear = false } = {}) {
@@ -12204,7 +12234,15 @@ function createServer() {
       next();
       return;
     }
+    if (request.path === "/igloo/customer/unlock") {
+      next();
+      return;
+    }
     if (request.path.startsWith("/igloo/customer") || request.path.startsWith("/igloo/templates/") || request.path.startsWith("/igloo/images/") || request.path.startsWith("/igloo/completion-photos/")) {
+      if (!hasIglooCustomerAccess(request)) {
+        response.status(401).json({ error: "IGLOO password required." });
+        return;
+      }
       next();
       return;
     }
@@ -12248,6 +12286,16 @@ function createServer() {
     });
   });
 
+
+  app.post("/api/igloo/customer/unlock", (request, response) => {
+    const password = String(request.body?.password || "");
+    if (password !== IGLOO_CUSTOMER_PASSWORD) {
+      response.status(401).json({ error: "Incorrect password." });
+      return;
+    }
+    response.setHeader("Set-Cookie", serializeIglooCustomerCookie());
+    response.json({ ok: true });
+  });
 
   app.get("/api/igloo/customer", async (request, response) => {
     try {
