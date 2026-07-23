@@ -19506,3 +19506,260 @@ button {
   opacity: 0.55;
   cursor: wait;
 }
+
+/* Compact permissions manager so all controls fit inside the modal. */
+.permissions-modal {
+  width: min(1180px, calc(100vw - 36px));
+  max-height: calc(100dvh - 36px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 18px;
+  border-radius: 24px;
+}
+
+.permissions-modal .modal-head {
+  align-items: center;
+}
+
+.permissions-modal .modal-head h3 {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+.permissions-modal .modal-head p {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.permissions-panel {
+  max-height: none;
+  min-height: 0;
+  gap: 10px;
+  padding: 0 6px 2px 0;
+  font-size: 0.82rem;
+}
+
+.permissions-panel > .permissions-head {
+  display: none;
+}
+
+.permissions-admin-tools {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  grid-template-columns: minmax(150px, 1fr) 90px minmax(140px, 0.8fr) auto auto;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.permissions-admin-tools input,
+.permissions-admin-tools select,
+.permissions-admin-tools button,
+.permissions-user-actions input,
+.permissions-user-actions button,
+.permissions-profile-field input,
+.permissions-qualification-add input,
+.permissions-qualification-add button,
+.permissions-attendance-actions button {
+  min-height: 32px;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+}
+
+.permissions-admin-tools .primary-button,
+.permissions-admin-tools .ghost-button {
+  white-space: nowrap;
+}
+
+.permissions-grid {
+  gap: 9px;
+}
+
+.permissions-user-card {
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+}
+
+.permissions-user-head {
+  gap: 8px;
+}
+
+.permissions-user-identity strong {
+  font-size: 0.92rem;
+  line-height: 1.1;
+}
+
+.permissions-user-meta,
+.permissions-owner-pill {
+  font-size: 0.68rem;
+}
+
+.permissions-owner-pill {
+  padding: 4px 8px;
+}
+
+.permissions-profile-card {
+  grid-template-columns: 54px minmax(110px, 0.65fr) minmax(170px, 1fr) minmax(115px, 0.65fr) minmax(190px, 1fr);
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.permissions-photo-control {
+  gap: 4px;
+  font-size: 0.62rem;
+}
+
+.permissions-photo-control img,
+.permissions-photo-control > span {
+  width: 48px;
+  height: 56px;
+  border-radius: 7px;
+  font-size: 0.74rem;
+}
+
+.permissions-profile-field,
+.permissions-qualifications {
+  gap: 4px;
+  font-size: 0.68rem;
+}
+
+.permissions-profile-field input,
+.permissions-qualification-add input {
+  padding: 7px 9px;
+  font-size: 0.76rem;
+}
+
+.permissions-qualification-list {
+  min-height: 22px;
+  gap: 4px;
+}
+
+.permissions-qualification-list small {
+  font-size: 0.66rem;
+}
+
+.qualification-badge {
+  padding: 3px 7px;
+  font-size: 0.64rem;
+}
+
+.permissions-qualification-add {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 5px;
+}
+
+.permissions-user-body {
+  grid-template-columns: minmax(380px, 1fr) minmax(360px, 0.95fr);
+  gap: 10px;
+}
+
+.permissions-main-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+
+.permissions-app-row {
+  gap: 4px;
+}
+
+.permissions-app-label {
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+
+.permission-segment {
+  gap: 5px;
+}
+
+.permission-chip {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.72rem;
+}
+
+.permissions-attendance-settings {
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+}
+
+.permissions-attendance-head strong {
+  font-size: 0.88rem;
+}
+
+.permissions-attendance-head p {
+  margin-top: 2px;
+  font-size: 0.72rem;
+}
+
+.permissions-saving-pill {
+  padding: 4px 8px;
+  font-size: 0.64rem;
+}
+
+.permissions-attendance-toggles {
+  gap: 8px;
+}
+
+.permissions-toggle,
+.permissions-hours-off,
+.permissions-hours-day {
+  font-size: 0.72rem;
+}
+
+.permissions-toggle {
+  gap: 5px;
+}
+
+.permissions-hours-grid {
+  gap: 5px;
+}
+
+.permissions-hours-row {
+  grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 46px;
+  gap: 6px;
+}
+
+.permissions-hours-input {
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+}
+
+.permissions-hours-off {
+  gap: 4px;
+}
+
+.permissions-attendance-actions {
+  gap: 7px;
+}
+
+.permissions-user-actions {
+  grid-template-columns: minmax(160px, 1fr) auto auto;
+  gap: 8px;
+}
+
+@media (max-width: 980px) {
+  .permissions-modal {
+    width: min(100%, calc(100vw - 20px));
+    padding: 14px;
+  }
+
+  .permissions-admin-tools,
+  .permissions-profile-card,
+  .permissions-user-body,
+  .permissions-main-grid,
+  .permissions-user-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .permissions-admin-tools {
+    position: static;
+  }
+}
