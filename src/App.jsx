@@ -2961,10 +2961,12 @@ function MainNavBar({
   const installerPath = "/installer";
   const mustangPath = "/mustang";
   const notificationsPath = "/notifications";
+  const wipPath = "/wip";
   const unreadNotifications = notifications.filter((entry) => !entry.read);
   const primaryNavItems = [
     { key: "home", label: "Home", path: homePath, allowed: true },
     { key: "board", label: "Installation Board", path: boardPath, allowed: boardAllowed },
+    { key: "wip", label: "WIP", path: wipPath, allowed: boardAllowed },
     { key: "design-board", label: "Design Board", path: designBoardPath, allowed: designBoardAllowed },
     { key: "filtering", label: "Filtering", path: filteringPath, allowed: filteringAllowed },
     { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
@@ -4063,7 +4065,8 @@ function HostLandingPage({
     canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
     canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
-    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null
+    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
+    canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
 
   const adminCards = [
@@ -4166,7 +4169,8 @@ function ClientLandingPage({
     canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
     canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
-    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null
+    canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
+    canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
 
   const adminCards = [
@@ -6595,6 +6599,338 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
     <\/script>` : ""}
   </body>
 </html>`;
+}
+
+
+const WIP_STORAGE_KEY = "sx-wip-board-v1";
+const WIP_SPECIAL_LANES = [
+  { id: "completed", title: "Completed" },
+  { id: "ordered", title: "Ordered in / No Production Required" },
+  { id: "hold", title: "On Hold" }
+];
+
+function getWipBoardDays(startIso = getLocalTodayIso()) {
+  const start = parseIsoDate(startIso) || new Date();
+  return Array.from({ length: 14 }, (_, index) => {
+    const date = addDays(start, index);
+    return {
+      id: toIsoDate(date),
+      label: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" }).format(date)
+    };
+  });
+}
+
+function normalizeWipKey(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function normalizeWipOrderReference(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function getWipLocation(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("southport")) return "Southport";
+  if (text.includes("central") || text.includes("lancashire")) return "Central Lancs";
+  return String(value || "").trim() || "-";
+}
+
+function getWipSalesperson(value) {
+  return String(value || "").trim().split(/\s+/)[0] || "-";
+}
+
+function formatWipMoney(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^-?\$?[\d,]+(?:\.\d+)?$/.test(raw)) return raw.replace("$", "\u00a3").replace(/^(?!\u00a3)(-?)/, "$1\u00a3");
+  return raw.replace(/\$/g, "\u00a3");
+}
+
+function getWipTabFromStatus(status) {
+  return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
+}
+
+function makeWipCard(row, headers, existingByOrder) {
+  const read = (name) => row[headers[normalizeWipKey(name)]] ?? "";
+  const orderNumber = normalizeWipOrderReference(read("Order Number"));
+  if (!orderNumber || !/^(ORD|INV|EST)/i.test(orderNumber)) return null;
+  const existing = existingByOrder.get(orderNumber) || {};
+  const status = String(read("Order Status") || "").trim();
+  return {
+    id: existing.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+    orderNumber,
+    orderStatus: status || "-",
+    company: String(read("Company") || "").trim(),
+    description: String(read("Description") || "").trim(),
+    salesperson: getWipSalesperson(read("Salesperson")),
+    productionLocation: getWipLocation(read("Production Location")),
+    preTaxTotal: formatWipMoney(read("Pre-Tax Total")),
+    tab: existing.tab || getWipTabFromStatus(status),
+    lane: existing.lane || "backlog",
+    importedAt: new Date().toISOString()
+  };
+}
+
+function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx) {
+  const workbook = xlsx.read(arrayBuffer, { type: "array", cellDates: false });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+  const headerIndex = rows.findIndex((row) => row.some((cell) => normalizeWipKey(cell) === "ordernumber"));
+  if (headerIndex < 0) throw new Error("Could not find the Order Number header row.");
+  const headerRow = rows[headerIndex];
+  const headers = headerRow.reduce((map, label, index) => {
+    const key = normalizeWipKey(label);
+    if (key) map[key] = index;
+    return map;
+  }, {});
+  const required = ["ordernumber", "orderstatus", "company", "description", "salesperson", "productionlocation", "pretaxtotal"];
+  const missing = required.filter((key) => headers[key] === undefined);
+  if (missing.length) throw new Error("Missing columns: " + missing.join(", "));
+  const existingByOrder = new Map(existingCards.map((card) => [card.orderNumber, card]));
+  return rows.slice(headerIndex + 1).map((row) => makeWipCard(row, headers, existingByOrder)).filter(Boolean);
+}
+
+function loadStoredWipCards() {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WIP_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function WipCard({ card, installDates = [], onDragStart }) {
+  return (
+    <article className="wip-card" draggable onDragStart={(event) => onDragStart(event, card.id)}>
+      <div className="wip-card-head">
+        <strong>{card.orderNumber}</strong>
+        {card.preTaxTotal ? <span>{card.preTaxTotal}</span> : null}
+      </div>
+      <p className="wip-card-company">{card.company || "No company"}</p>
+      <p className="wip-card-description">{card.description || "No description"}</p>
+      <div className="wip-card-meta">
+        <span>{card.orderStatus}</span>
+        <span>{card.salesperson}</span>
+        <span>{card.productionLocation}</span>
+      </div>
+      {installDates.length ? <p className="wip-install-date">Install: {installDates.join(", ")}</p> : null}
+    </article>
+  );
+}
+
+function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDropCard, onDragStart }) {
+  return (
+    <section
+      className="wip-lane"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const cardId = event.dataTransfer.getData("text/plain");
+        if (cardId) onDropCard(cardId, laneId, tab);
+      }}
+    >
+      <div className="wip-lane-head">
+        <strong>{title}</strong>
+        <span>{cards.length}</span>
+      </div>
+      {subtitle ? <small>{subtitle}</small> : null}
+      <div className="wip-lane-stack">
+        {cards.map((card) => (
+          <WipCard key={card.id} card={card} installDates={installDateMap[card.orderNumber] || []} onDragStart={onDragStart} />
+        ))}
+        {!cards.length ? <p className="wip-empty-lane">Drop jobs here</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function WipPage({ currentUser, onLogout, notifications }) {
+  const [cards, setCards] = useState(() => loadStoredWipCards());
+  const [activeTab, setActiveTab] = useState("wip");
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [installDateMap, setInstallDateMap] = useState({});
+  const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
+
+  useEffect(() => {
+    window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
+  }, [cards]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadInstallDates() {
+      try {
+        const start = toIsoDate(addDays(new Date(), -45));
+        const end = toIsoDate(addDays(new Date(), 120));
+        const response = await fetch("/api/board?include=data&start=" + encodeURIComponent(start) + "&end=" + encodeURIComponent(end));
+        if (!response.ok) return;
+        const payload = await response.json();
+        const nextMap = {};
+        (Array.isArray(payload.jobs) ? payload.jobs : []).forEach((job) => {
+          const ref = normalizeWipOrderReference(job.orderReference);
+          if (!ref || !job.date) return;
+          if (!nextMap[ref]) nextMap[ref] = new Set();
+          nextMap[ref].add(formatJobDate(job.date));
+        });
+        const compact = Object.fromEntries(Object.entries(nextMap).map(([key, value]) => [key, [...value].sort()]));
+        if (active) setInstallDateMap(compact);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    loadInstallDates();
+    return () => { active = false; };
+  }, []);
+
+  async function handleUpload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const buffer = await file.arrayBuffer();
+      const xlsx = await import("xlsx");
+      const parsedCards = parseWipWorkbook(buffer, cards, xlsx);
+      setCards(parsedCards);
+      const wipCount = parsedCards.filter((card) => card.tab === "wip").length;
+      const preWipCount = parsedCards.filter((card) => card.tab === "pre-wip").length;
+      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP.");
+    } catch (error) {
+      console.error(error);
+      setUploadMessage(error.message || "Could not read that Excel file.");
+    }
+  }
+
+  function onDragStart(event, cardId) {
+    event.dataTransfer.setData("text/plain", cardId);
+    event.dataTransfer.effectAllowed = "move";
+  }
+
+  function moveCard(cardId, lane, tab = activeTab) {
+    setCards((current) => current.map((card) => card.id === cardId ? { ...card, lane, tab } : card));
+  }
+
+  const visibleCards = cards.filter((card) => card.tab === activeTab);
+  const cardsByLane = visibleCards.reduce((map, card) => {
+    const key = card.lane || "backlog";
+    if (!map[key]) map[key] = [];
+    map[key].push(card);
+    return map;
+  }, {});
+  const tabCounts = {
+    wip: cards.filter((card) => card.tab === "wip").length,
+    "pre-wip": cards.filter((card) => card.tab === "pre-wip").length
+  };
+
+  return (
+    <div className="app-shell social-post-shell wip-shell">
+      <div className="page wip-page">
+        <MainNavBar currentUser={currentUser} active="wip" onLogout={onLogout} notifications={notifications} />
+        <section className="panel wip-panel">
+          <div className="wip-toolbar">
+            <div>
+              <span className="panel-kicker">Production planning</span>
+              <h1>WIP</h1>
+              <p>Upload the production WIP Excel file, then drag jobs into the right day or status.</p>
+            </div>
+            <div className="wip-actions">
+              <label className="wip-upload-button">
+                Upload Excel
+                <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleUpload} />
+              </label>
+              <button type="button" className="ghost-button" onClick={() => window.print()} disabled={!cards.length}>Print</button>
+            </div>
+          </div>
+          {uploadMessage ? <p className="wip-upload-message">{uploadMessage}</p> : null}
+          <div className="wip-tabs">
+            {[
+              { id: "wip", label: "WIP" },
+              { id: "pre-wip", label: "Pre-WIP" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={activeTab === tab.id ? "active" : ""}
+                onClick={() => setActiveTab(tab.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const cardId = event.dataTransfer.getData("text/plain");
+                  if (cardId) moveCard(cardId, "backlog", tab.id);
+                  setActiveTab(tab.id);
+                }}
+              >
+                {tab.label} <span>{tabCounts[tab.id] || 0}</span>
+              </button>
+            ))}
+          </div>
+          <div className="wip-board-wrap">
+            <div className="wip-special-lanes">
+              {WIP_SPECIAL_LANES.map((lane) => (
+                <WipDropLane
+                  key={lane.id}
+                  title={lane.title}
+                  laneId={lane.id}
+                  tab={activeTab}
+                  cards={cardsByLane[lane.id] || []}
+                  installDateMap={installDateMap}
+                  onDropCard={moveCard}
+                  onDragStart={onDragStart}
+                />
+              ))}
+            </div>
+            <WipDropLane
+              title={activeTab === "wip" ? "Unscheduled WIP" : "Pre-WIP holding"}
+              subtitle={activeTab === "pre-wip" ? "Drag onto the WIP tab to move it over instantly." : "Jobs waiting for a production day."}
+              laneId="backlog"
+              tab={activeTab}
+              cards={cardsByLane.backlog || []}
+              installDateMap={installDateMap}
+              onDropCard={moveCard}
+              onDragStart={onDragStart}
+            />
+            <div className="wip-day-grid">
+              {days.map((day) => (
+                <WipDropLane
+                  key={day.id}
+                  title={day.label}
+                  laneId={"day:" + day.id}
+                  tab={activeTab}
+                  cards={cardsByLane["day:" + day.id] || []}
+                  installDateMap={installDateMap}
+                  onDropCard={moveCard}
+                  onDragStart={onDragStart}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="wip-print-list">
+            <h1>Production WIP List</h1>
+            <p>{activeTab === "wip" ? "WIP" : "Pre-WIP"} - printed {formatJobDate(getLocalTodayIso())}</p>
+            {[...WIP_SPECIAL_LANES, ...days.map((day) => ({ id: "day:" + day.id, title: day.label }))].map((lane) => {
+              const laneCards = cardsByLane[lane.id] || [];
+              if (!laneCards.length) return null;
+              return (
+                <section key={lane.id}>
+                  <h2>{lane.title}</h2>
+                  {laneCards.map((card) => (
+                    <div key={card.id} className="wip-print-row">
+                      <strong>{card.orderNumber}</strong>
+                      <span>{card.company}</span>
+                      <span>{card.description}</span>
+                      <span>{card.salesperson}</span>
+                      <span>{card.productionLocation}</span>
+                      <span>{card.preTaxTotal}</span>
+                      {(installDateMap[card.orderNumber] || []).length ? <em>Install: {(installDateMap[card.orderNumber] || []).join(", ")}</em> : null}
+                    </div>
+                  ))}
+                </section>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
 }
 
 function ProFormaPage({ currentUser, onLogout, notifications }) {
@@ -19433,6 +19769,7 @@ export default function App() {
   const isMustangRoute = pathname.startsWith("/mustang");
   const isIglooCustomerRoute = pathname.startsWith("/igloo") && !pathname.startsWith("/igloo-admin");
   const isIglooAdminRoute = pathname.startsWith("/igloo-admin");
+  const isWipRoute = pathname.startsWith("/wip");
   const isBoardRoute = pathname.startsWith("/board");
   const isDesignBoardRoute = pathname.startsWith("/design-board");
   const isFilteringRoute = pathname.startsWith("/filtering");
@@ -19571,11 +19908,12 @@ export default function App() {
       ((boardEditable && isBoardRoute) || (!boardEditable && isClientBoardRoute))
   );
   const showMorningMeeting = Boolean(currentUser && canAccessBoard(currentUser) && isMorningMeetingRoute);
+  const showWip = Boolean(currentUser && canAccessBoard(currentUser) && isWipRoute);
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const installerOptions = useMemo(() => buildInstallerOptions(loginUsers), [loginUsers]);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -20050,7 +20388,7 @@ export default function App() {
       return;
     }
 
-    if ((isBoardRoute || isClientBoardRoute || isClientRamsRoute || isMorningMeetingRoute) && !canAccessBoard(currentUser)) {
+    if ((isBoardRoute || isClientBoardRoute || isClientRamsRoute || isMorningMeetingRoute || isWipRoute) && !canAccessBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -20093,7 +20431,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isWipRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -22142,6 +22480,16 @@ export default function App() {
   if (showMorningMeeting) {
     return (
       <MorningMeetingPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showWip) {
+    return (
+      <WipPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}

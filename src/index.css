@@ -19823,3 +19823,302 @@ button {
     position: static;
   }
 }
+
+/* WIP production board */
+.wip-shell {
+  background: #f5f7fb;
+}
+
+.wip-page {
+  max-width: 1540px;
+}
+
+.wip-panel {
+  padding: 18px;
+}
+
+.wip-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.wip-toolbar h1 {
+  margin: 4px 0;
+  color: #111827;
+  font-size: 1.8rem;
+}
+
+.wip-toolbar p,
+.wip-upload-message {
+  margin: 0;
+  color: #52627a;
+  font-size: 0.9rem;
+}
+
+.wip-actions,
+.wip-tabs,
+.wip-special-lanes {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wip-upload-button,
+.wip-tabs button {
+  border: 1px solid #cad7e6;
+  background: #fff;
+  border-radius: 14px;
+  min-height: 42px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: #26364d;
+  cursor: pointer;
+}
+
+.wip-upload-button input {
+  display: none;
+}
+
+.wip-tabs {
+  margin: 16px 0;
+}
+
+.wip-tabs button.active {
+  background: #5f3c74;
+  border-color: #5f3c74;
+  color: #fff;
+}
+
+.wip-tabs span,
+.wip-lane-head span {
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  background: rgba(95, 60, 116, 0.1);
+  color: #5f3c74;
+  font-size: 0.75rem;
+}
+
+.wip-tabs button.active span {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.wip-board-wrap {
+  display: grid;
+  gap: 14px;
+}
+
+.wip-special-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.wip-day-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.wip-lane {
+  border: 1px solid #d6e2ef;
+  background: #fbfdff;
+  border-radius: 14px;
+  padding: 10px;
+  min-height: 122px;
+}
+
+.wip-lane-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.wip-lane-head strong {
+  color: #122033;
+  font-size: 0.9rem;
+}
+
+.wip-lane > small {
+  display: block;
+  color: #64748b;
+  font-size: 0.76rem;
+  margin-bottom: 8px;
+}
+
+.wip-lane-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.wip-empty-lane {
+  border: 1px dashed #c7d6e7;
+  border-radius: 12px;
+  padding: 16px 10px;
+  text-align: center;
+  color: #8a98aa;
+  font-weight: 700;
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.wip-card {
+  border: 1px solid #d4e0ee;
+  border-left: 4px solid #5f3c74;
+  border-radius: 12px;
+  background: #fff;
+  padding: 9px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+  cursor: grab;
+}
+
+.wip-card:active {
+  cursor: grabbing;
+}
+
+.wip-card-head,
+.wip-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wip-card-head strong {
+  color: #5f3c74;
+  font-size: 0.82rem;
+}
+
+.wip-card-head span {
+  color: #5f3c74;
+  font-weight: 900;
+  font-size: 0.8rem;
+}
+
+.wip-card-company {
+  margin: 5px 0 2px;
+  color: #0f172a;
+  font-weight: 900;
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.wip-card-description {
+  margin: 0 0 8px;
+  color: #334155;
+  font-size: 0.78rem;
+  line-height: 1.28;
+}
+
+.wip-card-meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.wip-card-meta span {
+  border-radius: 999px;
+  background: #edf3f8;
+  color: #475569;
+  padding: 3px 7px;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.wip-install-date {
+  margin: 8px 0 0;
+  color: #dc2626;
+  font-weight: 900;
+  font-size: 0.76rem;
+}
+
+.wip-print-list {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .wip-special-lanes,
+  .wip-day-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .wip-toolbar {
+    flex-direction: column;
+  }
+
+  .wip-special-lanes,
+  .wip-day-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .host-nav-shell,
+  .wip-toolbar,
+  .wip-tabs,
+  .wip-board-wrap,
+  .wip-upload-message {
+    display: none !important;
+  }
+
+  .app-shell,
+  .wip-shell,
+  .page,
+  .wip-page,
+  .panel,
+  .wip-panel {
+    background: #fff !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  .wip-print-list {
+    display: block;
+    color: #111827;
+    font-family: Arial, sans-serif;
+  }
+
+  .wip-print-list h1 {
+    margin: 0 0 4px;
+    font-size: 22px;
+  }
+
+  .wip-print-list h2 {
+    background: #d9f99d;
+    color: #111827;
+    padding: 5px 8px;
+    margin: 14px 0 6px;
+    font-size: 15px;
+  }
+
+  .wip-print-row {
+    display: grid;
+    grid-template-columns: 90px 170px 1fr 70px 90px 80px;
+    gap: 8px;
+    border-bottom: 1px solid #d1d5db;
+    padding: 5px 0;
+    font-size: 11px;
+    break-inside: avoid;
+  }
+
+  .wip-print-row em {
+    grid-column: 1 / -1;
+    color: #dc2626;
+    font-style: normal;
+    font-weight: 700;
+  }
+}
