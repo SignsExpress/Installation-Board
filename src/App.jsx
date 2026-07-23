@@ -6606,6 +6606,7 @@ const WIP_STORAGE_KEY = "sx-wip-board-v1";
 const WIP_SPECIAL_LANES = [
   { id: "completed", title: "Completed" },
   { id: "ordered", title: "Ordered in / No Production Required" },
+  { id: "salesperson", title: "Order with sales person" },
   { id: "hold", title: "On Hold" }
 ];
 
@@ -6646,6 +6647,11 @@ function formatWipMoney(value) {
   return raw.replace(/\$/g, "\u00a3");
 }
 
+function parseWipMoney(value) {
+  const amount = Number(String(value || "").replace(/[^0-9.-]/g, ""));
+  return Number.isFinite(amount) ? amount : 0;
+}
+
 function getWipTabFromStatus(status) {
   return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
 }
@@ -6667,7 +6673,8 @@ function makeWipCard(row, headers, existingByOrder) {
     preTaxTotal: formatWipMoney(read("Pre-Tax Total")),
     tab: existing.tab || getWipTabFromStatus(status),
     lane: existing.lane || "backlog",
-    importedAt: new Date().toISOString()
+    extraLanes: Array.isArray(existing.extraLanes) ? existing.extraLanes : [],
+    importedAt: existing.importedAt || new Date().toISOString()
   };
 }
 
@@ -6700,9 +6707,14 @@ function loadStoredWipCards() {
   }
 }
 
-function WipCard({ card, installDates = [], onDragStart }) {
+function WipCard({ card, installDates = [], onDragStart, countMode = false, selected = false, onToggleCount, onMultiDay }) {
   return (
-    <article className="wip-card" draggable onDragStart={(event) => onDragStart(event, card.id)}>
+    <article
+      className={"wip-card" + (countMode ? " is-counting" : "") + (selected ? " is-count-selected" : "")}
+      draggable
+      onClick={() => { if (countMode) onToggleCount?.(card.id); }}
+      onDragStart={(event) => onDragStart(event, card.id)}
+    >
       <div className="wip-card-head">
         <strong>{card.orderNumber}</strong>
         {card.preTaxTotal ? <span>{card.preTaxTotal}</span> : null}
@@ -6715,11 +6727,22 @@ function WipCard({ card, installDates = [], onDragStart }) {
         <span>{card.productionLocation}</span>
       </div>
       {installDates.length ? <p className="wip-install-date">Install: {installDates.join(", ")}</p> : null}
+      <div className="wip-card-actions">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onMultiDay?.(card);
+          }}
+        >
+          Multi-day
+        </button>
+      </div>
     </article>
   );
 }
 
-function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDropCard, onDragStart }) {
+function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDropCard, onDragStart, countMode = false, countedCardIds = [], onToggleCount, onMultiDay }) {
   return (
     <section
       className={"wip-lane " + (laneId === "backlog" ? "is-wide" : "")}
@@ -6737,7 +6760,16 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDr
       {subtitle ? <small>{subtitle}</small> : null}
       <div className="wip-lane-stack">
         {cards.map((card) => (
-          <WipCard key={card.id} card={card} installDates={installDateMap[card.orderNumber] || []} onDragStart={onDragStart} />
+          <WipCard
+            key={card.id + "-" + laneId}
+            card={card}
+            installDates={installDateMap[card.orderNumber] || []}
+            onDragStart={onDragStart}
+            countMode={countMode}
+            selected={countedCardIds.includes(card.id)}
+            onToggleCount={onToggleCount}
+            onMultiDay={onMultiDay}
+          />
         ))}
         {!cards.length ? <p className="wip-empty-lane">Drop jobs here</p> : null}
       </div>
@@ -6750,6 +6782,10 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [activeTab, setActiveTab] = useState("wip");
   const [uploadMessage, setUploadMessage] = useState("");
   const [installDateMap, setInstallDateMap] = useState({});
+  const [countMode, setCountMode] = useState(false);
+  const [countedCardIds, setCountedCardIds] = useState([]);
+  const [multiDayCardId, setMultiDayCardId] = useState("");
+  const [multiDaySelection, setMultiDaySelection] = useState([]);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
 
   useEffect(() => {
@@ -6806,8 +6842,8 @@ function WipPage({ currentUser, onLogout, notifications }) {
   }
 
   function handleWipDragOver(event) {
-    const edgeSize = 190;
-    const maxStep = 74;
+    const edgeSize = 240;
+    const maxStep = 120;
     const distanceFromTop = event.clientY;
     const distanceFromBottom = window.innerHeight - event.clientY;
     if (distanceFromTop < edgeSize) {
@@ -6818,20 +6854,65 @@ function WipPage({ currentUser, onLogout, notifications }) {
   }
 
   function moveCard(cardId, lane, tab = activeTab) {
-    setCards((current) => current.map((card) => card.id === cardId ? { ...card, lane, tab } : card));
+    setCards((current) => current.map((card) => card.id === cardId ? { ...card, lane, tab, extraLanes: [] } : card));
+  }
+
+  function toggleCountedCard(cardId) {
+    setCountedCardIds((current) => current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]);
+  }
+
+  function clearWipCards() {
+    if (!window.confirm("Clear all WIP cards from this browser?")) return;
+    setCards([]);
+    setCountedCardIds([]);
+    setUploadMessage("WIP board cleared.");
+  }
+
+  function getWipCardDayLanes(card) {
+    return [...new Set([card.lane, ...(Array.isArray(card.extraLanes) ? card.extraLanes : [])].filter((lane) => lane && lane.startsWith("day:")))];
+  }
+
+  function openMultiDay(card) {
+    setMultiDayCardId(card.id);
+    setMultiDaySelection(getWipCardDayLanes(card));
+  }
+
+  function saveMultiDaySelection() {
+    const selectedDays = multiDaySelection.filter(Boolean);
+    setCards((current) => current.map((card) => {
+      if (card.id !== multiDayCardId) return card;
+      return {
+        ...card,
+        tab: activeTab,
+        lane: selectedDays[0] || "backlog",
+        extraLanes: selectedDays.slice(1)
+      };
+    }));
+    setMultiDayCardId("");
+    setMultiDaySelection([]);
+  }
+
+  function toggleMultiDayLane(laneId) {
+    setMultiDaySelection((current) => current.includes(laneId) ? current.filter((id) => id !== laneId) : [...current, laneId]);
   }
 
   const visibleCards = cards.filter((card) => card.tab === activeTab);
   const cardsByLane = visibleCards.reduce((map, card) => {
-    const key = card.lane || "backlog";
-    if (!map[key]) map[key] = [];
-    map[key].push(card);
+    const laneIds = [...new Set([card.lane || "backlog", ...(Array.isArray(card.extraLanes) ? card.extraLanes : [])].filter(Boolean))];
+    laneIds.forEach((key) => {
+      if (!map[key]) map[key] = [];
+      map[key].push(card);
+    });
     return map;
   }, {});
   const tabCounts = {
     wip: cards.filter((card) => card.tab === "wip").length,
     "pre-wip": cards.filter((card) => card.tab === "pre-wip").length
   };
+  const countedTotal = cards
+    .filter((card) => countedCardIds.includes(card.id))
+    .reduce((total, card) => total + parseWipMoney(card.preTaxTotal), 0);
+  const multiDayCard = cards.find((card) => card.id === multiDayCardId);
 
   return (
     <div className="app-shell social-post-shell wip-shell">
@@ -6849,10 +6930,27 @@ function WipPage({ currentUser, onLogout, notifications }) {
                 Upload Excel
                 <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleUpload} />
               </label>
+              <button
+                type="button"
+                className={"ghost-button" + (countMode ? " active" : "")}
+                onClick={() => setCountMode((value) => !value)}
+                disabled={!cards.length}
+              >
+                Count value
+              </button>
+              <button type="button" className="ghost-button" onClick={clearWipCards} disabled={!cards.length}>Clear WIP</button>
               <button type="button" className="ghost-button" onClick={() => window.print()} disabled={!cards.length}>Print</button>
             </div>
           </div>
           {uploadMessage ? <p className="wip-upload-message">{uploadMessage}</p> : null}
+          {countMode || countedCardIds.length ? (
+            <div className="wip-count-summary">
+              <strong>{countMode ? "Click cards to count value" : "Count value"}</strong>
+              <span>{countedCardIds.length} cards</span>
+              <b>{formatProFormaMoney(countedTotal)}</b>
+              {countedCardIds.length ? <button type="button" onClick={() => setCountedCardIds([])}>Reset</button> : null}
+            </div>
+          ) : null}
           <div className="wip-tabs">
             {[
               { id: "wip", label: "WIP" },
@@ -6887,6 +6985,10 @@ function WipPage({ currentUser, onLogout, notifications }) {
                   installDateMap={installDateMap}
                   onDropCard={moveCard}
                   onDragStart={onDragStart}
+                  countMode={countMode}
+                  countedCardIds={countedCardIds}
+                  onToggleCount={toggleCountedCard}
+                  onMultiDay={openMultiDay}
                 />
               ))}
             </div>
@@ -6899,6 +7001,10 @@ function WipPage({ currentUser, onLogout, notifications }) {
               installDateMap={installDateMap}
               onDropCard={moveCard}
               onDragStart={onDragStart}
+              countMode={countMode}
+              countedCardIds={countedCardIds}
+              onToggleCount={toggleCountedCard}
+              onMultiDay={openMultiDay}
             />
             <div className="wip-day-grid">
               {days.map((day) => (
@@ -6911,10 +7017,47 @@ function WipPage({ currentUser, onLogout, notifications }) {
                   installDateMap={installDateMap}
                   onDropCard={moveCard}
                   onDragStart={onDragStart}
+                  countMode={countMode}
+                  countedCardIds={countedCardIds}
+                  onToggleCount={toggleCountedCard}
+                  onMultiDay={openMultiDay}
                 />
               ))}
             </div>
           </div>
+          {multiDayCard ? (
+            <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+              <div className="wip-modal">
+                <div className="wip-modal-head">
+                  <div>
+                    <span>{multiDayCard.orderNumber}</span>
+                    <h2>Put job over multiple days</h2>
+                    <p>{multiDayCard.company} - {multiDayCard.description}</p>
+                  </div>
+                  <button type="button" onClick={() => setMultiDayCardId("")}>x</button>
+                </div>
+                <div className="wip-multi-day-grid">
+                  {days.map((day) => {
+                    const laneId = "day:" + day.id;
+                    return (
+                      <label key={day.id} className={multiDaySelection.includes(laneId) ? "selected" : ""}>
+                        <input
+                          type="checkbox"
+                          checked={multiDaySelection.includes(laneId)}
+                          onChange={() => toggleMultiDayLane(laneId)}
+                        />
+                        {day.label}
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className="wip-modal-actions">
+                  <button type="button" className="ghost-button" onClick={() => setMultiDaySelection([])}>Clear days</button>
+                  <button type="button" className="primary-button" onClick={saveMultiDaySelection}>Save days</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           <div className="wip-print-list">
             <h1>Production WIP List</h1>
             <p>{activeTab === "wip" ? "WIP" : "Pre-WIP"} - printed {formatJobDate(getLocalTodayIso())}</p>
