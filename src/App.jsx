@@ -11,15 +11,31 @@ const JOB_TYPES = [
   { value: "Other", colorClass: "job-type-other" }
 ];
 
-const INSTALLER_OPTIONS = [
-  { value: "MC", colorClass: "installer-mc" },
-  { value: "KC", colorClass: "installer-kc" },
-  { value: "ED", colorClass: "installer-ed" },
-  { value: "KW", colorClass: "installer-kw" },
-  { value: "PM", colorClass: "installer-pm" },
-  { value: "MR", colorClass: "installer-mr" },
-  { value: "Custom", colorClass: "installer-custom" }
+const LEGACY_INSTALLER_OPTIONS = [
+  { value: "MC", label: "MC", colorClass: "installer-mc" },
+  { value: "KC", label: "KC", colorClass: "installer-kc" },
+  { value: "ED", label: "ED", colorClass: "installer-ed" },
+  { value: "KW", label: "KW", colorClass: "installer-kw" },
+  { value: "PM", label: "PM", colorClass: "installer-pm" },
+  { value: "MR", label: "MR", colorClass: "installer-mr" }
 ];
+
+const INSTALLER_COLOR_CLASSES = [
+  "installer-colour-1",
+  "installer-colour-2",
+  "installer-colour-3",
+  "installer-colour-4",
+  "installer-colour-5",
+  "installer-colour-6",
+  "installer-colour-7",
+  "installer-colour-8",
+  "installer-colour-9",
+  "installer-colour-10",
+  "installer-colour-11",
+  "installer-colour-12"
+];
+
+const CUSTOM_INSTALLER_OPTION = { value: "Custom", label: "Custom", colorClass: "installer-custom" };
 
 const PERMISSION_OPTIONS = [
   { value: "admin", label: "Admin" },
@@ -1722,6 +1738,45 @@ function getInitials(name) {
     .join("") || "SE";
 }
 
+function getInstallerColorClassForName(name) {
+  const source = String(name || "").trim() || "installer";
+  let hash = 0;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = (hash * 31 + source.charCodeAt(index)) % 9973;
+  }
+  return INSTALLER_COLOR_CLASSES[hash % INSTALLER_COLOR_CLASSES.length];
+}
+
+function isActiveInstallerUser(user) {
+  if (!user || !String(user.displayName || "").trim()) return false;
+  const status = String(user.status || "").trim().toLowerCase();
+  return user.active !== false && user.isActive !== false && user.disabled !== true && user.deleted !== true && !["inactive", "disabled", "archived"].includes(status);
+}
+
+function buildInstallerOptions(users) {
+  const seen = new Set();
+  const options = (Array.isArray(users) ? users : [])
+    .filter(isActiveInstallerUser)
+    .sort((left, right) => String(left.displayName || "").localeCompare(String(right.displayName || "")))
+    .reduce((entries, user) => {
+      const userName = String(user.displayName || "").trim();
+      const staff = getHolidayStaffEntry(userName);
+      const value = staff?.code || userName;
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) return entries;
+      seen.add(key);
+      entries.push({
+        value,
+        label: staff?.code || getInitials(userName),
+        title: userName,
+        colorClass: LEGACY_INSTALLER_OPTIONS.find((option) => option.value === value)?.colorClass || getInstallerColorClassForName(userName)
+      });
+      return entries;
+    }, []);
+
+  return [...options, CUSTOM_INSTALLER_OPTION];
+}
+
 function formatRamsCreatedDate(value) {
   const parsed = value ? new Date(value) : new Date();
   if (Number.isNaN(parsed.getTime())) return formatJobDate(getLocalTodayIso());
@@ -2303,8 +2358,12 @@ function renderJobCardContent({
                   {installerLabels.map((installer) => {
                     const metaInstaller = getInstallerMeta(installer);
                     return (
-                      <span key={`title-${job.id}-${installer}`} className={`installer-badge title-inline ${metaInstaller.colorClass}`}>
-                        {installer}
+                      <span
+                        key={`title-${job.id}-${installer}`}
+                        className={`installer-badge title-inline ${metaInstaller.colorClass}`}
+                        title={metaInstaller.title || installer}
+                      >
+                        {metaInstaller.label || installer}
                       </span>
                     );
                   })}
@@ -19515,6 +19574,7 @@ export default function App() {
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const installerOptions = useMemo(() => buildInstallerOptions(loginUsers), [loginUsers]);
   const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
@@ -21765,7 +21825,21 @@ export default function App() {
   }
 
   function getInstallerMeta(value) {
-    return INSTALLER_OPTIONS.find((option) => option.value === value) || { value, colorClass: "installer-custom" };
+    const normalizedValue = String(value || "").trim();
+    const matchedUser = installerOptions.find(
+      (option) => option.value === normalizedValue || option.label === normalizedValue || option.title === normalizedValue
+    );
+    if (matchedUser) return matchedUser;
+
+    const matchedLegacy = LEGACY_INSTALLER_OPTIONS.find((option) => option.value === normalizedValue);
+    if (matchedLegacy) return matchedLegacy;
+
+    return {
+      value: normalizedValue,
+      label: getInitials(normalizedValue),
+      title: normalizedValue,
+      colorClass: getInstallerColorClassForName(normalizedValue)
+    };
   }
 
   function getInstallerDisplayList(item) {
@@ -22932,14 +23006,15 @@ export default function App() {
               <label>
                 Installers
                 <div className="installer-picker">
-                  {INSTALLER_OPTIONS.map((option) => (
+                  {installerOptions.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       className={`installer-chip ${option.colorClass} ${form.installers.includes(option.value) ? "active" : ""}`}
+                      title={option.title || option.value}
                       onClick={() => toggleInstaller(option.value)}
                     >
-                      {option.value}
+                      {option.label || option.value}
                     </button>
                   ))}
                 </div>

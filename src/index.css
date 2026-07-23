@@ -5179,6 +5179,66 @@ button {
   color: #c2410c;
 }
 
+.installer-colour-1 {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.installer-colour-2 {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.installer-colour-3 {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.installer-colour-4 {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.installer-colour-5 {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.installer-colour-6 {
+  background: #cffafe;
+  color: #155e75;
+}
+
+.installer-colour-7 {
+  background: #fae8ff;
+  color: #86198f;
+}
+
+.installer-colour-8 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.installer-colour-9 {
+  background: #fce7f3;
+  color: #9d174d;
+}
+
+.installer-colour-10 {
+  background: #ecfccb;
+  color: #3f6212;
+}
+
+.installer-colour-11 {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.installer-colour-12 {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
 .split-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
