@@ -6722,7 +6722,7 @@ function WipCard({ card, installDates = [], onDragStart }) {
 function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDropCard, onDragStart }) {
   return (
     <section
-      className="wip-lane"
+      className={"wip-lane " + (laneId === "backlog" ? "is-wide" : "")}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -6805,6 +6805,18 @@ function WipPage({ currentUser, onLogout, notifications }) {
     event.dataTransfer.effectAllowed = "move";
   }
 
+  function handleWipDragOver(event) {
+    const edgeSize = 190;
+    const maxStep = 74;
+    const distanceFromTop = event.clientY;
+    const distanceFromBottom = window.innerHeight - event.clientY;
+    if (distanceFromTop < edgeSize) {
+      window.scrollBy({ top: -Math.ceil(((edgeSize - distanceFromTop) / edgeSize) * maxStep), behavior: "auto" });
+    } else if (distanceFromBottom < edgeSize) {
+      window.scrollBy({ top: Math.ceil(((edgeSize - distanceFromBottom) / edgeSize) * maxStep), behavior: "auto" });
+    }
+  }
+
   function moveCard(cardId, lane, tab = activeTab) {
     setCards((current) => current.map((card) => card.id === cardId ? { ...card, lane, tab } : card));
   }
@@ -6823,7 +6835,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
 
   return (
     <div className="app-shell social-post-shell wip-shell">
-      <div className="page wip-page">
+      <div className="page wip-page" onDragOver={handleWipDragOver}>
         <MainNavBar currentUser={currentUser} active="wip" onLogout={onLogout} notifications={notifications} />
         <section className="panel wip-panel">
           <div className="wip-toolbar">
