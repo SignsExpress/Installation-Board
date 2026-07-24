@@ -20032,12 +20032,17 @@ button {
 .wip-card {
   border: 1px solid #d4e0ee;
   border-left: 4px solid #5f3c74;
-  border-radius: 11px;
+  border-radius: 10px;
   background: #fff;
-  padding: 8px;
+  padding: 7px 8px;
   min-width: 0;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.045);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
   cursor: grab;
+}
+
+.wip-card.has-install {
+  border-left-color: #dc2626;
+  background: linear-gradient(90deg, rgba(254, 226, 226, 0.72), #fff 34%);
 }
 
 .wip-card:active {
@@ -20047,56 +20052,65 @@ button {
 .wip-card-head,
 .wip-card-meta {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
 }
 
 .wip-card-head strong {
   color: #5f3c74;
-  font-size: 0.82rem;
+  font-size: 0.79rem;
+  letter-spacing: 0.01em;
 }
 
 .wip-card-head span {
   color: #5f3c74;
   font-weight: 900;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .wip-card-company {
-  margin: 4px 0 2px;
+  margin: 3px 0 1px;
   color: #0f172a;
   font-weight: 900;
-  font-size: 0.82rem;
-  line-height: 1.18;
+  font-size: 0.8rem;
+  line-height: 1.15;
 }
 
 .wip-card-description {
-  margin: 0 0 7px;
+  margin: 0 0 5px;
   color: #334155;
-  font-size: 0.74rem;
-  line-height: 1.24;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .wip-card-meta {
   flex-wrap: wrap;
   justify-content: flex-start;
-}
-
-.wip-card-meta span {
-  border-radius: 999px;
-  background: #edf3f8;
-  color: #475569;
-  padding: 3px 7px;
+  color: #52627a;
   font-size: 0.68rem;
   font-weight: 800;
 }
 
+.wip-card-meta span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wip-card-meta span + span::before {
+  content: "/";
+  color: #94a3b8;
+  font-weight: 700;
+  margin: 0 6px 0 0;
+}
+
 .wip-install-date {
-  margin: 8px 0 0;
+  margin: 5px 0 0;
   color: #dc2626;
   font-weight: 900;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .wip-card.is-counting {
@@ -20113,23 +20127,23 @@ button {
 .wip-card-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 5px;
 }
 
 .wip-card-actions button {
-  border: 1px solid #d5e1ee;
-  background: #f8fbff;
-  color: #53657d;
-  border-radius: 999px;
-  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: #5f3c74;
+  border-radius: 8px;
+  padding: 1px 0;
   font-size: 0.66rem;
-  font-weight: 800;
+  font-weight: 900;
   cursor: pointer;
 }
 
 .wip-card-actions button:hover {
-  border-color: #5f3c74;
-  color: #5f3c74;
+  color: #3e2a4e;
+  text-decoration: underline;
 }
 
 .wip-count-summary {

@@ -6720,7 +6720,7 @@ async function saveWipBoardToServer(cards) {
 function WipCard({ card, installDates = [], onDragStart, countMode = false, selected = false, onToggleCount, onMultiDay }) {
   return (
     <article
-      className={"wip-card" + (countMode ? " is-counting" : "") + (selected ? " is-count-selected" : "")}
+      className={"wip-card" + (installDates.length ? " has-install" : "") + (countMode ? " is-counting" : "") + (selected ? " is-count-selected" : "")}
       draggable
       onClick={() => { if (countMode) onToggleCount?.(card.id); }}
       onDragStart={(event) => onDragStart(event, card.id)}
