@@ -20263,6 +20263,66 @@ button {
   gap: 10px;
 }
 
+.wip-review-modal {
+  width: min(820px, 100%);
+}
+
+.wip-review-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(56vh, 520px);
+  overflow: auto;
+  margin: 16px 0;
+  padding-right: 4px;
+}
+
+.wip-review-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid #d9e4f0;
+  border-left: 4px solid #dc2626;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px;
+}
+
+.wip-review-card strong {
+  display: inline-block;
+  margin-right: 8px;
+  color: #5f3c74;
+  font-size: 0.82rem;
+}
+
+.wip-review-card span {
+  color: #0f172a;
+  font-weight: 900;
+  font-size: 0.82rem;
+}
+
+.wip-review-card p {
+  margin: 3px 0 0;
+  color: #52627a;
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.wip-review-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.wip-review-actions .success-button,
+.wip-review-actions .ghost-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 0.76rem;
+}
+
 .wip-print-list {
   display: none;
 }

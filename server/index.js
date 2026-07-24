@@ -281,6 +281,8 @@ function createEmptyBoardStore() {
     wipBoard: {
       cards: [],
       placementMemory: {},
+      previousCards: [],
+      completionReviewCards: [],
       updatedAt: ""
     },
     holidays: [],
@@ -1527,7 +1529,7 @@ async function readStore() {
             igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
-            wipBoard: { cards: [], placementMemory: {}, updatedAt: "" },
+            wipBoard: { cards: [], placementMemory: {}, previousCards: [], completionReviewCards: [], updatedAt: "" },
             holidays: [],
             subcontractorEvents: [],
             holidayRequests: [],
@@ -4455,6 +4457,8 @@ function sanitizeWipBoardState(payload = {}) {
   return {
     cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     placementMemory: sanitizeWipPlacementMemory(payload.placementMemory),
+    previousCards: Array.isArray(payload.previousCards) ? payload.previousCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
+    completionReviewCards: Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     updatedAt: String(payload.updatedAt || "").trim()
   };
 }

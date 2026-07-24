@@ -6604,6 +6604,8 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
 
 const WIP_STORAGE_KEY = "sx-wip-board-v1";
 const WIP_MEMORY_STORAGE_KEY = "sx-wip-board-memory-v1";
+const WIP_PREVIOUS_STORAGE_KEY = "sx-wip-board-previous-v1";
+const WIP_REVIEW_STORAGE_KEY = "sx-wip-board-review-v1";
 const WIP_SPECIAL_LANES = [
   { id: "completed", title: "Completed" },
   { id: "ordered", title: "Ordered in / No Production Required" },
@@ -6709,6 +6711,16 @@ function loadStoredWipCards() {
   }
 }
 
+function loadStoredWipCardList(storageKey) {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function loadStoredWipPlacementMemory() {
   if (typeof window === "undefined") return {};
   try {
@@ -6734,11 +6746,11 @@ function buildWipPlacementMemory(cards, existingMemory = {}) {
   }, { ...existingMemory });
 }
 
-async function saveWipBoardToServer(cards, placementMemory = {}) {
+async function saveWipBoardToServer(cards, placementMemory = {}, previousCards = [], completionReviewCards = []) {
   const response = await fetch("/api/wip-board", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cards, placementMemory })
+    body: JSON.stringify({ cards, placementMemory, previousCards, completionReviewCards })
   });
   if (!response.ok) throw new Error("Could not save WIP board.");
   return response.json();
@@ -6824,6 +6836,8 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [multiDayCardId, setMultiDayCardId] = useState("");
   const [multiDaySelection, setMultiDaySelection] = useState([]);
   const [placementMemory, setPlacementMemory] = useState(() => loadStoredWipPlacementMemory());
+  const [previousWipCards, setPreviousWipCards] = useState(() => loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY));
+  const [completionReviewCards, setCompletionReviewCards] = useState(() => loadStoredWipCardList(WIP_REVIEW_STORAGE_KEY));
   const serverLoadedRef = useRef(false);
   const serverSaveTimerRef = useRef(null);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
@@ -6840,14 +6854,18 @@ function WipPage({ currentUser, onLogout, notifications }) {
         const sharedMemory = payload.placementMemory && typeof payload.placementMemory === "object" && !Array.isArray(payload.placementMemory)
           ? payload.placementMemory
           : {};
+        const sharedPreviousCards = Array.isArray(payload.previousCards) ? payload.previousCards : [];
+        const sharedReviewCards = Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards : [];
         if (!active) return;
         if (Object.keys(sharedMemory).length) setPlacementMemory(sharedMemory);
+        setPreviousWipCards(sharedPreviousCards);
+        setCompletionReviewCards(sharedReviewCards);
         if (sharedCards.length) {
           setCards(sharedCards);
           setUploadMessage("Shared WIP board loaded.");
         } else if (localCards.length) {
           const localMemory = Object.keys(sharedMemory).length ? sharedMemory : buildWipPlacementMemory(localCards, loadStoredWipPlacementMemory());
-          await saveWipBoardToServer(localCards, localMemory);
+          await saveWipBoardToServer(localCards, localMemory, sharedPreviousCards, sharedReviewCards);
           setPlacementMemory(localMemory);
           if (!active) return;
           setCards(localCards);
@@ -6867,10 +6885,12 @@ function WipPage({ currentUser, onLogout, notifications }) {
   useEffect(() => {
     window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
     window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(placementMemory));
+    window.localStorage.setItem(WIP_PREVIOUS_STORAGE_KEY, JSON.stringify(previousWipCards));
+    window.localStorage.setItem(WIP_REVIEW_STORAGE_KEY, JSON.stringify(completionReviewCards));
     if (!serverLoadedRef.current) return undefined;
     if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     serverSaveTimerRef.current = window.setTimeout(() => {
-      saveWipBoardToServer(cards, placementMemory).catch((error) => {
+      saveWipBoardToServer(cards, placementMemory, previousWipCards, completionReviewCards).catch((error) => {
         console.error(error);
         setUploadMessage("Could not save the shared WIP board. Your browser copy is still saved.");
       });
@@ -6878,7 +6898,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
     return () => {
       if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     };
-  }, [cards, placementMemory]);
+  }, [cards, placementMemory, previousWipCards, completionReviewCards]);
 
   useEffect(() => {
     let active = true;
@@ -6914,11 +6934,19 @@ function WipPage({ currentUser, onLogout, notifications }) {
       const buffer = await file.arrayBuffer();
       const xlsx = await import("xlsx");
       const parsedCards = parseWipWorkbook(buffer, cards, xlsx, placementMemory);
+      const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
+      const reviewSource = previousWipCards.length ? previousWipCards : cards;
+      const nextReviewCards = reviewSource.filter((card) => {
+        const orderNumber = normalizeWipOrderReference(card.orderNumber);
+        return orderNumber && !parsedOrderNumbers.has(orderNumber);
+      });
+      setCompletionReviewCards(nextReviewCards);
       setCards(parsedCards);
       const wipCount = parsedCards.filter((card) => card.tab === "wip").length;
       const preWipCount = parsedCards.filter((card) => card.tab === "pre-wip").length;
       const suggestedCount = parsedCards.filter((card) => card.lane && card.lane !== "backlog").length;
-      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs.");
+      const reviewMessage = nextReviewCards.length ? " " + nextReviewCards.length + " missing jobs need completion review." : "";
+      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + reviewMessage);
     } catch (error) {
       console.error(error);
       setUploadMessage(error.message || "Could not read that Excel file.");
@@ -6954,6 +6982,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
     if (!window.confirm("Clear all WIP cards from the shared WIP board?")) return;
     setCards([]);
     setCountedCardIds([]);
+    setCompletionReviewCards([]);
     setUploadMessage("Shared WIP board cleared.");
   }
 
@@ -6962,9 +6991,31 @@ function WipPage({ currentUser, onLogout, notifications }) {
     if (!window.confirm("Remember these WIP positions and clear the shared board ready for the next WIP upload?")) return;
     const nextMemory = buildWipPlacementMemory(cards, placementMemory);
     setPlacementMemory(nextMemory);
+    setPreviousWipCards(cards);
+    setCompletionReviewCards([]);
     setCards([]);
     setCountedCardIds([]);
     setUploadMessage("WIP board cleared. These positions will be suggested on the next upload.");
+  }
+
+  function markWipReviewCompleted(orderNumber) {
+    const normalized = normalizeWipOrderReference(orderNumber);
+    setCompletionReviewCards((current) => current.filter((card) => normalizeWipOrderReference(card.orderNumber) !== normalized));
+  }
+
+  function returnWipReviewToUnscheduled(orderNumber) {
+    const normalized = normalizeWipOrderReference(orderNumber);
+    const cardToReturn = completionReviewCards.find((card) => normalizeWipOrderReference(card.orderNumber) === normalized);
+    if (!cardToReturn) return;
+    setCards((current) => {
+      if (current.some((card) => normalizeWipOrderReference(card.orderNumber) === normalized)) return current;
+      return [...current, { ...cardToReturn, tab: "wip", lane: "backlog", extraLanes: [] }];
+    });
+    markWipReviewCompleted(orderNumber);
+  }
+
+  function markAllWipReviewCompleted() {
+    setCompletionReviewCards([]);
   }
 
   function getWipCardDayLanes(card) {
@@ -7125,6 +7176,37 @@ function WipPage({ currentUser, onLogout, notifications }) {
               ))}
             </div>
           </div>
+          {completionReviewCards.length ? (
+            <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+              <div className="wip-modal wip-review-modal">
+                <div className="wip-modal-head">
+                  <div>
+                    <span>Completion review</span>
+                    <h2>Confirm jobs missing from the new WIP</h2>
+                    <p>These were on the previous remembered board but are not in the latest WIP upload.</p>
+                  </div>
+                </div>
+                <div className="wip-review-list">
+                  {completionReviewCards.map((card) => (
+                    <article key={card.id || card.orderNumber} className="wip-review-card">
+                      <div>
+                        <strong>{card.orderNumber}</strong>
+                        <span>{card.company || "No company"}</span>
+                        <p>{card.description || "No description"}</p>
+                      </div>
+                      <div className="wip-review-actions">
+                        <button type="button" className="success-button" onClick={() => markWipReviewCompleted(card.orderNumber)}>Completed</button>
+                        <button type="button" className="ghost-button" onClick={() => returnWipReviewToUnscheduled(card.orderNumber)}>Back to unallocated</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                <div className="wip-modal-actions">
+                  <button type="button" className="ghost-button" onClick={markAllWipReviewCompleted}>Mark all completed</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {multiDayCard ? (
             <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
               <div className="wip-modal">
