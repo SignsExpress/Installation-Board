@@ -280,6 +280,7 @@ function createEmptyBoardStore() {
     },
     wipBoard: {
       cards: [],
+      placementMemory: {},
       updatedAt: ""
     },
     holidays: [],
@@ -1526,7 +1527,7 @@ async function readStore() {
             igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
-            wipBoard: { cards: [], updatedAt: "" },
+            wipBoard: { cards: [], placementMemory: {}, updatedAt: "" },
             holidays: [],
             subcontractorEvents: [],
             holidayRequests: [],
@@ -4433,9 +4434,27 @@ function sanitizeWipCard(payload = {}) {
   };
 }
 
+function sanitizeWipPlacementMemory(payload = {}) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return {};
+  return Object.entries(payload).reduce((memory, [rawOrderNumber, rawPlacement]) => {
+    const orderNumber = String(rawOrderNumber || "").trim().toUpperCase();
+    if (!orderNumber || !rawPlacement || typeof rawPlacement !== "object" || Array.isArray(rawPlacement)) return memory;
+    memory[orderNumber] = {
+      tab: String(rawPlacement.tab || "wip").trim().toLowerCase() === "pre-wip" ? "pre-wip" : "wip",
+      lane: String(rawPlacement.lane || "backlog").trim() || "backlog",
+      extraLanes: Array.isArray(rawPlacement.extraLanes)
+        ? [...new Set(rawPlacement.extraLanes.map((lane) => String(lane || "").trim()).filter(Boolean))]
+        : [],
+      rememberedAt: String(rawPlacement.rememberedAt || "").trim()
+    };
+    return memory;
+  }, {});
+}
+
 function sanitizeWipBoardState(payload = {}) {
   return {
     cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
+    placementMemory: sanitizeWipPlacementMemory(payload.placementMemory),
     updatedAt: String(payload.updatedAt || "").trim()
   };
 }

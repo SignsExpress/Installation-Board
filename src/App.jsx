@@ -6603,6 +6603,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
 
 
 const WIP_STORAGE_KEY = "sx-wip-board-v1";
+const WIP_MEMORY_STORAGE_KEY = "sx-wip-board-memory-v1";
 const WIP_SPECIAL_LANES = [
   { id: "completed", title: "Completed" },
   { id: "ordered", title: "Ordered in / No Production Required" },
@@ -6656,11 +6657,12 @@ function getWipTabFromStatus(status) {
   return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
 }
 
-function makeWipCard(row, headers, existingByOrder) {
+function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
   const read = (name) => row[headers[normalizeWipKey(name)]] ?? "";
   const orderNumber = normalizeWipOrderReference(read("Order Number"));
   if (!orderNumber || !/^(ORD|INV|EST)/i.test(orderNumber)) return null;
-  const existing = existingByOrder.get(orderNumber) || {};
+  const remembered = placementMemory[orderNumber] || {};
+  const existing = existingByOrder.get(orderNumber) || remembered || {};
   const status = String(read("Order Status") || "").trim();
   return {
     id: existing.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
@@ -6678,7 +6680,7 @@ function makeWipCard(row, headers, existingByOrder) {
   };
 }
 
-function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx) {
+function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx, placementMemory = {}) {
   const workbook = xlsx.read(arrayBuffer, { type: "array", cellDates: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
@@ -6694,7 +6696,7 @@ function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx) {
   const missing = required.filter((key) => headers[key] === undefined);
   if (missing.length) throw new Error("Missing columns: " + missing.join(", "));
   const existingByOrder = new Map(existingCards.map((card) => [card.orderNumber, card]));
-  return rows.slice(headerIndex + 1).map((row) => makeWipCard(row, headers, existingByOrder)).filter(Boolean);
+  return rows.slice(headerIndex + 1).map((row) => makeWipCard(row, headers, existingByOrder, placementMemory)).filter(Boolean);
 }
 
 function loadStoredWipCards() {
@@ -6707,11 +6709,36 @@ function loadStoredWipCards() {
   }
 }
 
-async function saveWipBoardToServer(cards) {
+function loadStoredWipPlacementMemory() {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WIP_MEMORY_STORAGE_KEY) || "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function buildWipPlacementMemory(cards, existingMemory = {}) {
+  const rememberedAt = new Date().toISOString();
+  return cards.reduce((memory, card) => {
+    const orderNumber = normalizeWipOrderReference(card.orderNumber);
+    if (!orderNumber) return memory;
+    memory[orderNumber] = {
+      tab: card.tab || "wip",
+      lane: card.lane || "backlog",
+      extraLanes: Array.isArray(card.extraLanes) ? card.extraLanes : [],
+      rememberedAt
+    };
+    return memory;
+  }, { ...existingMemory });
+}
+
+async function saveWipBoardToServer(cards, placementMemory = {}) {
   const response = await fetch("/api/wip-board", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cards })
+    body: JSON.stringify({ cards, placementMemory })
   });
   if (!response.ok) throw new Error("Could not save WIP board.");
   return response.json();
@@ -6796,6 +6823,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [countedCardIds, setCountedCardIds] = useState([]);
   const [multiDayCardId, setMultiDayCardId] = useState("");
   const [multiDaySelection, setMultiDaySelection] = useState([]);
+  const [placementMemory, setPlacementMemory] = useState(() => loadStoredWipPlacementMemory());
   const serverLoadedRef = useRef(false);
   const serverSaveTimerRef = useRef(null);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
@@ -6809,12 +6837,18 @@ function WipPage({ currentUser, onLogout, notifications }) {
         if (!response.ok) throw new Error("Could not load shared WIP board.");
         const payload = await response.json();
         const sharedCards = Array.isArray(payload.cards) ? payload.cards : [];
+        const sharedMemory = payload.placementMemory && typeof payload.placementMemory === "object" && !Array.isArray(payload.placementMemory)
+          ? payload.placementMemory
+          : {};
         if (!active) return;
+        if (Object.keys(sharedMemory).length) setPlacementMemory(sharedMemory);
         if (sharedCards.length) {
           setCards(sharedCards);
           setUploadMessage("Shared WIP board loaded.");
         } else if (localCards.length) {
-          await saveWipBoardToServer(localCards);
+          const localMemory = Object.keys(sharedMemory).length ? sharedMemory : buildWipPlacementMemory(localCards, loadStoredWipPlacementMemory());
+          await saveWipBoardToServer(localCards, localMemory);
+          setPlacementMemory(localMemory);
           if (!active) return;
           setCards(localCards);
           setUploadMessage("Your saved WIP layout has been shared with everyone.");
@@ -6832,10 +6866,11 @@ function WipPage({ currentUser, onLogout, notifications }) {
 
   useEffect(() => {
     window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
+    window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(placementMemory));
     if (!serverLoadedRef.current) return undefined;
     if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     serverSaveTimerRef.current = window.setTimeout(() => {
-      saveWipBoardToServer(cards).catch((error) => {
+      saveWipBoardToServer(cards, placementMemory).catch((error) => {
         console.error(error);
         setUploadMessage("Could not save the shared WIP board. Your browser copy is still saved.");
       });
@@ -6843,7 +6878,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
     return () => {
       if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     };
-  }, [cards]);
+  }, [cards, placementMemory]);
 
   useEffect(() => {
     let active = true;
@@ -6878,11 +6913,12 @@ function WipPage({ currentUser, onLogout, notifications }) {
     try {
       const buffer = await file.arrayBuffer();
       const xlsx = await import("xlsx");
-      const parsedCards = parseWipWorkbook(buffer, cards, xlsx);
+      const parsedCards = parseWipWorkbook(buffer, cards, xlsx, placementMemory);
       setCards(parsedCards);
       const wipCount = parsedCards.filter((card) => card.tab === "wip").length;
       const preWipCount = parsedCards.filter((card) => card.tab === "pre-wip").length;
-      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP.");
+      const suggestedCount = parsedCards.filter((card) => card.lane && card.lane !== "backlog").length;
+      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs.");
     } catch (error) {
       console.error(error);
       setUploadMessage(error.message || "Could not read that Excel file.");
@@ -6915,10 +6951,20 @@ function WipPage({ currentUser, onLogout, notifications }) {
   }
 
   function clearWipCards() {
-    if (!window.confirm("Clear all WIP cards from this browser?")) return;
+    if (!window.confirm("Clear all WIP cards from the shared WIP board?")) return;
     setCards([]);
     setCountedCardIds([]);
-    setUploadMessage("WIP board cleared.");
+    setUploadMessage("Shared WIP board cleared.");
+  }
+
+  function clearAndRememberWipCards() {
+    if (!cards.length) return;
+    if (!window.confirm("Remember these WIP positions and clear the shared board ready for the next WIP upload?")) return;
+    const nextMemory = buildWipPlacementMemory(cards, placementMemory);
+    setPlacementMemory(nextMemory);
+    setCards([]);
+    setCountedCardIds([]);
+    setUploadMessage("WIP board cleared. These positions will be suggested on the next upload.");
   }
 
   function getWipCardDayLanes(card) {
@@ -6991,6 +7037,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
               >
                 Count value
               </button>
+              <button type="button" className="ghost-button" onClick={clearAndRememberWipCards} disabled={!cards.length}>Clear and remember</button>
               <button type="button" className="ghost-button" onClick={clearWipCards} disabled={!cards.length}>Clear WIP</button>
               <button type="button" className="ghost-button" onClick={() => window.print()} disabled={!cards.length}>Print</button>
             </div>
