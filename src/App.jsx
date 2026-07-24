@@ -6785,6 +6785,28 @@ function buildWipPlacementMemory(cards, existingMemory = {}) {
   }, { ...existingMemory });
 }
 
+function getWipVisibleLaneIds(days = []) {
+  return new Set([
+    "backlog",
+    ...WIP_SPECIAL_LANES.map((lane) => lane.id),
+    ...days.map((day) => "day:" + day.id)
+  ]);
+}
+
+function keepWipCardInVisibleLane(card, visibleLaneIds) {
+  if (!card || !visibleLaneIds) return card;
+  const lane = visibleLaneIds.has(card.lane) ? card.lane : "backlog";
+  const extraLanes = (Array.isArray(card.extraLanes) ? card.extraLanes : []).filter((extraLane) => visibleLaneIds.has(extraLane) && extraLane !== lane);
+  return lane === card.lane && extraLanes.length === (Array.isArray(card.extraLanes) ? card.extraLanes.length : 0)
+    ? card
+    : { ...card, lane, extraLanes };
+}
+
+function keepWipCardsInVisibleLanes(cards, days = []) {
+  const visibleLaneIds = getWipVisibleLaneIds(days);
+  return (Array.isArray(cards) ? cards : []).map((card) => keepWipCardInVisibleLane(card, visibleLaneIds));
+}
+
 async function saveWipBoardToServer(cards, placementMemory = {}, previousCards = [], completionReviewCards = []) {
   const response = await fetch("/api/wip-board", {
     method: "PUT",
@@ -6875,7 +6897,7 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, avai
 }
 
 function WipPage({ currentUser, onLogout, notifications }) {
-  const [cards, setCards] = useState(() => loadStoredWipCards());
+  const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
   const [uploadMessage, setUploadMessage] = useState("");
   const [installDateMap, setInstallDateMap] = useState({});
@@ -6898,11 +6920,11 @@ function WipPage({ currentUser, onLogout, notifications }) {
     let active = true;
     async function loadSharedWipBoard() {
       try {
-        const localCards = loadStoredWipCards();
+        const localCards = keepWipCardsInVisibleLanes(loadStoredWipCards(), days);
         const response = await fetch("/api/wip-board");
         if (!response.ok) throw new Error("Could not load shared WIP board.");
         const payload = await response.json();
-        const sharedCards = Array.isArray(payload.cards) ? payload.cards : [];
+        const sharedCards = keepWipCardsInVisibleLanes(Array.isArray(payload.cards) ? payload.cards : [], days);
         const sharedMemory = payload.placementMemory && typeof payload.placementMemory === "object" && !Array.isArray(payload.placementMemory)
           ? payload.placementMemory
           : {};
@@ -6998,7 +7020,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
       const buffer = await file.arrayBuffer();
       const xlsx = await import("xlsx");
       const currentMemory = placementMemoryRef.current || placementMemory;
-      const parsedCards = parseWipWorkbook(buffer, cards, xlsx, currentMemory);
+      const parsedCards = keepWipCardsInVisibleLanes(parseWipWorkbook(buffer, cards, xlsx, currentMemory), days);
       const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
       const storedPreviousCards = loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY);
       const refPreviousCards = previousWipCardsRef.current || [];
