@@ -278,6 +278,10 @@ function createEmptyBoardStore() {
     filteringBoard: {
       cards: []
     },
+    wipBoard: {
+      cards: [],
+      updatedAt: ""
+    },
     holidays: [],
     subcontractorEvents: [],
     holidayRequests: [],
@@ -1522,6 +1526,7 @@ async function readStore() {
             igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
+            wipBoard: { cards: [], updatedAt: "" },
             holidays: [],
             subcontractorEvents: [],
             holidayRequests: [],
@@ -1558,6 +1563,7 @@ async function readStore() {
           igloo: sanitizeIglooTracker(parsed.igloo),
           designBoard: sanitizeDesignBoardState(parsed.designBoard),
           filteringBoard: sanitizeFilteringBoardState(parsed.filteringBoard),
+          wipBoard: sanitizeWipBoardState(parsed.wipBoard),
           holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
           subcontractorEvents: Array.isArray(parsed.subcontractorEvents) ? parsed.subcontractorEvents.map((entry) => sanitizeSubcontractorEvent(entry)) : [],
           holidayRequests: Array.isArray(parsed.holidayRequests) ? parsed.holidayRequests : [],
@@ -1629,6 +1635,10 @@ async function writeStore(store) {
       cards: [...sanitizeFilteringBoardState(store.filteringBoard).cards].sort((left, right) =>
         String(right.approvedAt || right.updatedAt || right.createdAt || "").localeCompare(String(left.approvedAt || left.updatedAt || left.createdAt || ""))
       )
+    },
+    wipBoard: {
+      ...sanitizeWipBoardState(store.wipBoard),
+      updatedAt: String(store.wipBoard?.updatedAt || "").trim()
     },
     holidays: [...store.holidays].sort((left, right) => {
       if (left.date !== right.date) return left.date.localeCompare(right.date);
@@ -1715,6 +1725,9 @@ async function writeStore(store) {
       const previousStore = safeParseStoreJson(previousRaw) || createEmptyBoardStore();
       if (store.igloo === undefined && previousStore.igloo !== undefined) {
         nextStore.igloo = sanitizeIglooTracker(previousStore.igloo);
+      }
+      if (store.wipBoard === undefined && previousStore.wipBoard !== undefined) {
+        nextStore.wipBoard = sanitizeWipBoardState(previousStore.wipBoard);
       }
       await snapshotFile(dataFile, "jobs-store");
       await writeTextFileAtomically(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`);
@@ -4397,6 +4410,33 @@ function sanitizeDesignBoardState(payload = {}) {
 function sanitizeFilteringBoardState(payload = {}) {
   return {
     cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeFilteringCard(card)) : []
+  };
+}
+
+function sanitizeWipCard(payload = {}) {
+  const extraLanes = Array.isArray(payload.extraLanes)
+    ? [...new Set(payload.extraLanes.map((lane) => String(lane || "").trim()).filter(Boolean))]
+    : [];
+  return {
+    id: String(payload.id || makeId()),
+    orderNumber: String(payload.orderNumber || "").trim().toUpperCase(),
+    orderStatus: String(payload.orderStatus || "").trim(),
+    company: String(payload.company || "").trim(),
+    description: String(payload.description || "").trim(),
+    salesperson: String(payload.salesperson || "").trim(),
+    productionLocation: String(payload.productionLocation || "").trim(),
+    preTaxTotal: String(payload.preTaxTotal || "").trim(),
+    tab: String(payload.tab || "wip").trim().toLowerCase() === "pre-wip" ? "pre-wip" : "wip",
+    lane: String(payload.lane || "backlog").trim() || "backlog",
+    extraLanes,
+    importedAt: String(payload.importedAt || new Date().toISOString())
+  };
+}
+
+function sanitizeWipBoardState(payload = {}) {
+  return {
+    cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
+    updatedAt: String(payload.updatedAt || "").trim()
   };
 }
 
@@ -12874,6 +12914,23 @@ function createServer() {
     const savedStore = await writeStore(store);
     broadcast("board-updated", { source: "subcontractor-event", id: request.params.id });
     response.json(buildBoardRowsFromStore(savedStore));
+  });
+
+  app.get("/api/wip-board", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    response.json(sanitizeWipBoardState(store.wipBoard));
+  });
+
+  app.put("/api/wip-board", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const store = await readStore();
+    store.wipBoard = {
+      ...sanitizeWipBoardState(request.body),
+      updatedAt: new Date().toISOString()
+    };
+    const savedStore = await writeStore(store);
+    response.json(sanitizeWipBoardState(savedStore.wipBoard));
   });
 
   app.get("/api/board", async (request, response) => {

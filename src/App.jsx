@@ -6707,6 +6707,16 @@ function loadStoredWipCards() {
   }
 }
 
+async function saveWipBoardToServer(cards) {
+  const response = await fetch("/api/wip-board", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cards })
+  });
+  if (!response.ok) throw new Error("Could not save WIP board.");
+  return response.json();
+}
+
 function WipCard({ card, installDates = [], onDragStart, countMode = false, selected = false, onToggleCount, onMultiDay }) {
   return (
     <article
@@ -6786,10 +6796,53 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [countedCardIds, setCountedCardIds] = useState([]);
   const [multiDayCardId, setMultiDayCardId] = useState("");
   const [multiDaySelection, setMultiDaySelection] = useState([]);
+  const serverLoadedRef = useRef(false);
+  const serverSaveTimerRef = useRef(null);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
 
   useEffect(() => {
+    let active = true;
+    async function loadSharedWipBoard() {
+      try {
+        const localCards = loadStoredWipCards();
+        const response = await fetch("/api/wip-board");
+        if (!response.ok) throw new Error("Could not load shared WIP board.");
+        const payload = await response.json();
+        const sharedCards = Array.isArray(payload.cards) ? payload.cards : [];
+        if (!active) return;
+        if (sharedCards.length) {
+          setCards(sharedCards);
+          setUploadMessage("Shared WIP board loaded.");
+        } else if (localCards.length) {
+          await saveWipBoardToServer(localCards);
+          if (!active) return;
+          setCards(localCards);
+          setUploadMessage("Your saved WIP layout has been shared with everyone.");
+        }
+      } catch (error) {
+        console.error(error);
+        if (active) setUploadMessage("Using this browser's saved WIP board until the shared board loads.");
+      } finally {
+        if (active) serverLoadedRef.current = true;
+      }
+    }
+    loadSharedWipBoard();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
+    if (!serverLoadedRef.current) return undefined;
+    if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
+    serverSaveTimerRef.current = window.setTimeout(() => {
+      saveWipBoardToServer(cards).catch((error) => {
+        console.error(error);
+        setUploadMessage("Could not save the shared WIP board. Your browser copy is still saved.");
+      });
+    }, 450);
+    return () => {
+      if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
+    };
   }, [cards]);
 
   useEffect(() => {
