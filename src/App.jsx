@@ -6807,6 +6807,18 @@ function keepWipCardsInVisibleLanes(cards, days = []) {
   return (Array.isArray(cards) ? cards : []).map((card) => keepWipCardInVisibleLane(card, visibleLaneIds));
 }
 
+function isWipCardInCompletedLane(card) {
+  return String(card?.lane || "").trim() === "completed";
+}
+
+function keepWipMemoryForUploadedOrders(memory = {}, uploadedOrderNumbers = new Set()) {
+  return Object.entries(memory || {}).reduce((nextMemory, [orderNumber, placement]) => {
+    const normalized = normalizeWipOrderReference(orderNumber);
+    if (normalized && uploadedOrderNumbers.has(normalized)) nextMemory[normalized] = placement;
+    return nextMemory;
+  }, {});
+}
+
 async function saveWipBoardToServer(cards, placementMemory = {}, previousCards = [], completionReviewCards = []) {
   const response = await fetch("/api/wip-board", {
     method: "PUT",
@@ -7027,9 +7039,19 @@ function WipPage({ currentUser, onLogout, notifications }) {
       const reviewSource = refPreviousCards.length ? refPreviousCards : storedPreviousCards.length ? storedPreviousCards : cards;
       const nextReviewCards = reviewSource.filter((card) => {
         const orderNumber = normalizeWipOrderReference(card.orderNumber);
-        return orderNumber && !parsedOrderNumbers.has(orderNumber);
+        return orderNumber && !parsedOrderNumbers.has(orderNumber) && !isWipCardInCompletedLane(card);
       });
+      const reviewOrderNumbers = new Set(nextReviewCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
+      const nextPreviousCards = reviewSource.filter((card) => {
+        const orderNumber = normalizeWipOrderReference(card.orderNumber);
+        return orderNumber && (parsedOrderNumbers.has(orderNumber) || reviewOrderNumbers.has(orderNumber));
+      });
+      const nextPlacementMemory = keepWipMemoryForUploadedOrders(currentMemory, parsedOrderNumbers);
+      placementMemoryRef.current = nextPlacementMemory;
+      previousWipCardsRef.current = nextPreviousCards;
       completionReviewCardsRef.current = nextReviewCards;
+      setPlacementMemory(nextPlacementMemory);
+      setPreviousWipCards(nextPreviousCards);
       setCompletionReviewCards(nextReviewCards);
       setCards(parsedCards);
       const wipCount = parsedCards.filter((card) => card.tab === "wip").length;
