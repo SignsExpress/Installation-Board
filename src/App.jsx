@@ -6615,13 +6615,52 @@ const WIP_SPECIAL_LANES = [
 
 function getWipBoardDays(startIso = getLocalTodayIso()) {
   const start = parseIsoDate(startIso) || new Date();
-  return Array.from({ length: 14 }, (_, index) => {
-    const date = addDays(start, index);
-    return {
-      id: toIsoDate(date),
-      label: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" }).format(date)
-    };
+  const days = [];
+  let cursor = start;
+  while (days.length < 10) {
+    if (![0, 6].includes(cursor.getUTCDay())) {
+      days.push({
+        id: toIsoDate(cursor),
+        label: new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "2-digit", month: "short" }).format(cursor)
+      });
+    }
+    cursor = addDays(cursor, 1);
+  }
+  return days;
+}
+
+function getWipAvailabilityFromBoard(board) {
+  const availability = {};
+  (Array.isArray(board?.weeks) ? board.weeks : []).forEach((week) => {
+    (Array.isArray(week.rows) ? week.rows : []).forEach((row) => {
+      const date = String(row?.isoDate || "").trim();
+      if (!date) return;
+      const entries = [];
+      if (row.bankHoliday) {
+        entries.push({ id: date + "-bank", type: "bank", label: row.bankHoliday });
+      }
+      (Array.isArray(row.staffHolidays) ? row.staffHolidays : []).forEach((holiday) => {
+        const duration =
+          holiday.duration === "Morning" ? " AM" :
+            holiday.duration === "Afternoon" ? " PM" :
+              "";
+        entries.push({
+          id: holiday.id || date + "-" + holiday.person + "-" + duration,
+          type: isBirthdayHoliday(holiday) ? "birthday" : "holiday",
+          label: getHolidayDisplayToken(holiday.person) + duration
+        });
+      });
+      (Array.isArray(row.holidayEvents) ? row.holidayEvents : []).forEach((event) => {
+        entries.push({
+          id: event.id || date + "-" + event.title,
+          type: "event",
+          label: event.title || "Holiday note"
+        });
+      });
+      if (entries.length) availability[date] = entries;
+    });
   });
+  return availability;
 }
 
 function normalizeWipKey(value) {
@@ -6791,7 +6830,7 @@ function WipCard({ card, installDates = [], onDragStart, countMode = false, sele
   );
 }
 
-function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDropCard, onDragStart, countMode = false, countedCardIds = [], onToggleCount, onMultiDay }) {
+function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, availability = [], onDropCard, onDragStart, countMode = false, countedCardIds = [], onToggleCount, onMultiDay }) {
   return (
     <section
       className={"wip-lane " + (laneId === "backlog" ? "is-wide" : "")}
@@ -6807,6 +6846,15 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, onDr
         <span>{cards.length}</span>
       </div>
       {subtitle ? <small>{subtitle}</small> : null}
+      {availability.length ? (
+        <div className="wip-day-availability" aria-label="Staff holidays and bank holidays">
+          {availability.map((entry) => (
+            <span key={entry.id} className={`is-${entry.type}`}>
+              {entry.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="wip-lane-stack">
         {cards.map((card) => (
           <WipCard
@@ -6831,6 +6879,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [activeTab, setActiveTab] = useState("wip");
   const [uploadMessage, setUploadMessage] = useState("");
   const [installDateMap, setInstallDateMap] = useState({});
+  const [wipAvailabilityMap, setWipAvailabilityMap] = useState({});
   const [countMode, setCountMode] = useState(false);
   const [countedCardIds, setCountedCardIds] = useState([]);
   const [multiDayCardId, setMultiDayCardId] = useState("");
@@ -6929,7 +6978,10 @@ function WipPage({ currentUser, onLogout, notifications }) {
           nextMap[ref].add(formatJobDate(job.date));
         });
         const compact = Object.fromEntries(Object.entries(nextMap).map(([key, value]) => [key, [...value].sort()]));
-        if (active) setInstallDateMap(compact);
+        if (active) {
+          setInstallDateMap(compact);
+          setWipAvailabilityMap(getWipAvailabilityFromBoard(payload.board));
+        }
       } catch (error) {
         console.error(error);
       }
@@ -7207,6 +7259,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
                   tab={activeTab}
                   cards={cardsByLane["day:" + day.id] || []}
                   installDateMap={installDateMap}
+                  availability={wipAvailabilityMap[day.id] || []}
                   onDropCard={moveCard}
                   onDragStart={onDragStart}
                   countMode={countMode}
