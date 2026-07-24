@@ -5134,13 +5134,56 @@ button {
 }
 
 .installer-chip {
+  position: relative;
   border: 1px solid transparent;
-  opacity: 0.78;
+  opacity: 0.72;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease, border-color 0.16s ease;
+}
+
+.installer-chip:hover {
+  opacity: 0.94;
+  transform: translateY(-1px);
 }
 
 .installer-chip.active {
   opacity: 1;
-  box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.16);
+  border-color: currentColor;
+  padding-right: 28px;
+  box-shadow: 0 0 0 3px rgba(95, 60, 116, 0.15), 0 10px 20px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+}
+
+.installer-chip.active::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.installer-chip.active::before {
+  content: "";
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  z-index: 1;
+  width: 5px;
+  height: 9px;
+  border-right: 2px solid #fff;
+  border-bottom: 2px solid #fff;
+  transform: translateY(-60%) rotate(40deg);
+}
+
+.installer-chip.active.installer-ed::after {
+  background: #fff;
+}
+
+.installer-chip.active.installer-ed::before {
+  border-color: #111827;
 }
 
 .installer-mc {
