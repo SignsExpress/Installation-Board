@@ -6838,6 +6838,9 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const [placementMemory, setPlacementMemory] = useState(() => loadStoredWipPlacementMemory());
   const [previousWipCards, setPreviousWipCards] = useState(() => loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY));
   const [completionReviewCards, setCompletionReviewCards] = useState(() => loadStoredWipCardList(WIP_REVIEW_STORAGE_KEY));
+  const previousWipCardsRef = useRef(previousWipCards);
+  const completionReviewCardsRef = useRef(completionReviewCards);
+  const placementMemoryRef = useRef(placementMemory);
   const serverLoadedRef = useRef(false);
   const serverSaveTimerRef = useRef(null);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
@@ -6857,7 +6860,12 @@ function WipPage({ currentUser, onLogout, notifications }) {
         const sharedPreviousCards = Array.isArray(payload.previousCards) ? payload.previousCards : [];
         const sharedReviewCards = Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards : [];
         if (!active) return;
-        if (Object.keys(sharedMemory).length) setPlacementMemory(sharedMemory);
+        if (Object.keys(sharedMemory).length) {
+          placementMemoryRef.current = sharedMemory;
+          setPlacementMemory(sharedMemory);
+        }
+        previousWipCardsRef.current = sharedPreviousCards;
+        completionReviewCardsRef.current = sharedReviewCards;
         setPreviousWipCards(sharedPreviousCards);
         setCompletionReviewCards(sharedReviewCards);
         if (sharedCards.length) {
@@ -6866,6 +6874,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
         } else if (localCards.length) {
           const localMemory = Object.keys(sharedMemory).length ? sharedMemory : buildWipPlacementMemory(localCards, loadStoredWipPlacementMemory());
           await saveWipBoardToServer(localCards, localMemory, sharedPreviousCards, sharedReviewCards);
+          placementMemoryRef.current = localMemory;
           setPlacementMemory(localMemory);
           if (!active) return;
           setCards(localCards);
@@ -6883,6 +6892,9 @@ function WipPage({ currentUser, onLogout, notifications }) {
   }, []);
 
   useEffect(() => {
+    previousWipCardsRef.current = previousWipCards;
+    completionReviewCardsRef.current = completionReviewCards;
+    placementMemoryRef.current = placementMemory;
     window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
     window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(placementMemory));
     window.localStorage.setItem(WIP_PREVIOUS_STORAGE_KEY, JSON.stringify(previousWipCards));
@@ -6933,13 +6945,17 @@ function WipPage({ currentUser, onLogout, notifications }) {
     try {
       const buffer = await file.arrayBuffer();
       const xlsx = await import("xlsx");
-      const parsedCards = parseWipWorkbook(buffer, cards, xlsx, placementMemory);
+      const currentMemory = placementMemoryRef.current || placementMemory;
+      const parsedCards = parseWipWorkbook(buffer, cards, xlsx, currentMemory);
       const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
-      const reviewSource = previousWipCards.length ? previousWipCards : cards;
+      const storedPreviousCards = loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY);
+      const refPreviousCards = previousWipCardsRef.current || [];
+      const reviewSource = refPreviousCards.length ? refPreviousCards : storedPreviousCards.length ? storedPreviousCards : cards;
       const nextReviewCards = reviewSource.filter((card) => {
         const orderNumber = normalizeWipOrderReference(card.orderNumber);
         return orderNumber && !parsedOrderNumbers.has(orderNumber);
       });
+      completionReviewCardsRef.current = nextReviewCards;
       setCompletionReviewCards(nextReviewCards);
       setCards(parsedCards);
       const wipCount = parsedCards.filter((card) => card.tab === "wip").length;
@@ -6980,6 +6996,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
 
   function clearWipCards() {
     if (!window.confirm("Clear all WIP cards from the shared WIP board?")) return;
+    completionReviewCardsRef.current = [];
     setCards([]);
     setCountedCardIds([]);
     setCompletionReviewCards([]);
@@ -6989,33 +7006,57 @@ function WipPage({ currentUser, onLogout, notifications }) {
   function clearAndRememberWipCards() {
     if (!cards.length) return;
     if (!window.confirm("Remember these WIP positions and clear the shared board ready for the next WIP upload?")) return;
-    const nextMemory = buildWipPlacementMemory(cards, placementMemory);
+    const rememberedCards = [...cards];
+    const nextMemory = buildWipPlacementMemory(rememberedCards, placementMemoryRef.current || placementMemory);
+    placementMemoryRef.current = nextMemory;
+    previousWipCardsRef.current = rememberedCards;
+    completionReviewCardsRef.current = [];
+    window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(nextMemory));
+    window.localStorage.setItem(WIP_PREVIOUS_STORAGE_KEY, JSON.stringify(rememberedCards));
+    window.localStorage.setItem(WIP_REVIEW_STORAGE_KEY, JSON.stringify([]));
     setPlacementMemory(nextMemory);
-    setPreviousWipCards(cards);
+    setPreviousWipCards(rememberedCards);
     setCompletionReviewCards([]);
     setCards([]);
     setCountedCardIds([]);
     setUploadMessage("WIP board cleared. These positions will be suggested on the next upload.");
+    saveWipBoardToServer([], nextMemory, rememberedCards, []).catch((error) => {
+      console.error(error);
+      setUploadMessage("WIP positions are remembered in this browser, but could not save to the shared board yet.");
+    });
   }
 
   function markWipReviewCompleted(orderNumber) {
     const normalized = normalizeWipOrderReference(orderNumber);
-    setCompletionReviewCards((current) => current.filter((card) => normalizeWipOrderReference(card.orderNumber) !== normalized));
+    setCompletionReviewCards((current) => {
+      const next = current.filter((card) => normalizeWipOrderReference(card.orderNumber) !== normalized);
+      completionReviewCardsRef.current = next;
+      return next;
+    });
   }
 
   function returnWipReviewToUnscheduled(orderNumber) {
     const normalized = normalizeWipOrderReference(orderNumber);
-    const cardToReturn = completionReviewCards.find((card) => normalizeWipOrderReference(card.orderNumber) === normalized);
+    const reviewCards = completionReviewCardsRef.current.length ? completionReviewCardsRef.current : completionReviewCards;
+    const cardToReturn = reviewCards.find((card) => normalizeWipOrderReference(card.orderNumber) === normalized);
     if (!cardToReturn) return;
     setCards((current) => {
       if (current.some((card) => normalizeWipOrderReference(card.orderNumber) === normalized)) return current;
       return [...current, { ...cardToReturn, tab: "wip", lane: "backlog", extraLanes: [] }];
     });
+    setPreviousWipCards((current) => {
+      const next = current.filter((card) => normalizeWipOrderReference(card.orderNumber) !== normalized);
+      previousWipCardsRef.current = next;
+      return next;
+    });
     markWipReviewCompleted(orderNumber);
   }
 
   function markAllWipReviewCompleted() {
+    completionReviewCardsRef.current = [];
+    previousWipCardsRef.current = [];
     setCompletionReviewCards([]);
+    setPreviousWipCards([]);
   }
 
   function getWipCardDayLanes(card) {
