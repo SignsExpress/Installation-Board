@@ -6608,7 +6608,8 @@ const WIP_PREVIOUS_STORAGE_KEY = "sx-wip-board-previous-v1";
 const WIP_REVIEW_STORAGE_KEY = "sx-wip-board-review-v1";
 const WIP_SPECIAL_LANES = [
   { id: "completed", title: "Completed" },
-  { id: "ordered", title: "Ordered in / No Production Required" },
+  { id: "ordered", title: "Awaiting Materials" },
+  { id: "awaiting-installation", title: "Job complete, awaiting installation" },
   { id: "salesperson", title: "Order with sales person" },
   { id: "hold", title: "On Hold" }
 ];
