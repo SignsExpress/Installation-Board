@@ -20305,6 +20305,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loginUsers, setLoginUsers] = useState([]);
+  const [installerUsers, setInstallerUsers] = useState([]);
   const [loginDisplayName, setLoginDisplayName] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
@@ -20388,7 +20389,7 @@ export default function App() {
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
-  const installerOptions = useMemo(() => buildInstallerOptions(loginUsers), [loginUsers]);
+  const installerOptions = useMemo(() => buildInstallerOptions(installerUsers.length ? installerUsers : loginUsers), [installerUsers, loginUsers]);
   const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
@@ -20471,15 +20472,21 @@ export default function App() {
         const meResponse = await fetch("/api/auth/me");
         const mePayload = meResponse.ok ? await meResponse.json() : null;
         let usersPayload = [];
+        let installerUsersPayload = [];
 
         if (mePayload?.user) {
-          const usersResponse = await fetch("/api/auth/users");
+          const [usersResponse, installerUsersResponse] = await Promise.all([
+            fetch("/api/auth/users"),
+            fetch("/api/auth/active-users")
+          ]);
           usersPayload = usersResponse.ok ? await usersResponse.json() : [];
+          installerUsersPayload = installerUsersResponse.ok ? await installerUsersResponse.json() : [];
         }
 
         if (!active) return;
 
         setLoginUsers(Array.isArray(usersPayload) ? usersPayload : []);
+        setInstallerUsers(Array.isArray(installerUsersPayload) ? installerUsersPayload : []);
         if (mePayload?.user) {
           setCurrentUser(mePayload.user);
         }

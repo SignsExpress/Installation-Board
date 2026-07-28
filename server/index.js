@@ -12116,6 +12116,40 @@ function createServer() {
     })));
   });
 
+  app.get("/api/auth/active-users", async (request, response) => {
+    const session = getSessionFromRequest(request);
+    if (!session) {
+      response.status(401).json({ error: "Login required." });
+      return;
+    }
+
+    const freshSessionUser = await getFreshSessionUser(session);
+    if (!canAccessBoard(freshSessionUser)) {
+      response.status(403).json({ error: "Board access required." });
+      return;
+    }
+
+    const store = await readUsersStore();
+    const users = (Array.isArray(store.users) ? store.users : [])
+      .map((user) => sanitizeUser(user))
+      .filter((user) => {
+        const status = String(user.status || "").trim().toLowerCase();
+        return String(user.displayName || "").trim() && user.active !== false && user.isActive !== false && user.disabled !== true && user.deleted !== true && !["inactive", "disabled", "archived"].includes(status);
+      })
+      .sort((left, right) => String(left.displayName || "").localeCompare(String(right.displayName || "")))
+      .map((user) => ({
+        id: user.id,
+        displayName: user.displayName,
+        status: user.status || "",
+        active: user.active,
+        isActive: user.isActive,
+        disabled: user.disabled,
+        deleted: user.deleted
+      }));
+
+    response.json(users);
+  });
+
   app.get("/api/auth/me", (request, response) => {
     const session = getSessionFromRequest(request);
     if (!session) {
