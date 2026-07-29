@@ -6706,11 +6706,10 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
   const remembered = placementMemory[orderNumber] || {};
   const existing = existingByOrder.get(orderNumber) || remembered || {};
   const status = String(read("Order Status") || "").trim();
-  const existingPlacement = isWipCardInCompletedLane(existing)
-    ? { ...existing, tab: getWipTabFromStatus(status), lane: "backlog", extraLanes: [] }
-    : existing;
+  const importedTab = getWipTabFromStatus(status);
+  const tab = isWipCardInCompletedLane(existing) ? existing.tab || importedTab : importedTab;
   return {
-    id: existingPlacement.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
+    id: existing.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
     orderNumber,
     orderStatus: status || "-",
     company: String(read("Company") || "").trim(),
@@ -6718,10 +6717,10 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
     salesperson: getWipSalesperson(read("Salesperson")),
     productionLocation: getWipLocation(read("Production Location")),
     preTaxTotal: formatWipMoney(read("Pre-Tax Total")),
-    tab: existingPlacement.tab || getWipTabFromStatus(status),
-    lane: existingPlacement.lane || "backlog",
-    extraLanes: Array.isArray(existingPlacement.extraLanes) ? existingPlacement.extraLanes : [],
-    importedAt: existingPlacement.importedAt || new Date().toISOString()
+    tab,
+    lane: existing.lane || "backlog",
+    extraLanes: Array.isArray(existing.extraLanes) ? existing.extraLanes : [],
+    importedAt: existing.importedAt || new Date().toISOString()
   };
 }
 
@@ -6818,7 +6817,7 @@ function isWipCardInCompletedLane(card) {
 function keepWipMemoryForUploadedOrders(memory = {}, uploadedOrderNumbers = new Set()) {
   return Object.entries(memory || {}).reduce((nextMemory, [orderNumber, placement]) => {
     const normalized = normalizeWipOrderReference(orderNumber);
-    if (normalized && uploadedOrderNumbers.has(normalized) && !isWipCardInCompletedLane(placement)) nextMemory[normalized] = placement;
+    if (normalized && uploadedOrderNumbers.has(normalized)) nextMemory[normalized] = placement;
     return nextMemory;
   }, {});
 }
