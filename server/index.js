@@ -108,6 +108,9 @@ let boardStoreCorruptionError = null;
 let socialPostQueueProcessing = false;
 let socialPostQueueInterval = null;
 let memoryMonitorInterval = null;
+let coreBridgeSyncInterval = null;
+let coreBridgeSyncRunning = false;
+let coreBridgeRecentOrdersCache = { orders: [], updatedAt: "", lastSyncType: "" };
 let lastHighMemoryLogAt = 0;
 let lastMemorySnapshot = null;
 let boardStoreCache = null;
@@ -263,6 +266,20 @@ const DEFAULT_MUSTANG_SPEC = {
   photos: []
 };
 
+function sanitizeCoreBridgeSyncState(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const normalizeIso = (input) => {
+    if (!input) return "";
+    const date = new Date(String(input));
+    return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  };
+  return {
+    lastOrderModifiedDT: normalizeIso(source.lastOrderModifiedDT),
+    lastFullResyncAt: normalizeIso(source.lastFullResyncAt),
+    updatedAt: normalizeIso(source.updatedAt)
+  };
+}
+
 function createEmptyBoardStore() {
   return {
     jobs: [],
@@ -305,6 +322,7 @@ function createEmptyBoardStore() {
     socialPostDeletedToneVoiceIds: [],
     socialPostSuggestions: [],
     socialPostQueue: [],
+    coreBridgeSync: sanitizeCoreBridgeSyncState(),
     holidayResetVersion: HOLIDAY_RESET_VERSION
   };
 }
@@ -1549,7 +1567,8 @@ async function readStore() {
             socialPostToneVoices: [],
             socialPostDeletedToneVoiceIds: [],
             socialPostSuggestions: [],
-            socialPostQueue: []
+            socialPostQueue: [],
+            coreBridgeSync: sanitizeCoreBridgeSyncState()
           });
       const iglooRecovery = await recoverIglooTrackerFromBackupsIfReset(migrated.igloo);
       migrated.igloo = iglooRecovery.tracker;
@@ -1590,6 +1609,7 @@ async function readStore() {
           socialPostDeletedToneVoiceIds: Array.isArray(parsed.socialPostDeletedToneVoiceIds) ? parsed.socialPostDeletedToneVoiceIds : [],
           socialPostSuggestions: Array.isArray(parsed.socialPostSuggestions) ? parsed.socialPostSuggestions : [],
           socialPostQueue: Array.isArray(parsed.socialPostQueue) ? parsed.socialPostQueue : [],
+          coreBridgeSync: sanitizeCoreBridgeSyncState(parsed.coreBridgeSync),
           holidayResetVersion: Number(parsed.holidayResetVersion || 0)
         });
     const iglooRecovery = await recoverIglooTrackerFromBackupsIfReset(migrated.igloo);
@@ -1711,6 +1731,7 @@ async function writeStore(store) {
           if (left.userId !== right.userId) return String(left.userId || "").localeCompare(String(right.userId || ""));
           return String(left.endpoint || "").localeCompare(String(right.endpoint || ""));
         }),
+      coreBridgeSync: sanitizeCoreBridgeSyncState(store.coreBridgeSync),
       holidayResetVersion: Number(store.holidayResetVersion || HOLIDAY_RESET_VERSION)
     };
   if (boardStoreCorruptionError && fs.existsSync(dataFile)) {
@@ -1731,6 +1752,9 @@ async function writeStore(store) {
       }
       if (store.wipBoard === undefined && previousStore.wipBoard !== undefined) {
         nextStore.wipBoard = sanitizeWipBoardState(previousStore.wipBoard);
+      }
+      if (store.coreBridgeSync === undefined && previousStore.coreBridgeSync !== undefined) {
+        nextStore.coreBridgeSync = sanitizeCoreBridgeSyncState(previousStore.coreBridgeSync);
       }
       await snapshotFile(dataFile, "jobs-store");
       await writeTextFileAtomically(dataFile, `${JSON.stringify(nextStore, null, 2)}\n`);
@@ -7868,6 +7892,13 @@ function getCoreBridgeReferenceFamilyKey(reference = "") {
   return `corebridge:${parsed.isSouthport ? "southport" : "main"}:${parsed.suffix.toLowerCase()}`;
 }
 
+function formatCoreBridgeModifiedOnOrAfter(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().replace(/\.(\d{3})Z$/, (_match, millis) => `.${millis}0000Z`);
+}
+
 async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, options = {}) {
   const config = getCoreBridgeConfig();
   if (!config.token || !config.subscriptionKey) {
@@ -7883,6 +7914,9 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
   const looksLikeEstimateReference = formattedSearchVariants.some((value) => /^ests?-/i.test(value));
   const looksLikeInvoiceReference = formattedSearchVariants.some((value) => /^invs?-/i.test(value));
   const collectionTake = looksLikeFormattedNumber ? 10 : 100;
+  const collectionModifiedOnOrAfter = looksLikeFormattedNumber
+    ? ""
+    : formatCoreBridgeModifiedOnOrAfter(options.modifiedOnOrAfterDate);
   const requestPlans = formattedSearchVariants.flatMap((formattedNumber) => [
     ...(looksLikeInvoiceReference
       ? [
@@ -7894,9 +7928,8 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
               sortBy: "-modifiedDT",
               companylevel: "full",
               contactlevel: "full",
-              notelevel: "full",
               destinationlevel: "full",
-              itemlevel: "full",
+              modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           },
@@ -7906,6 +7939,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             url: buildCoreBridgeInvoiceUrl(config, {
               take: collectionTake,
               sortBy: "-modifiedDT",
+              modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           }
@@ -7921,9 +7955,8 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
               sortBy: "-modifiedDT",
               companylevel: "full",
               contactlevel: "full",
-              notelevel: "full",
               destinationlevel: "full",
-              itemlevel: "full",
+              modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           },
@@ -7933,6 +7966,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
             url: buildCoreBridgeEstimateUrl(config, {
               take: collectionTake,
               sortBy: "-modifiedDT",
+              modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
               formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
             })
           }
@@ -7946,9 +7980,8 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
         sortBy: "-modifiedDT",
         companylevel: "full",
         contactlevel: "full",
-        notelevel: "full",
         destinationlevel: "full",
-        itemlevel: "full",
+        modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
         formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
       })
     },
@@ -7958,6 +7991,7 @@ async function fetchCoreBridgeOrders(searchTerm = "", includeDebug = false, opti
       url: buildCoreBridgeOrderUrl(config, {
         take: collectionTake,
         sortBy: "-modifiedDT",
+        modifiedOnOrAfterDate: collectionModifiedOnOrAfter,
         formattednumber: looksLikeFormattedNumber ? formattedNumber : ""
       })
     }
@@ -11519,6 +11553,142 @@ async function processSocialPostQueue() {
   }
 }
 
+function getCoreBridgeSyncConfig() {
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  // On by default. Only an explicit off value disables it, so a non-technical
+  // owner gets incremental syncing with zero configuration.
+  const flag = String(process.env.COREBRIDGE_SYNC_ENABLED ?? "").trim().toLowerCase();
+  const explicitlyDisabled = flag === "0" || flag === "false" || flag === "no" || flag === "off";
+  return {
+    enabled: !explicitlyDisabled,
+    intervalMs: clamp(Number(process.env.COREBRIDGE_SYNC_INTERVAL_MS) || 5 * 60 * 1000, 30 * 1000, 60 * 60 * 1000),
+    overlapMs: clamp(Number(process.env.COREBRIDGE_SYNC_OVERLAP_MS) || 2 * 60 * 1000, 0, 60 * 60 * 1000),
+    fullResyncMs: clamp(Number(process.env.COREBRIDGE_SYNC_FULL_RESYNC_MS) || 24 * 60 * 60 * 1000, 60 * 60 * 1000, 7 * 24 * 60 * 60 * 1000),
+    take: clamp(Number(process.env.COREBRIDGE_SYNC_TAKE) || 100, 1, 200)
+  };
+}
+
+async function fetchCoreBridgeOrderSyncPage(config, modifiedOnOrAfterDate, take) {
+  const url = buildCoreBridgeOrderUrl(config, {
+    take,
+    sortBy: "-modifiedDT",
+    companylevel: "full",
+    contactlevel: "full",
+    destinationlevel: "full",
+    modifiedOnOrAfterDate: formatCoreBridgeModifiedOnOrAfter(modifiedOnOrAfterDate)
+  });
+  const response = await fetchWithTimeout(url, {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Ocp-Apim-Subscription-Key": config.subscriptionKey,
+      Accept: "application/json"
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`CoreBridge sync returned HTTP ${response.status}.`);
+  }
+  const body = await response.json();
+  return extractCoreBridgeRecords(body)
+    .map((record, index) => normalizeCoreBridgeOrder(record, index))
+    .filter((order) => order.orderReference || order.customerName);
+}
+
+function mergeCoreBridgeRecentOrders(orders, syncType, maxSize = 500) {
+  const nowIso = new Date().toISOString();
+  if (syncType === "full") {
+    coreBridgeRecentOrdersCache = { orders: orders.slice(0, maxSize), updatedAt: nowIso, lastSyncType: "full" };
+    return;
+  }
+  const byId = new Map(coreBridgeRecentOrdersCache.orders.map((order) => [String(order.id), order]));
+  for (const order of orders) {
+    byId.set(String(order.id), order);
+  }
+  coreBridgeRecentOrdersCache = { orders: [...byId.values()].slice(0, maxSize), updatedAt: nowIso, lastSyncType: "incremental" };
+}
+
+async function runCoreBridgeIncrementalSync({ force = false } = {}) {
+  const syncConfig = getCoreBridgeSyncConfig();
+  const config = getCoreBridgeConfig();
+  if (!config.token || !config.subscriptionKey) {
+    return { ok: false, skipped: "not-configured" };
+  }
+  // Never let a new poll start before the previous one has returned.
+  if (coreBridgeSyncRunning) {
+    return { ok: false, skipped: "in-flight" };
+  }
+
+  coreBridgeSyncRunning = true;
+  const runStartedAt = Date.now();
+  try {
+    const store = await readStore();
+    const syncState = sanitizeCoreBridgeSyncState(store.coreBridgeSync);
+    const lastFullResyncMs = syncState.lastFullResyncAt ? new Date(syncState.lastFullResyncAt).getTime() : 0;
+    const needsFullResync =
+      force ||
+      !syncState.lastOrderModifiedDT ||
+      !Number.isFinite(lastFullResyncMs) ||
+      lastFullResyncMs <= 0 ||
+      runStartedAt - lastFullResyncMs >= syncConfig.fullResyncMs;
+
+    // Incremental: rewind the cursor by the overlap window so an edit made during the
+    // previous poll (or under minor clock skew) is re-seen rather than skipped.
+    let modifiedOnOrAfterDate = "";
+    if (!needsFullResync) {
+      const cursorMs = new Date(syncState.lastOrderModifiedDT).getTime();
+      if (Number.isFinite(cursorMs)) {
+        modifiedOnOrAfterDate = new Date(cursorMs - syncConfig.overlapMs).toISOString();
+      }
+    }
+
+    const orders = await fetchCoreBridgeOrderSyncPage(config, modifiedOnOrAfterDate, syncConfig.take);
+    mergeCoreBridgeRecentOrders(orders, needsFullResync ? "full" : "incremental");
+
+    // Advance the cursor to the poll's START time (not completion), so records modified while
+    // the poll was in flight are picked up next time. Re-read to avoid clobbering concurrent writes.
+    const nextStore = await readStore();
+    const previousSync = sanitizeCoreBridgeSyncState(nextStore.coreBridgeSync);
+    const runStartedIso = new Date(runStartedAt).toISOString();
+    nextStore.coreBridgeSync = sanitizeCoreBridgeSyncState({
+      lastOrderModifiedDT: runStartedIso,
+      lastFullResyncAt: needsFullResync ? runStartedIso : previousSync.lastFullResyncAt,
+      updatedAt: new Date().toISOString()
+    });
+    await writeStore(nextStore);
+
+    return {
+      ok: true,
+      type: needsFullResync ? "full" : "incremental",
+      count: orders.length,
+      modifiedOnOrAfterDate: modifiedOnOrAfterDate || null,
+      cursor: nextStore.coreBridgeSync
+    };
+  } catch (error) {
+    // Leave the cursor untouched on failure so the next run retries the same window.
+    console.error("CoreBridge incremental sync failed.", error.message || error);
+    return { ok: false, error: error.message || String(error) };
+  } finally {
+    coreBridgeSyncRunning = false;
+  }
+}
+
+function ensureCoreBridgeSyncWorker() {
+  const syncConfig = getCoreBridgeSyncConfig();
+  if (!syncConfig.enabled || coreBridgeSyncInterval) return;
+  coreBridgeSyncInterval = setInterval(() => {
+    runCoreBridgeIncrementalSync().catch((error) => {
+      console.error("CoreBridge incremental sync tick failed.", error.message || error);
+    });
+  }, syncConfig.intervalMs);
+  if (typeof coreBridgeSyncInterval.unref === "function") {
+    coreBridgeSyncInterval.unref();
+  }
+  setTimeout(() => {
+    runCoreBridgeIncrementalSync().catch((error) => {
+      console.error("CoreBridge incremental sync (initial) failed.", error.message || error);
+    });
+  }, 5000);
+}
+
 function ensureSocialPostQueueWorker() {
   if (socialPostQueueInterval) return;
   socialPostQueueInterval = setInterval(() => {
@@ -11780,6 +11950,7 @@ function createServer() {
   ensureRequestsFile();
   ensureUsersFile();
   ensureMemoryMonitor();
+  ensureCoreBridgeSyncWorker();
   bootstrapPasswordsFromEnv()
     .then((result) => {
       if (result.updated) {
@@ -13368,7 +13539,8 @@ app.get("/api/corebridge/orders", async (request, response) => {
   try {
     const searchTerm = String(request.query.q || "").trim();
     const includeDebug = String(request.query.debug || "").trim() === "1";
-      const payload = await fetchCoreBridgeOrders(searchTerm, includeDebug);
+    const modifiedOnOrAfterDate = String(request.query.modifiedOnOrAfterDate || request.query.modifiedSince || "").trim();
+      const payload = await fetchCoreBridgeOrders(searchTerm, includeDebug, { modifiedOnOrAfterDate });
       response.json(payload);
     } catch (error) {
       console.error("CoreBridge lookup failed.", error.message);
@@ -13380,6 +13552,32 @@ app.get("/api/corebridge/orders", async (request, response) => {
         detail: error.message
       });
     }
+  });
+
+  app.get("/api/corebridge/sync-status", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const store = await readStore();
+      response.json({
+        config: getCoreBridgeSyncConfig(),
+        cursor: sanitizeCoreBridgeSyncState(store.coreBridgeSync),
+        running: coreBridgeSyncRunning,
+        cache: {
+          count: coreBridgeRecentOrdersCache.orders.length,
+          updatedAt: coreBridgeRecentOrdersCache.updatedAt,
+          lastSyncType: coreBridgeRecentOrdersCache.lastSyncType
+        }
+      });
+    } catch (error) {
+      response.status(500).json({ error: "Could not read CoreBridge sync status.", detail: error.message });
+    }
+  });
+
+  app.post("/api/corebridge/sync", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    const force = request.body?.full === true || String(request.body?.full || request.query.full || "").trim() === "1";
+    const result = await runCoreBridgeIncrementalSync({ force });
+    response.status(result.ok ? 200 : result.skipped === "in-flight" ? 409 : 500).json(result);
   });
 
   app.get("/api/corebridge-explorer/catalog", async (request, response) => {
