@@ -5495,6 +5495,55 @@ async function getBoardPayload(options = {}) {
   };
 }
 
+function getWipBoardContextFromPayload(payload = {}) {
+  const installDatesByOrder = {};
+  const availabilityByDate = {};
+
+  (Array.isArray(payload.board?.weeks) ? payload.board.weeks : []).forEach((week) => {
+    (Array.isArray(week.rows) ? week.rows : []).forEach((row) => {
+      const isoDate = String(row?.isoDate || "").trim();
+      if (!isoDate) return;
+
+      const entries = [];
+      if (row.bankHoliday) {
+        entries.push({ id: isoDate + "-bank", type: "bank", label: row.bankHoliday });
+      }
+
+      (Array.isArray(row.staffHolidays) ? row.staffHolidays : []).forEach((holiday) => {
+        const duration =
+          holiday.duration === "Morning" ? " AM" :
+            holiday.duration === "Afternoon" ? " PM" :
+              "";
+        entries.push({
+          id: holiday.id || (isoDate + "-" + (holiday.person || "holiday") + "-" + duration),
+          type: getHolidayType(holiday) === "birthday" ? "birthday" : "holiday",
+          label: (getHolidayStaffCode(holiday.person) || String(holiday.person || "").trim() || "Holiday") + duration
+        });
+      });
+
+      (Array.isArray(row.holidayEvents) ? row.holidayEvents : []).forEach((event) => {
+        entries.push({
+          id: event.id || (isoDate + "-" + (event.title || "event")),
+          type: "event",
+          label: event.title || "Holiday note"
+        });
+      });
+
+      if (entries.length) availabilityByDate[isoDate] = entries;
+
+      (Array.isArray(row.jobs) ? row.jobs : []).forEach((job) => {
+        const reference = String(job?.orderReference || "").trim().toUpperCase().replace(/\s+/g, "");
+        if (!reference) return;
+        if (!installDatesByOrder[reference]) installDatesByOrder[reference] = [];
+        if (!installDatesByOrder[reference].includes(isoDate)) installDatesByOrder[reference].push(isoDate);
+      });
+    });
+  });
+
+  Object.values(installDatesByOrder).forEach((dates) => dates.sort());
+  return { installDatesByOrder, availabilityByDate };
+}
+
 async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart()) {
   const store = await readStore();
   const usersStore = await readUsersStore();
@@ -13150,6 +13199,13 @@ function createServer() {
     response.json(sanitizeWipBoardState(store.wipBoard));
   });
 
+  app.get("/api/wip-board/install-context", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const start = parseIsoDate(String(request.query.start || "").trim());
+    const end = parseIsoDate(String(request.query.end || "").trim());
+    const payload = await getBoardPayload({ start, end });
+    response.json(getWipBoardContextFromPayload(payload));
+  });
   app.put("/api/wip-board", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     const store = await readStore();

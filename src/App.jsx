@@ -7004,20 +7004,18 @@ function WipPage({ currentUser, onLogout, notifications }) {
       try {
         const start = toIsoDate(addDays(new Date(), -45));
         const end = toIsoDate(addDays(new Date(), 120));
-        const response = await fetch("/api/board?include=data&start=" + encodeURIComponent(start) + "&end=" + encodeURIComponent(end));
+        const response = await fetch("/api/wip-board/install-context?start=" + encodeURIComponent(start) + "&end=" + encodeURIComponent(end));
         if (!response.ok) return;
         const payload = await response.json();
-        const nextMap = {};
-        (Array.isArray(payload.jobs) ? payload.jobs : []).forEach((job) => {
-          const ref = normalizeWipOrderReference(job.orderReference);
-          if (!ref || !job.date) return;
-          if (!nextMap[ref]) nextMap[ref] = new Set();
-          nextMap[ref].add(formatJobDate(job.date));
-        });
-        const compact = Object.fromEntries(Object.entries(nextMap).map(([key, value]) => [key, [...value].sort()]));
+        const compact = Object.fromEntries(
+          Object.entries(payload.installDatesByOrder || {}).map(([key, dates]) => [
+            normalizeWipOrderReference(key),
+            (Array.isArray(dates) ? dates : []).map((date) => formatJobDate(date)).sort()
+          ])
+        );
         if (active) {
           setInstallDateMap(compact);
-          setWipAvailabilityMap(getWipAvailabilityFromBoard(payload.board));
+          setWipAvailabilityMap(payload.availabilityByDate || {});
         }
       } catch (error) {
         console.error(error);
