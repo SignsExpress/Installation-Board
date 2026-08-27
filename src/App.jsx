@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 
 const JOB_TYPES = [
@@ -6969,6 +6970,11 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, avai
   );
 }
 
+function WipModalPortal({ children }) {
+  if (typeof document === "undefined") return children;
+  return createPortal(children, document.body);
+}
+
 function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
@@ -7442,7 +7448,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
             </div>
           </div>
           {detailCard ? (
-            <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+            <WipModalPortal><div className="wip-modal-backdrop" role="dialog" aria-modal="true">
               <div className="wip-modal wip-card-detail-modal">
                 <div className="wip-modal-head">
                   <div>
@@ -7486,10 +7492,10 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   <button type="button" className="danger-button" onClick={() => removeWipCardForever(detailCard)}>Remove from WIP forever</button>
                 </div>
               </div>
-            </div>
+            </div></WipModalPortal>
           ) : null}
           {completionReviewCards.length ? (
-            <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+            <WipModalPortal><div className="wip-modal-backdrop" role="dialog" aria-modal="true">
               <div className="wip-modal wip-review-modal">
                 <div className="wip-modal-head">
                   <div>
@@ -7517,10 +7523,10 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   <button type="button" className="ghost-button" onClick={markAllWipReviewCompleted}>Mark all completed</button>
                 </div>
               </div>
-            </div>
+            </div></WipModalPortal>
           ) : null}
           {multiDayCard ? (
-            <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+            <WipModalPortal><div className="wip-modal-backdrop" role="dialog" aria-modal="true">
               <div className="wip-modal">
                 <div className="wip-modal-head">
                   <div>
@@ -7550,7 +7556,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   <button type="button" className="primary-button" onClick={saveMultiDaySelection}>Save days</button>
                 </div>
               </div>
-            </div>
+            </div></WipModalPortal>
           ) : null}
           <div className="wip-print-list">
             <h1>Production WIP List</h1>
