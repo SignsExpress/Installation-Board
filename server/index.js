@@ -4441,6 +4441,11 @@ function sanitizeFilteringBoardState(payload = {}) {
   };
 }
 
+function sanitizeWipAssignees(payload = []) {
+  if (!Array.isArray(payload)) return [];
+  return [...new Set(payload.map((value) => String(value || "").trim()).filter(Boolean))].slice(0, 12);
+}
+
 function sanitizeWipCard(payload = {}) {
   const extraLanes = Array.isArray(payload.extraLanes)
     ? [...new Set(payload.extraLanes.map((lane) => String(lane || "").trim()).filter(Boolean))]
@@ -4457,6 +4462,7 @@ function sanitizeWipCard(payload = {}) {
     tab: String(payload.tab || "wip").trim().toLowerCase() === "pre-wip" ? "pre-wip" : "wip",
     lane: String(payload.lane || "backlog").trim() || "backlog",
     extraLanes,
+    productionAssignees: sanitizeWipAssignees(payload.productionAssignees),
     importedAt: String(payload.importedAt || new Date().toISOString())
   };
 }
@@ -12371,7 +12377,8 @@ function createServer() {
         active: user.active,
         isActive: user.isActive,
         disabled: user.disabled,
-        deleted: user.deleted
+        deleted: user.deleted,
+        photoDataUrl: user.photoDataUrl || ""
       }));
 
     response.json(users);

@@ -6607,6 +6607,7 @@ const WIP_MEMORY_STORAGE_KEY = "sx-wip-board-memory-v1";
 const WIP_PREVIOUS_STORAGE_KEY = "sx-wip-board-previous-v1";
 const WIP_REVIEW_STORAGE_KEY = "sx-wip-board-review-v1";
 const WIP_REMOVED_STORAGE_KEY = "sx-wip-board-removed-v1";
+const WIP_SUBBY_ASSIGNEE = { value: "Subby", label: "Subby", title: "Subby", colorClass: "installer-custom", isSubby: true };
 const WIP_SPECIAL_LANES = [
   { id: "completed", title: "Completed" },
   { id: "ordered", title: "Awaiting Materials" },
@@ -6700,6 +6701,31 @@ function getWipTabFromStatus(status) {
   return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
 }
 
+function normalizeWipAssignees(values = []) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map((value) => normalizeWipOrderReference(value) === "SUBBY" ? "Subby" : String(value || "").trim())
+    .filter(Boolean))];
+}
+
+function getWipAssigneeOptions(users = []) {
+  const people = buildInstallerOptions(users).filter((option) => option.value !== "Custom");
+  return [...people, WIP_SUBBY_ASSIGNEE];
+}
+
+function getWipAssigneeMeta(value, options = []) {
+  const normalized = String(value || "").trim();
+  const match = options.find((option) => option.value === normalized || option.title === normalized || option.label === normalized);
+  if (match) return match;
+  if (normalizeWipOrderReference(normalized) === "SUBBY") return WIP_SUBBY_ASSIGNEE;
+  return {
+    value: normalized,
+    label: getInitials(normalized),
+    title: normalized,
+    colorClass: getInstallerColorClassForName(normalized),
+    photoDataUrl: ""
+  };
+}
+
 function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
   const read = (name) => row[headers[normalizeWipKey(name)]] ?? "";
   const orderNumber = normalizeWipOrderReference(read("Order Number"));
@@ -6721,6 +6747,7 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
     tab,
     lane: existing.lane || "backlog",
     extraLanes: Array.isArray(existing.extraLanes) ? existing.extraLanes : [],
+    productionAssignees: normalizeWipAssignees(existing.productionAssignees),
     importedAt: existing.importedAt || new Date().toISOString()
   };
 }
@@ -6843,7 +6870,7 @@ async function saveWipBoardToServer(cards, placementMemory = {}, previousCards =
   return response.json();
 }
 
-function WipCard({ card, installDates = [], onDragStart, countMode = false, selected = false, onToggleCount, onMultiDay, onOpenDetails }) {
+function WipCard({ card, installDates = [], assigneeOptions = [], onDragStart, countMode = false, selected = false, onToggleCount, onMultiDay, onOpenDetails }) {
   return (
     <article
       className={"wip-card" + (installDates.length ? " has-install" : "") + (countMode ? " is-counting" : "") + (selected ? " is-count-selected" : "")}
@@ -6861,6 +6888,18 @@ function WipCard({ card, installDates = [], onDragStart, countMode = false, sele
         <strong>{card.orderNumber}</strong>
         {card.preTaxTotal ? <span>{card.preTaxTotal}</span> : null}
       </div>
+      {Array.isArray(card.productionAssignees) && card.productionAssignees.length ? (
+        <div className="wip-assignee-strip" aria-label="Production assignees">
+          {card.productionAssignees.map((assignee) => {
+            const meta = getWipAssigneeMeta(assignee, assigneeOptions);
+            return (
+              <span key={assignee} className={"wip-assignee-face " + meta.colorClass} title={meta.title || assignee}>
+                {meta.photoDataUrl ? <img src={meta.photoDataUrl} alt="" /> : meta.isSubby ? <span className="wip-subby-icon" aria-hidden="true" /> : <span>{meta.label || getInitials(meta.title || assignee)}</span>}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
       <p className="wip-card-company">{card.company || "No company"}</p>
       <p className="wip-card-description">{card.description || "No description"}</p>
       <div className="wip-card-meta">
@@ -6884,7 +6923,7 @@ function WipCard({ card, installDates = [], onDragStart, countMode = false, sele
   );
 }
 
-function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, availability = [], onDropCard, onDragStart, countMode = false, countedCardIds = [], onToggleCount, onMultiDay, onOpenDetails }) {
+function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, availability = [], assigneeOptions = [], onDropCard, onDragStart, countMode = false, countedCardIds = [], onToggleCount, onMultiDay, onOpenDetails }) {
   return (
     <section
       className={"wip-lane " + (laneId === "backlog" ? "is-wide" : "")}
@@ -6915,6 +6954,7 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, avai
             key={card.id + "-" + laneId}
             card={card}
             installDates={installDateMap[card.orderNumber] || []}
+            assigneeOptions={assigneeOptions}
             onDragStart={onDragStart}
             countMode={countMode}
             selected={countedCardIds.includes(card.id)}
@@ -6929,7 +6969,7 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, avai
   );
 }
 
-function WipPage({ currentUser, onLogout, notifications }) {
+function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
   const [uploadMessage, setUploadMessage] = useState("");
@@ -6951,6 +6991,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
   const serverLoadedRef = useRef(false);
   const serverSaveTimerRef = useRef(null);
   const days = useMemo(() => getWipBoardDays(getLocalTodayIso()), []);
+  const wipAssigneeOptions = useMemo(() => getWipAssigneeOptions(users), [users]);
 
   useEffect(() => {
     let active = true;
@@ -7115,6 +7156,21 @@ function WipPage({ currentUser, onLogout, notifications }) {
 
   function moveCard(cardId, lane, tab = activeTab) {
     setCards((current) => current.map((card) => card.id === cardId ? { ...card, lane, tab, extraLanes: [] } : card));
+  }
+
+  function toggleWipAssignee(cardId, assigneeValue) {
+    const value = String(assigneeValue || "").trim();
+    if (!value) return;
+    setCards((current) => current.map((card) => {
+      if (card.id !== cardId) return card;
+      const currentAssignees = normalizeWipAssignees(card.productionAssignees);
+      return {
+        ...card,
+        productionAssignees: currentAssignees.includes(value)
+          ? currentAssignees.filter((entry) => entry !== value)
+          : [...currentAssignees, value]
+      };
+    }));
   }
 
   function toggleCountedCard(cardId) {
@@ -7336,6 +7392,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
                   tab={activeTab}
                   cards={cardsByLane[lane.id] || []}
                   installDateMap={installDateMap}
+                  assigneeOptions={wipAssigneeOptions}
                   onDropCard={moveCard}
                   onDragStart={onDragStart}
                   countMode={countMode}
@@ -7353,6 +7410,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
               tab={activeTab}
               cards={cardsByLane.backlog || []}
               installDateMap={installDateMap}
+              assigneeOptions={wipAssigneeOptions}
               onDropCard={moveCard}
               onDragStart={onDragStart}
               countMode={countMode}
@@ -7371,6 +7429,7 @@ function WipPage({ currentUser, onLogout, notifications }) {
                   cards={cardsByLane["day:" + day.id] || []}
                   installDateMap={installDateMap}
                   availability={wipAvailabilityMap[day.id] || []}
+                  assigneeOptions={wipAssigneeOptions}
                   onDropCard={moveCard}
                   onDragStart={onDragStart}
                   countMode={countMode}
@@ -7392,6 +7451,28 @@ function WipPage({ currentUser, onLogout, notifications }) {
                     <p>{detailCard.description || "No description"}</p>
                   </div>
                   <button type="button" onClick={() => setDetailCardId("")}>x</button>
+                </div>
+                <div className="wip-detail-assignees">
+                  <strong>Production</strong>
+                  <div className="wip-assignee-picker">
+                    {wipAssigneeOptions.map((option) => {
+                      const active = normalizeWipAssignees(detailCard.productionAssignees).includes(option.value);
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          className={"wip-assignee-option " + option.colorClass + (active ? " active" : "")}
+                          onClick={() => toggleWipAssignee(detailCard.id, option.value)}
+                          title={option.title || option.label}
+                        >
+                          <span className={"wip-assignee-face " + option.colorClass}>
+                            {option.photoDataUrl ? <img src={option.photoDataUrl} alt="" /> : option.isSubby ? <span className="wip-subby-icon" aria-hidden="true" /> : <span>{option.label}</span>}
+                          </span>
+                          {option.isSubby ? "Subby" : option.title || option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="wip-card-detail-grid">
                   <span><strong>Status</strong>{detailCard.orderStatus || "-"}</span>
@@ -23068,6 +23149,7 @@ export default function App() {
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
+        users={installerUsers.length ? installerUsers : loginUsers}
       />
     );
   }
