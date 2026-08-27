@@ -4478,6 +4478,7 @@ function sanitizeWipPlacementMemory(payload = {}) {
       extraLanes: Array.isArray(rawPlacement.extraLanes)
         ? [...new Set(rawPlacement.extraLanes.map((lane) => String(lane || "").trim()).filter(Boolean))]
         : [],
+      productionAssignees: sanitizeWipAssignees(rawPlacement.productionAssignees),
       rememberedAt: String(rawPlacement.rememberedAt || "").trim()
     };
     return memory;

@@ -6807,10 +6807,12 @@ function buildWipPlacementMemory(cards, existingMemory = {}) {
   return cards.reduce((memory, card) => {
     const orderNumber = normalizeWipOrderReference(card.orderNumber);
     if (!orderNumber) return memory;
+    const productionAssignees = normalizeWipAssignees(card.productionAssignees);
     memory[orderNumber] = {
       tab: card.tab || "wip",
       lane: card.lane || "backlog",
       extraLanes: Array.isArray(card.extraLanes) ? card.extraLanes : [],
+      productionAssignees,
       rememberedAt
     };
     return memory;
@@ -7107,13 +7109,16 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
     try {
       const buffer = await file.arrayBuffer();
       const xlsx = await import("xlsx");
-      const currentMemory = placementMemoryRef.current || placementMemory;
+      const storedPreviousCards = loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY);
+      const refPreviousCards = previousWipCardsRef.current || [];
+      const previousMemorySource = refPreviousCards.length ? refPreviousCards : storedPreviousCards;
+      const currentMemory = previousMemorySource.length
+        ? buildWipPlacementMemory(previousMemorySource, placementMemoryRef.current || placementMemory)
+        : placementMemoryRef.current || placementMemory;
       const removedSet = new Set((removedOrderNumbersRef.current || removedOrderNumbers).map((value) => normalizeWipOrderReference(value)).filter(Boolean));
       const parsedCards = keepWipCardsInVisibleLanes(parseWipWorkbook(buffer, cards, xlsx, currentMemory), days)
         .filter((card) => !removedSet.has(normalizeWipOrderReference(card.orderNumber)));
       const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
-      const storedPreviousCards = loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY);
-      const refPreviousCards = previousWipCardsRef.current || [];
       const reviewSource = refPreviousCards.length ? refPreviousCards : storedPreviousCards.length ? storedPreviousCards : cards;
       const nextReviewCards = reviewSource.filter((card) => {
         const orderNumber = normalizeWipOrderReference(card.orderNumber);
