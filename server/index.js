@@ -300,6 +300,7 @@ function createEmptyBoardStore() {
       placementMemory: {},
       previousCards: [],
       completionReviewCards: [],
+      removedOrderNumbers: [],
       updatedAt: ""
     },
     holidays: [],
@@ -1547,7 +1548,7 @@ async function readStore() {
             igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
-            wipBoard: { cards: [], placementMemory: {}, previousCards: [], completionReviewCards: [], updatedAt: "" },
+            wipBoard: { cards: [], placementMemory: {}, previousCards: [], completionReviewCards: [], removedOrderNumbers: [], updatedAt: "" },
             holidays: [],
             subcontractorEvents: [],
             holidayRequests: [],
@@ -4477,12 +4478,18 @@ function sanitizeWipPlacementMemory(payload = {}) {
   }, {});
 }
 
+function sanitizeWipRemovedOrderNumbers(payload = []) {
+  if (!Array.isArray(payload)) return [];
+  return [...new Set(payload.map((value) => String(value || "").trim().toUpperCase().replace(/\s+/g, "")).filter(Boolean))];
+}
+
 function sanitizeWipBoardState(payload = {}) {
   return {
     cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     placementMemory: sanitizeWipPlacementMemory(payload.placementMemory),
     previousCards: Array.isArray(payload.previousCards) ? payload.previousCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     completionReviewCards: Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
+    removedOrderNumbers: sanitizeWipRemovedOrderNumbers(payload.removedOrderNumbers),
     updatedAt: String(payload.updatedAt || "").trim()
   };
 }

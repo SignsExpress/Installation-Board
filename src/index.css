@@ -20189,6 +20189,37 @@ button {
   text-decoration: underline;
 }
 
+
+.wip-card-detail-modal {
+  max-width: 560px;
+}
+
+.wip-card-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.wip-card-detail-grid span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #d9e5f2;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 10px 12px;
+  color: #172033;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.wip-card-detail-grid strong {
+  color: #697992;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .wip-count-summary {
   display: inline-flex;
   align-items: center;
