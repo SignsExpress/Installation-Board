@@ -5319,7 +5319,7 @@ const ORDER_PANEL_STANDARD_OFFCUTS = [
 ];
 
 function makeOrderPanelLine() {
-  return { id: makeId(), width: "", height: "", quantity: "1" };
+  return { id: `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, width: "", height: "", quantity: "1" };
 }
 
 function parseOrderPanelNumber(value) {
@@ -5350,7 +5350,7 @@ function getOrderPanelStock(stockId, customWidth, customHeight) {
 function normaliseOrderPanelLines(lines) {
   return (Array.isArray(lines) ? lines : [])
     .map((line) => ({
-      id: line.id || makeId(),
+      id: line.id || `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       width: parseOrderPanelNumber(line.width),
       height: parseOrderPanelNumber(line.height),
       quantity: Math.max(0, Math.floor(parseOrderPanelNumber(line.quantity)))
@@ -5417,7 +5417,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
     height: line.height
   }))).sort((a, b) => (b.width * b.height) - (a.width * a.height));
   const sheets = [];
-  const makeSheet = () => ({ id: makeId(), width: stock.width, height: stock.height, label: stock.label, pieces: [], freeRects: [{ x: 0, y: 0, width: stock.width, height: stock.height }] });
+  const makeSheet = () => ({ id: `panel-sheet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, width: stock.width, height: stock.height, label: stock.label, pieces: [], freeRects: [{ x: 0, y: 0, width: stock.width, height: stock.height }] });
 
   for (const piece of pieces) {
     let placed = sheets.some((sheet) => placeOrderPanelPiece(sheet, piece, kerf, allowRotate, "required"));
