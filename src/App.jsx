@@ -5358,13 +5358,30 @@ function normaliseOrderPanelLines(lines) {
     .filter((line) => line.width > 0 && line.height > 0 && line.quantity > 0);
 }
 
+function scoreOrderPanelFreeRects(rects) {
+  return rects.reduce((best, rect) => {
+    const area = rect.width * rect.height;
+    const standardIndex = ORDER_PANEL_STANDARD_OFFCUTS.findIndex((standard) =>
+      (standard.width <= rect.width && standard.height <= rect.height) ||
+      (standard.height <= rect.width && standard.width <= rect.height)
+    );
+    const standardScore = standardIndex >= 0 ? (ORDER_PANEL_STANDARD_OFFCUTS.length - standardIndex) * 100000000 : 0;
+    return Math.max(best, standardScore + area);
+  }, 0);
+}
+
 function splitOrderPanelRect(freeRect, piece, kerf) {
   const rightWidth = freeRect.width - piece.width - kerf;
   const bottomHeight = freeRect.height - piece.height - kerf;
-  const next = [];
-  if (rightWidth > 0) next.push({ x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: piece.height });
-  if (bottomHeight > 0) next.push({ x: freeRect.x, y: piece.y + piece.height + kerf, width: freeRect.width, height: bottomHeight });
-  return next.filter((rect) => rect.width > 0 && rect.height > 0);
+  const verticalSplit = [
+    rightWidth > 0 ? { x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: freeRect.height } : null,
+    bottomHeight > 0 ? { x: freeRect.x, y: piece.y + piece.height + kerf, width: piece.width, height: bottomHeight } : null
+  ].filter(Boolean);
+  const horizontalSplit = [
+    rightWidth > 0 ? { x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: piece.height } : null,
+    bottomHeight > 0 ? { x: freeRect.x, y: piece.y + piece.height + kerf, width: freeRect.width, height: bottomHeight } : null
+  ].filter(Boolean);
+  return scoreOrderPanelFreeRects(verticalSplit) >= scoreOrderPanelFreeRects(horizontalSplit) ? verticalSplit : horizontalSplit;
 }
 
 function findOrderPanelPlacement(freeRects, width, height, allowRotate) {
