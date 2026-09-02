@@ -826,6 +826,11 @@ function canEditMaterials(user) {
   return getUserPermission(user, "materials", user?.role === "host" ? "admin" : "none") === "admin";
 }
 
+function canAccessOrderPanels(user) {
+  if (canManagePermissions(user)) return true;
+  return getUserPermission(user, "orderPanels", user?.role === "host" ? "admin" : "none") !== "none";
+}
+
 function canAccessVanEstimator(user) {
   if (canManagePermissions(user)) return true;
   return getUserPermission(user, "vanEstimator", "none") !== "none";
@@ -12429,7 +12434,7 @@ function createServer() {
     }
 
     const sessionUser = sanitizeUser(user);
-    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessMaterials(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser) && !canAccessMustang(sessionUser)) {
+    if (!canAccessBoard(sessionUser) && !canAccessInstaller(sessionUser) && !canAccessHolidays(sessionUser) && !canAccessAttendance(sessionUser) && !canAccessMileage(sessionUser) && !canAccessMaterials(sessionUser) && !canAccessOrderPanels(sessionUser) && !canAccessVanEstimator(sessionUser) && !canAccessRams(sessionUser) && !canAccessSocialPost(sessionUser) && !canAccessDescriptionPull(sessionUser) && !canAccessProForma(sessionUser) && !canAccessMustang(sessionUser)) {
       response.status(403).json({ error: "That account does not have access." });
       return;
     }
@@ -12547,6 +12552,7 @@ function createServer() {
           attendance: request.body?.attendance,
         mileage: request.body?.mileage,
         materials: request.body?.materials,
+        orderPanels: request.body?.orderPanels,
         vanEstimator: request.body?.vanEstimator,
           rams: request.body?.rams,
           socialPost: request.body?.socialPost,

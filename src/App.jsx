@@ -2501,6 +2501,10 @@ function getPermissionForApp(user, key) {
         ? user?.role === "host"
           ? "admin"
           : "none"
+      : key === "orderPanels"
+        ? user?.role === "host"
+          ? "admin"
+          : "none"
       : key === "proForma"
         ? user?.role === "host"
           ? "admin"
@@ -2594,7 +2598,7 @@ function canEditMaterials(user) {
 
 function canAccessOrderPanels(user) {
   if (user?.canManagePermissions) return true;
-  return canAccessBoard(user) || canAccessMaterials(user);
+  return getPermissionForApp(user, "orderPanels") !== "none";
 }
 
 function canAccessVanEstimator(user) {
@@ -2649,7 +2653,7 @@ function canAccessMustang(user) {
 function usesHostShell(user) {
   return Boolean(
     user &&
-      (canAccessInstaller(user) || canEditBoard(user) || canEditDesignBoard(user) || canEditFiltering(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || canAccessMustang(user) || user.canManagePermissions)
+      (canAccessInstaller(user) || canEditBoard(user) || canEditDesignBoard(user) || canEditFiltering(user) || canAccessHolidays(user) || canEditAttendance(user) || canAccessMileage(user) || canAccessMaterials(user) || canAccessOrderPanels(user) || canAccessVanEstimator(user) || canAccessRams(user) || canAccessSocialPost(user) || canAccessDescriptionPull(user) || canEditProForma(user) || canAccessMustang(user) || user.canManagePermissions)
   );
 }
 
@@ -3204,6 +3208,7 @@ function PermissionsPanel({
             const attendancePermission = getPermissionForApp(user, "attendance");
             const mileagePermission = getPermissionForApp(user, "mileage");
             const materialsPermission = getPermissionForApp(user, "materials");
+            const orderPanelsPermission = getPermissionForApp(user, "orderPanels");
             const vanEstimatorPermission = getPermissionForApp(user, "vanEstimator");
             const ramsPermission = getPermissionForApp(user, "rams");
             const socialPostPermission = getPermissionForApp(user, "socialPost");
@@ -3458,6 +3463,24 @@ function PermissionsPanel({
                             className={`permission-chip ${materialsPermission === option.value ? "active" : ""}`}
                             disabled={permissionsLocked || savingKey === `${user.id}:materials`}
                             onClick={() => onChangePermission(user.id, "materials", option.value)}
+                            title={permissionsLocked ? "Owner access is always admin" : ""}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="permissions-app-row">
+                      <span className="permissions-app-label">Order Panels</span>
+                      <div className="permission-segment">
+                        {PERMISSION_OPTIONS.map((option) => (
+                          <button
+                            key={`${user.id}-order-panels-${option.value}`}
+                            type="button"
+                            className={`permission-chip ${orderPanelsPermission === option.value ? "active" : ""}`}
+                            disabled={permissionsLocked || savingKey === `${user.id}:orderPanels`}
+                            onClick={() => onChangePermission(user.id, "orderPanels", option.value)}
                             title={permissionsLocked ? "Owner access is always admin" : ""}
                           >
                             {option.label}
@@ -20863,7 +20886,7 @@ export default function App() {
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
   const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const installerOptions = useMemo(() => buildInstallerOptions(installerUsers.length ? installerUsers : loginUsers), [installerUsers, loginUsers]);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessOrderPanels(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -21762,6 +21785,7 @@ export default function App() {
       attendance: getPermissionForApp(targetUser, "attendance"),
       mileage: getPermissionForApp(targetUser, "mileage"),
       materials: getPermissionForApp(targetUser, "materials"),
+      orderPanels: getPermissionForApp(targetUser, "orderPanels"),
       vanEstimator: getPermissionForApp(targetUser, "vanEstimator"),
       rams: getPermissionForApp(targetUser, "rams"),
       socialPost: getPermissionForApp(targetUser, "socialPost"),
