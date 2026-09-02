@@ -2592,6 +2592,11 @@ function canEditMaterials(user) {
   return getPermissionForApp(user, "materials") === "admin";
 }
 
+function canAccessOrderPanels(user) {
+  if (user?.canManagePermissions) return true;
+  return canAccessBoard(user) || canAccessMaterials(user);
+}
+
 function canAccessVanEstimator(user) {
   if (user?.canManagePermissions) return true;
   return getPermissionForApp(user, "vanEstimator") !== "none";
@@ -2937,7 +2942,7 @@ function MainNavBar({
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
   const materialsAllowed = canAccessMaterials(currentUser);
-  const orderPanelsAllowed = canAccessMaterials(currentUser);
+  const orderPanelsAllowed = canAccessOrderPanels(currentUser);
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
@@ -4083,7 +4088,7 @@ function HostLandingPage({
     canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
-    canAccessMaterials(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
+    canAccessOrderPanels(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
     canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null,
     canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
@@ -20819,7 +20824,7 @@ export default function App() {
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showMaterials = Boolean(currentUser && canAccessMaterials(currentUser) && isMaterialsRoute);
-  const showOrderPanels = Boolean(currentUser && canAccessMaterials(currentUser) && isOrderPanelsRoute);
+  const showOrderPanels = Boolean(currentUser && canAccessOrderPanels(currentUser) && isOrderPanelsRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
@@ -21343,7 +21348,7 @@ export default function App() {
       return;
     }
 
-    if (isOrderPanelsRoute && !canAccessMaterials(currentUser)) {
+    if (isOrderPanelsRoute && !canAccessOrderPanels(currentUser)) {
       window.location.replace(nextHomePath);
       return;
     }
