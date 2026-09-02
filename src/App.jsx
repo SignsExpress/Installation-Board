@@ -4193,6 +4193,7 @@ function ClientLandingPage({
     canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
+    canAccessOrderPanels(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
     canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null
   ].filter(Boolean);
@@ -23468,6 +23469,16 @@ export default function App() {
     );
   }
 
+  if (showOrderPanels) {
+    return (
+      <OrderPanelsPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
   if (showHostLanding) {
     return (
       <HostLandingPage
@@ -23573,16 +23584,6 @@ export default function App() {
   if (showMaterials) {
     return (
       <MaterialsPage
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        notifications={notifications}
-      />
-    );
-  }
-
-  if (showOrderPanels) {
-    return (
-      <OrderPanelsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
