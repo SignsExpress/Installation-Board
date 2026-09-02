@@ -2937,6 +2937,7 @@ function MainNavBar({
   const holidaysAllowed = canAccessHolidays(currentUser);
   const mileageAllowed = canAccessMileage(currentUser);
   const materialsAllowed = canAccessMaterials(currentUser);
+  const orderPanelsAllowed = canAccessMaterials(currentUser);
   const vanEstimatorAllowed = canAccessVanEstimator(currentUser);
   const ramsAllowed = canAccessRams(currentUser);
   const socialPostAllowed = canAccessSocialPost(currentUser);
@@ -2953,6 +2954,7 @@ function MainNavBar({
   const holidaysPath = "/holidays";
   const mileagePath = "/mileage";
   const materialsPath = getMaterialsPath();
+  const orderPanelsPath = "/order-panels";
   const vanEstimatorPath = "/van-estimator";
   const ramsPath = "/rams";
   const socialPostPath = "/social-post";
@@ -2974,6 +2976,7 @@ function MainNavBar({
     { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
     { key: "materials", label: "Materials", path: materialsPath, allowed: materialsAllowed },
+    { key: "order-panels", label: "Order Panels", path: orderPanelsPath, allowed: orderPanelsAllowed },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
@@ -4080,6 +4083,7 @@ function HostLandingPage({
     canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
+    canAccessMaterials(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
     canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null,
     canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
@@ -5260,6 +5264,283 @@ function MaterialsPage({ currentUser, onLogout, notifications }) {
               )}
             </div>
           </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+
+const ORDER_PANEL_STOCK_SHEETS = [
+  { id: "2440x1220", label: "2440 x 1220mm", width: 2440, height: 1220 },
+  { id: "2550x1250", label: "2550 x 1250mm (Skybond Lite)", width: 2550, height: 1250 },
+  { id: "3050x1500", label: "3050 x 1500mm", width: 3050, height: 1500 },
+  { id: "3050x2050", label: "3050 x 2050mm", width: 3050, height: 2050 },
+  { id: "custom", label: "Custom size", width: 0, height: 0 }
+];
+
+const ORDER_PANEL_STANDARD_OFFCUTS = [
+  { width: 3050, height: 1500 },
+  { width: 1500, height: 1500 },
+  { width: 2550, height: 1250 },
+  { width: 2440, height: 1220 },
+  { width: 1220, height: 1220 },
+  { width: 800, height: 1200 },
+  { width: 600, height: 450 }
+];
+
+function makeOrderPanelLine() {
+  return { id: makeId(), width: "", height: "", quantity: "1" };
+}
+
+function parseOrderPanelNumber(value) {
+  const number = Number(String(value || "").replace(/[^0-9.]/g, ""));
+  return Number.isFinite(number) ? number : 0;
+}
+
+function formatOrderPanelSize(width, height) {
+  return Math.round(width) + " x " + Math.round(height) + "mm";
+}
+
+function formatOrderPanelQty(quantity) {
+  return Math.round(quantity) + "no.";
+}
+
+function getOrderPanelStock(stockId, customWidth, customHeight) {
+  if (stockId === "custom") {
+    return {
+      id: "custom",
+      label: formatOrderPanelSize(parseOrderPanelNumber(customWidth), parseOrderPanelNumber(customHeight)),
+      width: parseOrderPanelNumber(customWidth),
+      height: parseOrderPanelNumber(customHeight)
+    };
+  }
+  return ORDER_PANEL_STOCK_SHEETS.find((sheet) => sheet.id === stockId) || ORDER_PANEL_STOCK_SHEETS[0];
+}
+
+function normaliseOrderPanelLines(lines) {
+  return (Array.isArray(lines) ? lines : [])
+    .map((line) => ({
+      id: line.id || makeId(),
+      width: parseOrderPanelNumber(line.width),
+      height: parseOrderPanelNumber(line.height),
+      quantity: Math.max(0, Math.floor(parseOrderPanelNumber(line.quantity)))
+    }))
+    .filter((line) => line.width > 0 && line.height > 0 && line.quantity > 0);
+}
+
+function splitOrderPanelRect(freeRect, piece, kerf) {
+  const rightWidth = freeRect.width - piece.width - kerf;
+  const bottomHeight = freeRect.height - piece.height - kerf;
+  const next = [];
+  if (rightWidth > 0) next.push({ x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: piece.height });
+  if (bottomHeight > 0) next.push({ x: freeRect.x, y: piece.y + piece.height + kerf, width: freeRect.width, height: bottomHeight });
+  return next.filter((rect) => rect.width > 0 && rect.height > 0);
+}
+
+function findOrderPanelPlacement(freeRects, width, height, allowRotate) {
+  let best = null;
+  freeRects.forEach((rect, index) => {
+    const attempts = [{ width, height, rotated: false }];
+    if (allowRotate && width !== height) attempts.push({ width: height, height: width, rotated: true });
+    attempts.forEach((attempt) => {
+      if (attempt.width <= rect.width && attempt.height <= rect.height) {
+        const waste = rect.width * rect.height - attempt.width * attempt.height;
+        if (!best || waste < best.waste) best = { rect, index, ...attempt, waste };
+      }
+    });
+  });
+  return best;
+}
+
+function placeOrderPanelPiece(sheet, source, kerf, allowRotate, type) {
+  const placement = findOrderPanelPlacement(sheet.freeRects, source.width, source.height, allowRotate);
+  if (!placement) return false;
+  const piece = {
+    ...source,
+    type,
+    x: placement.rect.x,
+    y: placement.rect.y,
+    width: placement.width,
+    height: placement.height,
+    requestedWidth: source.width,
+    requestedHeight: source.height,
+    rotated: placement.rotated
+  };
+  sheet.pieces.push(piece);
+  sheet.freeRects = [
+    ...sheet.freeRects.slice(0, placement.index),
+    ...sheet.freeRects.slice(placement.index + 1),
+    ...splitOrderPanelRect(placement.rect, piece, kerf)
+  ].sort((a, b) => (a.y - b.y) || (a.x - b.x) || ((a.width * a.height) - (b.width * b.height)));
+  return true;
+}
+
+function buildOrderPanelPlan(lines, stock, options = {}) {
+  const kerf = Math.max(0, parseOrderPanelNumber(options.kerf) || 5);
+  const allowRotate = options.allowRotate !== false;
+  if (!stock.width || !stock.height) return { error: "Enter a valid sheet width and height.", sheets: [], disregarded: [], orderLines: [], kerf };
+  const orderLines = normaliseOrderPanelLines(lines);
+  const pieces = orderLines.flatMap((line) => Array.from({ length: line.quantity }, (_, index) => ({
+    id: line.id + "-" + index,
+    lineId: line.id,
+    width: line.width,
+    height: line.height
+  }))).sort((a, b) => (b.width * b.height) - (a.width * a.height));
+  const sheets = [];
+  const makeSheet = () => ({ id: makeId(), width: stock.width, height: stock.height, label: stock.label, pieces: [], freeRects: [{ x: 0, y: 0, width: stock.width, height: stock.height }] });
+
+  for (const piece of pieces) {
+    let placed = sheets.some((sheet) => placeOrderPanelPiece(sheet, piece, kerf, allowRotate, "required"));
+    if (!placed) {
+      const sheet = makeSheet();
+      placed = placeOrderPanelPiece(sheet, piece, kerf, allowRotate, "required");
+      if (!placed) return { error: formatOrderPanelSize(piece.width, piece.height) + " will not fit on " + stock.label + ".", sheets, disregarded: [], orderLines, kerf };
+      sheets.push(sheet);
+    }
+  }
+
+  if (options.standardiseOffcuts !== false) {
+    sheets.forEach((sheet) => {
+      ORDER_PANEL_STANDARD_OFFCUTS.forEach((standard, standardIndex) => {
+        let guard = 0;
+        while (guard < 500) {
+          guard += 1;
+          if (!placeOrderPanelPiece(sheet, { id: "offcut-" + standardIndex + "-" + guard, width: standard.width, height: standard.height }, kerf, allowRotate, "offcut")) break;
+        }
+      });
+    });
+  }
+
+  const disregarded = sheets.flatMap((sheet, sheetIndex) => sheet.freeRects
+    .filter((rect) => rect.width >= 100 && rect.height >= 100)
+    .map((rect) => ({ sheetIndex, ...rect })));
+  return { error: "", sheets, disregarded, orderLines, kerf };
+}
+
+function getOrderPanelEmail(plan, stock) {
+  if (!plan?.sheets?.length) return "";
+  const requiredGroups = new Map();
+  const offcutGroups = new Map();
+  plan.orderLines.forEach((line) => {
+    const key = formatOrderPanelSize(line.width, line.height);
+    requiredGroups.set(key, (requiredGroups.get(key) || 0) + line.quantity);
+  });
+  plan.sheets.forEach((sheet) => {
+    sheet.pieces.filter((piece) => piece.type === "offcut").forEach((piece) => {
+      const key = formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight);
+      offcutGroups.set(key, (offcutGroups.get(key) || 0) + 1);
+    });
+  });
+  return [
+    formatOrderPanelQty(plan.sheets.length) + " [" + stock.label + "] panels cut to:",
+    ...Array.from(requiredGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size),
+    ...(offcutGroups.size ? ["", "Plus standardised offcuts:", ...Array.from(offcutGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size)] : []),
+    "",
+    "All smaller offcuts to be disregarded.",
+    "If the panels exceed the amount shown above - please let me know urgently."
+  ].join("\n");
+}
+
+function OrderPanelsDrawing({ sheet, index }) {
+  const maxWidth = 520;
+  const scale = Math.min(maxWidth / sheet.width, 340 / sheet.height);
+  const width = Math.max(260, sheet.width * scale);
+  const height = Math.max(150, sheet.height * scale);
+  return (
+    <article className="order-panels-sheet-card">
+      <div className="order-panels-sheet-head"><strong>Sheet {index + 1}</strong><span>{formatOrderPanelSize(sheet.width, sheet.height)}</span></div>
+      <svg className="order-panels-sheet-svg" viewBox={"0 0 " + sheet.width + " " + sheet.height} style={{ width, height }} role="img" aria-label={"Sheet " + (index + 1) + " cutting layout"}>
+        <rect x="0" y="0" width={sheet.width} height={sheet.height} rx="10" fill="#f8fafc" stroke="#9fb1c7" strokeWidth="6" />
+        {sheet.pieces.map((piece, pieceIndex) => (
+          <g key={piece.id || pieceIndex}>
+            <rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} fill={piece.type === "offcut" ? "#dcfce7" : "#dbeafe"} stroke={piece.type === "offcut" ? "#15803d" : "#315a8c"} strokeWidth="4" />
+            <text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fontSize="52" fontWeight="800" fill="#102033">
+              {piece.type === "offcut" ? "Offcut " : ""}{formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight).replace("mm", "")}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="order-panels-sheet-notes"><span>{sheet.pieces.filter((piece) => piece.type === "required").length} required cuts</span><span>{sheet.pieces.filter((piece) => piece.type === "offcut").length} standard offcuts</span></div>
+    </article>
+  );
+}
+
+function OrderPanelsPage({ currentUser, onLogout, notifications }) {
+  const [stockId, setStockId] = useState("2440x1220");
+  const [customWidth, setCustomWidth] = useState("");
+  const [customHeight, setCustomHeight] = useState("");
+  const [kerf, setKerf] = useState("5");
+  const [standardiseOffcuts, setStandardiseOffcuts] = useState(true);
+  const [allowRotate, setAllowRotate] = useState(true);
+  const [lines, setLines] = useState([makeOrderPanelLine()]);
+  const [copied, setCopied] = useState(false);
+  const stock = getOrderPanelStock(stockId, customWidth, customHeight);
+  const plan = useMemo(() => buildOrderPanelPlan(lines, stock, { kerf, standardiseOffcuts, allowRotate }), [lines, stockId, customWidth, customHeight, kerf, standardiseOffcuts, allowRotate]);
+  const emailText = useMemo(() => getOrderPanelEmail(plan, stock), [plan, stock]);
+
+  function updateLine(id, field, value) {
+    setLines((current) => current.map((line) => line.id === id ? { ...line, [field]: value } : line));
+  }
+
+  function addLine() {
+    setLines((current) => [...current, makeOrderPanelLine()]);
+  }
+
+  function removeLine(id) {
+    setLines((current) => current.length <= 1 ? current : current.filter((line) => line.id !== id));
+  }
+
+  async function copyEmailText() {
+    if (!emailText) return;
+    try {
+      await navigator.clipboard.writeText(emailText);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  function savePdf() {
+    document.body.classList.add("printing-order-panels");
+    window.print();
+    window.setTimeout(() => document.body.classList.remove("printing-order-panels"), 300);
+  }
+
+  return (
+    <div className="app-shell order-panels-shell">
+      <div className="page order-panels-page">
+        <MainNavBar currentUser={currentUser} active="order-panels" onLogout={onLogout} notifications={notifications} />
+        <section className="panel order-panels-panel">
+          <div className="order-panels-head">
+            <div><span>Technical ordering</span><h2>Order Panels</h2></div>
+            <div className="order-panels-head-actions"><button className="ghost-button" type="button" onClick={copyEmailText} disabled={!emailText}>{copied ? "Copied" : "Copy email"}</button><button className="primary-button" type="button" onClick={savePdf} disabled={!plan.sheets.length}>Save PDF</button></div>
+          </div>
+          <div className="order-panels-grid">
+            <section className="order-panels-card order-panels-controls">
+              <div className="order-panels-field-grid">
+                <label>Sheet<select value={stockId} onChange={(event) => setStockId(event.target.value)}>{ORDER_PANEL_STOCK_SHEETS.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheet.label}</option>)}</select></label>
+                {stockId === "custom" ? <><label>Custom width<input type="number" value={customWidth} onChange={(event) => setCustomWidth(event.target.value)} placeholder="Width mm" /></label><label>Custom height<input type="number" value={customHeight} onChange={(event) => setCustomHeight(event.target.value)} placeholder="Height mm" /></label></> : null}
+                <label>Blade kerf<input type="number" value={kerf} onChange={(event) => setKerf(event.target.value)} /></label>
+              </div>
+              <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label></div>
+              <div className="order-panels-lines">
+                <div className="order-panels-line-head"><span>Width</span><span>Height</span><span>Qty</span><span></span></div>
+                {lines.map((line) => <div className="order-panels-line" key={line.id}><input type="number" value={line.width} onChange={(event) => updateLine(line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateLine(line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateLine(line.id, "quantity", event.target.value)} placeholder="1" /><button type="button" className="icon-button" onClick={() => removeLine(line.id)} disabled={lines.length <= 1}>x</button></div>)}
+              </div>
+              <button className="ghost-button order-panels-add" type="button" onClick={addLine}>Add another panel</button>
+            </section>
+            <section className="order-panels-card order-panels-summary">
+              <div className="order-panels-stat-row"><span>Sheets</span><strong>{plan.sheets.length}</strong></div>
+              <div className="order-panels-stat-row"><span>Required cuts</span><strong>{plan.sheets.reduce((total, sheet) => total + sheet.pieces.filter((piece) => piece.type === "required").length, 0)}</strong></div>
+              <div className="order-panels-stat-row"><span>Standard offcuts</span><strong>{plan.sheets.reduce((total, sheet) => total + sheet.pieces.filter((piece) => piece.type === "offcut").length, 0)}</strong></div>
+              {plan.error ? <p className="form-error">{plan.error}</p> : null}
+              <label className="order-panels-email-label">Supplier email<textarea value={emailText} readOnly rows="7" /></label>
+            </section>
+          </div>
+          <section className="order-panels-drawings">{plan.sheets.map((sheet, index) => <OrderPanelsDrawing key={sheet.id} sheet={sheet} index={index} />)}{!plan.sheets.length && !plan.error ? <p className="order-panels-empty">Add a panel size to build the cutting plan.</p> : null}</section>
+          {plan.disregarded.length ? <section className="order-panels-card order-panels-disregarded"><strong>Disregarded offcuts</strong><p>{plan.disregarded.map((rect) => "Sheet " + (rect.sheetIndex + 1) + ": " + formatOrderPanelSize(rect.width, rect.height)).join(" | ")}</p></section> : null}
         </section>
       </div>
     </div>
@@ -20413,6 +20694,7 @@ export default function App() {
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
   const isMaterialsRoute = pathname.startsWith("/materials");
+  const isOrderPanelsRoute = pathname.startsWith("/order-panels");
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
@@ -20537,6 +20819,7 @@ export default function App() {
   const showHolidays = Boolean(currentUser && canAccessHolidays(currentUser) && isHolidaysRoute);
   const showMileage = Boolean(currentUser && canAccessMileage(currentUser) && isMileageRoute);
   const showMaterials = Boolean(currentUser && canAccessMaterials(currentUser) && isMaterialsRoute);
+  const showOrderPanels = Boolean(currentUser && canAccessMaterials(currentUser) && isOrderPanelsRoute);
   const showVanEstimator = Boolean(currentUser && canAccessVanEstimator(currentUser) && isVanEstimatorRoute);
   const showSocialPost = Boolean(currentUser && canAccessSocialPost(currentUser) && isSocialPostRoute);
   const showDescriptionPull = Boolean(currentUser && canAccessDescriptionPull(currentUser) && isDescriptionPullRoute);
@@ -20572,9 +20855,9 @@ export default function App() {
   const showWip = Boolean(currentUser && canAccessBoard(currentUser) && isWipRoute);
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const installerOptions = useMemo(() => buildInstallerOptions(installerUsers.length ? installerUsers : loginUsers), [installerUsers, loginUsers]);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -21060,6 +21343,11 @@ export default function App() {
       return;
     }
 
+    if (isOrderPanelsRoute && !canAccessMaterials(currentUser)) {
+      window.location.replace(nextHomePath);
+      return;
+    }
+
     if ((isDesignBoardRoute || isClientDesignBoardRoute) && !canAccessDesignBoard(currentUser)) {
       window.location.replace(nextHomePath);
       return;
@@ -21075,7 +21363,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isMustangRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isMustangRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -21098,7 +21386,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isWipRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isWipRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isOrderPanelsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -23280,6 +23568,16 @@ export default function App() {
   if (showMaterials) {
     return (
       <MaterialsPage
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        notifications={notifications}
+      />
+    );
+  }
+
+  if (showOrderPanels) {
+    return (
+      <OrderPanelsPage
         currentUser={currentUser}
         onLogout={handleLogout}
         notifications={notifications}
