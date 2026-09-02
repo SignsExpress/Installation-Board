@@ -12031,6 +12031,15 @@ function createServer() {
   const app = express();
 
   app.use((request, response, next) => {
+    const host = String(request.headers.host || "").toLowerCase();
+    if (host === "sxpreston.com") {
+      response.redirect(301, `https://www.sxpreston.com${request.originalUrl || request.url || "/"}`);
+      return;
+    }
+    next();
+  });
+
+  app.use((request, response, next) => {
     const shouldTrack = request.path.startsWith("/api");
     if (!shouldTrack) {
       next();
@@ -12065,7 +12074,13 @@ function createServer() {
   });
   app.use(cors());
   app.use(express.json({ limit: "15mb" }));
-  app.use(express.static(PUBLIC_DIR));
+  app.use(express.static(PUBLIC_DIR, {
+    setHeaders(response, filePath) {
+      if (filePath.endsWith("sw.js")) {
+        response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      }
+    }
+  }));
   app.use((request, response, next) => {
     clearExpiredSessions();
     next();
@@ -16179,8 +16194,17 @@ app.get("/api/corebridge/orders", async (request, response) => {
   });
 
   if (fs.existsSync(DIST_DIR)) {
-    app.use(express.static(DIST_DIR));
+    app.use(express.static(DIST_DIR, {
+      setHeaders(response, filePath) {
+        if (filePath.endsWith("index.html")) {
+          response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        }
+      }
+    }));
     app.get("*", (request, response) => {
+      response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       response.sendFile(path.join(DIST_DIR, "index.html"));
     });
   } else {
