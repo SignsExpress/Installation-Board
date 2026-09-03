@@ -20871,7 +20871,7 @@ button {
 .order-panels-line-head,
 .order-panels-line {
   display: grid;
-  grid-template-columns: 1fr 1fr 0.55fr 42px;
+  grid-template-columns: minmax(125px, 0.8fr) 1fr 1fr 0.5fr 42px;
   gap: 8px;
   padding: 8px;
 }

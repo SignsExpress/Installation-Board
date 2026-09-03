@@ -5319,7 +5319,7 @@ const ORDER_PANEL_STANDARD_OFFCUTS = [
 ];
 
 function makeOrderPanelLine() {
-  return { id: `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, width: "", height: "", quantity: "1" };
+  return { id: `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, orderRef: "", width: "", height: "", quantity: "1" };
 }
 
 function parseOrderPanelNumber(value) {
@@ -5351,6 +5351,7 @@ function normaliseOrderPanelLines(lines) {
   return (Array.isArray(lines) ? lines : [])
     .map((line) => ({
       id: line.id || `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      orderRef: String(line.orderRef || "").trim(),
       width: parseOrderPanelNumber(line.width),
       height: parseOrderPanelNumber(line.height),
       quantity: Math.max(0, Math.floor(parseOrderPanelNumber(line.quantity)))
@@ -5476,6 +5477,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
   const pieces = orderLines.flatMap((line) => Array.from({ length: line.quantity }, (_, index) => ({
     id: line.id + "-" + index,
     lineId: line.id,
+    orderRef: line.orderRef,
     width: line.width,
     height: line.height
   }))).sort((a, b) => (b.width * b.height) - (a.width * a.height));
@@ -5527,7 +5529,7 @@ function getOrderPanelEmail(plan, stock) {
   const requiredGroups = new Map();
   const offcutGroups = new Map();
   plan.orderLines.forEach((line) => {
-    const key = formatOrderPanelSize(line.width, line.height);
+    const key = `${line.orderRef || "No ref"}|${formatOrderPanelSize(line.width, line.height)}`;
     requiredGroups.set(key, (requiredGroups.get(key) || 0) + line.quantity);
   });
   plan.sheets.forEach((sheet) => {
@@ -5538,12 +5540,13 @@ function getOrderPanelEmail(plan, stock) {
   });
   return [
     formatOrderPanelQty(plan.sheets.length) + " [" + stock.label + "] panels cut to:",
-    ...Array.from(requiredGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size),
+    ...Array.from(requiredGroups.entries()).map(([key, quantity]) => {
+      const [orderRef, size] = key.split("|");
+      return formatOrderPanelQty(quantity) + " " + (orderRef && orderRef !== "No ref" ? orderRef + " - " : "") + size;
+    }),
     ...(offcutGroups.size ? ["", "Plus standardised offcuts:", ...Array.from(offcutGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size)] : []),
     "",
-    plan.nominalCutting
-      ? "Nominal cutting requested: approximate cuts are fine, with no trim allowance required."
-      : "Please allow for a " + Math.round(plan.effectiveTrim) + "mm trim cut all the way round each sheet and a " + Math.round(plan.effectiveKerf) + "mm blade kerf per cut.",
+    "Please label each panel with the order number and size and offcuts with 'OFFCUT' (no size required).",
     "All smaller offcuts to be disregarded.",
     "If the panels exceed the amount shown above - please let me know urgently."
   ].join("\n");
@@ -5573,7 +5576,7 @@ function OrderPanelsDrawing({ sheet, index }) {
           <g key={piece.id || pieceIndex}>
             <rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} fill={piece.type === "offcut" ? "#dcfce7" : "#dbeafe"} stroke={piece.type === "offcut" ? "#15803d" : "#315a8c"} strokeWidth="4" />
             <text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fontSize="52" fontWeight="800" fill="#102033">
-              {piece.type === "offcut" ? "Offcut " : ""}{formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight).replace("mm", "")}
+              {piece.type === "offcut" ? "Offcut " : ""}{piece.type !== "offcut" && piece.orderRef ? piece.orderRef + " - " : ""}{formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight).replace("mm", "")}
             </text>
           </g>
         ))}
@@ -5646,8 +5649,8 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
               </div>
               <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label><label className="order-panels-nominal"><input type="checkbox" checked={nominalCutting} onChange={(event) => setNominalCutting(event.target.checked)} /> Nominal cutting</label></div>
               <div className="order-panels-lines">
-                <div className="order-panels-line-head"><span>Width</span><span>Height</span><span>Qty</span><span></span></div>
-                {lines.map((line) => <div className="order-panels-line" key={line.id}><input type="number" value={line.width} onChange={(event) => updateLine(line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateLine(line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateLine(line.id, "quantity", event.target.value)} placeholder="1" /><button type="button" className="icon-button" onClick={() => removeLine(line.id)} disabled={lines.length <= 1}>x</button></div>)}
+                <div className="order-panels-line-head"><span>Order ref</span><span>Width</span><span>Height</span><span>Qty</span><span></span></div>
+                {lines.map((line) => <div className="order-panels-line" key={line.id}><input value={line.orderRef} onChange={(event) => updateLine(line.id, "orderRef", event.target.value)} placeholder="REF-xxxx" /><input type="number" value={line.width} onChange={(event) => updateLine(line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateLine(line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateLine(line.id, "quantity", event.target.value)} placeholder="1" /><button type="button" className="icon-button" onClick={() => removeLine(line.id)} disabled={lines.length <= 1}>x</button></div>)}
               </div>
               <button className="ghost-button order-panels-add" type="button" onClick={addLine}>Add another panel</button>
             </section>
