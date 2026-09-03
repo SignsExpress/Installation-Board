@@ -6932,6 +6932,7 @@ function buildProFormaPreviewHtml(draft, summary, templateInput, options = {}) {
 
 const WIP_STORAGE_KEY = "sx-wip-board-v1";
 const WIP_MEMORY_STORAGE_KEY = "sx-wip-board-memory-v1";
+const WIP_DETAIL_MEMORY_STORAGE_KEY = "sx-wip-board-detail-memory-v1";
 const WIP_PREVIOUS_STORAGE_KEY = "sx-wip-board-previous-v1";
 const WIP_REVIEW_STORAGE_KEY = "sx-wip-board-review-v1";
 const WIP_REMOVED_STORAGE_KEY = "sx-wip-board-removed-v1";
@@ -7231,7 +7232,7 @@ async function enrichWipCardsFromCoreBridge(cards = [], options = {}) {
         const response = await fetch("/api/wip-board/enrich", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderNumbers: [target.orderNumber] })
+          body: JSON.stringify({ cards: [target] })
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -7321,6 +7322,66 @@ function buildWipPlacementMemory(cards, existingMemory = {}) {
   }, { ...existingMemory });
 }
 
+function normalizeWipCompanyKey(value = "") {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function loadStoredWipDetailMemory() {
+  if (typeof window === "undefined") return { orders: {}, companies: {} };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WIP_DETAIL_MEMORY_STORAGE_KEY) || "{}");
+    return {
+      orders: parsed && typeof parsed.orders === "object" && !Array.isArray(parsed.orders) ? parsed.orders : {},
+      companies: parsed && typeof parsed.companies === "object" && !Array.isArray(parsed.companies) ? parsed.companies : {}
+    };
+  } catch {
+    return { orders: {}, companies: {} };
+  }
+}
+
+function buildWipDetailMemory(cards, existingMemory = {}) {
+  const updatedAt = new Date().toISOString();
+  const nextMemory = {
+    orders: { ...(existingMemory?.orders || {}) },
+    companies: { ...(existingMemory?.companies || {}) }
+  };
+
+  (Array.isArray(cards) ? cards : []).forEach((card) => {
+    const orderNumber = normalizeWipOrderReference(card.orderNumber);
+    const company = String(card.company || "").replace(/\s+/g, " ").trim();
+    const companyKey = normalizeWipCompanyKey(company);
+    const description = String(card.description || "").replace(/\s+/g, " ").trim();
+    const salesperson = getWipSalesperson(card.salesperson);
+    const usableDescription = isWipPlaceholderDescription(description) ? "" : description;
+    const usableSalesperson = salesperson && salesperson !== "-" ? salesperson : "";
+
+    if (!usableDescription && !usableSalesperson) return;
+
+    if (orderNumber) {
+      const existing = nextMemory.orders[orderNumber] || {};
+      nextMemory.orders[orderNumber] = {
+        orderNumber,
+        company: company || existing.company || "",
+        description: usableDescription || existing.description || "",
+        salesperson: usableSalesperson || existing.salesperson || "",
+        updatedAt
+      };
+    }
+
+    if (companyKey) {
+      const existing = nextMemory.companies[companyKey] || {};
+      nextMemory.companies[companyKey] = {
+        company: company || existing.company || "",
+        description: usableDescription || existing.description || "",
+        salesperson: usableSalesperson || existing.salesperson || "",
+        updatedAt
+      };
+    }
+  });
+
+  return nextMemory;
+}
+
 function getWipVisibleLaneIds(days = []) {
   return new Set([
     "backlog",
@@ -7365,11 +7426,11 @@ function loadStoredWipRemovedOrderNumbers() {
   }
 }
 
-async function saveWipBoardToServer(cards, placementMemory = {}, previousCards = [], completionReviewCards = [], removedOrderNumbers = []) {
+async function saveWipBoardToServer(cards, placementMemory = {}, detailMemory = { orders: {}, companies: {} }, previousCards = [], completionReviewCards = [], removedOrderNumbers = []) {
   const response = await fetch("/api/wip-board", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cards, placementMemory, previousCards, completionReviewCards, removedOrderNumbers })
+    body: JSON.stringify({ cards, placementMemory, detailMemory, previousCards, completionReviewCards, removedOrderNumbers })
   });
   if (!response.ok) throw new Error("Could not save WIP board.");
   return response.json();
@@ -7543,12 +7604,14 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [detailCardId, setDetailCardId] = useState("");
   const [importProgress, setImportProgress] = useState(null);
   const [placementMemory, setPlacementMemory] = useState(() => loadStoredWipPlacementMemory());
+  const [detailMemory, setDetailMemory] = useState(() => loadStoredWipDetailMemory());
   const [previousWipCards, setPreviousWipCards] = useState(() => loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY));
   const [completionReviewCards, setCompletionReviewCards] = useState(() => loadStoredWipCardList(WIP_REVIEW_STORAGE_KEY));
   const [removedOrderNumbers, setRemovedOrderNumbers] = useState(() => loadStoredWipRemovedOrderNumbers());
   const previousWipCardsRef = useRef(previousWipCards);
   const completionReviewCardsRef = useRef(completionReviewCards);
   const placementMemoryRef = useRef(placementMemory);
+  const detailMemoryRef = useRef(detailMemory);
   const removedOrderNumbersRef = useRef(removedOrderNumbers);
   const serverLoadedRef = useRef(false);
   const serverSaveTimerRef = useRef(null);
@@ -7567,6 +7630,12 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
         const sharedMemory = payload.placementMemory && typeof payload.placementMemory === "object" && !Array.isArray(payload.placementMemory)
           ? payload.placementMemory
           : {};
+        const sharedDetailMemory = payload.detailMemory && typeof payload.detailMemory === "object" && !Array.isArray(payload.detailMemory)
+          ? {
+              orders: payload.detailMemory.orders && typeof payload.detailMemory.orders === "object" && !Array.isArray(payload.detailMemory.orders) ? payload.detailMemory.orders : {},
+              companies: payload.detailMemory.companies && typeof payload.detailMemory.companies === "object" && !Array.isArray(payload.detailMemory.companies) ? payload.detailMemory.companies : {}
+            }
+          : { orders: {}, companies: {} };
         const sharedPreviousCards = Array.isArray(payload.previousCards) ? payload.previousCards : [];
         const sharedReviewCards = Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards : [];
         const sharedRemovedOrderNumbers = Array.isArray(payload.removedOrderNumbers)
@@ -7577,6 +7646,8 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
           placementMemoryRef.current = sharedMemory;
           setPlacementMemory(sharedMemory);
         }
+        detailMemoryRef.current = sharedDetailMemory;
+        setDetailMemory(sharedDetailMemory);
         previousWipCardsRef.current = sharedPreviousCards;
         completionReviewCardsRef.current = sharedReviewCards;
         removedOrderNumbersRef.current = sharedRemovedOrderNumbers;
@@ -7588,9 +7659,12 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
           setUploadMessage("Shared WIP board loaded.");
         } else if (localCards.length) {
           const localMemory = Object.keys(sharedMemory).length ? sharedMemory : buildWipPlacementMemory(localCards, loadStoredWipPlacementMemory());
-          await saveWipBoardToServer(localCards, localMemory, sharedPreviousCards, sharedReviewCards, sharedRemovedOrderNumbers);
+          const localDetailMemory = buildWipDetailMemory(localCards, Object.keys(sharedDetailMemory.orders || {}).length || Object.keys(sharedDetailMemory.companies || {}).length ? sharedDetailMemory : loadStoredWipDetailMemory());
+          await saveWipBoardToServer(localCards, localMemory, localDetailMemory, sharedPreviousCards, sharedReviewCards, sharedRemovedOrderNumbers);
           placementMemoryRef.current = localMemory;
+          detailMemoryRef.current = localDetailMemory;
           setPlacementMemory(localMemory);
+          setDetailMemory(localDetailMemory);
           if (!active) return;
           setCards(localCards);
           setUploadMessage("Your saved WIP layout has been shared with everyone.");
@@ -7610,16 +7684,18 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
     previousWipCardsRef.current = previousWipCards;
     completionReviewCardsRef.current = completionReviewCards;
     placementMemoryRef.current = placementMemory;
+    detailMemoryRef.current = detailMemory;
     removedOrderNumbersRef.current = removedOrderNumbers;
     window.localStorage.setItem(WIP_STORAGE_KEY, JSON.stringify(cards));
     window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(placementMemory));
+    window.localStorage.setItem(WIP_DETAIL_MEMORY_STORAGE_KEY, JSON.stringify(detailMemory));
     window.localStorage.setItem(WIP_PREVIOUS_STORAGE_KEY, JSON.stringify(previousWipCards));
     window.localStorage.setItem(WIP_REVIEW_STORAGE_KEY, JSON.stringify(completionReviewCards));
     window.localStorage.setItem(WIP_REMOVED_STORAGE_KEY, JSON.stringify(removedOrderNumbers));
     if (!serverLoadedRef.current) return undefined;
     if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     serverSaveTimerRef.current = window.setTimeout(() => {
-      saveWipBoardToServer(cards, placementMemory, previousWipCards, completionReviewCards, removedOrderNumbers).catch((error) => {
+      saveWipBoardToServer(cards, placementMemory, detailMemory, previousWipCards, completionReviewCards, removedOrderNumbers).catch((error) => {
         console.error(error);
         setUploadMessage("Could not save the shared WIP board. Your browser copy is still saved.");
       });
@@ -7627,7 +7703,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
     return () => {
       if (serverSaveTimerRef.current) window.clearTimeout(serverSaveTimerRef.current);
     };
-  }, [cards, placementMemory, previousWipCards, completionReviewCards, removedOrderNumbers]);
+  }, [cards, placementMemory, detailMemory, previousWipCards, completionReviewCards, removedOrderNumbers]);
 
   useEffect(() => {
     let active = true;
@@ -7727,10 +7803,13 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
         return orderNumber && (parsedOrderNumbers.has(orderNumber) || reviewOrderNumbers.has(orderNumber));
       });
       const nextPlacementMemory = keepWipMemoryForUploadedOrders(currentMemory, parsedOrderNumbers);
+      const nextDetailMemory = buildWipDetailMemory(parsedCards, detailMemoryRef.current || detailMemory);
       placementMemoryRef.current = nextPlacementMemory;
+      detailMemoryRef.current = nextDetailMemory;
       previousWipCardsRef.current = nextPreviousCards;
       completionReviewCardsRef.current = nextReviewCards;
       setPlacementMemory(nextPlacementMemory);
+      setDetailMemory(nextDetailMemory);
       setPreviousWipCards(nextPreviousCards);
       setCompletionReviewCards(nextReviewCards);
       setCards(parsedCards);
@@ -7807,19 +7886,23 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
     if (!window.confirm("Remember these WIP positions and clear the shared board ready for the next WIP upload?")) return;
     const rememberedCards = [...cards];
     const nextMemory = buildWipPlacementMemory(rememberedCards, placementMemoryRef.current || placementMemory);
+    const nextDetailMemory = buildWipDetailMemory(rememberedCards, detailMemoryRef.current || detailMemory);
     placementMemoryRef.current = nextMemory;
+    detailMemoryRef.current = nextDetailMemory;
     previousWipCardsRef.current = rememberedCards;
     completionReviewCardsRef.current = [];
     window.localStorage.setItem(WIP_MEMORY_STORAGE_KEY, JSON.stringify(nextMemory));
+    window.localStorage.setItem(WIP_DETAIL_MEMORY_STORAGE_KEY, JSON.stringify(nextDetailMemory));
     window.localStorage.setItem(WIP_PREVIOUS_STORAGE_KEY, JSON.stringify(rememberedCards));
     window.localStorage.setItem(WIP_REVIEW_STORAGE_KEY, JSON.stringify([]));
     setPlacementMemory(nextMemory);
+    setDetailMemory(nextDetailMemory);
     setPreviousWipCards(rememberedCards);
     setCompletionReviewCards([]);
     setCards([]);
     setCountedCardIds([]);
     setUploadMessage("WIP board cleared. These positions will be suggested on the next upload.");
-    saveWipBoardToServer([], nextMemory, rememberedCards, [], removedOrderNumbersRef.current || removedOrderNumbers).catch((error) => {
+    saveWipBoardToServer([], nextMemory, nextDetailMemory, rememberedCards, [], removedOrderNumbersRef.current || removedOrderNumbers).catch((error) => {
       console.error(error);
       setUploadMessage("WIP positions are remembered in this browser, but could not save to the shared board yet.");
     });
@@ -7836,6 +7919,15 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       const next = { ...(current || {}) };
       delete next[orderNumber];
       placementMemoryRef.current = next;
+      return next;
+    });
+    setDetailMemory((current) => {
+      const next = {
+        orders: { ...(current?.orders || {}) },
+        companies: { ...(current?.companies || {}) }
+      };
+      delete next.orders[orderNumber];
+      detailMemoryRef.current = next;
       return next;
     });
     setPreviousWipCards((current) => {

@@ -298,6 +298,7 @@ function createEmptyBoardStore() {
     wipBoard: {
       cards: [],
       placementMemory: {},
+      detailMemory: { orders: {}, companies: {} },
       previousCards: [],
       completionReviewCards: [],
       removedOrderNumbers: [],
@@ -1553,7 +1554,7 @@ async function readStore() {
             igloo: sanitizeIglooTracker(),
             designBoard: { cards: [], settings: { signOffFollowUpHours: 48 } },
             filteringBoard: { cards: [] },
-            wipBoard: { cards: [], placementMemory: {}, previousCards: [], completionReviewCards: [], removedOrderNumbers: [], updatedAt: "" },
+            wipBoard: { cards: [], placementMemory: {}, detailMemory: { orders: {}, companies: {} }, previousCards: [], completionReviewCards: [], removedOrderNumbers: [], updatedAt: "" },
             holidays: [],
             subcontractorEvents: [],
             holidayRequests: [],
@@ -4495,10 +4496,40 @@ function sanitizeWipRemovedOrderNumbers(payload = []) {
   return [...new Set(payload.map((value) => String(value || "").trim().toUpperCase().replace(/\s+/g, "")).filter(Boolean))];
 }
 
+function sanitizeWipDetailMemoryEntry(payload = {}) {
+  return {
+    orderNumber: String(payload.orderNumber || "").trim().toUpperCase().replace(/\s+/g, ""),
+    company: String(payload.company || "").replace(/\s+/g, " ").trim(),
+    description: String(payload.description || "").replace(/\s+/g, " ").trim(),
+    salesperson: String(payload.salesperson || "").replace(/\s+/g, " ").trim(),
+    updatedAt: String(payload.updatedAt || "").trim()
+  };
+}
+
+function sanitizeWipDetailMemory(payload = {}) {
+  const source = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const orders = Object.entries(source.orders || {}).reduce((memory, [rawKey, rawEntry]) => {
+    const key = String(rawKey || rawEntry?.orderNumber || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!key) return memory;
+    const entry = sanitizeWipDetailMemoryEntry({ ...rawEntry, orderNumber: key });
+    if (entry.description || entry.salesperson) memory[key] = entry;
+    return memory;
+  }, {});
+  const companies = Object.entries(source.companies || {}).reduce((memory, [rawKey, rawEntry]) => {
+    const key = String(rawKey || rawEntry?.company || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (!key) return memory;
+    const entry = sanitizeWipDetailMemoryEntry({ ...rawEntry, company: rawEntry?.company || rawKey });
+    if (entry.description || entry.salesperson) memory[key] = entry;
+    return memory;
+  }, {});
+  return { orders, companies };
+}
+
 function sanitizeWipBoardState(payload = {}) {
   return {
     cards: Array.isArray(payload.cards) ? payload.cards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     placementMemory: sanitizeWipPlacementMemory(payload.placementMemory),
+    detailMemory: sanitizeWipDetailMemory(payload.detailMemory),
     previousCards: Array.isArray(payload.previousCards) ? payload.previousCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     completionReviewCards: Array.isArray(payload.completionReviewCards) ? payload.completionReviewCards.map((card) => sanitizeWipCard(card)).filter((card) => card.orderNumber) : [],
     removedOrderNumbers: sanitizeWipRemovedOrderNumbers(payload.removedOrderNumbers),
@@ -4516,7 +4547,10 @@ function normalizeWipEnrichmentReference(value = "") {
 }
 
 function buildStoredWipEnrichmentIndex(store = {}) {
+  const detailMemory = sanitizeWipDetailMemory(store?.wipBoard?.detailMemory);
   const candidates = [
+    ...Object.values(detailMemory.orders || {}),
+    ...Object.values(detailMemory.companies || {}),
     ...(Array.isArray(store?.wipBoard?.cards) ? store.wipBoard.cards : []),
     ...(Array.isArray(store?.wipBoard?.previousCards) ? store.wipBoard.previousCards : []),
     ...(Array.isArray(store?.wipBoard?.completionReviewCards) ? store.wipBoard.completionReviewCards : []),
@@ -4525,36 +4559,55 @@ function buildStoredWipEnrichmentIndex(store = {}) {
     ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
   ];
   const byReferenceFamily = new Map();
+  const byCompany = new Map();
 
   candidates.forEach((candidate) => {
     const reference = normalizeWipEnrichmentReference(candidate?.orderNumber || candidate?.orderReference);
-    if (!reference) return;
-    const key = getCoreBridgeReferenceFamilyKey(reference);
-    if (!key) return;
-
-    const existing = byReferenceFamily.get(key) || {};
     const description = String(candidate?.description || "").replace(/\s+/g, " ").trim();
     const salesperson = String(candidate?.salesperson || "").replace(/\s+/g, " ").trim();
     const company = String(candidate?.company || candidate?.customerName || "").replace(/\s+/g, " ").trim();
+    const usableDescription = !isWipEnrichmentPlaceholderDescription(description) ? description : "";
+    const usableSalesperson = salesperson && salesperson !== "-" ? salesperson : "";
 
-    byReferenceFamily.set(key, {
-      orderNumber: existing.orderNumber || reference,
-      description: !isWipEnrichmentPlaceholderDescription(description) ? description : existing.description || "",
-      salesperson: salesperson && salesperson !== "-" ? salesperson : existing.salesperson || "",
-      company: existing.company || company,
-      source: "saved portal data"
-    });
+    if (!usableDescription && !usableSalesperson) return;
+
+    if (reference) {
+      const key = getCoreBridgeReferenceFamilyKey(reference);
+      const existing = key ? byReferenceFamily.get(key) || {} : {};
+      if (key) {
+        byReferenceFamily.set(key, {
+          orderNumber: existing.orderNumber || reference,
+          description: usableDescription || existing.description || "",
+          salesperson: usableSalesperson || existing.salesperson || "",
+          company: existing.company || company,
+          source: "saved portal data"
+        });
+      }
+    }
+
+    const companyKey = company.toLowerCase();
+    if (companyKey) {
+      const existing = byCompany.get(companyKey) || {};
+      byCompany.set(companyKey, {
+        orderNumber: existing.orderNumber || reference,
+        description: usableDescription || existing.description || "",
+        salesperson: usableSalesperson || existing.salesperson || "",
+        company,
+        source: "saved portal company match"
+      });
+    }
   });
 
-  return byReferenceFamily;
+  return { byReferenceFamily, byCompany };
 }
 
-function getStoredWipEnrichment(index, orderNumber = "") {
+function getStoredWipEnrichment(index, orderNumber = "", company = "") {
   const reference = normalizeWipEnrichmentReference(orderNumber);
-  if (!reference) return null;
-  const match = index.get(getCoreBridgeReferenceFamilyKey(reference));
-  if (!match || (!match.description && !match.salesperson)) return null;
-  return match;
+  const match = reference ? index.byReferenceFamily.get(getCoreBridgeReferenceFamilyKey(reference)) : null;
+  if (match && (match.description || match.salesperson)) return match;
+  const companyMatch = index.byCompany.get(String(company || "").replace(/\s+/g, " ").trim().toLowerCase());
+  if (!companyMatch || (!companyMatch.description && !companyMatch.salesperson)) return null;
+  return companyMatch;
 }
 
 function sanitizeAttendanceMonthNote(payload) {
@@ -13342,10 +13395,21 @@ function createServer() {
   app.post("/api/wip-board/enrich", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     const normalizeReference = (value) => String(value || "").trim().toUpperCase().replace(/\s+/g, "");
-    const requestedOrderNumbers = Array.isArray(request.body?.orderNumbers)
-      ? request.body.orderNumbers
-      : [];
-    const orderNumbers = [...new Set(requestedOrderNumbers.map(normalizeReference).filter(Boolean))].slice(0, 100);
+    const requestedCards = Array.isArray(request.body?.cards)
+      ? request.body.cards
+      : Array.isArray(request.body?.orderNumbers)
+        ? request.body.orderNumbers.map((orderNumber) => ({ orderNumber }))
+        : [];
+    const targetByOrder = new Map();
+    requestedCards.forEach((card) => {
+      const orderNumber = normalizeReference(card?.orderNumber || card);
+      if (!orderNumber || targetByOrder.has(orderNumber)) return;
+      targetByOrder.set(orderNumber, {
+        orderNumber,
+        company: String(card?.company || card?.customerName || "").replace(/\s+/g, " ").trim()
+      });
+    });
+    const targets = [...targetByOrder.values()].slice(0, 100);
     const enrichments = {};
     const errors = [];
     const store = await readStore();
@@ -13353,12 +13417,13 @@ function createServer() {
     let cursor = 0;
 
     async function enrichNextOrder() {
-      while (cursor < orderNumbers.length) {
-        const orderNumber = orderNumbers[cursor];
+      while (cursor < targets.length) {
+        const target = targets[cursor];
+        const orderNumber = target.orderNumber;
         cursor += 1;
 
         try {
-          const storedMatch = getStoredWipEnrichment(storedEnrichmentIndex, orderNumber);
+          const storedMatch = getStoredWipEnrichment(storedEnrichmentIndex, orderNumber, target.company);
           if (storedMatch) {
             enrichments[orderNumber] = {
               orderNumber: storedMatch.orderNumber || orderNumber,
@@ -13389,7 +13454,7 @@ function createServer() {
       }
     }
 
-    await Promise.all(Array.from({ length: Math.min(4, orderNumbers.length) }, enrichNextOrder));
+    await Promise.all(Array.from({ length: Math.min(4, targets.length) }, enrichNextOrder));
     response.json({ enrichments, errors });
   });
 
