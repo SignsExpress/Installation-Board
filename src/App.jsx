@@ -5462,9 +5462,16 @@ function placeOrderPanelPiece(sheet, source, kerf, allowRotate, type) {
 }
 
 function buildOrderPanelPlan(lines, stock, options = {}) {
+  const nominalCutting = options.nominalCutting === true;
   const kerf = Math.max(0, parseOrderPanelNumber(options.kerf) || 5);
+  const trimCut = Math.max(0, parseOrderPanelNumber(options.trimCut) || 5);
+  const effectiveKerf = nominalCutting ? 0 : kerf;
+  const effectiveTrim = nominalCutting ? 0 : trimCut;
   const allowRotate = options.allowRotate !== false;
   if (!stock.width || !stock.height) return { error: "Enter a valid sheet width and height.", sheets: [], disregarded: [], orderLines: [], kerf };
+  const usableWidth = stock.width - effectiveTrim;
+  const usableHeight = stock.height - effectiveTrim;
+  if (usableWidth <= 0 || usableHeight <= 0) return { error: "Trim cut is larger than the selected sheet.", sheets: [], disregarded: [], orderLines: [], kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting };
   const orderLines = normaliseOrderPanelLines(lines);
   const pieces = orderLines.flatMap((line) => Array.from({ length: line.quantity }, (_, index) => ({
     id: line.id + "-" + index,
@@ -5473,14 +5480,26 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
     height: line.height
   }))).sort((a, b) => (b.width * b.height) - (a.width * a.height));
   const sheets = [];
-  const makeSheet = () => ({ id: `panel-sheet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, width: stock.width, height: stock.height, label: stock.label, pieces: [], freeRects: [{ x: 0, y: 0, width: stock.width, height: stock.height }] });
+  const makeSheet = () => ({
+    id: `panel-sheet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    width: stock.width,
+    height: stock.height,
+    usableWidth,
+    usableHeight,
+    trimCut: effectiveTrim,
+    kerf: effectiveKerf,
+    nominalCutting,
+    label: stock.label,
+    pieces: [],
+    freeRects: [{ x: 0, y: 0, width: usableWidth, height: usableHeight }]
+  });
 
   for (const piece of pieces) {
-    let placed = sheets.some((sheet) => placeOrderPanelPiece(sheet, piece, kerf, allowRotate, "required"));
+    let placed = sheets.some((sheet) => placeOrderPanelPiece(sheet, piece, effectiveKerf, allowRotate, "required"));
     if (!placed) {
       const sheet = makeSheet();
-      placed = placeOrderPanelPiece(sheet, piece, kerf, allowRotate, "required");
-      if (!placed) return { error: formatOrderPanelSize(piece.width, piece.height) + " will not fit on " + stock.label + ".", sheets, disregarded: [], orderLines, kerf };
+      placed = placeOrderPanelPiece(sheet, piece, effectiveKerf, allowRotate, "required");
+      if (!placed) return { error: formatOrderPanelSize(piece.width, piece.height) + " will not fit on " + stock.label + ".", sheets, disregarded: [], orderLines, kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting };
       sheets.push(sheet);
     }
   }
@@ -5491,7 +5510,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
         let guard = 0;
         while (guard < 500) {
           guard += 1;
-          if (!placeOrderPanelPiece(sheet, { id: "offcut-" + standardIndex + "-" + guard, width: standard.width, height: standard.height }, kerf, allowRotate, "offcut")) break;
+          if (!placeOrderPanelPiece(sheet, { id: "offcut-" + standardIndex + "-" + guard, width: standard.width, height: standard.height }, effectiveKerf, allowRotate, "offcut")) break;
         }
       });
     });
@@ -5500,7 +5519,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
   const disregarded = sheets.flatMap((sheet, sheetIndex) => sheet.freeRects
     .filter((rect) => rect.width >= 100 && rect.height >= 100)
     .map((rect) => ({ sheetIndex, ...rect })));
-  return { error: "", sheets, disregarded, orderLines, kerf };
+  return { error: "", sheets, disregarded, orderLines, kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting };
 }
 
 function getOrderPanelEmail(plan, stock) {
@@ -5522,6 +5541,9 @@ function getOrderPanelEmail(plan, stock) {
     ...Array.from(requiredGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size),
     ...(offcutGroups.size ? ["", "Plus standardised offcuts:", ...Array.from(offcutGroups.entries()).map(([size, quantity]) => formatOrderPanelQty(quantity) + " " + size)] : []),
     "",
+    plan.nominalCutting
+      ? "Nominal cutting requested: approximate cuts are fine, with no trim allowance required."
+      : "Please allow for a " + Math.round(plan.effectiveTrim) + "mm trim cut per sheet and a " + Math.round(plan.effectiveKerf) + "mm blade kerf per cut.",
     "All smaller offcuts to be disregarded.",
     "If the panels exceed the amount shown above - please let me know urgently."
   ].join("\n");
@@ -5537,6 +5559,13 @@ function OrderPanelsDrawing({ sheet, index }) {
       <div className="order-panels-sheet-head"><strong>Sheet {index + 1}</strong><span>{formatOrderPanelSize(sheet.width, sheet.height)}</span></div>
       <svg className="order-panels-sheet-svg" viewBox={"0 0 " + sheet.width + " " + sheet.height} style={{ width, height }} role="img" aria-label={"Sheet " + (index + 1) + " cutting layout"}>
         <rect x="0" y="0" width={sheet.width} height={sheet.height} rx="10" fill="#f8fafc" stroke="#9fb1c7" strokeWidth="6" />
+        {sheet.trimCut > 0 ? (
+          <>
+            <rect x={sheet.usableWidth} y="0" width={sheet.width - sheet.usableWidth} height={sheet.height} fill="#fee2e2" opacity="0.65" />
+            <rect x="0" y={sheet.usableHeight} width={sheet.width} height={sheet.height - sheet.usableHeight} fill="#fee2e2" opacity="0.65" />
+            <text x={sheet.width - Math.max(35, sheet.trimCut * 6)} y={sheet.height / 2} textAnchor="middle" dominantBaseline="middle" fontSize="38" fontWeight="800" fill="#991b1b" transform={"rotate(90 " + (sheet.width - Math.max(35, sheet.trimCut * 6)) + " " + (sheet.height / 2) + ")"}>trim</text>
+          </>
+        ) : null}
         {sheet.pieces.map((piece, pieceIndex) => (
           <g key={piece.id || pieceIndex}>
             <rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} fill={piece.type === "offcut" ? "#dcfce7" : "#dbeafe"} stroke={piece.type === "offcut" ? "#15803d" : "#315a8c"} strokeWidth="4" />
@@ -5546,7 +5575,7 @@ function OrderPanelsDrawing({ sheet, index }) {
           </g>
         ))}
       </svg>
-      <div className="order-panels-sheet-notes"><span>{sheet.pieces.filter((piece) => piece.type === "required").length} required cuts</span><span>{sheet.pieces.filter((piece) => piece.type === "offcut").length} standard offcuts</span></div>
+      <div className="order-panels-sheet-notes"><span>{sheet.pieces.filter((piece) => piece.type === "required").length} required cuts</span><span>{sheet.trimCut > 0 ? `${Math.round(sheet.trimCut)}mm trim allowed` : "Nominal cut"}</span><span>{sheet.pieces.filter((piece) => piece.type === "offcut").length} standard offcuts</span></div>
     </article>
   );
 }
@@ -5556,12 +5585,14 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
   const [customWidth, setCustomWidth] = useState("");
   const [customHeight, setCustomHeight] = useState("");
   const [kerf, setKerf] = useState("5");
+  const [trimCut, setTrimCut] = useState("5");
   const [standardiseOffcuts, setStandardiseOffcuts] = useState(true);
   const [allowRotate, setAllowRotate] = useState(true);
+  const [nominalCutting, setNominalCutting] = useState(false);
   const [lines, setLines] = useState([makeOrderPanelLine()]);
   const [copied, setCopied] = useState(false);
   const stock = getOrderPanelStock(stockId, customWidth, customHeight);
-  const plan = useMemo(() => buildOrderPanelPlan(lines, stock, { kerf, standardiseOffcuts, allowRotate }), [lines, stockId, customWidth, customHeight, kerf, standardiseOffcuts, allowRotate]);
+  const plan = useMemo(() => buildOrderPanelPlan(lines, stock, { kerf, trimCut, standardiseOffcuts, allowRotate, nominalCutting }), [lines, stockId, customWidth, customHeight, kerf, trimCut, standardiseOffcuts, allowRotate, nominalCutting]);
   const emailText = useMemo(() => getOrderPanelEmail(plan, stock), [plan, stock]);
 
   function updateLine(id, field, value) {
@@ -5607,9 +5638,10 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
               <div className="order-panels-field-grid">
                 <label>Sheet<select value={stockId} onChange={(event) => setStockId(event.target.value)}>{ORDER_PANEL_STOCK_SHEETS.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheet.label}</option>)}</select></label>
                 {stockId === "custom" ? <><label>Custom width<input type="number" value={customWidth} onChange={(event) => setCustomWidth(event.target.value)} placeholder="Width mm" /></label><label>Custom height<input type="number" value={customHeight} onChange={(event) => setCustomHeight(event.target.value)} placeholder="Height mm" /></label></> : null}
-                <label>Blade kerf<input type="number" value={kerf} onChange={(event) => setKerf(event.target.value)} /></label>
+                <label>Blade kerf<input type="number" value={kerf} onChange={(event) => setKerf(event.target.value)} disabled={nominalCutting} /></label>
+                <label>Trim cut<input type="number" value={trimCut} onChange={(event) => setTrimCut(event.target.value)} disabled={nominalCutting} /></label>
               </div>
-              <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label></div>
+              <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label><label className="order-panels-nominal"><input type="checkbox" checked={nominalCutting} onChange={(event) => setNominalCutting(event.target.checked)} /> Nominal cutting</label></div>
               <div className="order-panels-lines">
                 <div className="order-panels-line-head"><span>Width</span><span>Height</span><span>Qty</span><span></span></div>
                 {lines.map((line) => <div className="order-panels-line" key={line.id}><input type="number" value={line.width} onChange={(event) => updateLine(line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateLine(line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateLine(line.id, "quantity", event.target.value)} placeholder="1" /><button type="button" className="icon-button" onClick={() => removeLine(line.id)} disabled={lines.length <= 1}>x</button></div>)}

@@ -20788,7 +20788,7 @@ button {
 .order-panels-field-grid {
   align-items: end;
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(120px, 0.7fr));
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(105px, 0.65fr));
   gap: 10px;
 }
 
@@ -20824,6 +20824,12 @@ button {
   padding: 0 10px;
 }
 
+.order-panels-field-grid input:disabled {
+  background: #eef2f7;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
 .order-panels-email-label textarea {
   min-height: 132px;
   padding: 10px;
@@ -20846,6 +20852,14 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.order-panels-switches .order-panels-nominal {
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  padding: 6px 10px;
 }
 
 .order-panels-lines {
