@@ -4506,6 +4506,57 @@ function sanitizeWipBoardState(payload = {}) {
   };
 }
 
+function isWipEnrichmentPlaceholderDescription(value = "") {
+  const text = String(value || "").trim();
+  return !text || /^\d+\s+items?$/i.test(text);
+}
+
+function normalizeWipEnrichmentReference(value = "") {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function buildStoredWipEnrichmentIndex(store = {}) {
+  const candidates = [
+    ...(Array.isArray(store?.wipBoard?.cards) ? store.wipBoard.cards : []),
+    ...(Array.isArray(store?.wipBoard?.previousCards) ? store.wipBoard.previousCards : []),
+    ...(Array.isArray(store?.wipBoard?.completionReviewCards) ? store.wipBoard.completionReviewCards : []),
+    ...(Array.isArray(store?.jobs) ? store.jobs : []),
+    ...(Array.isArray(store?.designBoard?.cards) ? store.designBoard.cards : []),
+    ...(Array.isArray(store?.filteringBoard?.cards) ? store.filteringBoard.cards : [])
+  ];
+  const byReferenceFamily = new Map();
+
+  candidates.forEach((candidate) => {
+    const reference = normalizeWipEnrichmentReference(candidate?.orderNumber || candidate?.orderReference);
+    if (!reference) return;
+    const key = getCoreBridgeReferenceFamilyKey(reference);
+    if (!key) return;
+
+    const existing = byReferenceFamily.get(key) || {};
+    const description = String(candidate?.description || "").replace(/\s+/g, " ").trim();
+    const salesperson = String(candidate?.salesperson || "").replace(/\s+/g, " ").trim();
+    const company = String(candidate?.company || candidate?.customerName || "").replace(/\s+/g, " ").trim();
+
+    byReferenceFamily.set(key, {
+      orderNumber: existing.orderNumber || reference,
+      description: !isWipEnrichmentPlaceholderDescription(description) ? description : existing.description || "",
+      salesperson: salesperson && salesperson !== "-" ? salesperson : existing.salesperson || "",
+      company: existing.company || company,
+      source: "saved portal data"
+    });
+  });
+
+  return byReferenceFamily;
+}
+
+function getStoredWipEnrichment(index, orderNumber = "") {
+  const reference = normalizeWipEnrichmentReference(orderNumber);
+  if (!reference) return null;
+  const match = index.get(getCoreBridgeReferenceFamilyKey(reference));
+  if (!match || (!match.description && !match.salesperson)) return null;
+  return match;
+}
+
 function sanitizeAttendanceMonthNote(payload) {
   return {
     id: String(payload?.id || makeId()),
@@ -13297,6 +13348,8 @@ function createServer() {
     const orderNumbers = [...new Set(requestedOrderNumbers.map(normalizeReference).filter(Boolean))].slice(0, 100);
     const enrichments = {};
     const errors = [];
+    const store = await readStore();
+    const storedEnrichmentIndex = buildStoredWipEnrichmentIndex(store);
     let cursor = 0;
 
     async function enrichNextOrder() {
@@ -13305,13 +13358,29 @@ function createServer() {
         cursor += 1;
 
         try {
+          const storedMatch = getStoredWipEnrichment(storedEnrichmentIndex, orderNumber);
+          if (storedMatch) {
+            enrichments[orderNumber] = {
+              orderNumber: storedMatch.orderNumber || orderNumber,
+              description: storedMatch.description || "",
+              salesperson: storedMatch.salesperson || "",
+              source: storedMatch.source || "saved portal data"
+            };
+          }
+
+          if (enrichments[orderNumber]?.description && enrichments[orderNumber]?.salesperson) {
+            continue;
+          }
+
           const { order: match, lookupAttempts } = await fetchDesignBoardOrderByReference(orderNumber);
           if (!match) continue;
 
           enrichments[orderNumber] = {
-            orderNumber: normalizeReference(match.orderReference) || orderNumber,
-            description: String(match.description || "").replace(/\s+/g, " ").trim(),
-            salesperson: String(match.salesperson || "").replace(/\s+/g, " ").trim(),
+            ...(enrichments[orderNumber] || {}),
+            orderNumber: normalizeReference(match.orderReference) || enrichments[orderNumber]?.orderNumber || orderNumber,
+            description: enrichments[orderNumber]?.description || String(match.description || "").replace(/\s+/g, " ").trim(),
+            salesperson: enrichments[orderNumber]?.salesperson || String(match.salesperson || "").replace(/\s+/g, " ").trim(),
+            source: enrichments[orderNumber]?.source || "CoreBridge",
             lookupAttempts: Array.isArray(lookupAttempts) ? lookupAttempts.length : 0
           };
         } catch (error) {

@@ -7225,7 +7225,7 @@ async function enrichWipCardsFromCoreBridge(cards = [], options = {}) {
     while (cursor < targets.length) {
       const target = targets[cursor];
       cursor += 1;
-      reportProgress(target.orderNumber, { status: "fetching", detail: "Checking CoreBridge" });
+      reportProgress(target.orderNumber, { status: "fetching", detail: "Checking saved data + CoreBridge" });
 
       try {
         const response = await fetch("/api/wip-board/enrich", {
@@ -7253,10 +7253,10 @@ async function enrichWipCardsFromCoreBridge(cards = [], options = {}) {
         completed += 1;
         if (changedForOrder) {
           enrichedCount += 1;
-          reportProgress(target.orderNumber, { status: "found", detail: "Filled missing detail" });
+          reportProgress(target.orderNumber, { status: "found", detail: "Filled from " + (enrichment.source || "lookup") });
         } else {
           failedCount += 1;
-          reportProgress(target.orderNumber, { status: enrichment ? "unchanged" : "missing", detail: enrichment ? "No extra fields returned" : "No matching CoreBridge detail" });
+          reportProgress(target.orderNumber, { status: enrichment ? "unchanged" : "missing", detail: enrichment ? "No extra fields returned" : "No saved/CoreBridge detail" });
         }
       } catch (error) {
         completed += 1;
@@ -7495,7 +7495,7 @@ function WipImportProgressModal({ progress, onClose }) {
             <div>
               <span>WIP import</span>
               <h2>{complete ? "Import finished" : "Finding missing job details"}</h2>
-              <p>{complete ? "These are the CoreBridge lookup results from this upload." : "Cards are being checked against CoreBridge before the board is saved."}</p>
+              <p>{complete ? "These are the saved-data and CoreBridge lookup results from this upload." : "Cards are being checked against saved portal data and CoreBridge before the board is saved."}</p>
             </div>
             {complete ? <button type="button" onClick={onClose} aria-label="Close import progress">x</button> : null}
           </div>
@@ -7676,7 +7676,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       let enrichmentFailedCount = 0;
       const enrichmentTargets = parsedCards.filter(needsWipCoreBridgeEnrichment).length;
       if (enrichmentTargets) {
-        setUploadMessage("Loaded the WIP file. Looking up " + enrichmentTargets + " order reference" + (enrichmentTargets === 1 ? "" : "s") + " in CoreBridge...");
+        setUploadMessage("Loaded the WIP file. Looking up " + enrichmentTargets + " order reference" + (enrichmentTargets === 1 ? "" : "s") + " in saved data and CoreBridge...");
         setImportProgress({
           phase: "fetching",
           total: enrichmentTargets,
@@ -7710,7 +7710,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
             entries: (current?.entries || []).map((entry) => ({
               ...entry,
               status: entry.status === "found" ? "found" : "error",
-              detail: entry.status === "found" ? entry.detail : "CoreBridge lookup failed"
+              detail: entry.status === "found" ? entry.detail : "Saved data/CoreBridge lookup failed"
             }))
           }));
         }
@@ -7739,9 +7739,9 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       const suggestedCount = parsedCards.filter((card) => card.lane && card.lane !== "backlog").length;
       const reviewMessage = nextReviewCards.length ? " " + nextReviewCards.length + " missing jobs need completion review." : "";
       const enrichmentMessage = enrichedCount
-        ? " Filled " + enrichedCount + " missing CoreBridge detail" + (enrichedCount === 1 ? "" : "s") + "."
+        ? " Filled " + enrichedCount + " missing job detail" + (enrichedCount === 1 ? "" : "s") + "."
         : enrichmentFailedCount
-          ? " CoreBridge enrichment was unavailable for " + enrichmentFailedCount + " job" + (enrichmentFailedCount === 1 ? "" : "s") + "."
+          ? " Saved data/CoreBridge enrichment was unavailable for " + enrichmentFailedCount + " job" + (enrichmentFailedCount === 1 ? "" : "s") + "."
           : "";
       setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + enrichmentMessage + reviewMessage);
       if (enrichmentTargets) {
