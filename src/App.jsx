@@ -7552,8 +7552,9 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
         .filter((card) => !removedSet.has(normalizeWipOrderReference(card.orderNumber)));
       let enrichedCount = 0;
       let enrichmentFailedCount = 0;
-      if (parsedCards.some(needsWipCoreBridgeEnrichment)) {
-        setUploadMessage("Loaded the WIP file. Filling missing descriptions and salespeople from CoreBridge...");
+      const enrichmentTargets = parsedCards.filter(needsWipCoreBridgeEnrichment).length;
+      if (enrichmentTargets) {
+        setUploadMessage("Loaded the WIP file. Looking up " + enrichmentTargets + " order reference" + (enrichmentTargets === 1 ? "" : "s") + " in CoreBridge...");
         try {
           const enrichmentResult = await enrichWipCardsFromCoreBridge(parsedCards);
           parsedCards = enrichmentResult.cards;

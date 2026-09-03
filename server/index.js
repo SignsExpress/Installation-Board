@@ -13305,18 +13305,14 @@ function createServer() {
         cursor += 1;
 
         try {
-          const payload = await fetchCoreBridgeOrders(orderNumber, false);
-          const orders = Array.isArray(payload.orders) ? payload.orders : [];
-          const match =
-            orders.find((order) => normalizeReference(order.orderReference) === orderNumber) ||
-            orders[0] ||
-            null;
+          const { order: match, lookupAttempts } = await fetchDesignBoardOrderByReference(orderNumber);
           if (!match) continue;
 
           enrichments[orderNumber] = {
             orderNumber: normalizeReference(match.orderReference) || orderNumber,
             description: String(match.description || "").replace(/\s+/g, " ").trim(),
-            salesperson: String(match.salesperson || "").replace(/\s+/g, " ").trim()
+            salesperson: String(match.salesperson || "").replace(/\s+/g, " ").trim(),
+            lookupAttempts: Array.isArray(lookupAttempts) ? lookupAttempts.length : 0
           };
         } catch (error) {
           errors.push({ orderNumber, message: error.message || "Lookup failed" });
