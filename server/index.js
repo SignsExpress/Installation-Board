@@ -6631,6 +6631,50 @@ function pickBestCoreBridgeDescription(flatRecord) {
   return scanned || fallback;
 }
 
+function pickBestCoreBridgeSalesperson(flatRecord) {
+  const direct = pickFirst(flatRecord, [
+    "salesperson.displayname",
+    "salesperson.fullname",
+    "salesperson.name",
+    "salesperson.firstname",
+    "salesperson",
+    "salespersonname",
+    "salespersonfirstname",
+    "salespersonfirst",
+    "salesrep.displayname",
+    "salesrep.fullname",
+    "salesrep.name",
+    "salesrep.firstname",
+    "salesrepresentative.displayname",
+    "salesrepresentative.fullname",
+    "salesrepresentative.name",
+    "salesrepresentative.firstname",
+    "assignedsalesperson.displayname",
+    "assignedsalesperson.fullname",
+    "assignedsalesperson.name",
+    "assignedsalesperson.firstname",
+    "estimate.salesperson.displayname",
+    "estimate.salesperson.name",
+    "order.salesperson.displayname",
+    "order.salesperson.name",
+    "rep.displayname",
+    "rep.fullname",
+    "rep.name",
+    "rep.firstname"
+  ]);
+  if (direct) return direct;
+
+  return pickMatchingValue(flatRecord, (key, value) => {
+    const normalizedKey = String(key || "").toLowerCase();
+    const normalizedValue = String(value || "").trim();
+    if (!normalizedValue) return false;
+    if (looksLikeEmail(normalizedValue) || looksLikePhone(normalizedValue)) return false;
+    if (/\d{4}-\d{2}-\d{2}/.test(normalizedValue)) return false;
+    if (/(email|phone|mobile|telephone|date|status|total|amount|price|tax)/i.test(normalizedKey)) return false;
+    return normalizedKey.includes("sales") && /(person|rep|representative|user|name|employee)/i.test(normalizedKey);
+  });
+}
+
 function pickBestCoreBridgePhone(flatRecord) {
   const contactRoleLocatorPhone = pickMatchingValue(flatRecord, (key, value) => {
     const normalizedKey = String(key || "").toLowerCase();
@@ -7350,6 +7394,7 @@ function normalizeCoreBridgeOrder(record, index) {
       "specialinstructions",
       "instructions"
     ]),
+    salesperson: pickBestCoreBridgeSalesperson(flat),
     status: pickFirst(flat, ["enumorderorderstatus.name", "status", "orderstatus", "jobstatus"]),
     jobTotalExVat: Number(pickFirst(flat, [
       "pretax",
@@ -13242,6 +13287,47 @@ function createServer() {
     const payload = await getBoardPayload({ start, end });
     response.json(getWipBoardContextFromPayload(payload));
   });
+
+  app.post("/api/wip-board/enrich", async (request, response) => {
+    if (!requireBoardAccess(request, response)) return;
+    const normalizeReference = (value) => String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+    const requestedOrderNumbers = Array.isArray(request.body?.orderNumbers)
+      ? request.body.orderNumbers
+      : [];
+    const orderNumbers = [...new Set(requestedOrderNumbers.map(normalizeReference).filter(Boolean))].slice(0, 100);
+    const enrichments = {};
+    const errors = [];
+    let cursor = 0;
+
+    async function enrichNextOrder() {
+      while (cursor < orderNumbers.length) {
+        const orderNumber = orderNumbers[cursor];
+        cursor += 1;
+
+        try {
+          const payload = await fetchCoreBridgeOrders(orderNumber, false);
+          const orders = Array.isArray(payload.orders) ? payload.orders : [];
+          const match =
+            orders.find((order) => normalizeReference(order.orderReference) === orderNumber) ||
+            orders[0] ||
+            null;
+          if (!match) continue;
+
+          enrichments[orderNumber] = {
+            orderNumber: normalizeReference(match.orderReference) || orderNumber,
+            description: String(match.description || "").replace(/\s+/g, " ").trim(),
+            salesperson: String(match.salesperson || "").replace(/\s+/g, " ").trim()
+          };
+        } catch (error) {
+          errors.push({ orderNumber, message: error.message || "Lookup failed" });
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: Math.min(4, orderNumbers.length) }, enrichNextOrder));
+    response.json({ enrichments, errors });
+  });
+
   app.put("/api/wip-board", async (request, response) => {
     if (!requireBoardAccess(request, response)) return;
     const store = await readStore();

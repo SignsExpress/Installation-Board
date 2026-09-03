@@ -7099,12 +7099,16 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
   const importedDescription = normalizeWipKey(itemCount) === "items" || /^\d+$/.test(itemCount)
     ? (itemCount ? `${itemCount} item${itemCount === "1" ? "" : "s"}` : "")
     : itemCount;
+  const existingDescription = String(existing.description || "").trim();
+  const description = isWipPlaceholderDescription(importedDescription) && !isWipPlaceholderDescription(existingDescription)
+    ? existingDescription
+    : importedDescription || existingDescription;
   return {
     id: existing.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
     orderNumber,
     orderStatus: status || "-",
     company: String(read("company") || "").replace(/\s+/g, " ").trim(),
-    description: importedDescription || existing.description || "",
+    description,
     salesperson: getWipSalesperson(read("salesperson") || existing.salesperson),
     productionLocation: getWipLocation(read("productionLocation") || existing.productionLocation),
     preTaxTotal: formatWipMoney(read("preTaxTotal") || existing.preTaxTotal),
@@ -7133,6 +7137,71 @@ function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx, placementMemory
   if (missing.length) throw new Error("Missing columns: " + missing.join(", "));
   const existingByOrder = new Map(existingCards.map((card) => [card.orderNumber, card]));
   return rows.slice(headerIndex + 1).map((row) => makeWipCard(row, headers, existingByOrder, placementMemory)).filter(Boolean);
+}
+
+function isWipPlaceholderDescription(value) {
+  const text = String(value || "").trim();
+  return !text || /^\d+\s+items?$/i.test(text);
+}
+
+function needsWipCoreBridgeEnrichment(card = {}) {
+  return Boolean(
+    normalizeWipOrderReference(card.orderNumber) &&
+      (isWipPlaceholderDescription(card.description) || !String(card.salesperson || "").trim() || String(card.salesperson || "").trim() === "-")
+  );
+}
+
+async function enrichWipCardsFromCoreBridge(cards = []) {
+  const orderNumbers = [...new Set((Array.isArray(cards) ? cards : [])
+    .filter(needsWipCoreBridgeEnrichment)
+    .map((card) => normalizeWipOrderReference(card.orderNumber))
+    .filter(Boolean))];
+
+  if (!orderNumbers.length) {
+    return { cards, enrichedCount: 0, failedCount: 0 };
+  }
+
+  const response = await fetch("/api/wip-board/enrich", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderNumbers })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || payload.detail || "Could not fill missing WIP details from CoreBridge.");
+  }
+
+  const enrichments = payload.enrichments && typeof payload.enrichments === "object" ? payload.enrichments : {};
+  let enrichedCount = 0;
+  const enrichedCards = cards.map((card) => {
+    const key = normalizeWipOrderReference(card.orderNumber);
+    const enrichment = enrichments[key];
+    if (!enrichment) return card;
+
+    const nextCard = { ...card };
+    let changed = false;
+    const description = String(enrichment.description || "").trim();
+    const salesperson = getWipSalesperson(enrichment.salesperson);
+
+    if (description && isWipPlaceholderDescription(nextCard.description)) {
+      nextCard.description = description;
+      changed = true;
+    }
+
+    if (salesperson && salesperson !== "-" && (!String(nextCard.salesperson || "").trim() || String(nextCard.salesperson || "").trim() === "-")) {
+      nextCard.salesperson = salesperson;
+      changed = true;
+    }
+
+    if (changed) enrichedCount += 1;
+    return nextCard;
+  });
+
+  return {
+    cards: enrichedCards,
+    enrichedCount,
+    failedCount: Array.isArray(payload.errors) ? payload.errors.length : 0
+  };
 }
 
 function loadStoredWipCards() {
@@ -7479,8 +7548,22 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
         ? buildWipPlacementMemory(previousMemorySource, placementMemoryRef.current || placementMemory)
         : placementMemoryRef.current || placementMemory;
       const removedSet = new Set((removedOrderNumbersRef.current || removedOrderNumbers).map((value) => normalizeWipOrderReference(value)).filter(Boolean));
-      const parsedCards = keepWipCardsInVisibleLanes(parseWipWorkbook(buffer, cards, xlsx, currentMemory), days)
+      let parsedCards = keepWipCardsInVisibleLanes(parseWipWorkbook(buffer, cards, xlsx, currentMemory), days)
         .filter((card) => !removedSet.has(normalizeWipOrderReference(card.orderNumber)));
+      let enrichedCount = 0;
+      let enrichmentFailedCount = 0;
+      if (parsedCards.some(needsWipCoreBridgeEnrichment)) {
+        setUploadMessage("Loaded the WIP file. Filling missing descriptions and salespeople from CoreBridge...");
+        try {
+          const enrichmentResult = await enrichWipCardsFromCoreBridge(parsedCards);
+          parsedCards = enrichmentResult.cards;
+          enrichedCount = enrichmentResult.enrichedCount;
+          enrichmentFailedCount = enrichmentResult.failedCount;
+        } catch (enrichmentError) {
+          console.error(enrichmentError);
+          enrichmentFailedCount = parsedCards.filter(needsWipCoreBridgeEnrichment).length;
+        }
+      }
       const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
       const reviewSource = refPreviousCards.length ? refPreviousCards : storedPreviousCards.length ? storedPreviousCards : cards;
       const nextReviewCards = reviewSource.filter((card) => {
@@ -7504,7 +7587,12 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       const preWipCount = parsedCards.filter((card) => card.tab === "pre-wip").length;
       const suggestedCount = parsedCards.filter((card) => card.lane && card.lane !== "backlog").length;
       const reviewMessage = nextReviewCards.length ? " " + nextReviewCards.length + " missing jobs need completion review." : "";
-      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + reviewMessage);
+      const enrichmentMessage = enrichedCount
+        ? " Filled " + enrichedCount + " missing CoreBridge detail" + (enrichedCount === 1 ? "" : "s") + "."
+        : enrichmentFailedCount
+          ? " CoreBridge enrichment was unavailable for " + enrichmentFailedCount + " job" + (enrichmentFailedCount === 1 ? "" : "s") + "."
+          : "";
+      setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + enrichmentMessage + reviewMessage);
     } catch (error) {
       console.error(error);
       setUploadMessage(error.message || "Could not read that WIP file.");
