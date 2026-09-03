@@ -5469,8 +5469,8 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
   const effectiveTrim = nominalCutting ? 0 : trimCut;
   const allowRotate = options.allowRotate !== false;
   if (!stock.width || !stock.height) return { error: "Enter a valid sheet width and height.", sheets: [], disregarded: [], orderLines: [], kerf };
-  const usableWidth = stock.width - effectiveTrim;
-  const usableHeight = stock.height - effectiveTrim;
+  const usableWidth = stock.width - (effectiveTrim * 2);
+  const usableHeight = stock.height - (effectiveTrim * 2);
   if (usableWidth <= 0 || usableHeight <= 0) return { error: "Trim cut is larger than the selected sheet.", sheets: [], disregarded: [], orderLines: [], kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting };
   const orderLines = normaliseOrderPanelLines(lines);
   const pieces = orderLines.flatMap((line) => Array.from({ length: line.quantity }, (_, index) => ({
@@ -5491,7 +5491,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
     nominalCutting,
     label: stock.label,
     pieces: [],
-    freeRects: [{ x: 0, y: 0, width: usableWidth, height: usableHeight }]
+    freeRects: [{ x: effectiveTrim, y: effectiveTrim, width: usableWidth, height: usableHeight }]
   });
 
   for (const piece of pieces) {
@@ -5543,7 +5543,7 @@ function getOrderPanelEmail(plan, stock) {
     "",
     plan.nominalCutting
       ? "Nominal cutting requested: approximate cuts are fine, with no trim allowance required."
-      : "Please allow for a " + Math.round(plan.effectiveTrim) + "mm trim cut per sheet and a " + Math.round(plan.effectiveKerf) + "mm blade kerf per cut.",
+      : "Please allow for a " + Math.round(plan.effectiveTrim) + "mm trim cut all the way round each sheet and a " + Math.round(plan.effectiveKerf) + "mm blade kerf per cut.",
     "All smaller offcuts to be disregarded.",
     "If the panels exceed the amount shown above - please let me know urgently."
   ].join("\n");
@@ -5561,8 +5561,11 @@ function OrderPanelsDrawing({ sheet, index }) {
         <rect x="0" y="0" width={sheet.width} height={sheet.height} rx="10" fill="#f8fafc" stroke="#9fb1c7" strokeWidth="6" />
         {sheet.trimCut > 0 ? (
           <>
-            <rect x={sheet.usableWidth} y="0" width={sheet.width - sheet.usableWidth} height={sheet.height} fill="#fee2e2" opacity="0.65" />
-            <rect x="0" y={sheet.usableHeight} width={sheet.width} height={sheet.height - sheet.usableHeight} fill="#fee2e2" opacity="0.65" />
+            <rect x="0" y="0" width={sheet.trimCut} height={sheet.height} fill="#fee2e2" opacity="0.65" />
+            <rect x={sheet.width - sheet.trimCut} y="0" width={sheet.trimCut} height={sheet.height} fill="#fee2e2" opacity="0.65" />
+            <rect x="0" y="0" width={sheet.width} height={sheet.trimCut} fill="#fee2e2" opacity="0.65" />
+            <rect x="0" y={sheet.height - sheet.trimCut} width={sheet.width} height={sheet.trimCut} fill="#fee2e2" opacity="0.65" />
+            <rect x={sheet.trimCut} y={sheet.trimCut} width={sheet.usableWidth} height={sheet.usableHeight} fill="none" stroke="#fca5a5" strokeWidth="3" strokeDasharray="20 14" />
             <text x={sheet.width - Math.max(35, sheet.trimCut * 6)} y={sheet.height / 2} textAnchor="middle" dominantBaseline="middle" fontSize="38" fontWeight="800" fill="#991b1b" transform={"rotate(90 " + (sheet.width - Math.max(35, sheet.trimCut * 6)) + " " + (sheet.height / 2) + ")"}>trim</text>
           </>
         ) : null}
@@ -5575,7 +5578,7 @@ function OrderPanelsDrawing({ sheet, index }) {
           </g>
         ))}
       </svg>
-      <div className="order-panels-sheet-notes"><span>{sheet.pieces.filter((piece) => piece.type === "required").length} required cuts</span><span>{sheet.trimCut > 0 ? `${Math.round(sheet.trimCut)}mm trim allowed` : "Nominal cut"}</span><span>{sheet.pieces.filter((piece) => piece.type === "offcut").length} standard offcuts</span></div>
+      <div className="order-panels-sheet-notes"><span>{sheet.pieces.filter((piece) => piece.type === "required").length} required cuts</span><span>{sheet.trimCut > 0 ? `${Math.round(sheet.trimCut)}mm trim all round` : "Nominal cut"}</span><span>{sheet.pieces.filter((piece) => piece.type === "offcut").length} standard offcuts</span></div>
     </article>
   );
 }
