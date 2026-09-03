@@ -7029,6 +7029,29 @@ function getWipTabFromStatus(status) {
   return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
 }
 
+const WIP_HEADER_ALIASES = {
+  orderNumber: ["Order Number", "Order #", "Order No", "Order Ref"],
+  orderStatus: ["Order Status", "Status"],
+  company: ["Company", "Customer", "Customer Name"],
+  description: ["Description", "Job Description", "Items"],
+  salesperson: ["Salesperson", "Sales Person", "Rep"],
+  productionLocation: ["Production Location"],
+  preTaxTotal: ["Pre-Tax Total", "Pre-Tax Value", "Pre Tax Total", "Pre Tax Value"]
+};
+
+function getWipHeaderIndex(headers, field) {
+  const aliases = WIP_HEADER_ALIASES[field] || [field];
+  for (const alias of aliases) {
+    const index = headers[normalizeWipKey(alias)];
+    if (index !== undefined) return index;
+  }
+  return undefined;
+}
+
+function isWipOrderHeaderLabel(value) {
+  return (WIP_HEADER_ALIASES.orderNumber || []).some((alias) => normalizeWipKey(alias) === normalizeWipKey(value));
+}
+
 function normalizeWipAssignees(values = []) {
   return [...new Set((Array.isArray(values) ? values : [])
     .map((value) => normalizeWipOrderReference(value) === "SUBBY" ? "Subby" : String(value || "").trim())
@@ -7055,23 +7078,30 @@ function getWipAssigneeMeta(value, options = []) {
 }
 
 function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
-  const read = (name) => row[headers[normalizeWipKey(name)]] ?? "";
-  const orderNumber = normalizeWipOrderReference(read("Order Number"));
+  const read = (field) => {
+    const index = getWipHeaderIndex(headers, field);
+    return index === undefined ? "" : row[index] ?? "";
+  };
+  const orderNumber = normalizeWipOrderReference(read("orderNumber"));
   if (!orderNumber || !/^(ORD|INV|EST)/i.test(orderNumber)) return null;
   const remembered = placementMemory[orderNumber] || {};
   const existing = existingByOrder.get(orderNumber) || remembered || {};
-  const status = String(read("Order Status") || "").trim();
+  const status = String(read("orderStatus") || "").trim();
   const importedTab = getWipTabFromStatus(status);
   const tab = isWipCardInCompletedLane(existing) ? existing.tab || importedTab : importedTab;
+  const itemCount = String(read("description") || "").trim();
+  const importedDescription = normalizeWipKey(itemCount) === "items" || /^\d+$/.test(itemCount)
+    ? (itemCount ? `${itemCount} item${itemCount === "1" ? "" : "s"}` : "")
+    : itemCount;
   return {
     id: existing.id || orderNumber + "-" + Date.now() + "-" + Math.random().toString(16).slice(2),
     orderNumber,
     orderStatus: status || "-",
-    company: String(read("Company") || "").trim(),
-    description: String(read("Description") || "").trim(),
-    salesperson: getWipSalesperson(read("Salesperson")),
-    productionLocation: getWipLocation(read("Production Location")),
-    preTaxTotal: formatWipMoney(read("Pre-Tax Total")),
+    company: String(read("company") || "").replace(/\s+/g, " ").trim(),
+    description: importedDescription || existing.description || "",
+    salesperson: getWipSalesperson(read("salesperson") || existing.salesperson),
+    productionLocation: getWipLocation(read("productionLocation") || existing.productionLocation),
+    preTaxTotal: formatWipMoney(read("preTaxTotal") || existing.preTaxTotal),
     tab,
     lane: existing.lane || "backlog",
     extraLanes: Array.isArray(existing.extraLanes) ? existing.extraLanes : [],
@@ -7084,7 +7114,7 @@ function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx, placementMemory
   const workbook = xlsx.read(arrayBuffer, { type: "array", cellDates: false });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
-  const headerIndex = rows.findIndex((row) => row.some((cell) => normalizeWipKey(cell) === "ordernumber"));
+  const headerIndex = rows.findIndex((row) => row.some((cell) => isWipOrderHeaderLabel(cell)));
   if (headerIndex < 0) throw new Error("Could not find the Order Number header row.");
   const headerRow = rows[headerIndex];
   const headers = headerRow.reduce((map, label, index) => {
@@ -7092,8 +7122,8 @@ function parseWipWorkbook(arrayBuffer, existingCards = [], xlsx, placementMemory
     if (key) map[key] = index;
     return map;
   }, {});
-  const required = ["ordernumber", "orderstatus", "company", "description", "salesperson", "productionlocation", "pretaxtotal"];
-  const missing = required.filter((key) => headers[key] === undefined);
+  const required = ["orderNumber", "orderStatus", "company", "productionLocation", "preTaxTotal"];
+  const missing = required.filter((key) => getWipHeaderIndex(headers, key) === undefined);
   if (missing.length) throw new Error("Missing columns: " + missing.join(", "));
   const existingByOrder = new Map(existingCards.map((card) => [card.orderNumber, card]));
   return rows.slice(headerIndex + 1).map((row) => makeWipCard(row, headers, existingByOrder, placementMemory)).filter(Boolean);
@@ -7471,7 +7501,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + reviewMessage);
     } catch (error) {
       console.error(error);
-      setUploadMessage(error.message || "Could not read that Excel file.");
+      setUploadMessage(error.message || "Could not read that WIP file.");
     }
   }
 
@@ -7673,8 +7703,8 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
             </div>
             <div className="wip-actions">
               <label className="wip-upload-button">
-                Upload Excel
-                <input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleUpload} />
+                Upload WIP file
+                <input type="file" accept=".xlsx,.xls,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={handleUpload} />
               </label>
               <button
                 type="button"
