@@ -7026,7 +7026,8 @@ function parseWipMoney(value) {
 }
 
 function getWipTabFromStatus(status) {
-  return normalizeWipKey(status).includes("prewip") ? "pre-wip" : "wip";
+  const key = normalizeWipKey(status);
+  return key.includes("pre") && key.includes("wip") ? "pre-wip" : "wip";
 }
 
 const WIP_HEADER_ALIASES = {
@@ -7088,7 +7089,12 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
   const existing = existingByOrder.get(orderNumber) || remembered || {};
   const status = String(read("orderStatus") || "").trim();
   const importedTab = getWipTabFromStatus(status);
-  const tab = isWipCardInCompletedLane(existing) ? existing.tab || importedTab : importedTab;
+  const existingCompleted = isWipCardInCompletedLane(existing);
+  const tab = existingCompleted ? existing.tab || importedTab : importedTab;
+  const lane = !existingCompleted && importedTab === "pre-wip" ? "backlog" : existing.lane || "backlog";
+  const extraLanes = !existingCompleted && importedTab === "pre-wip"
+    ? []
+    : Array.isArray(existing.extraLanes) ? existing.extraLanes : [];
   const itemCount = String(read("description") || "").trim();
   const importedDescription = normalizeWipKey(itemCount) === "items" || /^\d+$/.test(itemCount)
     ? (itemCount ? `${itemCount} item${itemCount === "1" ? "" : "s"}` : "")
@@ -7103,8 +7109,8 @@ function makeWipCard(row, headers, existingByOrder, placementMemory = {}) {
     productionLocation: getWipLocation(read("productionLocation") || existing.productionLocation),
     preTaxTotal: formatWipMoney(read("preTaxTotal") || existing.preTaxTotal),
     tab,
-    lane: existing.lane || "backlog",
-    extraLanes: Array.isArray(existing.extraLanes) ? existing.extraLanes : [],
+    lane,
+    extraLanes,
     productionAssignees: normalizeWipAssignees(existing.productionAssignees),
     importedAt: existing.importedAt || new Date().toISOString()
   };
