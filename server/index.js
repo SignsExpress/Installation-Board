@@ -4546,6 +4546,10 @@ function normalizeWipEnrichmentReference(value = "") {
   return String(value || "").trim().toUpperCase().replace(/\s+/g, "");
 }
 
+function normalizeWipEnrichmentCompany(value = "") {
+  return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 function buildStoredWipEnrichmentIndex(store = {}) {
   const detailMemory = sanitizeWipDetailMemory(store?.wipBoard?.detailMemory);
   const candidates = [
@@ -4585,7 +4589,7 @@ function buildStoredWipEnrichmentIndex(store = {}) {
       }
     }
 
-    const companyKey = company.toLowerCase();
+    const companyKey = normalizeWipEnrichmentCompany(company);
     if (companyKey) {
       const existing = byCompany.get(companyKey) || {};
       byCompany.set(companyKey, {
@@ -4605,9 +4609,27 @@ function getStoredWipEnrichment(index, orderNumber = "", company = "") {
   const reference = normalizeWipEnrichmentReference(orderNumber);
   const match = reference ? index.byReferenceFamily.get(getCoreBridgeReferenceFamilyKey(reference)) : null;
   if (match && (match.description || match.salesperson)) return match;
-  const companyMatch = index.byCompany.get(String(company || "").replace(/\s+/g, " ").trim().toLowerCase());
+  const companyMatch = index.byCompany.get(normalizeWipEnrichmentCompany(company));
   if (!companyMatch || (!companyMatch.description && !companyMatch.salesperson)) return null;
   return companyMatch;
+}
+
+async function fetchCoreBridgeSalespersonByCompany(company = "") {
+  const companyKey = normalizeWipEnrichmentCompany(company);
+  if (companyKey.length < 4) return null;
+
+  const payload = await fetchCoreBridgeOrders(company, { fields: true, raw: false }, { includeClosed: true });
+  const orders = Array.isArray(payload.orders) ? payload.orders : [];
+  const match = orders.find((order) =>
+    normalizeWipEnrichmentCompany(order.customerName) === companyKey &&
+    String(order.salesperson || "").trim()
+  ) || orders.find((order) => String(order.salesperson || "").trim());
+
+  if (!match?.salesperson) return null;
+  return {
+    salesperson: String(match.salesperson || "").replace(/\s+/g, " ").trim(),
+    source: "CoreBridge company search"
+  };
 }
 
 function sanitizeAttendanceMonthNote(payload) {
@@ -6743,24 +6765,45 @@ function pickBestCoreBridgeSalesperson(flatRecord) {
     "salesperson.firstname",
     "salesperson",
     "salespersonname",
+    "salespersonfullname",
     "salespersonfirstname",
     "salespersonfirst",
+    "salesperson.fullname",
+    "salesperson.display",
+    "salespersonlabel",
     "salesrep.displayname",
     "salesrep.fullname",
     "salesrep.name",
     "salesrep.firstname",
+    "salesrepfullname",
+    "salesrepname",
     "salesrepresentative.displayname",
     "salesrepresentative.fullname",
     "salesrepresentative.name",
     "salesrepresentative.firstname",
+    "salesrepresentativefullname",
+    "salesrepresentativename",
     "assignedsalesperson.displayname",
     "assignedsalesperson.fullname",
     "assignedsalesperson.name",
     "assignedsalesperson.firstname",
+    "assignedsalespersonfullname",
     "estimate.salesperson.displayname",
     "estimate.salesperson.name",
     "order.salesperson.displayname",
     "order.salesperson.name",
+    "employee.displayname",
+    "employee.fullname",
+    "employee.name",
+    "createdby.displayname",
+    "createdby.fullname",
+    "createdby.name",
+    "enteredby.displayname",
+    "enteredby.fullname",
+    "enteredby.name",
+    "accountmanager.displayname",
+    "accountmanager.fullname",
+    "accountmanager.name",
     "rep.displayname",
     "rep.fullname",
     "rep.name",
@@ -13438,16 +13481,26 @@ function createServer() {
           }
 
           const { order: match, lookupAttempts } = await fetchDesignBoardOrderByReference(orderNumber);
-          if (!match) continue;
-
-          enrichments[orderNumber] = {
-            ...(enrichments[orderNumber] || {}),
-            orderNumber: normalizeReference(match.orderReference) || enrichments[orderNumber]?.orderNumber || orderNumber,
-            description: enrichments[orderNumber]?.description || String(match.description || "").replace(/\s+/g, " ").trim(),
-            salesperson: enrichments[orderNumber]?.salesperson || String(match.salesperson || "").replace(/\s+/g, " ").trim(),
-            source: enrichments[orderNumber]?.source || "CoreBridge",
-            lookupAttempts: Array.isArray(lookupAttempts) ? lookupAttempts.length : 0
-          };
+          if (match) {
+            enrichments[orderNumber] = {
+              ...(enrichments[orderNumber] || {}),
+              orderNumber: normalizeReference(match.orderReference) || enrichments[orderNumber]?.orderNumber || orderNumber,
+              description: enrichments[orderNumber]?.description || String(match.description || "").replace(/\s+/g, " ").trim(),
+              salesperson: enrichments[orderNumber]?.salesperson || String(match.salesperson || "").replace(/\s+/g, " ").trim(),
+              source: enrichments[orderNumber]?.source || "CoreBridge",
+              lookupAttempts: Array.isArray(lookupAttempts) ? lookupAttempts.length : 0
+            };
+          }
+          if (!enrichments[orderNumber]?.salesperson) {
+            const companyMatch = await fetchCoreBridgeSalespersonByCompany(target.company);
+            if (companyMatch?.salesperson) {
+              enrichments[orderNumber] = {
+                ...(enrichments[orderNumber] || {}),
+                salesperson: companyMatch.salesperson,
+                source: enrichments[orderNumber]?.description ? `${enrichments[orderNumber]?.source || "CoreBridge"} + ${companyMatch.source}` : companyMatch.source
+              };
+            }
+          }
         } catch (error) {
           errors.push({ orderNumber, message: error.message || "Lookup failed" });
         }
