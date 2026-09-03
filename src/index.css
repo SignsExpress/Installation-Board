@@ -20367,6 +20367,116 @@ button {
   padding: 18px;
 }
 
+.wip-import-progress-modal {
+  width: min(760px, 100%);
+}
+
+.wip-import-progress-bar {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf2f8;
+  margin: 16px 0 10px;
+}
+
+.wip-import-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #6b3f82, #006eb6);
+  transition: width 180ms ease;
+}
+
+.wip-import-progress-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #475569;
+  font-size: 0.82rem;
+  margin-bottom: 12px;
+}
+
+.wip-import-progress-summary strong,
+.wip-import-progress-summary span {
+  border: 1px solid #d7e2ef;
+  border-radius: 999px;
+  background: #f8fbff;
+  padding: 5px 9px;
+}
+
+.wip-import-progress-list {
+  display: grid;
+  gap: 7px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.wip-import-progress-card {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(220px, 1.5fr) minmax(140px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #d7e2ef;
+  border-left: 5px solid #cbd5e1;
+  border-radius: 12px;
+  padding: 9px 10px;
+  background: #fff;
+  color: #111827;
+  font-size: 0.8rem;
+}
+
+.wip-import-progress-card div,
+.wip-import-progress-card p,
+.wip-import-progress-card em {
+  min-width: 0;
+}
+
+.wip-import-progress-card strong,
+.wip-import-progress-card span,
+.wip-import-progress-card p,
+.wip-import-progress-card em {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wip-import-progress-card span,
+.wip-import-progress-card p,
+.wip-import-progress-card em {
+  color: #52627a;
+}
+
+.wip-import-progress-card em {
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
+}
+
+.wip-import-progress-card.is-fetching {
+  border-left-color: #006eb6;
+  background: #f4faff;
+}
+
+.wip-import-progress-card.is-found {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.wip-import-progress-card.is-missing,
+.wip-import-progress-card.is-unchanged {
+  border-left-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.wip-import-progress-card.is-error {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
 .wip-modal-head {
   display: flex;
   justify-content: space-between;

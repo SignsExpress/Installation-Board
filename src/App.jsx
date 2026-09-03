@@ -7151,56 +7151,126 @@ function needsWipCoreBridgeEnrichment(card = {}) {
   );
 }
 
-async function enrichWipCardsFromCoreBridge(cards = []) {
-  const orderNumbers = [...new Set((Array.isArray(cards) ? cards : [])
-    .filter(needsWipCoreBridgeEnrichment)
-    .map((card) => normalizeWipOrderReference(card.orderNumber))
-    .filter(Boolean))];
+function mergeWipCardEnrichment(card, enrichment) {
+  if (!card || !enrichment) return { card, changed: false };
 
-  if (!orderNumbers.length) {
+  const nextCard = { ...card };
+  let changed = false;
+  const description = String(enrichment.description || "").trim();
+  const salesperson = getWipSalesperson(enrichment.salesperson);
+
+  if (description && isWipPlaceholderDescription(nextCard.description)) {
+    nextCard.description = description;
+    changed = true;
+  }
+
+  if (salesperson && salesperson !== "-" && (!String(nextCard.salesperson || "").trim() || String(nextCard.salesperson || "").trim() === "-")) {
+    nextCard.salesperson = salesperson;
+    changed = true;
+  }
+
+  return { card: nextCard, changed };
+}
+
+async function enrichWipCardsFromCoreBridge(cards = [], options = {}) {
+  const targetByOrder = new Map();
+  (Array.isArray(cards) ? cards : []).filter(needsWipCoreBridgeEnrichment).forEach((card) => {
+    const orderNumber = normalizeWipOrderReference(card.orderNumber);
+    if (!orderNumber || targetByOrder.has(orderNumber)) return;
+    targetByOrder.set(orderNumber, {
+      orderNumber,
+      company: card.company || "",
+      description: card.description || "",
+      salesperson: card.salesperson || ""
+    });
+  });
+  const targets = [...targetByOrder.values()];
+
+  if (!targets.length) {
     return { cards, enrichedCount: 0, failedCount: 0 };
   }
 
-  const response = await fetch("/api/wip-board/enrich", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ orderNumbers })
+  const total = targets.length;
+  const entries = targets.map((target) => ({ ...target, status: "pending", detail: "Waiting" }));
+  const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+  let nextCards = cards;
+  let enrichedCount = 0;
+  let failedCount = 0;
+  let completed = 0;
+  let cursor = 0;
+
+  const reportProgress = (orderNumber, patch = {}) => {
+    const index = entries.findIndex((entry) => entry.orderNumber === orderNumber);
+    if (index >= 0) entries[index] = { ...entries[index], ...patch };
+    onProgress?.({
+      phase: "fetching",
+      total,
+      completed,
+      enrichedCount,
+      failedCount,
+      entries: [...entries]
+    });
+  };
+
+  onProgress?.({
+    phase: "fetching",
+    total,
+    completed,
+    enrichedCount,
+    failedCount,
+    entries: [...entries]
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || payload.detail || "Could not fill missing WIP details from CoreBridge.");
+
+  async function enrichNextTarget() {
+    while (cursor < targets.length) {
+      const target = targets[cursor];
+      cursor += 1;
+      reportProgress(target.orderNumber, { status: "fetching", detail: "Checking CoreBridge" });
+
+      try {
+        const response = await fetch("/api/wip-board/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNumbers: [target.orderNumber] })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || payload.detail || "CoreBridge lookup failed.");
+        }
+
+        const enrichments = payload.enrichments && typeof payload.enrichments === "object" ? payload.enrichments : {};
+        const enrichment = enrichments[target.orderNumber];
+        let changedForOrder = false;
+        if (enrichment) {
+          nextCards = nextCards.map((card) => {
+            if (normalizeWipOrderReference(card.orderNumber) !== target.orderNumber) return card;
+            const merged = mergeWipCardEnrichment(card, enrichment);
+            if (merged.changed) changedForOrder = true;
+            return merged.card;
+          });
+        }
+
+        completed += 1;
+        if (changedForOrder) {
+          enrichedCount += 1;
+          reportProgress(target.orderNumber, { status: "found", detail: "Filled missing detail" });
+        } else {
+          failedCount += 1;
+          reportProgress(target.orderNumber, { status: enrichment ? "unchanged" : "missing", detail: enrichment ? "No extra fields returned" : "No matching CoreBridge detail" });
+        }
+      } catch (error) {
+        completed += 1;
+        failedCount += 1;
+        reportProgress(target.orderNumber, { status: "error", detail: error.message || "Lookup failed" });
+      }
+    }
   }
 
-  const enrichments = payload.enrichments && typeof payload.enrichments === "object" ? payload.enrichments : {};
-  let enrichedCount = 0;
-  const enrichedCards = cards.map((card) => {
-    const key = normalizeWipOrderReference(card.orderNumber);
-    const enrichment = enrichments[key];
-    if (!enrichment) return card;
-
-    const nextCard = { ...card };
-    let changed = false;
-    const description = String(enrichment.description || "").trim();
-    const salesperson = getWipSalesperson(enrichment.salesperson);
-
-    if (description && isWipPlaceholderDescription(nextCard.description)) {
-      nextCard.description = description;
-      changed = true;
-    }
-
-    if (salesperson && salesperson !== "-" && (!String(nextCard.salesperson || "").trim() || String(nextCard.salesperson || "").trim() === "-")) {
-      nextCard.salesperson = salesperson;
-      changed = true;
-    }
-
-    if (changed) enrichedCount += 1;
-    return nextCard;
-  });
-
+  await Promise.all(Array.from({ length: Math.min(4, targets.length) }, enrichNextTarget));
   return {
-    cards: enrichedCards,
+    cards: nextCards,
     enrichedCount,
-    failedCount: Array.isArray(payload.errors) ? payload.errors.length : 0
+    failedCount
   };
 }
 
@@ -7409,6 +7479,57 @@ function WipModalPortal({ children }) {
   return createPortal(children, document.body);
 }
 
+function WipImportProgressModal({ progress, onClose }) {
+  if (!progress) return null;
+  const entries = Array.isArray(progress.entries) ? progress.entries : [];
+  const total = Number(progress.total || entries.length || 0);
+  const completed = Math.min(total, Number(progress.completed || 0));
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+  const complete = progress.phase === "complete";
+
+  return (
+    <WipModalPortal>
+      <div className="wip-modal-backdrop" role="dialog" aria-modal="true">
+        <div className="wip-modal wip-import-progress-modal">
+          <div className="wip-modal-head">
+            <div>
+              <span>WIP import</span>
+              <h2>{complete ? "Import finished" : "Finding missing job details"}</h2>
+              <p>{complete ? "These are the CoreBridge lookup results from this upload." : "Cards are being checked against CoreBridge before the board is saved."}</p>
+            </div>
+            {complete ? <button type="button" onClick={onClose} aria-label="Close import progress">x</button> : null}
+          </div>
+          <div className="wip-import-progress-bar" aria-label={"Import progress " + percent + "%"}>
+            <span style={{ width: percent + "%" }} />
+          </div>
+          <div className="wip-import-progress-summary">
+            <strong>{completed} / {total} checked</strong>
+            <span>{progress.enrichedCount || 0} filled</span>
+            <span>{progress.failedCount || 0} not filled</span>
+          </div>
+          <div className="wip-import-progress-list">
+            {entries.map((entry) => (
+              <article key={entry.orderNumber} className={"wip-import-progress-card is-" + (entry.status || "pending")}>
+                <div>
+                  <strong>{entry.orderNumber}</strong>
+                  <span>{entry.company || "No company"}</span>
+                </div>
+                <p>{entry.description || "Missing description"} / {entry.salesperson && entry.salesperson !== "-" ? entry.salesperson : "Missing salesperson"}</p>
+                <em>{entry.detail || entry.status || "Waiting"}</em>
+              </article>
+            ))}
+          </div>
+          {complete ? (
+            <div className="wip-modal-actions">
+              <button type="button" className="primary-button" onClick={onClose}>Done</button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </WipModalPortal>
+  );
+}
+
 function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
@@ -7420,6 +7541,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [multiDayCardId, setMultiDayCardId] = useState("");
   const [multiDaySelection, setMultiDaySelection] = useState([]);
   const [detailCardId, setDetailCardId] = useState("");
+  const [importProgress, setImportProgress] = useState(null);
   const [placementMemory, setPlacementMemory] = useState(() => loadStoredWipPlacementMemory());
   const [previousWipCards, setPreviousWipCards] = useState(() => loadStoredWipCardList(WIP_PREVIOUS_STORAGE_KEY));
   const [completionReviewCards, setCompletionReviewCards] = useState(() => loadStoredWipCardList(WIP_REVIEW_STORAGE_KEY));
@@ -7555,14 +7677,42 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
       const enrichmentTargets = parsedCards.filter(needsWipCoreBridgeEnrichment).length;
       if (enrichmentTargets) {
         setUploadMessage("Loaded the WIP file. Looking up " + enrichmentTargets + " order reference" + (enrichmentTargets === 1 ? "" : "s") + " in CoreBridge...");
+        setImportProgress({
+          phase: "fetching",
+          total: enrichmentTargets,
+          completed: 0,
+          enrichedCount: 0,
+          failedCount: 0,
+          entries: parsedCards.filter(needsWipCoreBridgeEnrichment).map((card) => ({
+            orderNumber: normalizeWipOrderReference(card.orderNumber),
+            company: card.company || "",
+            description: card.description || "",
+            salesperson: card.salesperson || "",
+            status: "pending",
+            detail: "Waiting"
+          }))
+        });
         try {
-          const enrichmentResult = await enrichWipCardsFromCoreBridge(parsedCards);
+          const enrichmentResult = await enrichWipCardsFromCoreBridge(parsedCards, {
+            onProgress: (progress) => setImportProgress(progress)
+          });
           parsedCards = enrichmentResult.cards;
           enrichedCount = enrichmentResult.enrichedCount;
           enrichmentFailedCount = enrichmentResult.failedCount;
         } catch (enrichmentError) {
           console.error(enrichmentError);
           enrichmentFailedCount = parsedCards.filter(needsWipCoreBridgeEnrichment).length;
+          setImportProgress((current) => ({
+            ...(current || {}),
+            phase: "complete",
+            completed: current?.total || enrichmentTargets,
+            failedCount: current?.total || enrichmentTargets,
+            entries: (current?.entries || []).map((entry) => ({
+              ...entry,
+              status: entry.status === "found" ? "found" : "error",
+              detail: entry.status === "found" ? entry.detail : "CoreBridge lookup failed"
+            }))
+          }));
         }
       }
       const parsedOrderNumbers = new Set(parsedCards.map((card) => normalizeWipOrderReference(card.orderNumber)).filter(Boolean));
@@ -7594,6 +7744,9 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
           ? " CoreBridge enrichment was unavailable for " + enrichmentFailedCount + " job" + (enrichmentFailedCount === 1 ? "" : "s") + "."
           : "";
       setUploadMessage("Loaded " + parsedCards.length + " jobs: " + wipCount + " WIP, " + preWipCount + " Pre-WIP. Suggested positions for " + suggestedCount + " remembered jobs." + enrichmentMessage + reviewMessage);
+      if (enrichmentTargets) {
+        setImportProgress((current) => current ? { ...current, phase: "complete" } : null);
+      }
     } catch (error) {
       console.error(error);
       setUploadMessage(error.message || "Could not read that WIP file.");
@@ -8015,6 +8168,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
               </div>
             </div></WipModalPortal>
           ) : null}
+          <WipImportProgressModal progress={importProgress} onClose={() => setImportProgress(null)} />
           <div className="wip-print-list">
             <h1>Production WIP List</h1>
             <p>{activeTab === "wip" ? "WIP" : "Pre-WIP"} - printed {formatJobDate(getLocalTodayIso())}</p>
