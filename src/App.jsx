@@ -5370,18 +5370,59 @@ function scoreOrderPanelFreeRects(rects) {
   }, 0);
 }
 
-function splitOrderPanelRect(freeRect, piece, kerf) {
-  const rightWidth = freeRect.width - piece.width - kerf;
-  const bottomHeight = freeRect.height - piece.height - kerf;
-  const verticalSplit = [
-    rightWidth > 0 ? { x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: freeRect.height } : null,
-    bottomHeight > 0 ? { x: freeRect.x, y: piece.y + piece.height + kerf, width: piece.width, height: bottomHeight } : null
-  ].filter(Boolean);
-  const horizontalSplit = [
-    rightWidth > 0 ? { x: piece.x + piece.width + kerf, y: freeRect.y, width: rightWidth, height: piece.height } : null,
-    bottomHeight > 0 ? { x: freeRect.x, y: piece.y + piece.height + kerf, width: freeRect.width, height: bottomHeight } : null
-  ].filter(Boolean);
-  return scoreOrderPanelFreeRects(verticalSplit) >= scoreOrderPanelFreeRects(horizontalSplit) ? verticalSplit : horizontalSplit;
+function orderPanelRectsOverlap(left, right) {
+  return !(
+    left.x >= right.x + right.width ||
+    left.x + left.width <= right.x ||
+    left.y >= right.y + right.height ||
+    left.y + left.height <= right.y
+  );
+}
+
+function orderPanelRectContains(outer, inner) {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.width <= outer.x + outer.width &&
+    inner.y + inner.height <= outer.y + outer.height
+  );
+}
+
+function splitOrderPanelFreeRect(freeRect, piece, kerf) {
+  if (!orderPanelRectsOverlap(freeRect, piece)) return [freeRect];
+
+  const pieceLeft = piece.x;
+  const pieceRight = piece.x + piece.width;
+  const pieceTop = piece.y;
+  const pieceBottom = piece.y + piece.height;
+  const freeLeft = freeRect.x;
+  const freeRight = freeRect.x + freeRect.width;
+  const freeTop = freeRect.y;
+  const freeBottom = freeRect.y + freeRect.height;
+  const rects = [];
+
+  if (pieceLeft > freeLeft) {
+    rects.push({ x: freeLeft, y: freeTop, width: pieceLeft - freeLeft - kerf, height: freeRect.height });
+  }
+  if (pieceRight < freeRight) {
+    rects.push({ x: pieceRight + kerf, y: freeTop, width: freeRight - pieceRight - kerf, height: freeRect.height });
+  }
+  if (pieceTop > freeTop) {
+    rects.push({ x: freeLeft, y: freeTop, width: freeRect.width, height: pieceTop - freeTop - kerf });
+  }
+  if (pieceBottom < freeBottom) {
+    rects.push({ x: freeLeft, y: pieceBottom + kerf, width: freeRect.width, height: freeBottom - pieceBottom - kerf });
+  }
+
+  return rects.filter((rect) => rect.width > 0 && rect.height > 0);
+}
+
+function pruneOrderPanelFreeRects(rects) {
+  return rects.filter((rect, index) =>
+    rect.width > 0 &&
+    rect.height > 0 &&
+    !rects.some((other, otherIndex) => otherIndex !== index && orderPanelRectContains(other, rect))
+  );
 }
 
 function findOrderPanelPlacement(freeRects, width, height, allowRotate) {
@@ -5414,11 +5455,9 @@ function placeOrderPanelPiece(sheet, source, kerf, allowRotate, type) {
     rotated: placement.rotated
   };
   sheet.pieces.push(piece);
-  sheet.freeRects = [
-    ...sheet.freeRects.slice(0, placement.index),
-    ...sheet.freeRects.slice(placement.index + 1),
-    ...splitOrderPanelRect(placement.rect, piece, kerf)
-  ].sort((a, b) => (a.y - b.y) || (a.x - b.x) || ((a.width * a.height) - (b.width * b.height)));
+  sheet.freeRects = pruneOrderPanelFreeRects(
+    sheet.freeRects.flatMap((freeRect) => splitOrderPanelFreeRect(freeRect, piece, kerf))
+  ).sort((a, b) => (a.y - b.y) || (a.x - b.x) || ((a.width * a.height) - (b.width * b.height)));
   return true;
 }
 
