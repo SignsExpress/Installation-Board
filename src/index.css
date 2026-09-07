@@ -20860,14 +20860,6 @@ button {
   gap: 8px;
 }
 
-.order-panels-switches .order-panels-nominal {
-  border: 1px solid #c7d2fe;
-  border-radius: 999px;
-  background: #eef2ff;
-  color: #3730a3;
-  padding: 6px 10px;
-}
-
 .order-panels-material-groups,
 .order-panels-plan-output,
 .order-panels-material-plan {
@@ -20937,7 +20929,7 @@ button {
 .order-panels-line-head,
 .order-panels-line {
   display: grid;
-  grid-template-columns: minmax(125px, 0.8fr) 1fr 1fr 0.5fr 42px;
+  grid-template-columns: minmax(125px, 0.85fr) 1fr 1fr 0.45fr minmax(86px, 0.55fr) 42px;
   gap: 8px;
   padding: 8px;
 }
@@ -20960,6 +20952,33 @@ button {
   height: 34px;
   min-height: 34px;
   border-radius: 10px;
+}
+
+.order-panels-line-nominal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid #cbd8e6;
+  border-radius: 10px;
+  background: #fff;
+  color: #52627a;
+  font-size: 0.76rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.order-panels-line-nominal input {
+  width: auto;
+  min-height: auto;
+  padding: 0;
+}
+
+.order-panels-line-nominal.is-active {
+  border-color: #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
 }
 
 .order-panels-add {
@@ -21082,9 +21101,26 @@ button {
 
   body.printing-order-panels .order-panels-drawings {
     grid-template-columns: 1fr;
+    display: block;
   }
 
   body.printing-order-panels .order-panels-material-plan {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-order-panels .order-panels-material-plan:not(:last-child) {
     break-after: page;
+    page-break-after: always;
+  }
+
+  body.printing-order-panels .order-panels-material-plan-head,
+  body.printing-order-panels .order-panels-sheet-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body.printing-order-panels .order-panels-sheet-card {
+    margin-bottom: 10mm;
   }
 }

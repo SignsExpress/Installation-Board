@@ -5319,7 +5319,7 @@ const ORDER_PANEL_STANDARD_OFFCUTS = [
 ];
 
 function makeOrderPanelLine() {
-  return { id: `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, orderRef: "", width: "", height: "", quantity: "1" };
+  return { id: `panel-line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, orderRef: "", width: "", height: "", quantity: "1", nominalCutting: false };
 }
 
 function makeOrderPanelGroup() {
@@ -5365,7 +5365,8 @@ function normaliseOrderPanelLines(lines) {
       orderRef: String(line.orderRef || "").trim(),
       width: parseOrderPanelNumber(line.width),
       height: parseOrderPanelNumber(line.height),
-      quantity: Math.max(0, Math.floor(parseOrderPanelNumber(line.quantity)))
+      quantity: Math.max(0, Math.floor(parseOrderPanelNumber(line.quantity))),
+      nominalCutting: line.nominalCutting === true
     }))
     .filter((line) => line.width > 0 && line.height > 0 && line.quantity > 0);
 }
@@ -5475,46 +5476,50 @@ function placeOrderPanelPiece(sheet, source, kerf, allowRotate, type) {
 
 function buildOrderPanelPlan(lines, stock, options = {}) {
   const material = String(options.material || "").trim();
-  const nominalCutting = options.nominalCutting === true;
   const kerf = Math.max(0, parseOrderPanelNumber(options.kerf) || 5);
   const trimCut = Math.max(0, parseOrderPanelNumber(options.trimCut) || 5);
-  const effectiveKerf = nominalCutting ? 0 : kerf;
-  const effectiveTrim = nominalCutting ? 0 : trimCut;
   const allowRotate = options.allowRotate !== false;
   if (!stock.width || !stock.height) return { error: "Enter a valid sheet width and height.", sheets: [], disregarded: [], orderLines: [], kerf, material, stock };
-  const usableWidth = stock.width - (effectiveTrim * 2);
-  const usableHeight = stock.height - (effectiveTrim * 2);
-  if (usableWidth <= 0 || usableHeight <= 0) return { error: "Trim cut is larger than the selected sheet.", sheets: [], disregarded: [], orderLines: [], kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting, material, stock };
+  const accurateUsableWidth = stock.width - (trimCut * 2);
+  const accurateUsableHeight = stock.height - (trimCut * 2);
+  if (accurateUsableWidth <= 0 || accurateUsableHeight <= 0) return { error: "Trim cut is larger than the selected sheet.", sheets: [], disregarded: [], orderLines: [], kerf, trimCut, material, stock };
   const orderLines = normaliseOrderPanelLines(lines);
   const pieces = orderLines.flatMap((line) => Array.from({ length: line.quantity }, (_, index) => ({
     id: line.id + "-" + index,
     lineId: line.id,
     orderRef: line.orderRef,
+    nominalCutting: line.nominalCutting,
     width: line.width,
     height: line.height
   }))).sort((a, b) => (b.width * b.height) - (a.width * a.height));
   const sheets = [];
-  const makeSheet = () => ({
-    id: `panel-sheet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    width: stock.width,
-    height: stock.height,
-    usableWidth,
-    usableHeight,
-    trimCut: effectiveTrim,
-    kerf: effectiveKerf,
-    nominalCutting,
-    material,
-    label: stock.label,
-    pieces: [],
-    freeRects: [{ x: effectiveTrim, y: effectiveTrim, width: usableWidth, height: usableHeight }]
-  });
+  const makeSheet = (nominalCutting) => {
+    const effectiveKerf = nominalCutting ? 0 : kerf;
+    const effectiveTrim = nominalCutting ? 0 : trimCut;
+    const usableWidth = stock.width - (effectiveTrim * 2);
+    const usableHeight = stock.height - (effectiveTrim * 2);
+    return {
+      id: `panel-sheet-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      width: stock.width,
+      height: stock.height,
+      usableWidth,
+      usableHeight,
+      trimCut: effectiveTrim,
+      kerf: effectiveKerf,
+      nominalCutting,
+      material,
+      label: stock.label,
+      pieces: [],
+      freeRects: [{ x: effectiveTrim, y: effectiveTrim, width: usableWidth, height: usableHeight }]
+    };
+  };
 
   for (const piece of pieces) {
-    let placed = sheets.some((sheet) => placeOrderPanelPiece(sheet, piece, effectiveKerf, allowRotate, "required"));
+    let placed = sheets.some((sheet) => sheet.nominalCutting === piece.nominalCutting && placeOrderPanelPiece(sheet, piece, sheet.kerf, allowRotate, "required"));
     if (!placed) {
-      const sheet = makeSheet();
-      placed = placeOrderPanelPiece(sheet, piece, effectiveKerf, allowRotate, "required");
-      if (!placed) return { error: formatOrderPanelSize(piece.width, piece.height) + " will not fit on " + stock.label + ".", sheets, disregarded: [], orderLines, kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting, material, stock };
+      const sheet = makeSheet(piece.nominalCutting);
+      placed = placeOrderPanelPiece(sheet, piece, sheet.kerf, allowRotate, "required");
+      if (!placed) return { error: formatOrderPanelSize(piece.width, piece.height) + " will not fit on " + stock.label + ".", sheets, disregarded: [], orderLines, kerf, trimCut, material, stock };
       sheets.push(sheet);
     }
   }
@@ -5525,7 +5530,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
         let guard = 0;
         while (guard < 500) {
           guard += 1;
-          if (!placeOrderPanelPiece(sheet, { id: "offcut-" + standardIndex + "-" + guard, width: standard.width, height: standard.height }, effectiveKerf, allowRotate, "offcut")) break;
+          if (!placeOrderPanelPiece(sheet, { id: "offcut-" + standardIndex + "-" + guard, width: standard.width, height: standard.height }, sheet.kerf, allowRotate, "offcut")) break;
         }
       });
     });
@@ -5534,7 +5539,7 @@ function buildOrderPanelPlan(lines, stock, options = {}) {
   const disregarded = sheets.flatMap((sheet, sheetIndex) => sheet.freeRects
     .filter((rect) => rect.width >= 100 && rect.height >= 100)
     .map((rect) => ({ sheetIndex, ...rect })));
-  return { error: "", sheets, disregarded, orderLines, kerf, trimCut, effectiveKerf, effectiveTrim, nominalCutting, material, stock };
+  return { error: "", sheets, disregarded, orderLines, kerf, trimCut, material, stock };
 }
 
 function getOrderPanelEmail(plans) {
@@ -5544,7 +5549,7 @@ function getOrderPanelEmail(plans) {
     const requiredGroups = new Map();
     const offcutGroups = new Map();
     plan.orderLines.forEach((line) => {
-      const key = `${line.orderRef || "No ref"}|${formatOrderPanelSize(line.width, line.height)}`;
+      const key = `${line.orderRef || "No ref"}|${formatOrderPanelSize(line.width, line.height)}${line.nominalCutting ? " (nominal)" : ""}`;
       requiredGroups.set(key, (requiredGroups.get(key) || 0) + line.quantity);
     });
     plan.sheets.forEach((sheet) => {
@@ -5606,7 +5611,7 @@ function OrderPanelsDrawing({ sheet, index }) {
           <g key={piece.id || pieceIndex}>
             <rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} fill={piece.type === "offcut" ? "#dcfce7" : "#dbeafe"} stroke={piece.type === "offcut" ? "#15803d" : "#315a8c"} strokeWidth="4" />
             <text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fontSize="52" fontWeight="800" fill="#102033">
-              {piece.type === "offcut" ? "Offcut " : ""}{piece.type !== "offcut" && piece.orderRef ? piece.orderRef + " - " : ""}{formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight).replace("mm", "")}
+              {piece.type === "offcut" ? "Offcut " : ""}{piece.type !== "offcut" && piece.orderRef ? piece.orderRef + " - " : ""}{formatOrderPanelSize(piece.requestedWidth, piece.requestedHeight).replace("mm", "")}{piece.type !== "offcut" && piece.nominalCutting ? " (nominal)" : ""}
             </text>
           </g>
         ))}
@@ -5621,13 +5626,12 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
   const [trimCut, setTrimCut] = useState("5");
   const [standardiseOffcuts, setStandardiseOffcuts] = useState(true);
   const [allowRotate, setAllowRotate] = useState(true);
-  const [nominalCutting, setNominalCutting] = useState(false);
   const [groups, setGroups] = useState([makeOrderPanelGroup()]);
   const [copied, setCopied] = useState(false);
   const plans = useMemo(() => groups.map((group) => {
     const stock = getOrderPanelStock(group.stockId, group.customWidth, group.customHeight);
-    return buildOrderPanelPlan(group.lines, stock, { kerf, trimCut, standardiseOffcuts, allowRotate, nominalCutting, material: group.material });
-  }), [groups, kerf, trimCut, standardiseOffcuts, allowRotate, nominalCutting]);
+    return buildOrderPanelPlan(group.lines, stock, { kerf, trimCut, standardiseOffcuts, allowRotate, material: group.material });
+  }), [groups, kerf, trimCut, standardiseOffcuts, allowRotate]);
   const emailText = useMemo(() => getOrderPanelEmail(plans), [plans]);
   const allSheets = plans.flatMap((plan) => plan.sheets || []);
   const totalRequiredCuts = allSheets.reduce((total, sheet) => total + sheet.pieces.filter((piece) => piece.type === "required").length, 0);
@@ -5693,10 +5697,10 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
           <div className="order-panels-grid">
             <section className="order-panels-card order-panels-controls">
               <div className="order-panels-field-grid">
-                <label>Blade kerf<input type="number" value={kerf} onChange={(event) => setKerf(event.target.value)} disabled={nominalCutting} /></label>
-                <label>Trim cut<input type="number" value={trimCut} onChange={(event) => setTrimCut(event.target.value)} disabled={nominalCutting} /></label>
+                <label>Blade kerf<input type="number" value={kerf} onChange={(event) => setKerf(event.target.value)} /></label>
+                <label>Trim cut<input type="number" value={trimCut} onChange={(event) => setTrimCut(event.target.value)} /></label>
               </div>
-              <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label><label className="order-panels-nominal"><input type="checkbox" checked={nominalCutting} onChange={(event) => setNominalCutting(event.target.checked)} /> Nominal cutting</label></div>
+              <div className="order-panels-switches"><label><input type="checkbox" checked={standardiseOffcuts} onChange={(event) => setStandardiseOffcuts(event.target.checked)} /> Standardise Offcuts</label><label><input type="checkbox" checked={allowRotate} onChange={(event) => setAllowRotate(event.target.checked)} /> Allow rotation</label></div>
               <div className="order-panels-material-groups">
                 {groups.map((group, groupIndex) => (
                   <section className="order-panels-material-card" key={group.id}>
@@ -5710,8 +5714,8 @@ function OrderPanelsPage({ currentUser, onLogout, notifications }) {
                       {group.stockId === "custom" ? <><label>Custom width<input type="number" value={group.customWidth} onChange={(event) => updateGroup(group.id, "customWidth", event.target.value)} placeholder="Width mm" /></label><label>Custom height<input type="number" value={group.customHeight} onChange={(event) => updateGroup(group.id, "customHeight", event.target.value)} placeholder="Height mm" /></label></> : null}
                     </div>
                     <div className="order-panels-lines">
-                      <div className="order-panels-line-head"><span>Order ref</span><span>Width</span><span>Height</span><span>Qty</span><span></span></div>
-                      {group.lines.map((line) => <div className="order-panels-line" key={line.id}><input value={line.orderRef} onChange={(event) => updateGroupLine(group.id, line.id, "orderRef", event.target.value)} placeholder="REF-xxxx" /><input type="number" value={line.width} onChange={(event) => updateGroupLine(group.id, line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateGroupLine(group.id, line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateGroupLine(group.id, line.id, "quantity", event.target.value)} placeholder="1" /><button type="button" className="icon-button" onClick={() => removeGroupLine(group.id, line.id)} disabled={group.lines.length <= 1}>x</button></div>)}
+                      <div className="order-panels-line-head"><span>Order ref</span><span>Width</span><span>Height</span><span>Qty</span><span>Nominal</span><span></span></div>
+                      {group.lines.map((line) => <div className="order-panels-line" key={line.id}><input value={line.orderRef} onChange={(event) => updateGroupLine(group.id, line.id, "orderRef", event.target.value)} placeholder="REF-xxxx" /><input type="number" value={line.width} onChange={(event) => updateGroupLine(group.id, line.id, "width", event.target.value)} placeholder="800" /><input type="number" value={line.height} onChange={(event) => updateGroupLine(group.id, line.id, "height", event.target.value)} placeholder="1200" /><input type="number" value={line.quantity} onChange={(event) => updateGroupLine(group.id, line.id, "quantity", event.target.value)} placeholder="1" /><label className={`order-panels-line-nominal ${line.nominalCutting === true ? "is-active" : ""}`}><input type="checkbox" checked={line.nominalCutting === true} onChange={(event) => updateGroupLine(group.id, line.id, "nominalCutting", event.target.checked)} /><span>Nominal</span></label><button type="button" className="icon-button" onClick={() => removeGroupLine(group.id, line.id)} disabled={group.lines.length <= 1}>x</button></div>)}
                     </div>
                     <button className="ghost-button order-panels-add" type="button" onClick={() => addGroupLine(group.id)}>Add panel to this material</button>
                   </section>
