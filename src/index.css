@@ -20721,6 +20721,7 @@ button {
 .order-panels-grid,
 .order-panels-field-grid,
 .order-panels-switches,
+.order-panels-material-head,
 .order-panels-line,
 .order-panels-line-head,
 .order-panels-stat-row,
@@ -20788,11 +20789,12 @@ button {
 .order-panels-field-grid {
   align-items: end;
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(105px, 0.65fr));
+  grid-template-columns: repeat(2, minmax(105px, 150px));
   gap: 10px;
 }
 
 .order-panels-field-grid label,
+.order-panels-material-fields label,
 .order-panels-email-label {
   display: grid;
   gap: 5px;
@@ -20805,6 +20807,8 @@ button {
 
 .order-panels-field-grid input,
 .order-panels-field-grid select,
+.order-panels-material-fields input,
+.order-panels-material-fields select,
 .order-panels-line input,
 .order-panels-email-label textarea {
   width: 100%;
@@ -20819,6 +20823,8 @@ button {
 
 .order-panels-field-grid input,
 .order-panels-field-grid select,
+.order-panels-material-fields input,
+.order-panels-material-fields select,
 .order-panels-line input {
   min-height: 36px;
   padding: 0 10px;
@@ -20860,6 +20866,66 @@ button {
   background: #eef2ff;
   color: #3730a3;
   padding: 6px 10px;
+}
+
+.order-panels-material-groups,
+.order-panels-plan-output,
+.order-panels-material-plan {
+  display: grid;
+  gap: 12px;
+}
+
+.order-panels-material-card {
+  border: 1px solid #d7e2ee;
+  border-radius: 14px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.order-panels-material-head {
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.order-panels-material-head strong,
+.order-panels-material-plan-head h3 {
+  margin: 0;
+  color: #111827;
+  font-size: 0.95rem;
+}
+
+.order-panels-material-head .ghost-button {
+  min-height: 32px;
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 0.76rem;
+}
+
+.order-panels-material-fields {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(190px, 1fr) repeat(2, minmax(100px, 0.55fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.order-panels-add-material {
+  width: fit-content;
+  min-height: 38px;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 0.82rem;
+}
+
+.order-panels-material-plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 2px 2px 0;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 850;
 }
 
 .order-panels-lines {
@@ -20984,6 +21050,7 @@ button {
 @media (max-width: 980px) {
   .order-panels-grid,
   .order-panels-field-grid,
+  .order-panels-material-fields,
   .order-panels-drawings {
     grid-template-columns: 1fr;
   }
@@ -20991,8 +21058,11 @@ button {
 
 @media print {
   body.printing-order-panels .host-nav-shell,
+  body.printing-order-panels .order-panels-head,
   body.printing-order-panels .order-panels-controls,
-  body.printing-order-panels .order-panels-head-actions {
+  body.printing-order-panels .order-panels-head-actions,
+  body.printing-order-panels .order-panels-grid,
+  body.printing-order-panels .order-panels-disregarded {
     display: none !important;
   }
 
@@ -21010,11 +21080,11 @@ button {
     border: 0 !important;
   }
 
-  body.printing-order-panels .order-panels-grid {
+  body.printing-order-panels .order-panels-drawings {
     grid-template-columns: 1fr;
   }
 
-  body.printing-order-panels .order-panels-drawings {
-    grid-template-columns: 1fr;
+  body.printing-order-panels .order-panels-material-plan {
+    break-after: page;
   }
 }
