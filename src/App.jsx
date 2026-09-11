@@ -5438,6 +5438,28 @@ function pruneOrderPanelFreeRects(rects) {
   );
 }
 
+function getOrderPanelPlacementScore(rect, attempt) {
+  const remainingWidth = rect.width - attempt.width;
+  const remainingHeight = rect.height - attempt.height;
+  return {
+    rotated: attempt.rotated ? 1 : 0,
+    shortSide: Math.min(remainingWidth, remainingHeight),
+    longSide: Math.max(remainingWidth, remainingHeight),
+    area: rect.width * rect.height - attempt.width * attempt.height
+  };
+}
+
+function isBetterOrderPanelPlacement(candidate, best) {
+  if (!best) return true;
+  const keys = ["rotated", "shortSide", "longSide", "area"];
+  for (const key of keys) {
+    if (candidate.score[key] !== best.score[key]) {
+      return candidate.score[key] < best.score[key];
+    }
+  }
+  return false;
+}
+
 function findOrderPanelPlacement(freeRects, width, height, allowRotate) {
   let best = null;
   freeRects.forEach((rect, index) => {
@@ -5445,8 +5467,8 @@ function findOrderPanelPlacement(freeRects, width, height, allowRotate) {
     if (allowRotate && width !== height) attempts.push({ width: height, height: width, rotated: true });
     attempts.forEach((attempt) => {
       if (attempt.width <= rect.width && attempt.height <= rect.height) {
-        const waste = rect.width * rect.height - attempt.width * attempt.height;
-        if (!best || waste < best.waste) best = { rect, index, ...attempt, waste };
+        const candidate = { rect, index, ...attempt, score: getOrderPanelPlacementScore(rect, attempt) };
+        if (isBetterOrderPanelPlacement(candidate, best)) best = candidate;
       }
     });
   });
