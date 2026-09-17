@@ -3844,7 +3844,9 @@ function buildPdfDocument(job, photoAssets = []) {
     {
       text: `Installers: ${[
         ...(Array.isArray(job.installers) ? job.installers.filter((entry) => entry !== "Custom") : []),
-        ...(job.installers?.includes?.("Custom") && job.customInstaller ? [job.customInstaller] : [])
+        ...(job.installers?.includes?.("Custom")
+          ? Array.isArray(job.customInstallers) ? job.customInstallers : job.customInstaller ? [job.customInstaller] : []
+          : [])
       ].join(", ") || "-"}`,
       font: "regular",
       size: 9,
@@ -3995,6 +3997,9 @@ function sanitizeJob(payload) {
       ? payload.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
       : [];
   const rawPhotos = Array.isArray(payload.photos) ? payload.photos.map(sanitizeJobPhoto) : [];
+  const customInstallers = Array.isArray(payload.customInstallers)
+    ? payload.customInstallers.map((name) => String(name || "").trim()).filter(Boolean)
+    : payload.customInstaller ? [String(payload.customInstaller).trim()] : [];
   const rawRamsDocuments = Array.isArray(payload.ramsDocuments)
     ? payload.ramsDocuments.map(sanitizeRamsDocument)
     : [];
@@ -4009,7 +4014,8 @@ function sanitizeJob(payload) {
     number: String(payload.number || "").trim(),
     address: String(payload.address || "").trim(),
     installers: rawInstallers,
-    customInstaller: String(payload.customInstaller || "").trim(),
+    customInstaller: customInstallers[0] || "",
+    customInstallers,
     jobType: String(payload.jobType || "Install").trim(),
     customJobType: String(payload.customJobType || "").trim(),
     jobTotalExVat: Number.isFinite(Number(payload.jobTotalExVat)) ? Math.max(0, Math.round(Number(payload.jobTotalExVat) * 100) / 100) : 0,

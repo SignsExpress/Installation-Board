@@ -122,6 +122,7 @@ const EMPTY_FORM = {
   address: "",
   installers: [],
   customInstaller: "",
+  customInstallers: [],
   jobType: "Install",
   customJobType: "",
   jobTotalExVat: 0,
@@ -1679,13 +1680,18 @@ function getRamsContact(job) {
   return [job?.contact, job?.number].filter(Boolean).join(" - ") || "Site contact to be confirmed";
 }
 
+function getCustomInstallerNames(job) {
+  if (Array.isArray(job?.customInstallers)) return job.customInstallers.map((name) => String(name || "").trim()).filter(Boolean);
+  return job?.customInstaller ? [String(job.customInstaller).trim()] : [];
+}
+
 function getInstallerNamesForRams(job) {
   const names = Array.isArray(job?.installers)
     ? job.installers
       .filter((entry) => entry && entry !== "Custom")
       .map((entry) => getHolidayStaffEntry(entry)?.fullName || entry)
     : [];
-  if (job?.installers?.includes?.("Custom") && job?.customInstaller) names.push(job.customInstaller);
+  if (job?.installers?.includes?.("Custom")) names.push(...getCustomInstallerNames(job));
   return names.length ? names.join(", ") : "To be allocated";
 }
 
@@ -1708,13 +1714,13 @@ function getRamsInstallerRoster(job) {
       })
     : [];
 
-  if (job?.installers?.includes?.("Custom") && job?.customInstaller) {
-    roster.push({
-      key: `custom-${roster.length}`,
+  if (job?.installers?.includes?.("Custom")) {
+    getCustomInstallerNames(job).forEach((name, index) => roster.push({
+      key: `custom-${index}`,
       code: "Custom",
-      name: job.customInstaller,
+      name,
       isCustom: true
-    });
+    }));
   }
 
   return roster.length ? roster : [{ key: "unallocated", code: "", name: "To be allocated", isCustom: true }];
@@ -22652,6 +22658,7 @@ export default function App() {
           ? job.installers.split(/[,/]+/).map((item) => item.trim()).filter(Boolean)
           : [],
       customInstaller: job.customInstaller || "",
+      customInstallers: getCustomInstallerNames(job),
       jobType: job.jobType || "Install",
       customJobType: job.customJobType || "",
       isPlaceholder: Boolean(job.isPlaceholder),
@@ -23560,7 +23567,10 @@ export default function App() {
           number: form.number.trim(),
           address: form.address.trim(),
           installers: form.installers,
-          customInstaller: form.customInstaller.trim(),
+          customInstaller: form.installers.includes("Custom") ? (form.customInstallers.find((name) => name.trim()) || "").trim() : "",
+          customInstallers: form.installers.includes("Custom")
+            ? form.customInstallers.map((name) => name.trim()).filter(Boolean)
+            : [],
           jobType: form.jobType,
           customJobType: form.customJobType.trim(),
           isPlaceholder: Boolean(form.isPlaceholder),
@@ -23737,9 +23747,7 @@ export default function App() {
         : [];
 
     const visible = source.filter((entry) => entry !== "Custom");
-    if (source.includes("Custom") && item.customInstaller) {
-      visible.push(item.customInstaller);
-    }
+    if (source.includes("Custom")) visible.push(...getCustomInstallerNames(item));
     return visible;
   }
 
@@ -24929,14 +24937,32 @@ export default function App() {
               </label>
 
               {form.installers.includes("Custom") ? (
-                <label>
-                  Custom installer
-                  <input
-                    type="text"
-                    value={form.customInstaller}
-                    onChange={(event) => setForm((current) => ({ ...current, customInstaller: event.target.value }))}
-                  />
-                </label>
+                <div className="custom-installer-fields">
+                  <span>Subcontractor installers</span>
+                  {(form.customInstallers.length ? form.customInstallers : [""]).map((name, index) => (
+                    <div className="custom-installer-row" key={index}>
+                      <input
+                        type="text"
+                        aria-label={`Subcontractor installer ${index + 1}`}
+                        placeholder={`Installer ${index + 1} name`}
+                        value={name}
+                        onChange={(event) => setForm((current) => {
+                          const names = current.customInstallers.length ? [...current.customInstallers] : [""];
+                          names[index] = event.target.value;
+                          return { ...current, customInstallers: names };
+                        })}
+                      />
+                      <button className="ghost-button" type="button" aria-label={`Remove subcontractor installer ${index + 1}`} onClick={() => setForm((current) => ({
+                        ...current,
+                        customInstallers: current.customInstallers.filter((_, itemIndex) => itemIndex !== index)
+                      }))}>Remove</button>
+                    </div>
+                  ))}
+                  <button className="ghost-button" type="button" onClick={() => setForm((current) => ({
+                    ...current,
+                    customInstallers: [...current.customInstallers, ""]
+                  }))}>+ Add subcontractor</button>
+                </div>
               ) : null}
 
               <label>

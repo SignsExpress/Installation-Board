@@ -9493,6 +9493,29 @@ button {
   background: #f8fbff;
 }
 
+.installation-job-backdrop .custom-installer-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.installation-job-backdrop .custom-installer-fields > span {
+  font-weight: 700;
+}
+
+.installation-job-backdrop .custom-installer-row {
+  display: flex;
+  gap: 8px;
+}
+
+.installation-job-backdrop .custom-installer-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.installation-job-backdrop .custom-installer-fields > button {
+  justify-self: start;
+}
+
 .installation-job-backdrop .installer-chip {
   min-height: 29px;
   padding: 0 9px;
