@@ -2303,6 +2303,7 @@ function renderJobCardContent({
   editJob,
   handleDelete,
   setActiveClientJob,
+  openJobPhotoViewer,
   buildDragPreview,
   getTransparentDragImage,
   clearDragPreview,
@@ -2408,6 +2409,26 @@ function renderJobCardContent({
         ) : null}
         {isCondensed && job.morningMeetingNotes ? (
           <p className="job-notes compact condensed-note morning-meeting-card-note"><b>Morning meeting:</b> {job.morningMeetingNotes}</p>
+        ) : null}
+        {Array.isArray(job.photos) && job.photos.length ? (
+          <div className="job-card-photo-strip" onClick={(event) => event.stopPropagation()}>
+            {job.photos.slice(0, 2).map((photo, index) => (
+              <button
+                key={photo.id}
+                type="button"
+                className="job-card-photo-thumb"
+                onClick={() => openJobPhotoViewer(job, index)}
+                aria-label={`View photo ${index + 1} of ${job.photos.length}`}
+              >
+                <img src={photo.url || buildJobPhotoUrl(job.id, photo.id)} alt="" loading="lazy" />
+              </button>
+            ))}
+            {job.photos.length > 2 ? (
+              <button type="button" className="job-card-photo-more" onClick={() => openJobPhotoViewer(job, 2)}>
+                +{job.photos.length - 2} more
+              </button>
+            ) : null}
+          </div>
         ) : null}
         {!isCondensed ? (
           <>
@@ -21362,6 +21383,7 @@ export default function App() {
   const [adminPhotoUploading, setAdminPhotoUploading] = useState(false);
   const [adminPendingCompletePhotos, setAdminPendingCompletePhotos] = useState([]);
   const [adminExporting, setAdminExporting] = useState(false);
+  const [jobPhotoViewer, setJobPhotoViewer] = useState(null);
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderLookupQuery, setOrderLookupQuery] = useState("");
   const [orderLookupLoading, setOrderLookupLoading] = useState(false);
@@ -21403,6 +21425,7 @@ export default function App() {
   const dragPositionRef = useRef({ x: 0, y: 0 });
   const clientPhotoInputRef = useRef(null);
   const adminPhotoInputRef = useRef(null);
+  const installPhotoInputRef = useRef(null);
   const openedNotificationJobIdRef = useRef("");
   const historyRecoveryAttemptedRef = useRef(false);
   const boardEditable = canEditBoard(currentUser);
@@ -24065,6 +24088,36 @@ export default function App() {
     );
   }
 
+  async function uploadInstallJobPhotos(job, files) {
+    const selectedFiles = Array.from(files || []);
+    if (!job?.id || !selectedFiles.length) return;
+    setAdminPhotoUploading(true);
+    try {
+      await uploadJobPhotos(job.id, selectedFiles);
+      setMessage(createMessage(`${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"} added to the install card.`, "success"));
+    } catch (error) {
+      console.error(error);
+      setMessage(createMessage(error.message || "Could not upload the install photos.", "error"));
+    } finally {
+      setAdminPhotoUploading(false);
+      if (installPhotoInputRef.current) installPhotoInputRef.current.value = "";
+    }
+  }
+
+  function openJobPhotoViewer(job, photoIndex = 0) {
+    const photos = Array.isArray(job?.photos) ? job.photos : [];
+    if (!photos.length) return;
+    setJobPhotoViewer({ job, photoIndex: Math.min(Math.max(photoIndex, 0), photos.length - 1) });
+  }
+
+  function moveJobPhotoViewer(direction) {
+    setJobPhotoViewer((current) => {
+      const photos = Array.isArray(current?.job?.photos) ? current.job.photos : [];
+      if (!photos.length) return null;
+      return { ...current, photoIndex: (current.photoIndex + direction + photos.length) % photos.length };
+    });
+  }
+
   if (showOrderPanels) {
     return (
       <OrderPanelsPage
@@ -24657,6 +24710,7 @@ export default function App() {
                                   editJob,
                                   handleDelete,
                                   setActiveClientJob,
+                                  openJobPhotoViewer,
                                   buildDragPreview,
                                   getTransparentDragImage,
                                   clearDragPreview,
@@ -24747,6 +24801,7 @@ export default function App() {
                           editJob,
                           handleDelete,
                           setActiveClientJob,
+                          openJobPhotoViewer,
                           buildDragPreview,
                           getTransparentDragImage,
                           clearDragPreview,
@@ -24827,14 +24882,26 @@ export default function App() {
             </div>
 
             <form className="job-form job-form-scroll" onSubmit={handleSubmit}>
-              <label>
-                Date
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                />
-              </label>
+              <div className="split-fields job-editor-primary-row">
+                <label>
+                  Date
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Net job value
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.jobTotalExVat}
+                    onChange={(event) => setForm((current) => ({ ...current, jobTotalExVat: event.target.value }))}
+                  />
+                </label>
+              </div>
 
               <div className="corebridge-lookup-bar">
                 <button className="ghost-button" type="button" onClick={() => openOrderLookup()}>
@@ -24861,34 +24928,25 @@ export default function App() {
                 </div>
               </label>
 
-              <label>
-                Customer name
-                <input
-                  type="text"
-                  value={form.customerName}
-                  onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))}
-                />
-              </label>
+              <div className="split-fields job-editor-copy-row">
+                <label>
+                  Customer name
+                  <input
+                    type="text"
+                    value={form.customerName}
+                    onChange={(event) => setForm((current) => ({ ...current, customerName: event.target.value }))}
+                  />
+                </label>
 
-              <label>
-                Description
-                <input
-                  type="text"
-                  value={form.description}
-                  onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
-                />
-              </label>
-
-              <label>
-                Net job value
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.jobTotalExVat}
-                  onChange={(event) => setForm((current) => ({ ...current, jobTotalExVat: event.target.value }))}
-                />
-              </label>
+                <label>
+                  Description
+                  <input
+                    type="text"
+                    value={form.description}
+                    onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                  />
+                </label>
+              </div>
 
               <div className="split-fields">
                 <label>
@@ -25070,6 +25128,16 @@ export default function App() {
                 ) : null}
 
               <div className="form-actions job-form-actions">
+                {activeAdminJob ? (
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => installPhotoInputRef.current?.click()}
+                    disabled={adminPhotoUploading || adminExporting}
+                  >
+                    {adminPhotoUploading ? "Uploading..." : "Upload install photos"}
+                  </button>
+                ) : null}
                 {activeAdminJob && !activeAdminJob.isCompleted && !adminCompletePrompt ? (
                   <button
                     className="success-button"
@@ -25114,14 +25182,6 @@ export default function App() {
                 </button>
                 {activeAdminJob?.isCompleted ? (
                   <>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() => adminPhotoInputRef.current?.click()}
-                      disabled={adminPhotoUploading}
-                    >
-                      {adminPhotoUploading ? "Uploading..." : "Upload photos"}
-                    </button>
                     <button
                       className="ghost-button"
                       type="button"
@@ -25198,6 +25258,17 @@ export default function App() {
               </div>
             </form>
             <input
+              ref={installPhotoInputRef}
+              className="visually-hidden"
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(event) => {
+                if (!activeAdminJob) return;
+                uploadInstallJobPhotos(activeAdminJob, event.target.files);
+              }}
+            />
+            <input
               ref={adminPhotoInputRef}
               className="visually-hidden"
               type="file"
@@ -25212,6 +25283,29 @@ export default function App() {
           </div>
         </div>
       ) : null}
+      {jobPhotoViewer ? (() => {
+        const photos = Array.isArray(jobPhotoViewer.job?.photos) ? jobPhotoViewer.job.photos : [];
+        const photo = photos[jobPhotoViewer.photoIndex];
+        if (!photo) return null;
+        return (
+          <div className="modal-backdrop job-photo-viewer-backdrop" onClick={() => setJobPhotoViewer(null)}>
+            <div className="job-photo-viewer" role="dialog" aria-modal="true" aria-label="Install photo viewer" onClick={(event) => event.stopPropagation()}>
+              <div className="job-photo-viewer-head">
+                <div>
+                  <strong>{jobPhotoViewer.job.orderReference || jobPhotoViewer.job.customerName}</strong>
+                  <span>{jobPhotoViewer.photoIndex + 1} of {photos.length}</span>
+                </div>
+                <button type="button" className="icon-button" onClick={() => setJobPhotoViewer(null)} aria-label="Close photo viewer">x</button>
+              </div>
+              <div className="job-photo-viewer-stage">
+                {photos.length > 1 ? <button type="button" className="job-photo-viewer-arrow previous" onClick={() => moveJobPhotoViewer(-1)} aria-label="Previous photo">&#8249;</button> : null}
+                <img src={photo.url || buildJobPhotoUrl(jobPhotoViewer.job.id, photo.id)} alt={photo.fileName || "Install photo"} />
+                {photos.length > 1 ? <button type="button" className="job-photo-viewer-arrow next" onClick={() => moveJobPhotoViewer(1)} aria-label="Next photo">&#8250;</button> : null}
+              </div>
+            </div>
+          </div>
+        );
+      })() : null}
       {!isClientMode && orderLookupOpen ? (
         <div
           className="modal-backdrop"
