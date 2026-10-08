@@ -6,7 +6,8 @@ const sourceDir = process.env.PORTAL_SOURCE_DIR;
 if (!sourceDir) throw new Error('Set PORTAL_SOURCE_DIR to the existing portal directory.');
 const board = JSON.parse(fs.readFileSync(path.join(sourceDir, 'data', 'jobs.json'), 'utf8'));
 const installers = JSON.parse(fs.readFileSync(path.join(sourceDir, 'data', 'installers-live.json'), 'utf8'));
-const snapshot = {label: 'Local snapshot', board: {jobs: board.jobs || [], designBoard: board.designBoard || {cards: []}, holidayRequests: board.holidayRequests || [], attendanceEntries: board.attendanceEntries || [], notifications: board.notifications || []}, installers};
+const captured = process.env.PORTAL_PREVIEW_SNAPSHOT ? JSON.parse(fs.readFileSync(process.env.PORTAL_PREVIEW_SNAPSHOT, 'utf8')) : null;
+const snapshot = captured ? {...captured, installers: captured.installers || installers} : {label: 'Local snapshot', board: {jobs: board.jobs || [], designBoard: board.designBoard || {cards: []}, holidayRequests: board.holidayRequests || [], attendanceEntries: board.attendanceEntries || [], notifications: board.notifications || []}, installers};
 http.createServer((req, res) => {
   if (req.method !== 'GET') {res.writeHead(405);res.end();return;}
   res.setHeader('Cache-Control', 'no-store');
