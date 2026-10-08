@@ -8,6 +8,7 @@
     "server": "node server/index.js",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "preview:rebuild": "node preview/working-server.cjs",
     "start": "node server/index.js",
     "set-password": "node scripts/set-password.js"
   },

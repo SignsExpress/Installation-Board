@@ -3021,12 +3021,13 @@ function MainNavBar({
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed },
     { key: "mustang", label: "Mustang", path: mustangPath, allowed: mustangAllowed }
-  ].filter((item) => item.allowed);
+  ].filter((item) => item.allowed && !["filtering", "materials", "mustang"].includes(item.key));
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
   const navItems = [...primaryNavItems, notificationItem];
   const activeNavKey = primaryNavItems.some((item) => item.key === active) ? active : "home";
   return (
     <header className="host-nav-shell">
+      <div className="rebuild-environment"><strong>PORTAL REBUILD</strong><span>Local test saves · CoreBridge and AI not connected</span></div>
       <nav className="host-nav">
         <div className="host-nav-inner">
           <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)} aria-label="Go to home">
@@ -3045,6 +3046,7 @@ function MainNavBar({
               ))}
             </select>
           </label>
+          <div className="rebuild-workspace-label">WORKSPACE</div>
           <div className="host-nav-links">
             {navItems.map((item) => (
               <button
@@ -4121,9 +4123,7 @@ function HostLandingPage({
   }
 
   const boardCards = [
-    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
-    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
@@ -4145,7 +4145,6 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const operationsCards = [
-    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
     canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
   ].filter(Boolean);
 
@@ -4154,7 +4153,6 @@ function HostLandingPage({
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
   const personalCards = [
-    canAccessMustang(currentUser) ? <HostLaunchCard key="mustang" icon="mustang" label="Mustang" description="Spec and parts tracker" onClick={() => window.open("/mustang", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards, personalCards].filter((items) => items.length).length;
 
@@ -4168,6 +4166,7 @@ function HostLandingPage({
           notifications={notifications}
         />
 
+        <section className="rebuild-welcome"><div><span className="rebuild-eyebrow">SIGNS EXPRESS · TEAM WORKSPACE</span><h1>Welcome back, {currentUser.displayName.split(" ")[0]}.</h1><p>Your boards, team and tools in one place.</p></div><span className="rebuild-date">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/London" })}</span></section>
         <section className="panel host-landing-panel" style={{ "--host-landing-columns": sectionCount }}>
           <div className="host-landing-sections">
             <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
@@ -4226,9 +4225,7 @@ function ClientLandingPage({
   }
 
   const boardCards = [
-    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
-    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
@@ -4249,7 +4246,6 @@ function ClientLandingPage({
   ].filter(Boolean);
 
   const operationsCards = [
-    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
     canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards].filter((items) => items.length).length;
@@ -4264,6 +4260,7 @@ function ClientLandingPage({
           notifications={notifications}
         />
 
+        <section className="rebuild-welcome"><div><span className="rebuild-eyebrow">SIGNS EXPRESS · TEAM WORKSPACE</span><h1>Welcome back, {currentUser.displayName.split(" ")[0]}.</h1><p>Your boards, team and tools in one place.</p></div><span className="rebuild-date">{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/London" })}</span></section>
         <section className="panel host-landing-panel" style={{ "--host-landing-columns": sectionCount }}>
           <div className="host-landing-sections">
             <HostLaunchSection title="Boards">{boardCards}</HostLaunchSection>
@@ -24823,12 +24820,6 @@ export default function App() {
           </section>
         </div>
       </div>
-      {!isClientMode ? (
-        <button className="morning-meeting-launcher" type="button" onClick={() => window.location.assign("/morning-meeting")}>
-          <span>Morning Meeting</span>
-          <small>Open daily outline</small>
-        </button>
-      ) : null}
       {!isClientMode && installationReportOpen ? (
         <div
           className="modal-backdrop installation-report-backdrop"

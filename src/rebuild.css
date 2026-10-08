@@ -1,0 +1,62 @@
+/* Rebuild shell only. Screen scope deliberately excludes PDF and print output. */
+@media screen {
+body.portal-rebuild {--sx-purple:#5f3c74;--sx-accent:#5f3c74;--sx-panel:#fff;--sx-border:#e6e9ef;--sx-shadow:0 2px 6px #32333804;background:#f6f7fb;color:#323338;font-family:"Helvetica Neue",Arial,sans-serif;}
+.portal-rebuild .app-shell:has(.host-nav-shell){padding:102px 30px 32px 268px}
+.portal-rebuild .page{max-width:1680px;gap:20px}
+.portal-rebuild .host-nav-shell{inset:0 auto 0 0;width:232px;background:#fff;border-right:1px solid #e6e9ef;box-shadow:none;border-bottom:0;backdrop-filter:none;overflow-y:auto}
+.portal-rebuild .host-nav-inner{display:flex;flex-direction:column;align-items:stretch;padding:18px 14px;gap:0;max-width:none}
+.portal-rebuild .host-nav-brand{justify-content:flex-start;padding:8px 15px 20px;min-height:100px}
+.portal-rebuild .host-nav-brand-logo{width:170px;height:auto;max-height:92px;object-fit:contain}
+.portal-rebuild .rebuild-workspace-label{font-size:10px;letter-spacing:1.7px;color:#9699a5;padding:14px}
+.portal-rebuild .host-nav-links{display:flex;flex-direction:column;align-items:stretch;gap:3px;width:100%;overflow:visible;flex-wrap:nowrap}
+.portal-rebuild .host-nav-link{width:100%;border:0;border-radius:6px;text-align:left;justify-content:flex-start;padding:11px 14px;min-height:39px;color:#676879;font-size:13px;font-weight:500;background:transparent;white-space:normal;box-shadow:none}
+.portal-rebuild .host-nav-link.active{background:#f0eaf5;color:#5f3c74;border:0;font-weight:700}
+.portal-rebuild .host-nav-link:hover{background:#f6f3f8}
+.portal-rebuild .host-nav-meta{margin:24px 0 0;padding:18px 8px 0;border-top:1px solid #e6e9ef;display:flex;flex-wrap:wrap;justify-content:space-between;width:100%}
+.portal-rebuild .host-nav-account-menu{position:static;margin-top:8px;box-shadow:none}
+.portal-rebuild .host-nav-user{max-width:150px;white-space:normal}
+.portal-rebuild .host-nav-mobile-menu{display:none}
+.portal-rebuild .rebuild-environment{position:fixed;top:0;left:232px;right:0;height:66px;background:#fff;border-bottom:1px solid #e6e9ef;display:flex;align-items:center;gap:20px;padding:0 32px;color:#676879;font-size:12px}
+.portal-rebuild .rebuild-environment strong{color:#5f3c74;font-size:11px;letter-spacing:1.3px}
+.portal-rebuild .panel,.portal-rebuild .hero{border:1px solid #e6e9ef;border-radius:10px;box-shadow:0 2px 6px #32333804;background:#fff;backdrop-filter:none}
+.portal-rebuild .rebuild-welcome{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:8px 0 15px}
+.portal-rebuild .rebuild-welcome h1{font-size:30px;letter-spacing:-.7px;font-weight:600;margin:10px 0}
+.portal-rebuild .rebuild-welcome p{margin:0;color:#676879}
+.portal-rebuild .rebuild-eyebrow{font-size:10px;letter-spacing:1.5px;color:#5f3c74}
+.portal-rebuild .rebuild-date{color:#9699a5;font-size:12px}
+.portal-rebuild .host-landing-panel{padding:0;background:transparent;border:0;box-shadow:none}
+.portal-rebuild .host-landing-sections{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;align-items:start}
+.portal-rebuild .host-landing-section{padding:0;background:none;border:0;box-shadow:none}
+.portal-rebuild .host-landing-section:has(.host-landing-actions:empty){display:none}
+.portal-rebuild .host-landing-section-head h3{font-size:12px;text-transform:uppercase;letter-spacing:1.2px;color:#676879;margin-bottom:14px}
+.portal-rebuild .host-landing-actions{display:grid;grid-template-columns:1fr;gap:10px}
+.portal-rebuild .host-launch-card{border:1px solid #e6e9ef;border-radius:9px;background:#fff;padding:19px;min-height:104px;display:flex;gap:16px;align-items:center;text-align:left;box-shadow:0 2px 5px #32333803;transform:none}
+.portal-rebuild .host-launch-card:hover{border-color:#b8a4c6;box-shadow:0 3px 12px #5f3c740c;transform:translateY(-1px)}
+.portal-rebuild .host-launch-icon{background:#f2edf6;color:#5f3c74;width:44px;height:44px;min-width:44px;border-radius:9px;padding:11px}
+.portal-rebuild .host-launch-copy strong{font-size:14px;color:#323338;font-weight:600}
+.portal-rebuild .host-launch-copy small{font-size:12px;color:#9699a5;line-height:1.5;margin-top:5px}
+.portal-rebuild .host-launch-card:is(.icon-attendance,.icon-holidays,.icon-mileage,.icon-rams) .host-launch-icon{background:#e9f6f7;color:#0f98a5}
+.portal-rebuild .primary-button{background:#5f3c74;border-color:#5f3c74;color:#fff;border-radius:6px;box-shadow:none}
+.portal-rebuild .ghost-button,.portal-rebuild .secondary-button{border-radius:6px;box-shadow:none}
+.portal-rebuild input:not([type=checkbox]):not([type=radio]):not([type=range]),.portal-rebuild select,.portal-rebuild textarea{border-radius:6px;border-color:#dce0e8}
+.portal-rebuild input:focus-visible,.portal-rebuild select:focus-visible,.portal-rebuild textarea:focus-visible,.portal-rebuild button:focus-visible{outline:2px solid #9471af;outline-offset:2px}
+.portal-rebuild .modal{border-radius:12px;border:1px solid #e6e9ef}
+.portal-rebuild .job-card,.portal-rebuild .design-board-card,.portal-rebuild .wip-card{border-radius:8px;box-shadow:0 1px 3px #32333806}
+.portal-rebuild .board-row,.portal-rebuild .design-board-column{border-color:#e6e9ef;border-radius:8px}
+.portal-rebuild .design-board-column,.portal-rebuild .wip-lane{background:#f0f2f7}
+.portal-rebuild .auth-panel{border-radius:12px}
+.portal-rebuild .morning-meeting-launcher{display:none}
+@media(max-width:1100px){.portal-rebuild .host-landing-sections{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+.portal-rebuild .app-shell:has(.host-nav-shell){padding:160px 14px 24px}
+.portal-rebuild .host-nav-shell{inset:0 0 auto;width:100%;overflow:visible;border-right:0;border-bottom:1px solid #e6e9ef}
+.portal-rebuild .host-nav-inner{display:flex;flex-direction:row;align-items:center;gap:10px;padding:10px 14px}
+.portal-rebuild .host-nav-brand{min-height:45px;padding:0}.portal-rebuild .host-nav-brand-logo{width:105px;max-height:58px}
+.portal-rebuild .host-nav-links,.portal-rebuild .rebuild-workspace-label,.portal-rebuild .host-nav-meta{display:none}
+.portal-rebuild .host-nav-mobile-menu{display:grid;flex:1;gap:4px}
+.portal-rebuild .rebuild-environment{position:static;height:auto;min-height:46px;padding:10px 14px;flex-wrap:wrap;gap:5px;font-size:10px}
+.portal-rebuild .rebuild-welcome{align-items:flex-start;flex-direction:column}.portal-rebuild .rebuild-welcome h1{font-size:25px}
+.portal-rebuild .host-landing-sections{grid-template-columns:1fr}
+}
+}
+
