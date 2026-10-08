@@ -1437,6 +1437,7 @@ function mergeHolidaySeed(store) {
         igloo: sanitizeIglooTracker(store.igloo),
         designBoard: sanitizeDesignBoardState(store.designBoard),
         filteringBoard: sanitizeFilteringBoardState(store.filteringBoard),
+        wipBoard: sanitizeWipBoardState(store.wipBoard),
         holidays: Array.isArray(store.holidays) ? [...store.holidays] : [],
         subcontractorEvents: Array.isArray(store.subcontractorEvents) ? store.subcontractorEvents.map((entry) => sanitizeSubcontractorEvent(entry)) : [],
         holidayRequests: Array.isArray(store.holidayRequests) ? [...store.holidayRequests] : [],
