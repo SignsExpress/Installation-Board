@@ -1,0 +1,7 @@
+.portal-skin-switch {position:fixed;right:16px;bottom:14px;z-index:1400;display:flex;align-items:center;gap:12px;padding:10px 14px;background:#fff;border:1px solid #ded6e6;border-radius:9px;box-shadow:0 3px 18px #25213614;font:12px/1.4 Arial,sans-serif;color:#66606c}
+.portal-skin-switch a {font:600 12px/1.4 Arial,sans-serif;color:#5f3c74;text-decoration:none}
+.portal-skin-switch a:hover {text-decoration:underline}
+.portal-skin-switch a:focus-visible {outline:2px solid #5f3c74;outline-offset:4px}
+.skin-loading {padding:32px;font:14px Arial,sans-serif;color:#5f3c74}
+@media(max-width:760px){.portal-skin-switch {right:8px;bottom:8px;padding:9px 12px}.portal-skin-switch>span{display:none}}
+@media print {.portal-skin-switch{display:none}}

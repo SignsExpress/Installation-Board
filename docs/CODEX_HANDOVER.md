@@ -209,3 +209,11 @@ The home computer must also have:
 The auto-build/commit/push preference is stored in `AGENTS.md`, but Codex command approvals and private credentials are machine-specific. A fresh Codex window should diagnose and complete any missing local setup rather than changing application code to work around it.
 
 Do not copy office `data/jobs.json` or `data/users.json` changes into Git merely to make the home machine match. Production operational data is separate from source-code deployment.
+
+## Optional new skin — 8 October 2026
+
+Classic remains the default application (`src/App.jsx`). The new interface is opt-in through `?skin=new`, remembers the choice in this browser, and has a permanent Switch to Classic link. `?skin=classic` explicitly restores the original application. `src/ModernApp.jsx` is the isolated early-access interface; its CSS and feedback wrapper load only when selected. Both use the existing live API, authentication, permissions and operational data. No copied preview database or disconnected test runner is used in production.
+
+Share https://www.sxpreston.com/?skin=new with early-access users. Changes made there affect real live jobs. Removed modules are hidden/redirected in the new interface; Classic retains its existing module access for compatibility. Invoice PDF generator and print-preview functions are identical across skins. Browser QA covers new/classic switching, route persistence and original styling using the isolated preview API. Focused tests cover default selection, explicit overrides, URL preservation and PDF parity.
+
+The existing holiday seed merge now also retains WIP state, matching the tested rebuild fix. Do not commit local operational data. Future behaviour fixes affecting both skins must be applied to both App.jsx and ModernApp.jsx until the early-access interface becomes the default.
