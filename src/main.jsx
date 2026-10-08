@@ -9,7 +9,7 @@ try { stored = window.localStorage.getItem(SKIN_KEY); } catch {}
 const skin = resolveSkin(window.location.search, stored);
 try { window.localStorage.setItem(SKIN_KEY, skin); } catch {}
 document.body.classList.toggle("portal-rebuild", skin === "new");
-const App = lazy(() => skin === "new" ? import("./modern-entry") : import("./App"));
+const App = skin === "new" ? lazy(() => import("./modern-entry")) : lazy(() => import("./App"));
 
 const root = document.getElementById("root");
 if (root) root.innerHTML = "";
