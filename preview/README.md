@@ -25,3 +25,11 @@ Keep the established generator, editor, calculations, print styles, template ass
 ## Validation
 
 Build and server syntax checks passed. Twelve authenticated module read APIs passed. Installation create/read/delete, design task create/schedule/delete and WIP persistent-save checks passed against test data. Browser review confirmed the branded home page, WIP controls and pro-forma editor.
+
+## October 2026 polish pass
+
+The rebuild now uses shared navigation groups, module headings, action menus, save feedback and accessible side drawers. Installation and Design cards open full details; editing uses a matching drawer. WIP has separate production-week and status views with search, date controls and preserved bookings outside the visible week. Attendance has a contained monthly overview, employee editing drawer, edit detection and a warning before leaving with unsaved changes. Pro-Forma uses Pull / Check / Deposit / Preview steps while retaining its original HTML generator and print-preview function unchanged.
+
+The full authenticated live backup was imported into the ignored test runtime: 280 installation jobs, 30 WIP jobs, 12 design cards, 833 attendance entries and 156 holidays. The copied live pro-forma template is version 5. No operational data or credentials are committed.
+
+Validation: production build and five focused regression tests pass. Browser checks cover installation detail/edit, design details, WIP schedule/status/search, attendance edit/reset/focus restoration, mobile width and invoice initial steps. Exact unchanged PDF-generator and print-preview functions were compared against the prior commit. CoreBridge source pulls and AI generation still require their integrations before end-to-end approval; the test runner intentionally keeps those integrations disconnected.

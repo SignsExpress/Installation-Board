@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
+import { PortalHeading, PortalActionMenu, PortalDrawerPanel, PortalSteps, PortalFeedback } from "./portal-ui";
+import { PORTAL_GROUPS, portalWeekDays, filterPortalWip } from "./portal-model.mjs";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -2344,12 +2346,12 @@ function renderJobCardContent({
         clearDragPreview();
       }}
       onClick={() => {
-        if (isClientMode) {
-          setActiveClientJob(job);
-        } else {
-          editJob(job);
-        }
+        setActiveClientJob(job);
       }}
+      tabIndex={0}
+      role="button"
+      aria-label={`View ${job.orderReference || "job"}, ${job.customerName || "customer"}`}
+      onKeyDown={event => { if (event.target === event.currentTarget && ["Enter", " "].includes(event.key)) { event.preventDefault(); setActiveClientJob(job); } }}
     >
         <div className="job-card-top">
           <div className="job-title-wrap">
@@ -3024,10 +3026,11 @@ function MainNavBar({
   ].filter((item) => item.allowed && !["filtering", "materials", "mustang"].includes(item.key));
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
   const navItems = [...primaryNavItems, notificationItem];
-  const activeNavKey = primaryNavItems.some((item) => item.key === active) ? active : "home";
+  const activeNavKey = navItems.some((item) => item.key === active) ? active : "home";
   return (
+    <>
     <header className="host-nav-shell">
-      <div className="rebuild-environment"><strong>PORTAL REBUILD</strong><span>Local test saves · CoreBridge and AI not connected</span></div>
+      <div className="rebuild-environment"><strong>PORTAL REBUILD</strong><span>Changes save to this test workspace</span><span className="portal-connection-pill">Live integrations disconnected</span></div>
       <nav className="host-nav">
         <div className="host-nav-inner">
           <button type="button" className="host-nav-brand" onClick={() => goTo(homePath)} aria-label="Go to home">
@@ -3036,23 +3039,26 @@ function MainNavBar({
           <label className="host-nav-mobile-menu">
             <span>Menu</span>
             <select value={activeNavKey} onChange={(event) => {
-              const nextItem = primaryNavItems.find((item) => item.key === event.target.value);
+              const nextItem = navItems.find((item) => item.key === event.target.value);
               if (nextItem) goTo(nextItem.path);
             }}>
-              {primaryNavItems.map((item) => (
+              {navItems.map((item) => (
                 <option key={item.key} value={item.key}>
                   {item.label}
                 </option>
               ))}
             </select>
           </label>
-          <div className="rebuild-workspace-label">WORKSPACE</div>
           <div className="host-nav-links">
-            {navItems.map((item) => (
+            {PORTAL_GROUPS.map((group) => {
+              const items = group.keys.map(key => navItems.find(item => item.key === key)).filter(Boolean);
+              if (!items.length) return null;
+              return <div className="portal-nav-group" key={group.label}><div className="portal-nav-group-label">{group.label}</div>{items.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 className={`host-nav-link ${active === item.key ? "active" : ""}`}
+                aria-current={active === item.key ? "page" : undefined}
                 onClick={() => goTo(item.path)}
               >
                 <span className="host-nav-link-label">
@@ -3060,7 +3066,8 @@ function MainNavBar({
                   {item.badge ? <span className="host-nav-badge inline">{item.badge}</span> : null}
                 </span>
               </button>
-            ))}
+              ))}</div>;
+            })}
           </div>
           <div className="host-nav-meta">
             <button
@@ -3101,6 +3108,9 @@ function MainNavBar({
         </div>
       </nav>
     </header>
+    <PortalHeading active={active} />
+    <PortalFeedback />
+    </>
   );
 }
 
@@ -7601,6 +7611,10 @@ function keepWipCardInVisibleLane(card, visibleLaneIds) {
 
 function keepWipCardsInVisibleLanes(cards, days = []) {
   const visibleLaneIds = getWipVisibleLaneIds(days);
+  // Changing the visible week must never unschedule a saved job.
+  (Array.isArray(cards) ? cards : []).forEach(card => {
+    [card.lane, ...(card.extraLanes || [])].filter(lane => /^day:\d{4}-\d{2}-\d{2}$/.test(lane || "")).forEach(lane => visibleLaneIds.add(lane));
+  });
   return (Array.isArray(cards) ? cards : []).map((card) => keepWipCardInVisibleLane(card, visibleLaneIds));
 }
 
@@ -7649,6 +7663,10 @@ function WipCard({ card, installDates = [], assigneeOptions = [], onDragStart, c
         onOpenDetails?.(card);
       }}
       onDragStart={(event) => onDragStart(event, card.id)}
+      tabIndex={0}
+      role="button"
+      aria-label={`View ${card.orderNumber}, ${card.company}`}
+      onKeyDown={event => {if(event.target === event.currentTarget && ["Enter", " "].includes(event.key)){event.preventDefault();if(countMode)onToggleCount?.(card.id);else onOpenDetails?.(card);}}}
     >
       <div className="wip-card-head">
         <strong>{card.orderNumber}</strong>
@@ -7737,7 +7755,7 @@ function WipDropLane({ title, subtitle, laneId, tab, cards, installDateMap, avai
 
 function WipModalPortal({ children }) {
   if (typeof document === "undefined") return children;
-  return createPortal(children, document.body);
+  return createPortal(children, document.getElementById("root") || document.body);
 }
 
 function WipImportProgressModal({ progress, onClose }) {
@@ -7794,6 +7812,10 @@ function WipImportProgressModal({ progress, onClose }) {
 function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
+  const [wipView, setWipView] = useState("schedule");
+  const [wipWeekOffset, setWipWeekOffset] = useState(0);
+  const [wipSearch, setWipSearch] = useState("");
+  const scheduleDays = useMemo(() => portalWeekDays(getLocalTodayIso(), wipWeekOffset), [wipWeekOffset]);
   const [uploadMessage, setUploadMessage] = useState("");
   const [installDateMap, setInstallDateMap] = useState({});
   const [wipAvailabilityMap, setWipAvailabilityMap] = useState({});
@@ -8211,7 +8233,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
     setMultiDaySelection((current) => current.includes(laneId) ? current.filter((id) => id !== laneId) : [...current, laneId]);
   }
 
-  const visibleCards = cards.filter((card) => card.tab === activeTab);
+  const visibleCards = filterPortalWip(cards, activeTab, wipSearch);
   const cardsByLane = visibleCards.reduce((map, card) => {
     const laneIds = [...new Set([card.lane || "backlog", ...(Array.isArray(card.extraLanes) ? card.extraLanes : [])].filter(Boolean))];
     laneIds.forEach((key) => {
@@ -8254,9 +8276,11 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
               >
                 Count value
               </button>
-              <button type="button" className="ghost-button" onClick={clearAndRememberWipCards} disabled={!cards.length}>Clear and remember</button>
-              <button type="button" className="ghost-button" onClick={clearWipCards} disabled={!cards.length}>Clear WIP</button>
-              <button type="button" className="ghost-button" onClick={() => window.print()} disabled={!cards.length}>Print</button>
+              <PortalActionMenu>
+                <button type="button" onClick={() => window.print()} disabled={!cards.length}>Print board</button>
+                <button type="button" onClick={clearAndRememberWipCards} disabled={!cards.length}>Clear and remember layout</button>
+                <button type="button" className="danger" onClick={clearWipCards} disabled={!cards.length}>Clear WIP</button>
+              </PortalActionMenu>
             </div>
           </div>
           {uploadMessage ? <p className="wip-upload-message">{uploadMessage}</p> : null}
@@ -8290,8 +8314,17 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
               </button>
             ))}
           </div>
-          <div className="wip-board-wrap">
-            <div className="wip-special-lanes">
+          <div className="portal-board-controls">
+            <div className="portal-segmented" aria-label="WIP view">
+              <button type="button" aria-pressed={wipView === "schedule"} onClick={() => setWipView("schedule")}>Production schedule</button>
+              <button type="button" aria-pressed={wipView === "status"} onClick={() => setWipView("status")}>Status overview</button>
+            </div>
+            <label className="portal-search"><span className="portal-sr-only">Search WIP jobs</span><input type="search" placeholder="Search job, customer or salesperson" value={wipSearch} onChange={event => setWipSearch(event.target.value)} /></label>
+          </div>
+          <div className="portal-board-summary"><span><strong>{visibleCards.length}</strong> matching jobs</span><span><strong>{visibleCards.filter(card => card.lane.startsWith("day:")).length}</strong> scheduled</span><span><strong>{(cardsByLane.backlog || []).length}</strong> waiting for a day</span></div>
+          {!visibleCards.length ? <div className="portal-empty"><strong>{wipSearch ? "No jobs match your search" : "No jobs in this board"}</strong><p>{wipSearch ? "Try a different reference or customer name." : "Upload your WIP file to start planning production."}</p>{wipSearch ? <button type="button" className="ghost-button" onClick={() => setWipSearch("")}>Clear search</button> : null}</div> : null}
+          <div className={"wip-board-wrap portal-wip-" + wipView}>
+            {wipView === "status" ? <div className="wip-special-lanes">
               {WIP_SPECIAL_LANES.map((lane) => (
                 <WipDropLane
                   key={lane.id}
@@ -8310,7 +8343,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   onOpenDetails={(card) => setDetailCardId(card.id)}
                 />
               ))}
-            </div>
+            </div> : null}
             <WipDropLane
               title={activeTab === "wip" ? "Unscheduled WIP" : "Pre-WIP holding"}
               subtitle={activeTab === "pre-wip" ? "Drag onto the WIP tab to move it over instantly." : "Jobs waiting for a production day."}
@@ -8327,8 +8360,10 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
               onMultiDay={openMultiDay}
               onOpenDetails={(card) => setDetailCardId(card.id)}
             />
+            {wipView === "schedule" ? <>
+            <div className="portal-week-nav"><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(offset => offset - 1)} aria-label="Previous production week">← Previous week</button><strong>{scheduleDays[0].label} – {scheduleDays[4].label}</strong><div><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(0)} disabled={!wipWeekOffset}>This week</button><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(offset => offset + 1)} aria-label="Next production week">Next week →</button></div></div>
             <div className="wip-day-grid">
-              {days.map((day) => (
+              {scheduleDays.map((day) => (
                 <WipDropLane
                   key={day.id}
                   title={day.label}
@@ -8348,18 +8383,22 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                 />
               ))}
             </div>
+            {visibleCards.filter(card => card.lane.startsWith("day:") && !scheduleDays.some(day => "day:" + day.id === card.lane)).length ? <div className="portal-other-week"><span>Jobs scheduled outside this week remain saved.</span><button type="button" className="text-button" onClick={() => setWipView("status")}>View all scheduled jobs</button></div> : null}
+            </> : <section className="portal-scheduled-list"><div className="portal-section-head"><h3>Scheduled production</h3><span>{visibleCards.filter(card => card.lane.startsWith("day:")).length} jobs</span></div>{visibleCards.filter(card => card.lane.startsWith("day:")).sort((a,b)=>a.lane.localeCompare(b.lane)).map(card=><button type="button" className="portal-job-row" key={card.id} onClick={()=>setDetailCardId(card.id)}><strong>{card.orderNumber}</strong><span>{card.company}</span><span>{card.description}</span><span>{formatJobDate(card.lane.slice(4))}</span></button>)}</section>}
           </div>
           {detailCard ? (
-            <WipModalPortal><div className="wip-modal-backdrop" role="dialog" aria-modal="true">
-              <div className="wip-modal wip-card-detail-modal">
+            <WipModalPortal><div className="wip-modal-backdrop portal-drawer-backdrop" onClick={() => setDetailCardId("")}>
+              <PortalDrawerPanel className="wip-modal wip-card-detail-modal" label="Production job details" onClose={() => setDetailCardId("")}>
                 <div className="wip-modal-head">
                   <div>
                     <span>{detailCard.orderNumber}</span>
                     <h2>{detailCard.company || "No company"}</h2>
                     <p>{detailCard.description || "No description"}</p>
                   </div>
-                  <button type="button" onClick={() => setDetailCardId("")}>x</button>
+                  <button type="button" className="icon-button" aria-label="Close production details" onClick={() => setDetailCardId("")}>×</button>
                 </div>
+                <section className="portal-drawer-section"><h4>Summary</h4><p>{detailCard.description || "No description added."}</p></section>
+                <section className="portal-drawer-section"><h4>Schedule</h4><label>Production date<input type="date" aria-label="Production date" value={detailCard.lane.startsWith("day:") ? detailCard.lane.slice(4) : ""} onChange={event => moveCard(detailCard.id,event.target.value ? "day:" + event.target.value : "backlog",detailCard.tab)} /></label><label>Board status<select aria-label="Production board status" value={detailCard.lane.startsWith("day:") ? "scheduled" : detailCard.lane} onChange={event => {if(event.target.value !== "scheduled")moveCard(detailCard.id,event.target.value,detailCard.tab);}}><option value="scheduled" disabled>Scheduled production</option><option value="backlog">Unscheduled</option>{WIP_SPECIAL_LANES.map(lane => <option key={lane.id} value={lane.id}>{lane.title}</option>)}</select></label><button type="button" className="ghost-button" onClick={() => {setDetailCardId("");openMultiDay(detailCard);}}>Plan multiple days</button></section>
                 <div className="wip-detail-assignees">
                   <strong>Production</strong>
                   <div className="wip-assignee-picker">
@@ -8393,7 +8432,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   <button type="button" className="ghost-button" onClick={() => setDetailCardId("")}>Close</button>
                   <button type="button" className="danger-button" onClick={() => removeWipCardForever(detailCard)}>Remove from WIP forever</button>
                 </div>
-              </div>
+              </PortalDrawerPanel>
             </div></WipModalPortal>
           ) : null}
           {completionReviewCards.length ? (
@@ -8492,6 +8531,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
 }
 
 function ProFormaPage({ currentUser, onLogout, notifications }) {
+  const [invoiceStep, setInvoiceStep] = useState(0);
   const [orderReference, setOrderReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -8802,6 +8842,7 @@ function removeLineItem(lineId) {
       }
       setCustomDepositNotice("");
       setDraft(buildDraftFromPayload(payload));
+      setInvoiceStep(1);
     } catch (pullError) {
       setError(pullError.message || "Could not pull the Pro-Forma details.");
     } finally {
@@ -8940,14 +8981,15 @@ function removeLineItem(lineId) {
         />
 
         <section className="panel social-post-panel pro-forma-panel">
-          <div className="pro-forma-grid">
+          <PortalSteps steps={["Pull order", "Check details", "Choose deposit", "Preview PDF"]} active={invoiceStep} maxStep={draft ? 3 : 0} onChange={setInvoiceStep} />
+          <div className={"pro-forma-grid portal-invoice-stage stage-" + invoiceStep}>
             <form className="social-post-card pro-forma-fetch-card" onSubmit={pullProForma}>
-              <h3>Pull Pro-Forma</h3>
-              <p className="muted-copy">Enter an `EST` or `ORD` reference, pull the CoreBridge detail, then tidy the draft before sending it out.</p>
+              <h3>{invoiceStep === 2 ? "Payment & deposit" : "Source order"}</h3>
+              <p className="muted-copy">{invoiceStep === 2 ? "Choose a deposit or keep the current payment terms, then check the invoice preview." : "Enter an EST or ORD reference to load the exact order details."}</p>
               <label>
                 CoreBridge reference
                 <div className="social-post-order-row">
-                  <input
+                  <input aria-label="Pro-forma order reference"
                     value={orderReference}
                     onChange={(event) => setOrderReference(event.target.value)}
                     placeholder="EST-3379 or ORD-3379"
@@ -8958,7 +9000,7 @@ function removeLineItem(lineId) {
                 </div>
               </label>
 
-              <div className="pro-forma-deposit-tools">
+              <div className={"pro-forma-deposit-tools" + (invoiceStep === 2 ? " is-active-step" : "")}>
                 <h4>Deposit</h4>
                 <div className="pro-forma-deposit-buttons">
                   <button type="button" className={`ghost-button${draft?.depositType === "percent" && String(draft.depositValue) === "25" ? " active" : ""}`} disabled={!draft} onClick={() => applyDepositPreset(25)}>25% deposit</button>
@@ -8990,13 +9032,11 @@ function removeLineItem(lineId) {
             <div className="social-post-card pro-forma-editor-card">
                 <div className="pro-forma-editor-head">
                   <div>
-                    <h3>DOCUMENT NAME</h3>
+                    <h3>{draft ? "Order details" : "Ready when you are"}</h3>
                   </div>
                   <div className="pro-forma-editor-actions">
                     <div className="pro-forma-total-pill"><span>Total</span><strong>{formatProFormaMoney(total)}</strong></div>
-                  <button type="button" className="primary-button" disabled={!draft || printing} onClick={openPrintPreview}>
-                      {printing ? "Opening..." : "Print / Save PDF"}
-                    </button>
+                    <button type="button" className="primary-button" disabled={!draft} onClick={() => setInvoiceStep(invoiceStep === 2 ? 3 : 2)}>{invoiceStep === 2 ? "Preview invoice →" : "Choose deposit →"}</button>
                   </div>
                 </div>
 
@@ -9153,10 +9193,11 @@ function removeLineItem(lineId) {
                   </div>
                 </div>
               ) : (
-                <p className="muted-copy">Your editable pro-forma draft will appear here once you pull a CoreBridge reference.</p>
+                <div className="portal-empty"><div className="portal-empty-icon" aria-hidden="true">▤</div><strong>Start with an order reference</strong><p>Your invoice details and approved layout will appear here after the order is loaded.</p></div>
               )}
             </div>
           </div>
+          {invoiceStep === 3 && draft ? <section className="portal-invoice-preview"><div className="portal-section-head"><div><h3>Invoice preview</h3><p>The approved PDF layout is used here. Check the details before printing.</p></div><div className="portal-inline-actions"><button type="button" className="ghost-button" onClick={() => setInvoiceStep(1)}>Edit details</button><button type="button" className="primary-button" disabled={printing} onClick={openPrintPreview}>{printing ? "Opening…" : "Print / Save PDF"}</button></div></div><iframe title="Approved invoice preview" srcDoc={previewHtml} /><p className="muted">The print window includes the saved payment terms and document attachments.</p></section> : null}
         </section>
       </div>
     </div>
@@ -10037,6 +10078,10 @@ function DesignBoardColumn({
             className={`${getDesignBoardCardClassName(card)} ${draggingCardId === card.id ? "is-dragging" : ""}`.trim()}
             draggable={editable}
             onClick={() => onToggleCard?.(card)}
+            tabIndex={0}
+            role="button"
+            aria-label={`View ${card.orderReference || "task"}, ${card.customerName || card.description || "details"}`}
+            onKeyDown={event => {if(event.target === event.currentTarget && ["Enter", " "].includes(event.key)){event.preventDefault();onToggleCard?.(card);}}}
             onDragStart={editable ? (event) => {
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", card.id);
@@ -10113,13 +10158,11 @@ function DesignBoardColumn({
                   )}
                 </div>
                 <div className="design-board-card-tools">
-                  <button type="button" className="design-board-tool-button" onClick={() => onChaseCard?.(card)}>Chased</button>
-                  <button type="button" className={`design-board-tool-button ${card.designerNote ? "has-note" : ""}`} onClick={() => onNoteCard?.(card)}>
-                    {card.designerNote ? "Note added" : "Add note"}
-                  </button>
                   <details className="design-board-more-menu">
                     <summary>More</summary>
                     <div className="design-board-more-popover">
+                      <button type="button" onClick={() => onChaseCard?.(card)}>Record a chase</button>
+                      <button type="button" onClick={() => onNoteCard?.(card)}>{card.designerNote ? "Edit designer note" : "Add designer note"}</button>
                       {card.cardType === "task" ? null : (
                         <button type="button" onClick={() => onRepullCard?.(card)} disabled={isRepulling}>
                           {isRepulling ? <span className="button-spinner-label"><span className="button-spinner" />Re-Pulling...</span> : "Re-Pull"}
@@ -10530,9 +10573,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 <button className="design-board-add-task-button" type="button" onClick={() => setTaskModalOpen(true)}>
                   Add task
                 </button>
-                <button className="design-board-settings-button" type="button" onClick={() => setSettingsOpen(true)}>
-                  Settings
-                </button>
+                <PortalActionMenu><button type="button" onClick={() => setSettingsOpen(true)}>Approval targets & settings</button></PortalActionMenu>
               </form>
             ) : null}
           </div>
@@ -10660,7 +10701,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
         </section>
 
         {editable && taskModalOpen ? (
-          <div className="modal-backdrop" onClick={() => setTaskModalOpen(false)}>
+          <div className="modal-backdrop portal-drawer-backdrop" onClick={() => setTaskModalOpen(false)}>
             <form className="modal design-board-task-modal" onSubmit={handleCreateTask} onClick={(event) => event.stopPropagation()}>
               <div className="modal-head">
                 <div>
@@ -10839,25 +10880,32 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
         ) : null}
 
         {detailCard ? (
-          <div className="modal-backdrop" onClick={() => setDetailCardId("")}>
-            <div className="modal design-board-detail-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-backdrop portal-drawer-backdrop" onClick={() => setDetailCardId("")}>
+            <PortalDrawerPanel className="modal design-board-detail-modal" label="Design job details" onClose={() => setDetailCardId("")}>
               <div className="modal-head">
                 <div>
                   <h3>{detailCard.cardType === "task" ? detailCard.description || "Task" : detailCard.orderReference}</h3>
                   <p>{detailCard.customerName || "Customer not set"}</p>
                 </div>
-                <button className="icon-button" type="button" onClick={() => setDetailCardId("")}>x</button>
+                <button className="icon-button" type="button" aria-label="Close design details" onClick={() => setDetailCardId("")}>×</button>
               </div>
               <div className="design-board-detail-grid">
                 <section>
-                  <h4>{detailCard.cardType === "task" ? "Task Details" : "Job Details"}</h4>
+                  <h4>Summary</h4>
+                  <p className="portal-preserve-lines">{detailCard.description || "No description added."}</p>
+                  <h4>Schedule & contact</h4>
                   <dl className="design-board-card-meta">
+                    <div><dt>Status</dt><dd>{String(detailCard.status || "new").replaceAll("-", " ")}</dd></div>
+                    <div><dt>Artwork date</dt><dd>{detailCard.scheduledDate ? formatJobDate(detailCard.scheduledDate) : "Unallocated"}</dd></div>
                     {detailCard.jobTotalExVat ? <div><dt>Net total</dt><dd>{formatProFormaMoney(detailCard.jobTotalExVat)}</dd></div> : null}
                     <div><dt>Contact</dt><dd>{[detailCard.contact, detailCard.number].filter(Boolean).join(" - ") || "No contact"}</dd></div>
                     {detailCard.contactEmail ? <div><dt>Email</dt><dd>{detailCard.contactEmail}</dd></div> : null}
                     {detailCard.cardType === "task" ? null : <div><dt>Address</dt><dd>{detailCard.address || detailCard.siteAddress || "No address"}</dd></div>}
                     {detailCard.createdAt ? <div><dt>Date added</dt><dd>{formatProFormaDate(detailCard.createdAt)}</dd></div> : null}
                   </dl>
+                  <h4>Notes</h4><p className="portal-preserve-lines">{detailCard.designerNote || detailCard.notes || "No notes added."}</p>
+                  {detailCard.designerNote && detailCard.notes ? <p className="portal-preserve-lines">{detailCard.notes}</p> : null}
+                  <h4>Order items & artwork</h4>
                   {detailCard.cardType === "task" && detailCard.notes ? <p className="design-board-task-detail-note">{detailCard.notes}</p> : null}
                   {Array.isArray(detailCard.items) && detailCard.items.length ? (
                     <ul className="design-board-items design-board-detail-items">
@@ -10885,19 +10933,19 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                   {detailCopyStatus ? <p className="form-success">{detailCopyStatus}</p> : null}
                 </section>
               </div>
-            </div>
+            </PortalDrawerPanel>
           </div>
         ) : null}
 
         {editable && editingCard && editDraft ? (
-          <div className="modal-backdrop" onClick={() => setEditingCardId("")}>
-            <div className="modal design-board-edit-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="modal-backdrop portal-drawer-backdrop" onClick={() => setEditingCardId("")}>
+            <PortalDrawerPanel className="modal design-board-edit-modal" label="Edit design job" onClose={() => setEditingCardId("")}>
               <div className="modal-head">
                 <div>
                   <h3>Edit design card</h3>
                   <p>{editingCard.orderReference}</p>
                 </div>
-                <button className="icon-button" type="button" onClick={() => setEditingCardId("")}>x</button>
+                <button className="icon-button" type="button" aria-label="Close design editor" onClick={() => setEditingCardId("")}>×</button>
               </div>
               <div className="design-board-edit-scroll">
                 <div className="design-board-edit-grid">
@@ -10981,7 +11029,7 @@ function DesignBoardPage({ currentUser, onLogout, notifications }) {
                 <button className="ghost-button" type="button" onClick={() => setEditingCardId("")}>Cancel</button>
                 <button className="primary-button" type="button" onClick={handleSaveEdit}>Save changes</button>
               </div>
-            </div>
+            </PortalDrawerPanel>
           </div>
         ) : null}
       </div>
@@ -15335,6 +15383,7 @@ function AttendancePage({
   const [monthNoteDrafts, setMonthNoteDrafts] = useState({});
   const [noteForm, setNoteForm] = useState(EMPTY_ATTENDANCE_NOTE_FORM);
   const [selectedAttendanceEditor, setSelectedAttendanceEditor] = useState(EMPTY_ATTENDANCE_ADMIN_EDITOR);
+  const [attendancePerson, setAttendancePerson] = useState("");
 
   useEffect(() => {
     setDrafts({});
@@ -15343,6 +15392,7 @@ function AttendancePage({
 
   useEffect(() => {
     setSelectedAttendanceEditor(EMPTY_ATTENDANCE_ADMIN_EDITOR);
+    setAttendancePerson("");
   }, [attendanceData?.monthId]);
 
   useEffect(() => {
@@ -15542,10 +15592,17 @@ function AttendancePage({
         .filter(Boolean)
     : [];
 
+  useEffect(() => {
+    if (!changedAttendanceCells.length && !changedMonthNotes.length) return;
+    const warn = event => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [changedAttendanceCells.length, changedMonthNotes.length]);
+
   async function handleSaveAllAttendanceChanges() {
     if (!changedAttendanceCells.length) {
       setAttendanceDebugMessage(`No savable edits detected. Draft rows: ${Object.keys(drafts).length}.`);
-      return;
+      return true;
     }
     setAttendanceDebugMessage(
       `Attempting save for ${changedAttendanceCells.length} row${changedAttendanceCells.length === 1 ? "" : "s"}. Draft rows: ${Object.keys(drafts).length}.`
@@ -15565,14 +15622,16 @@ function AttendancePage({
         return next;
       });
     }
+    return clearedKeys.length === changedAttendanceCells.length;
   }
 
   async function handleSaveAttendanceMonthNotes() {
     for (const entry of changedMonthNotes) {
       const saved = await onSaveAttendanceMonthNote(entry);
-      if (!saved) return;
+      if (!saved) return false;
     }
     setMonthNoteDrafts({});
+    return true;
   }
 
   async function submitEmployeeNote(event) {
@@ -15609,6 +15668,7 @@ function AttendancePage({
   }
 
   function openAttendanceAdminEditor(cell, isoDate) {
+    setAttendancePerson(cell.person);
     const key = getAttendanceCellKey(cell.person, isoDate);
     const draft = drafts[key] || {};
     setSelectedAttendanceEditor({
@@ -15622,6 +15682,13 @@ function AttendancePage({
 
   function updateAttendanceAdminEditor(updates) {
     setSelectedAttendanceEditor((current) => ({ ...current, ...updates }));
+    if (selectedAttendanceEditor.person && selectedAttendanceEditor.date) {
+      setDraftValue(selectedAttendanceEditor.person, selectedAttendanceEditor.date, {
+        ...updates,
+        notifyEmployee: updates.notifyEmployee ?? selectedAttendanceEditor.notifyEmployee,
+        ...(updates.adminStatus === "absent" ? { clockIn: "", clockOut: "" } : {})
+      });
+    }
   }
 
   function applyAttendanceAdminEditor() {
@@ -15696,7 +15763,11 @@ function AttendancePage({
             </div>
           </div>
           {adminMode && attendanceDebugMessage ? <div className="attendance-debug-banner">{attendanceDebugMessage}</div> : null}
-          {adminMode ? (
+          {adminMode && attendancePerson ? (
+            <div className="modal-backdrop portal-drawer-backdrop" onClick={() => setAttendancePerson("")}>
+            <PortalDrawerPanel className="modal portal-attendance-drawer" label="Employee attendance details" onClose={() => setAttendancePerson("")}>
+            <div className="modal-head"><div><p className="panel-kicker">Attendance · {attendanceMonthLabel}</p><h3>{staff.find(person=>person.person===attendancePerson)?.fullName || attendancePerson}</h3><p>Clockings, adjustments and monthly notes</p></div><button type="button" className="icon-button" aria-label="Close attendance details" onClick={()=>setAttendancePerson("")}>×</button></div>
+            <section className="portal-drawer-section"><h4>Selected day</h4><p>{selectedAttendanceEditor.person===attendancePerson ? formatJobDate(selectedAttendanceEditor.date) : "Select a date below to edit its status or add a note."}</p>
             <section className="attendance-admin-editor">
               <div className="attendance-admin-editor-grid">
                 <label>
@@ -15704,7 +15775,7 @@ function AttendancePage({
                   <select
                     value={selectedAttendanceEditor.adminStatus}
                     onChange={(event) => updateAttendanceAdminEditor({ adminStatus: event.target.value })}
-                    disabled={!selectedAttendanceCell}
+                    disabled={!selectedAttendanceCell || selectedAttendanceEditor.person !== attendancePerson}
                   >
                     <option value="">Present / normal</option>
                     <option value="absent">Absent</option>
@@ -15715,7 +15786,7 @@ function AttendancePage({
                     type="checkbox"
                     checked={Boolean(selectedAttendanceEditor.notifyEmployee)}
                     onChange={(event) => updateAttendanceAdminEditor({ notifyEmployee: event.target.checked })}
-                    disabled={!selectedAttendanceCell}
+                    disabled={!selectedAttendanceCell || selectedAttendanceEditor.person !== attendancePerson}
                   />
                   <span>Notify employee when saved</span>
                 </label>
@@ -15728,20 +15799,16 @@ function AttendancePage({
                       value={selectedAttendanceEditor.adminNote}
                       onChange={(event) => updateAttendanceAdminEditor({ adminNote: event.target.value })}
                       placeholder="Add a note about a manual override, absence, forgotten key fob, or anything the team should remember."
-                      disabled={!selectedAttendanceCell}
+                      disabled={!selectedAttendanceCell || selectedAttendanceEditor.person !== attendancePerson}
                     />
-                    <button
-                      className="ghost-button attendance-admin-apply-button"
-                      type="button"
-                      disabled={!selectedAttendanceCell}
-                      onClick={applyAttendanceAdminEditor}
-                    >
-                      Submit note
-                    </button>
                   </div>
                 </label>
               </div>
-            </section>
+            </section></section>
+            <section className="portal-drawer-section"><h4>Clockings</h4><p className="muted">Choose a date to add a manager note or change its status.</p><div className="portal-attendance-days">{rows.map(row=>{const cell=row.cells.find(entry=>entry.person===attendancePerson);if(!cell)return null;return <div key={row.isoDate} className={"portal-attendance-day"+(selectedAttendanceEditor.date===row.isoDate && selectedAttendanceEditor.person===attendancePerson?" selected":"")}><button type="button" className="portal-attendance-date" onClick={()=>openAttendanceAdminEditor(cell,row.isoDate)}><strong>{row.weekdayLabel}</strong><span>{row.dateLabel}</span></button>{cell.displayLabel?<span className="portal-attendance-day-status">{cell.displayLabel}</span>:<div className="portal-clock-fields"><label>In<input aria-label={"Clock in "+row.dateLabel} value={getDraftValue(cell.person,row.isoDate,"clockIn",cell.clockIn)} placeholder="--:--" disabled={!cell.canEditClockIn} onChange={event=>setDraftValue(cell.person,row.isoDate,{clockIn:event.target.value})}/></label><label>Out<input aria-label={"Clock out "+row.dateLabel} value={getDraftValue(cell.person,row.isoDate,"clockOut",cell.clockOut)} placeholder="--:--" disabled={!cell.canEditClockOut} onChange={event=>setDraftValue(cell.person,row.isoDate,{clockOut:event.target.value})}/></label></div>}{cell.anomalySummary || cell.breakSummary || cell.adminNote ? <small className="portal-attendance-day-note">{[cell.anomalySummary,cell.breakSummary?"Breaks: "+cell.breakSummary:"",cell.adminNote].filter(Boolean).join(" · ")}</small>:null}</div>})}</div></section>
+            <section className="portal-drawer-section"><h4>Month note</h4><textarea rows={4} aria-label="Employee month note" placeholder="Add a note for this month" value={monthNoteDrafts[attendancePerson] ?? attendanceSummary.find(entry=>entry.person===attendancePerson)?.monthNote ?? ""} onChange={event=>setMonthNoteDrafts(current=>({...current,[attendancePerson]:event.target.value}))}/></section>
+            <div className="portal-drawer-footer"><span>{changedAttendanceCells.length + changedMonthNotes.length ? "Unsaved changes stay in this page until you save." : "All changes saved"}</span><button className="primary-button" type="button" disabled={(!changedAttendanceCells.length && !changedMonthNotes.length) || Boolean(attendanceSavingKey) || attendanceMonthNoteSaving} onClick={async()=>{if(changedAttendanceCells.length && !(await handleSaveAllAttendanceChanges()))return;if(changedMonthNotes.length)await handleSaveAttendanceMonthNotes();}}>Save changes</button></div>
+            </PortalDrawerPanel></div>
           ) : null}
 
           {loading ? <div className="board-loading">Loading attendance...</div> : null}
@@ -15759,7 +15826,7 @@ function AttendancePage({
                         colSpan={2}
                         title={person.fullName || person.person}
                       >
-                        <span>{getAttendanceStaffLabel(person)}</span>
+                        <button type="button" className="portal-staff-link" onClick={() => {setAttendancePerson(person.person);setSelectedAttendanceEditor(EMPTY_ATTENDANCE_ADMIN_EDITOR);}}>{getAttendanceStaffLabel(person)}</button>
                       </th>
                     ))}
                   </tr>
@@ -15820,14 +15887,7 @@ function AttendancePage({
                             >
                               <div className="attendance-dual-grid">
                                 <div className="attendance-cell-stack attendance-cell-stack-dual">
-                                  <input
-                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""} ${cell.clockInStatus ? `is-${cell.clockInStatus}` : ""}`}
-                                    value={getDraftValue(cell.person, row.isoDate, "clockIn", cell.clockIn)}
-                                    placeholder="--:--"
-                                    disabled={!cell.canEditClockIn}
-                                    onClick={(event) => event.stopPropagation()}
-                                    onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockIn: event.target.value })}
-                                  />
+                                  <button type="button" className={`portal-clock-value ${hasDraftChanges ? "is-edited" : ""} ${cell.clockInStatus ? `is-${cell.clockInStatus}` : ""}`} aria-label={`View ${cell.person} on ${row.dateLabel}`} onClick={event=>{event.stopPropagation();openAttendanceAdminEditor(cell,row.isoDate);}}>{getDraftValue(cell.person,row.isoDate,"clockIn",cell.clockIn) || "—"}</button>
                                   {hasDraftChanges ? (
                                     <div className="attendance-cell-edited">Edited</div>
                                   ) : (
@@ -15835,14 +15895,7 @@ function AttendancePage({
                                   )}
                                 </div>
                                 <div className="attendance-cell-stack attendance-cell-stack-dual">
-                                  <input
-                                    className={`attendance-time-input ${hasDraftChanges ? "is-edited" : ""} ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : ""}`}
-                                    value={getDraftValue(cell.person, row.isoDate, "clockOut", cell.clockOut)}
-                                    placeholder="--:--"
-                                    disabled={!cell.canEditClockOut}
-                                    onClick={(event) => event.stopPropagation()}
-                                    onChange={(event) => setDraftValue(cell.person, row.isoDate, { clockOut: event.target.value })}
-                                  />
+                                  <button type="button" className={`portal-clock-value ${hasDraftChanges ? "is-edited" : ""} ${cell.clockOutStatus ? `is-${cell.clockOutStatus}` : ""}`} aria-label={`View ${cell.person} on ${row.dateLabel}`} onClick={event=>{event.stopPropagation();openAttendanceAdminEditor(cell,row.isoDate);}}>{getDraftValue(cell.person,row.isoDate,"clockOut",cell.clockOut) || "—"}</button>
                                   <div className="attendance-cell-spacer" />
                                 </div>
                                 {cell.halfDayHolidayLabel ? (
@@ -16017,6 +16070,8 @@ function AttendancePage({
                           >
                             <textarea
                               className="attendance-summary-note-input"
+                              readOnly
+                              onClick={() => {setAttendancePerson(person.person);setSelectedAttendanceEditor(EMPTY_ATTENDANCE_ADMIN_EDITOR);}}
                               value={noteValue}
                               placeholder="Add month note"
                               onChange={(event) =>
@@ -24856,11 +24911,11 @@ export default function App() {
       ) : null}
       {!isClientMode && jobModalDate ? (
         <div
-          className="modal-backdrop installation-job-backdrop"
+          className="modal-backdrop installation-job-backdrop portal-drawer-backdrop"
           onPointerDown={handleBackdropPointerDown}
           onClick={(event) => handleBackdropClick(event, () => resetForm())}
         >
-          <div className="modal job-modal" onPointerDown={() => { backdropPointerStartedRef.current = false; }} onClick={(event) => event.stopPropagation()}>
+          <PortalDrawerPanel className="modal job-modal" label={editingId ? "Edit installation job" : "Add installation job"} onClose={() => resetForm()} onPointerDown={() => { backdropPointerStartedRef.current = false; }}>
             <div className="modal-head job-modal-head">
               <div>
                 <span className="job-modal-kicker">{editingId ? "Installation Board" : "New installation job"}</span>
@@ -25271,7 +25326,7 @@ export default function App() {
                 setAdminPendingCompletePhotos(files);
               }}
             />
-          </div>
+          </PortalDrawerPanel>
         </div>
       ) : null}
       {jobPhotoViewer ? (() => {
@@ -25366,6 +25421,19 @@ export default function App() {
               )}
             </div>
           </div>
+        </div>
+      ) : null}
+      {!isClientMode && activeClientJob ? (
+        <div className="modal-backdrop portal-drawer-backdrop" onClick={() => setActiveClientJob(null)}>
+          <PortalDrawerPanel className="modal portal-job-inspection" label="Installation job details" onClose={() => setActiveClientJob(null)}>
+            <div className="modal-head"><div><p className="panel-kicker">Installation job</p><h3>{activeClientJob.orderReference || "No reference"}</h3><p>{activeClientJob.customerName}</p></div><button type="button" className="icon-button" aria-label="Close job details" onClick={() => setActiveClientJob(null)}>×</button></div>
+            <section className="portal-drawer-section"><h4>Summary</h4><p>{activeClientJob.description || "No description added."}</p><div className="portal-detail-grid"><div><span>Job type</span><strong>{getJobTypeLabel(activeClientJob)}</strong></div><div><span>Net value</span><strong>{formatInstallationValue(activeClientJob.jobTotalExVat || 0)}</strong></div><div><span>Status</span><strong>{activeClientJob.isCompleted ? "Completed" : activeClientJob.isSnagging ? "Snagging" : activeClientJob.isPlaceholder ? "Placeholder" : "Booked"}</strong></div></div></section>
+            <section className="portal-drawer-section"><h4>Schedule & team</h4><div className="portal-detail-grid"><div><span>Installation date</span><strong>{activeClientJob.date ? formatJobDate(activeClientJob.date) : "Unscheduled"}</strong></div><div><span>Installers</span><strong>{getInstallerDisplayList(activeClientJob).join(", ") || "Unassigned"}</strong></div><div className="portal-detail-wide"><span>Site address</span><p>{activeClientJob.address || "No address added."}</p></div></div></section>
+            <section className="portal-drawer-section"><h4>Contact</h4><div className="portal-detail-grid"><div><span>Name</span><strong>{activeClientJob.contact || "Not recorded"}</strong></div><div><span>Phone</span>{activeClientJob.number ? <a href={"tel:" + activeClientJob.number}>{activeClientJob.number}</a> : <strong>Not recorded</strong>}</div></div></section>
+            <section className="portal-drawer-section"><h4>Notes</h4><p className="portal-preserve-lines">{activeClientJob.notes || "No job notes yet."}</p>{activeClientJob.morningMeetingNotes ? <div className="portal-note-callout"><strong>Production notes</strong><p>{activeClientJob.morningMeetingNotes}</p></div> : null}</section>
+            <section className="portal-drawer-section"><h4>Files & photos</h4>{activeClientJob.photos?.length ? <button type="button" className="ghost-button" onClick={() => { const job=activeClientJob; setActiveClientJob(null); openJobPhotoViewer(job,0); }}>View {activeClientJob.photos.length} photos</button> : <p className="muted">No photos attached.</p>}{(activeClientJob.ramsDocuments || []).map(doc => <a className="portal-file-link" key={doc.id} href={`/rams?jobId=${encodeURIComponent(activeClientJob.id)}&ramsId=${encodeURIComponent(doc.id)}`}>{doc.name || "Saved RAMS document"} ↗</a>)}</section>
+            <div className="portal-drawer-footer"><button type="button" className="ghost-button" onClick={() => setActiveClientJob(null)}>Close</button><button type="button" className="primary-button" onClick={() => {const job=activeClientJob;setActiveClientJob(null);editJob(job);}}>Edit job</button></div>
+          </PortalDrawerPanel>
         </div>
       ) : null}
       {isClientMode && activeClientJob ? (
