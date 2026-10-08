@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 import { PortalHeading, PortalActionMenu, PortalDrawerPanel, PortalSteps, PortalFeedback } from "./portal-ui";
-import { PORTAL_GROUPS, portalWeekDays, filterPortalWip } from "./portal-model.mjs";
+import { PORTAL_GROUPS, filterPortalWip } from "./portal-model.mjs";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -7812,10 +7812,7 @@ function WipImportProgressModal({ progress, onClose }) {
 function WipPage({ currentUser, onLogout, notifications, users = [] }) {
   const [cards, setCards] = useState(() => keepWipCardsInVisibleLanes(loadStoredWipCards(), getWipBoardDays(getLocalTodayIso())));
   const [activeTab, setActiveTab] = useState("wip");
-  const [wipView, setWipView] = useState("schedule");
-  const [wipWeekOffset, setWipWeekOffset] = useState(0);
   const [wipSearch, setWipSearch] = useState("");
-  const scheduleDays = useMemo(() => portalWeekDays(getLocalTodayIso(), wipWeekOffset), [wipWeekOffset]);
   const [uploadMessage, setUploadMessage] = useState("");
   const [installDateMap, setInstallDateMap] = useState({});
   const [wipAvailabilityMap, setWipAvailabilityMap] = useState({});
@@ -8315,16 +8312,12 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
             ))}
           </div>
           <div className="portal-board-controls">
-            <div className="portal-segmented" aria-label="WIP view">
-              <button type="button" aria-pressed={wipView === "schedule"} onClick={() => setWipView("schedule")}>Production schedule</button>
-              <button type="button" aria-pressed={wipView === "status"} onClick={() => setWipView("status")}>Status overview</button>
-            </div>
             <label className="portal-search"><span className="portal-sr-only">Search WIP jobs</span><input type="search" placeholder="Search job, customer or salesperson" value={wipSearch} onChange={event => setWipSearch(event.target.value)} /></label>
           </div>
           <div className="portal-board-summary"><span><strong>{visibleCards.length}</strong> matching jobs</span><span><strong>{visibleCards.filter(card => card.lane.startsWith("day:")).length}</strong> scheduled</span><span><strong>{(cardsByLane.backlog || []).length}</strong> waiting for a day</span></div>
           {!visibleCards.length ? <div className="portal-empty"><strong>{wipSearch ? "No jobs match your search" : "No jobs in this board"}</strong><p>{wipSearch ? "Try a different reference or customer name." : "Upload your WIP file to start planning production."}</p>{wipSearch ? <button type="button" className="ghost-button" onClick={() => setWipSearch("")}>Clear search</button> : null}</div> : null}
-          <div className={"wip-board-wrap portal-wip-" + wipView}>
-            {wipView === "status" ? <div className="wip-special-lanes">
+          <div className="wip-board-wrap portal-wip-combined">
+            <div className="wip-special-lanes">
               {WIP_SPECIAL_LANES.map((lane) => (
                 <WipDropLane
                   key={lane.id}
@@ -8343,7 +8336,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                   onOpenDetails={(card) => setDetailCardId(card.id)}
                 />
               ))}
-            </div> : null}
+            </div>
             <WipDropLane
               title={activeTab === "wip" ? "Unscheduled WIP" : "Pre-WIP holding"}
               subtitle={activeTab === "pre-wip" ? "Drag onto the WIP tab to move it over instantly." : "Jobs waiting for a production day."}
@@ -8360,10 +8353,9 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
               onMultiDay={openMultiDay}
               onOpenDetails={(card) => setDetailCardId(card.id)}
             />
-            {wipView === "schedule" ? <>
-            <div className="portal-week-nav"><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(offset => offset - 1)} aria-label="Previous production week">← Previous week</button><strong>{scheduleDays[0].label} – {scheduleDays[4].label}</strong><div><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(0)} disabled={!wipWeekOffset}>This week</button><button className="ghost-button" type="button" onClick={() => setWipWeekOffset(offset => offset + 1)} aria-label="Next production week">Next week →</button></div></div>
+            <div className="portal-section-head portal-wip-range"><h3>Next two working weeks</h3><span>{days[0].label} – {days[days.length - 1].label}</span></div>
             <div className="wip-day-grid">
-              {scheduleDays.map((day) => (
+              {days.map((day) => (
                 <WipDropLane
                   key={day.id}
                   title={day.label}
@@ -8383,8 +8375,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
                 />
               ))}
             </div>
-            {visibleCards.filter(card => card.lane.startsWith("day:") && !scheduleDays.some(day => "day:" + day.id === card.lane)).length ? <div className="portal-other-week"><span>Jobs scheduled outside this week remain saved.</span><button type="button" className="text-button" onClick={() => setWipView("status")}>View all scheduled jobs</button></div> : null}
-            </> : <section className="portal-scheduled-list"><div className="portal-section-head"><h3>Scheduled production</h3><span>{visibleCards.filter(card => card.lane.startsWith("day:")).length} jobs</span></div>{visibleCards.filter(card => card.lane.startsWith("day:")).sort((a,b)=>a.lane.localeCompare(b.lane)).map(card=><button type="button" className="portal-job-row" key={card.id} onClick={()=>setDetailCardId(card.id)}><strong>{card.orderNumber}</strong><span>{card.company}</span><span>{card.description}</span><span>{formatJobDate(card.lane.slice(4))}</span></button>)}</section>}
+
           </div>
           {detailCard ? (
             <WipModalPortal><div className="wip-modal-backdrop portal-drawer-backdrop" onClick={() => setDetailCardId("")}>

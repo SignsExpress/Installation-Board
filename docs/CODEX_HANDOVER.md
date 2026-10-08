@@ -217,3 +217,7 @@ Classic remains the default application (`src/App.jsx`). The new interface is op
 Share https://www.sxpreston.com/?skin=new with early-access users. Changes made there affect real live jobs. Removed modules are hidden/redirected in the new interface; Classic retains its existing module access for compatibility. Invoice PDF generator and print-preview functions are identical across skins. Browser QA covers new/classic switching, route persistence and original styling using the isolated preview API. Focused tests cover default selection, explicit overrides, URL preservation and PDF parity.
 
 The existing holiday seed merge now also retains WIP state, matching the tested rebuild fix. Do not commit local operational data. Future behaviour fixes affecting both skins must be applied to both App.jsx and ModernApp.jsx until the early-access interface becomes the default.
+
+### WIP behaviour restored — 8 October 2026
+
+The new skin uses one combined draggable WIP board. Status lanes are always visible together with unscheduled work and ten working days starting today, skipping weekends, matching Classic's getWipBoardDays rule. There is no separate status/schedule toggle or Monday-based week navigation. Status lanes remain sticky on desktop to accept jobs dragged from the date lanes. Existing upload memory, multi-day planning, assignees, count-value and completion review rules are retained. Date and drag/drop transition regression tests live in tests/wip-board.test.mjs.

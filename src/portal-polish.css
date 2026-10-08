@@ -230,3 +230,17 @@
 @media screen {
  .portal-rebuild #root :is(h4,h5,h6) {font-family:inherit;font-weight:650;line-height:1.4}
 }
+@media screen {
+ .portal-rebuild .portal-wip-combined {display:flex;flex-direction:column;gap:18px;min-width:0}
+ .portal-rebuild .portal-wip-combined .wip-special-lanes {display:grid;grid-template-columns:repeat(5,minmax(180px,1fr));gap:12px;overflow-x:auto;padding-bottom:6px}
+ .portal-rebuild .portal-wip-combined .wip-day-grid {display:grid;grid-template-columns:repeat(5,minmax(180px,1fr));gap:12px;overflow-x:auto;padding-bottom:8px}
+ .portal-rebuild .portal-wip-combined .wip-lane {min-height:150px;min-width:0}
+ .portal-rebuild #root .portal-wip-range {padding:6px 0 0}
+ .portal-rebuild .portal-wip-combined > .wip-lane {max-height:360px;overflow:auto}
+}
+@media screen {
+ .portal-rebuild .portal-wip-combined .wip-special-lanes {grid-template-columns:repeat(5,minmax(140px,1fr));position:sticky;top:64px;z-index:4;background:#fff;max-height:300px}
+ .portal-rebuild .portal-wip-combined .wip-special-lanes .wip-lane {max-height:286px;overflow-y:auto}
+ .portal-rebuild .portal-wip-combined .wip-day-grid {grid-template-columns:repeat(5,minmax(140px,1fr))}
+ @media(max-width:760px){.portal-rebuild .portal-wip-combined .wip-special-lanes {position:static;grid-template-columns:repeat(5,180px)}.portal-rebuild .portal-wip-combined .wip-day-grid {grid-template-columns:repeat(5,180px)}}
+}

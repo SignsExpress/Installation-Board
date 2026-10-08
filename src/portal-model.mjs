@@ -7,7 +7,7 @@ export const PORTAL_GROUPS = [
 ];
 export const MODULE_META = {
   board:['Installation Board','Plan installations, see availability and keep each job moving.','Boards'],
-  wip:['WIP','A clear production schedule, with a separate overview of jobs by status.','Boards'],
+  wip:['WIP','Drag jobs between production days and status lanes in one shared board.','Boards'],
   'design-board':['Design Board','Allocate artwork, track approvals and keep customer responses in view.','Boards'],
   attendance:['Attendance','Review the month, then select a person to inspect or adjust their clockings.','Team'],
   holidays:['Holidays','Plan team availability, review requests and manage leave allowances.','Team'],
