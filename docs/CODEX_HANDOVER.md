@@ -225,3 +225,7 @@ The new skin uses one combined draggable WIP board. Status lanes are always visi
 ## Original design restored — 13 October 2026
 
 The user rejected the new design. main.jsx now loads only the established App.jsx and index.css. The early-access switch is removed, saved skin preferences are cleared, and old ?skin=new links also load the original portal. The unused new-skin source remains in Git history/source for reference but is not imported or shipped in the production build. Do not re-enable it without an explicit user request. Live operational data, the existing PDF layout and the WIP data-preservation fix are retained.
+
+## Four modules retired — 13 October 2026
+
+Morning Meeting, Filtering Board, Materials and Mustang are removed from Classic desktop/mobile navigation and host/client home launchers. The Installation Board Morning Meeting shortcut is removed. Old module URLs (including client/nested routes) resolve to Home at startup through retired-modules.mjs. This is a page-entry removal: saved data and shared APIs/helpers remain to protect Design Board approval workflows, panel tools and other module dependencies. No remaining module screen, PDF generator, CSS or server implementation was changed. Build and tests/retired-modules.test.mjs checks pass.

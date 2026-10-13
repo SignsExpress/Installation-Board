@@ -3007,11 +3007,9 @@ function MainNavBar({
     { key: "board", label: "Installation Board", path: boardPath, allowed: boardAllowed },
     { key: "wip", label: "WIP", path: wipPath, allowed: boardAllowed },
     { key: "design-board", label: "Design Board", path: designBoardPath, allowed: designBoardAllowed },
-    { key: "filtering", label: "Filtering", path: filteringPath, allowed: filteringAllowed },
     { key: "attendance", label: "Attendance", path: attendancePath, allowed: attendanceAllowed },
     { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
-    { key: "materials", label: "Materials", path: materialsPath, allowed: materialsAllowed },
     { key: "order-panels", label: "Order Panels", path: orderPanelsPath, allowed: orderPanelsAllowed },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
@@ -3020,7 +3018,6 @@ function MainNavBar({
     { key: "corebridge-explorer", label: "Corebridge APIs", path: coreBridgeExplorerPath, allowed: coreBridgeExplorerAllowed },
     { key: "pro-forma", label: "Pro-Forma", path: proFormaPath, allowed: proFormaAllowed },
     { key: "installer", label: "Subcontractors", path: installerPath, allowed: installerAllowed },
-    { key: "mustang", label: "Mustang", path: mustangPath, allowed: mustangAllowed }
   ].filter((item) => item.allowed);
   const notificationItem = { key: "notifications", label: "Notifications", path: notificationsPath, allowed: true, badge: unreadNotifications.length };
   const navItems = [...primaryNavItems, notificationItem];
@@ -4121,9 +4118,7 @@ function HostLandingPage({
   }
 
   const boardCards = [
-    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
-    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
@@ -4145,7 +4140,6 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const operationsCards = [
-    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
     canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
   ].filter(Boolean);
 
@@ -4154,7 +4148,6 @@ function HostLandingPage({
     currentUser?.canManagePermissions ? <HostLaunchCard key="permissions" icon="permissions" label="Permissions" description="Users and access" onClick={() => setPermissionsOpen(true)} /> : null
   ].filter(Boolean);
   const personalCards = [
-    canAccessMustang(currentUser) ? <HostLaunchCard key="mustang" icon="mustang" label="Mustang" description="Spec and parts tracker" onClick={() => window.open("/mustang", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards, personalCards].filter((items) => items.length).length;
 
@@ -4226,9 +4219,7 @@ function ClientLandingPage({
   }
 
   const boardCards = [
-    canAccessBoard(currentUser) ? <HostLaunchCard key="morning-meeting" icon="materials" label="Morning Meeting" description="Production planner and notes" onClick={() => goTo("/morning-meeting")} /> : null,
     canAccessDesignBoard(currentUser) ? <HostLaunchCard key="design-board" icon="design" label="Design Board" description="Artwork planning board" onClick={() => goTo(designBoardPath)} /> : null,
-    canAccessFiltering(currentUser) ? <HostLaunchCard key="filtering-board" icon="filtering" label="Filtering Board" description="Approved artwork holding" onClick={() => goTo(filteringPath)} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="installation-board" icon="board" label="Installation Board" description="Jobs and scheduling" onClick={() => goTo(getBoardPathForUser(currentUser))} /> : null,
     canAccessBoard(currentUser) ? <HostLaunchCard key="wip" icon="board" label="WIP" description="Production drag board" onClick={() => goTo("/wip")} /> : null
   ].filter(Boolean);
@@ -4249,7 +4240,6 @@ function ClientLandingPage({
   ].filter(Boolean);
 
   const operationsCards = [
-    canAccessMaterials(currentUser) ? <HostLaunchCard key="materials" icon="materials" label="Materials" description="Shop stock requests" onClick={() => goTo("/materials")} /> : null,
     canAccessRams(currentUser) ? <HostLaunchCard key="rams" icon="rams" label="RAMS" description="Risk and method docs" onClick={() => goTo("/rams")} /> : null
   ].filter(Boolean);
   const sectionCount = [boardCards, adminCards, toolsCards, operationsCards].filter((items) => items.length).length;
@@ -24823,12 +24813,6 @@ export default function App() {
           </section>
         </div>
       </div>
-      {!isClientMode ? (
-        <button className="morning-meeting-launcher" type="button" onClick={() => window.location.assign("/morning-meeting")}>
-          <span>Morning Meeting</span>
-          <small>Open daily outline</small>
-        </button>
-      ) : null}
       {!isClientMode && installationReportOpen ? (
         <div
           className="modal-backdrop installation-report-backdrop"
