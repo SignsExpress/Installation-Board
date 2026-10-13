@@ -229,3 +229,7 @@ The user rejected the new design. main.jsx now loads only the established App.js
 ## Four modules retired — 13 October 2026
 
 Morning Meeting, Filtering Board, Materials and Mustang are removed from Classic desktop/mobile navigation and host/client home launchers. The Installation Board Morning Meeting shortcut is removed. Old module URLs (including client/nested routes) resolve to Home at startup through retired-modules.mjs. This is a page-entry removal: saved data and shared APIs/helpers remain to protect Design Board approval workflows, panel tools and other module dependencies. No remaining module screen, PDF generator, CSS or server implementation was changed. Build and tests/retired-modules.test.mjs checks pass.
+
+## Standalone Vehicle Pricing foundation — 13 October 2026
+
+vehicle-pricing-product is a separate local application on port 5192 with its own companies, users, sessions and settings. The portal does not import or serve it. Owner admin supports company creation, user creation/password reset and suspension. A first-login illustrated setup wizard calibrates four reference jobs across Medium/Large/Luton using extracted formula functions, then opens the extracted original calculator. Runtime data and owner credentials are ignored. Company isolation/password/calibration tests and both builds pass. See vehicle-pricing-product/README.md for limits and the independent hosting step still needed before external access.

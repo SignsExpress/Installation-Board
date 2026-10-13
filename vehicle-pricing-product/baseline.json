@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "settingsByTemplate": {
+    "medium-van-transit-custom": {
+      "standardVinylRate": 84,
+      "wrapRateStart": 107,
+      "wrapRateFloor": 77,
+      "wrapRateTaper": 34,
+      "labourSellRate": 160,
+      "standardSmallHoursPerM2": 0.68,
+      "standardSmallMinHours": 1,
+      "standardSmallMaxHours": 1.6,
+      "standardLargeHoursPerM2": 0.5,
+      "wrapLabourStartHoursPerM2": 0.98,
+      "wrapLabourFloorHoursPerM2": 0.62,
+      "wrapLabourTaper": 0.44,
+      "sectionFactors": {
+        "one": 0.92,
+        "twoToThree": 1.02,
+        "fourToFive": 1.1,
+        "moreThanFive": 1.18
+      },
+      "difficultyFactors": {
+        "flat": 1,
+        "light_curve": 1.09,
+        "normal_wrap_curve": 1.18,
+        "deep_recess": 1.3
+      },
+      "marketAnchors": {
+        "c0": 0,
+        "c05": 275,
+        "c10": 450,
+        "c15": 725,
+        "c22": 1175,
+        "c35": 1750,
+        "c55": 2600,
+        "c85": 3500,
+        "c100": 3750
+      },
+      "blendWeights": {
+        "noWrap": {
+          "calculated": 0.48,
+          "anchor": 0.52
+        },
+        "wrapUnder35": {
+          "calculated": 0.44,
+          "anchor": 0.56
+        },
+        "wrapUnder70": {
+          "calculated": 0.32,
+          "anchor": 0.68
+        },
+        "wrapFull": {
+          "calculated": 0.18,
+          "anchor": 0.82
+        }
+      },
+      "minPrice": 275,
+      "minAnyWrapPrice": 675,
+      "minPartialWrapPrice": 975,
+      "minFullWrapPrice": 2250,
+      "materialMultipliers": {
+        "standard": 1,
+        "contra": 1.2,
+        "reflective": 2
+      },
+      "__defaultsVersion": 1
+    },
+    "large-van-ford-transit-panel-lwb": {
+      "standardVinylRate": 86,
+      "wrapRateStart": 110,
+      "wrapRateFloor": 80,
+      "wrapRateTaper": 32,
+      "labourSellRate": 160,
+      "standardSmallHoursPerM2": 0.7,
+      "standardSmallMinHours": 1,
+      "standardSmallMaxHours": 1.7,
+      "standardLargeHoursPerM2": 0.52,
+      "wrapLabourStartHoursPerM2": 1.02,
+      "wrapLabourFloorHoursPerM2": 0.66,
+      "wrapLabourTaper": 0.42,
+      "sectionFactors": {
+        "one": 0.92,
+        "twoToThree": 1.03,
+        "fourToFive": 1.12,
+        "moreThanFive": 1.2
+      },
+      "difficultyFactors": {
+        "flat": 1,
+        "light_curve": 1.1,
+        "normal_wrap_curve": 1.2,
+        "deep_recess": 1.32
+      },
+      "marketAnchors": {
+        "c0": 0,
+        "c05": 300,
+        "c10": 500,
+        "c15": 800,
+        "c22": 1300,
+        "c35": 1900,
+        "c55": 2850,
+        "c85": 3850,
+        "c100": 4100
+      },
+      "blendWeights": {
+        "noWrap": {
+          "calculated": 0.46,
+          "anchor": 0.54
+        },
+        "wrapUnder35": {
+          "calculated": 0.42,
+          "anchor": 0.58
+        },
+        "wrapUnder70": {
+          "calculated": 0.28,
+          "anchor": 0.72
+        },
+        "wrapFull": {
+          "calculated": 0.15,
+          "anchor": 0.85
+        }
+      },
+      "minPrice": 300,
+      "minAnyWrapPrice": 700,
+      "minPartialWrapPrice": 1050,
+      "minFullWrapPrice": 2500,
+      "materialMultipliers": {
+        "standard": 1,
+        "contra": 1.2,
+        "reflective": 2
+      },
+      "__defaultsVersion": 2
+    },
+    "luton-van-vauxhall-movano": {
+      "standardVinylRate": 84,
+      "wrapRateStart": 107,
+      "wrapRateFloor": 77,
+      "wrapRateTaper": 34,
+      "labourSellRate": 160,
+      "standardSmallHoursPerM2": 0.68,
+      "standardSmallMinHours": 1,
+      "standardSmallMaxHours": 1.6,
+      "standardLargeHoursPerM2": 0.5,
+      "wrapLabourStartHoursPerM2": 0.98,
+      "wrapLabourFloorHoursPerM2": 0.62,
+      "wrapLabourTaper": 0.44,
+      "sectionFactors": {
+        "one": 0.92,
+        "twoToThree": 1.02,
+        "fourToFive": 1.1,
+        "moreThanFive": 1.18
+      },
+      "difficultyFactors": {
+        "flat": 1,
+        "light_curve": 1.09,
+        "normal_wrap_curve": 1.18,
+        "deep_recess": 1.3
+      },
+      "marketAnchors": {
+        "c0": 0,
+        "c05": 275,
+        "c10": 450,
+        "c15": 725,
+        "c22": 1175,
+        "c35": 1750,
+        "c55": 2600,
+        "c85": 3500,
+        "c100": 3750
+      },
+      "blendWeights": {
+        "noWrap": {
+          "calculated": 0.48,
+          "anchor": 0.52
+        },
+        "wrapUnder35": {
+          "calculated": 0.44,
+          "anchor": 0.56
+        },
+        "wrapUnder70": {
+          "calculated": 0.32,
+          "anchor": 0.68
+        },
+        "wrapFull": {
+          "calculated": 0.18,
+          "anchor": 0.82
+        }
+      },
+      "minPrice": 275,
+      "minAnyWrapPrice": 675,
+      "minPartialWrapPrice": 975,
+      "minFullWrapPrice": 2250,
+      "materialMultipliers": {
+        "standard": 1,
+        "contra": 1.2,
+        "reflective": 2
+      },
+      "__defaultsVersion": 1
+    }
+  }
+}
