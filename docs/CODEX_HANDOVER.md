@@ -221,3 +221,7 @@ The existing holiday seed merge now also retains WIP state, matching the tested 
 ### WIP behaviour restored — 8 October 2026
 
 The new skin uses one combined draggable WIP board. Status lanes are always visible together with unscheduled work and ten working days starting today, skipping weekends, matching Classic's getWipBoardDays rule. There is no separate status/schedule toggle or Monday-based week navigation. Status lanes remain sticky on desktop to accept jobs dragged from the date lanes. Existing upload memory, multi-day planning, assignees, count-value and completion review rules are retained. Date and drag/drop transition regression tests live in tests/wip-board.test.mjs.
+
+## Original design restored — 13 October 2026
+
+The user rejected the new design. main.jsx now loads only the established App.jsx and index.css. The early-access switch is removed, saved skin preferences are cleared, and old ?skin=new links also load the original portal. The unused new-skin source remains in Git history/source for reference but is not imported or shipped in the production build. Do not re-enable it without an explicit user request. Live operational data, the existing PDF layout and the WIP data-preservation fix are retained.
