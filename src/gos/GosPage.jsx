@@ -85,7 +85,8 @@ async function markedPhoto(photo, boxes) {
 function Modal({
   title,
   onClose,
-  children
+  children,
+  className = ''
 }) {
   const ref = useRef(null);
   useEffect(() => {
@@ -98,7 +99,7 @@ function Modal({
       old?.focus?.();
     };
   }, []);
-  return <div className="gos-backdrop"><section className="gos-modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onKeyDown={e => {
+  return <div className="gos-backdrop"><section className={"gos-modal " + className} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onKeyDown={e => {
       if (e.key === 'Escape') onClose();
       if (e.key === 'Tab') {
         const list = Array.from(ref.current.querySelectorAll('button,input,select,textarea,a[href]')).filter(el => !el.disabled && el.getClientRects().length);
@@ -257,15 +258,15 @@ function Order({
       setSending(false);
     }
   }
-  return <Modal title={kind === 'repair' ? 'Order a repair' : 'Order vehicle livery'} onClose={() => {
+  return <Modal className={kind === 'repair' ? 'gos-repair-modal' : 'gos-order-modal'} title={kind === 'repair' ? 'Order repair' : 'Order graphics'} onClose={() => {
     if (!sending) onClose();
-  }}><form onSubmit={submit}><p className="gos-muted">Find a registration to use its saved vehicle and livery details.</p><div className="gos-segment"><button type="button" aria-pressed={mode === 'existing'} onClick={() => {
+  }}><form onSubmit={submit}><div className="gos-segment"><button type="button" aria-pressed={mode === 'existing'} onClick={() => {
           setMode('existing');
           setBoxes({});
-        }}>Existing registration</button><button type="button" aria-pressed={mode === 'new'} onClick={() => {
+        }}>Existing van</button><button type="button" aria-pressed={mode === 'new'} onClick={() => {
           setMode('new');
           setBoxes({});
-        }}>New registration</button></div>{mode === 'existing' ? <><label>Search registration<input type="search" autoComplete="off" placeholder="Type a registration, driver or model…" value={regSearch} onFocus={() => setShowResults(true)} onChange={e => {
+        }}>New van</button></div>{mode === 'existing' ? <><label>Search registration<input type="search" autoComplete="off" placeholder="Type a registration, driver or model…" value={regSearch} onFocus={() => setShowResults(true)} onChange={e => {
             setRegSearch(e.target.value);
             setExistingId('');
             setShowResults(true);
@@ -275,15 +276,15 @@ function Order({
               e.preventDefault();
               if (matching.length === 1) chooseVehicle(matching[0]);
             }
-          }} /></label>{showResults && <div className="gos-reg-results" role="region" aria-label="Matching registrations">{matching.map(v => <button type="button" key={v.id} onClick={() => chooseVehicle(v)}><strong>{v.reg}</strong><span>{v.model}</span><small>{v.name}</small></button>)}{!matching.length && <p>No registrations match. Use New registration to add a vehicle.</p>}{matching.length === 15 && <p>Showing the first 15 matches. Keep typing to narrow the search.</p>}</div>}{existing && <p className="gos-summary"><strong>{existing.reg}</strong> · {existing.model} · {existing.wheelbase || 'Wheelbase not recorded'} · {existing.colour || 'Colour not recorded'}<br />{existing.division} · {existing.name}{livery && <><br /><span className="gos-tag">{livery.name}</span></>}</p>}</> : <><Fields full={false} showLivery={false} value={vehicle} onChange={setVehicle} liveries={register.liveries} divisions={divisions} /><section className="gos-new-artwork"><h3>Choose the livery for this vehicle</h3>{design && !choosingDesign ? <div className="gos-selected-artwork"><strong>{livery?.name}</strong><span>{design.title}</span><button type="button" onClick={() => setChoosingDesign(true)}>Change livery</button></div> : <><label>Find a livery / van type<input type="search" placeholder="E.g. Standard GOS, Transit Custom, LWB…" value={designSearch} onChange={e => setDesignSearch(e.target.value)} /></label><div className="gos-design-options">{(register.designs || []).filter(d => normalized(d.title + ' ' + register.liveries.find(l => l.id === d.liveryId)?.name).includes(normalized(designSearch))).map(d => <button type="button" key={d.id} aria-pressed={designId === d.id} onClick={() => {
+          }} /></label>{showResults && <div className="gos-reg-results" role="region" aria-label="Matching registrations">{matching.map(v => <button type="button" key={v.id} onClick={() => chooseVehicle(v)}><strong>{v.reg}</strong><span>{v.model}</span><small>{v.name}</small></button>)}{!matching.length && <p>No registrations match. Use New registration to add a vehicle.</p>}{matching.length === 15 && <p>Showing the first 15 matches. Keep typing to narrow the search.</p>}</div>}{existing && <p className="gos-summary"><strong>{existing.reg}</strong><span>{[existing.model, existing.wheelbase, existing.colour].filter(Boolean).join(' / ')}</span>{livery && <span>{livery.name}</span>}</p>}</> : <><Fields full={false} showLivery={false} value={vehicle} onChange={setVehicle} liveries={register.liveries} divisions={divisions} /><section className="gos-new-artwork"><h3>Choose the livery for this vehicle</h3>{design && !choosingDesign ? <div className="gos-selected-artwork"><strong>{livery?.name}</strong><span>{design.title}</span><button type="button" onClick={() => setChoosingDesign(true)}>Change livery</button></div> : <><label>Find a livery / van type<input type="search" placeholder="E.g. Standard GOS, Transit Custom, LWB…" value={designSearch} onChange={e => setDesignSearch(e.target.value)} /></label><div className="gos-design-options">{(register.designs || []).filter(d => normalized(d.title + ' ' + register.liveries.find(l => l.id === d.liveryId)?.name).includes(normalized(designSearch))).map(d => <button type="button" key={d.id} aria-pressed={designId === d.id} onClick={() => {
                 setDesignId(d.id);
                 setChoosingDesign(false);
                 setBoxes({});
               }}><img src={d.previewUrl} alt={d.title} loading="lazy" /><strong>{register.liveries.find(l => l.id === d.liveryId)?.name}</strong><span>{d.title}</span></button>)}</div></>}</section></>}
- <section className="gos-order-images"><h3>{kind === 'repair' ? 'Mark the areas that need repairing' : 'Vehicle livery'}</h3>{kind === 'repair' && photos.length > 0 && <p>Drag boxes over the graphics that need repair. The marked PDF will be attached to your order.</p>}{!photos.length ? <p className="gos-empty">{mode === 'existing' ? existing ? 'No PDF design is assigned to this registration. Update the vehicle record in the register first.' : 'Search for and select a registration to see its livery.' : 'Choose a livery above to see the artwork.'}</p> : photos.map(p => kind === 'repair' ? <RepairImage key={p.id} photo={p} boxes={boxes[p.id] || []} onChange={b => setBoxes({
+ <section className="gos-order-images">{kind === 'repair' && <h3>Mark repairs</h3>}{kind === 'repair' && photos.length > 0 && <p>Draw a box around each repair.</p>}{!photos.length ? <p className="gos-empty">{mode === 'existing' ? existing ? 'No drawing saved. Edit the vehicle first.' : 'Find your van above.' : 'Choose a livery above.'}</p> : photos.map(p => kind === 'repair' ? <RepairImage key={p.id} photo={p} boxes={boxes[p.id] || []} onChange={b => setBoxes({
           ...boxes,
           [p.id]: b
-        })} /> : <img className="gos-order-image" key={p.id} src={p.url} alt={p.name || livery?.name} />)}</section><label>Order notes / reference<textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Purchase order, required date, delivery or repair instructions" /></label>{error && <p role="alert" className="gos-error">{error}</p>}{!register.orderingReady && <p className="gos-error">Ordering is temporarily unavailable.</p>}<footer><button type="button" disabled={sending} onClick={onClose}>Cancel</button><button className="gos-primary" disabled={sending || !register.orderingReady}>{sending ? 'Sending order…' : 'Send ' + (kind === 'repair' ? 'repair' : 'livery') + ' order'}</button></footer></form></Modal>;
+        })} /> : <img className="gos-order-image" key={p.id} src={p.url} alt={p.name || livery?.name} />)}</section><label>Notes (optional)<textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="PO number, date or anything we need to know" /></label>{error && <p role="alert" className="gos-error">{error}</p>}{!register.orderingReady && <p className="gos-error">Ordering is temporarily unavailable.</p>}<footer><button type="button" disabled={sending} onClick={onClose}>Cancel</button><button className="gos-primary" disabled={sending || !register.orderingReady}>{sending ? 'Sending order…' : 'Send ' + (kind === 'repair' ? 'repair' : 'livery') + ' order'}</button></footer></form></Modal>;
 }
 export default function GosPage() {
   const [register, setRegister] = useState(null),
@@ -365,17 +366,17 @@ export default function GosPage() {
     }
   }
   if (loading) return <div className="gos-app"><p className="gos-loading">Loading GOS Vehicle Liveries…</p></div>;
-  if (!register) return <div className="gos-app gos-login"><form onSubmit={login}><img className="gos-logo gos-login-logo" src="/gos/logo.svg" alt="GOS Services" /><p className="gos-eyebrow">VEHICLE LIVERIES</p><h1>Your fleet, every livery.</h1><p>View your vehicle register, request new graphics and mark repairs.</p><label>Portal password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>{error && <p role="alert" className="gos-error">{error}</p>}<button className="gos-primary" disabled={busy}>{busy ? 'Signing in…' : 'Open vehicle portal'}</button><small>Managed by Signs Express Central Lancashire & Southport</small></form></div>;
+  if (!register) return <div className="gos-app gos-login"><form onSubmit={login}><img className="gos-logo gos-login-logo" src="/gos/logo.svg" alt="GOS Services" /><p className="gos-eyebrow">VEHICLE LIVERIES</p><h1>Vehicle Liveries</h1><label>Portal password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>{error && <p role="alert" className="gos-error">{error}</p>}<button className="gos-primary" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button><small>Managed by Signs Express Central Lancashire & Southport</small></form></div>;
   const divisions = [...new Set(register.vehicles.map(v => v.division).filter(Boolean))].sort();
   const vehicles = register.vehicles.filter(v => (!division || v.division === division) && (!liveryFilter || v.liveryId === liveryFilter) && (!search || [v.reg, v.name, v.division, v.model, v.group, register.liveries.find(l => l.id === v.liveryId)?.name].join(' ').toLowerCase().includes(search.toLowerCase()) || v.reg.replace(/\s/g, '').toLowerCase().includes(search.replace(/\s/g, '').toLowerCase())));
   return <div className="gos-app"><header className="gos-top"><div><img className="gos-logo" src="/gos/logo.svg" alt="GOS Services" /><span>Vehicle Liveries</span></div><nav><button onClick={() => setOrder({
           kind: 'livery'
-        })} className="gos-primary">Order livery</button><button onClick={() => setOrder({
+        })} className="gos-primary">Order graphics</button><button onClick={() => setOrder({
           kind: 'repair'
         })}>Order repair</button><button onClick={async () => {
           await api('/logout', {});
           setRegister(null);
-        }}>Sign out</button></nav></header><main>{register.previewMode && <div className="gos-info">Test preview — orders are captured locally. No emails are sent.</div>}<div className="gos-heading"><div><p className="gos-eyebrow">GOS FLEET PORTAL</p><h1>GOS Vehicle Liveries</h1><p>Find your vehicles, check their liveries and keep the register up to date.</p></div><span className="gos-total">{register.vehicles.length} vehicles</span></div>{notice && <div className="gos-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}{error && !edit && <p className="gos-error" role="alert">{error}</p>}<div className="gos-tabs">{[['vehicles', 'Vehicle register'], ['liveries', 'Livery designs'], ['orders', 'Order history']].map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>{tab === 'vehicles' ? <><div className="gos-filters"><label>Search<input type="search" placeholder="Registration, driver, model…" value={search} onChange={e => setSearch(e.target.value)} /></label><label>Division<select value={division} onChange={e => setDivision(e.target.value)}><option value="">All divisions</option>{divisions.map(d => <option key={d}>{d}</option>)}</select></label><label>Livery<select value={liveryFilter} onChange={e => setLiveryFilter(e.target.value)}><option value="">All liveries</option>{register.liveries.map(l => <option value={l.id} key={l.id}>{l.name}</option>)}</select></label><button onClick={() => {
+        }}>Sign out</button></nav></header><main>{register.previewMode && <div className="gos-info">Test preview — orders are captured locally. No emails are sent.</div>}<div className="gos-heading"><div><h1>{tab === 'vehicles' ? 'Vehicles' : tab === 'liveries' ? 'PDFs' : 'Orders'}</h1></div><span className="gos-total">{register.vehicles.length} vehicles</span></div>{notice && <div className="gos-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Dismiss notification">×</button></div>}{error && !edit && <p className="gos-error" role="alert">{error}</p>}<div className="gos-tabs">{[['vehicles', 'Vehicles'], ['liveries', 'PDFs'], ['orders', 'Orders']].map(([id, label]) => <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>{tab === 'vehicles' ? <><div className="gos-filters"><label>Search<input type="search" placeholder="Registration, driver, model…" value={search} onChange={e => setSearch(e.target.value)} /></label><label>Division<select value={division} onChange={e => setDivision(e.target.value)}><option value="">All divisions</option>{divisions.map(d => <option key={d}>{d}</option>)}</select></label><label>Livery<select value={liveryFilter} onChange={e => setLiveryFilter(e.target.value)}><option value="">All liveries</option>{register.liveries.map(l => <option value={l.id} key={l.id}>{l.name}</option>)}</select></label><button onClick={() => {
             setEdit({
               ...blank,
               liveryId: register.liveries[0]?.id
@@ -386,26 +387,26 @@ export default function GosPage() {
               p = v.matchedDesign ? {
                 url: v.matchedDesign.previewUrl
               } : v.photos?.[0];
-            return <article key={v.id} className="gos-vehicle-card"><div className="gos-card-photo">{p ? <img src={p.url} alt={v.reg + ' vehicle photo'} loading="lazy" /> : <div><strong>{v.reg}</strong><span>No exact PDF match yet</span></div>}{v.matchedDesign ? <a className="gos-upload" href={v.matchedDesign.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a> : <button className="gos-upload" onClick={() => {
+            return <article key={v.id} className="gos-vehicle-card"><div className="gos-card-photo">{p ? <img src={p.url} alt={v.reg + ' vehicle photo'} loading="lazy" /> : <div><strong>{v.reg}</strong><span>Drawing needed</span></div>}{v.matchedDesign ? <a className="gos-upload" href={v.matchedDesign.pdfUrl} target="_blank" rel="noreferrer">Open PDF</a> : <button className="gos-upload" onClick={() => {
                   setEdit({
                     ...v,
                     designId: ''
                   });
                   setError('');
-                }}>Choose PDF design</button>}</div><div className="gos-card-body"><div className="gos-reg-row"><h2>{v.reg}</h2><button onClick={() => {
+                }}>Choose drawing</button>}</div><div className="gos-card-body"><div className="gos-reg-row"><h2>{v.reg}</h2><button onClick={() => {
                     setEdit({
                       ...v,
                       designId: v.designId || v.matchedDesign?.id || ''
                     });
                     setError('');
-                  }} aria-label={'Edit ' + v.reg}>Edit</button></div><p>{v.model}</p>{v.matchedDesign && <p className="gos-pdf-caption">PDF {v.matchedDesign.pageNumber}: {v.matchedDesign.title}</p>}<p className="gos-muted">{[v.wheelbase, v.colour].filter(Boolean).join(' · ') || 'Vehicle details can be added'}</p><dl><div><dt>Division</dt><dd>{v.division || 'Unallocated'}</dd></div><div><dt>Assigned to</dt><dd>{v.name || 'Unassigned'}</dd></div></dl><span className="gos-tag">{l?.name || 'No livery selected'}</span>{v.notes && <p>{v.notes}</p>}<div className="gos-card-actions"><button onClick={() => setOrder({
+                  }} aria-label={'Edit ' + v.reg}>Edit</button></div><p>{v.model}</p><p className="gos-muted">{[v.wheelbase, v.colour].filter(Boolean).join(' · ') || 'Vehicle details can be added'}</p><dl><div><dt>Division</dt><dd>{v.division || 'Unallocated'}</dd></div><div><dt>Assigned to</dt><dd>{v.name || 'Unassigned'}</dd></div></dl><span className="gos-tag">{l?.name || 'No livery selected'}</span>{v.notes && <p>{v.notes}</p>}<div className="gos-card-actions"><button onClick={() => setOrder({
                     kind: 'livery',
                     initialId: v.id
-                  })}>Order livery</button><button onClick={() => setOrder({
+                  })}>Order graphics</button><button onClick={() => setOrder({
                     kind: 'repair',
                     initialId: v.id
                   })}>Order repair</button></div></div></article>;
-          })}</div>{!vehicles.length && <p className="gos-empty">No vehicles match these filters.</p>}</> : tab === 'liveries' ? <><div className="gos-info">Choose a PDF page by livery category, van type and wheelbase. The text from the original page identifies the vehicle; snapshots are previews only. Orders and repairs use the original PDF page.</div><div className="gos-documents">{(register.documents || []).map(d => <a key={d.id} href={d.url} target="_blank" rel="noreferrer">Open {d.name} ({d.pageCount} pages)</a>)}</div><Suspense fallback={<p>Loading PDF importer…</p>}><PdfUpload liveries={register.liveries} onUpload={async payload => {
+          })}</div>{!vehicles.length && <p className="gos-empty">No vehicles match these filters.</p>}</> : tab === 'liveries' ? <><div className="gos-documents">{(register.documents || []).map(d => <span key={d.id}>{d.name} · {d.pageCount} pages</span>)}</div><Suspense fallback={<p>Loading PDF importer…</p>}><PdfUpload documents={register.documents || []} designs={register.designs || []} liveries={register.liveries} onUpload={async payload => {
             await api('/documents', payload);
             await refresh();
           }} /></Suspense><form className="gos-add-livery" onSubmit={async e => {
@@ -428,7 +429,7 @@ export default function GosPage() {
               setLiveryFilter(l.id);
               setDivision('');
               setSearch('');
-            }}>View vehicles</button></div><div className="gos-pdf-grid">{(register.designs || []).filter(d => d.liveryId === l.id).map(d => <article className="gos-pdf-card" key={d.id}><a href={d.pdfUrl} target="_blank" rel="noreferrer"><img src={d.previewUrl} alt={d.title} loading="lazy" /></a><div><span className="gos-tag">Page {d.pageNumber}</span><h3>{d.title}</h3><a href={d.pdfUrl} target="_blank" rel="noreferrer">Open PDF page</a></div></article>)}</div>{!(register.designs || []).some(d => d.liveryId === l.id) && <p className="gos-empty">No PDF pages assigned to this category.</p>}</section>)} </> : <div className="gos-table-wrap"><table><thead><tr><th>Reference</th><th>Type</th><th>Registration</th><th>Livery</th><th>Date</th><th>Email status</th></tr></thead><tbody>{register.orders.slice().reverse().map(o => <tr key={o.id}><td>{o.id.slice(0, 8)}</td><td>{o.kind}</td><td>{o.reg}</td><td>{o.livery}</td><td>{new Date(o.createdAt).toLocaleString('en-GB')}</td><td>{o.status}</td></tr>)}</tbody></table>{!register.orders.length && <p className="gos-empty">No orders submitted yet.</p>}</div>}</main>{edit && <Modal title={edit.id ? 'Edit ' + edit.reg : 'Add vehicle'} onClose={() => {
+            }}>View vehicles</button></div><div className="gos-pdf-grid">{(register.designs || []).filter(d => d.liveryId === l.id).map(d => <article className="gos-pdf-card" key={d.id}><a href={d.pdfUrl} target="_blank" rel="noreferrer"><img src={d.previewUrl} alt={d.title} loading="lazy" /></a><div><span className="gos-tag">Page {d.pageNumber}</span><h3>{d.title}</h3><a href={d.pdfUrl} target="_blank" rel="noreferrer">View PDF</a></div></article>)}</div>{!(register.designs || []).some(d => d.liveryId === l.id) && <p className="gos-empty">No PDF pages assigned to this category.</p>}</section>)} </> : <div className="gos-table-wrap"><table><thead><tr><th>Reference</th><th>Type</th><th>Registration</th><th>Livery</th><th>Date</th><th>Email status</th></tr></thead><tbody>{register.orders.slice().reverse().map(o => <tr key={o.id}><td>{o.id.slice(0, 8)}</td><td>{o.kind}</td><td>{o.reg}</td><td>{o.livery}</td><td>{new Date(o.createdAt).toLocaleString('en-GB')}</td><td>{o.status}</td></tr>)}</tbody></table>{!register.orders.length && <p className="gos-empty">No orders submitted yet.</p>}</div>}</main>{edit && <Modal title={edit.id ? 'Edit ' + edit.reg : 'Add vehicle'} onClose={() => {
       if (!busy) setEdit(null);
     }}><form onSubmit={save}><Fields value={edit} onChange={setEdit} liveries={register.liveries} divisions={divisions} designs={register.designs || []} />{error && <p role="alert" className="gos-error">{error}</p>}<footer><button type="button" onClick={() => setEdit(null)}>Cancel</button><button className="gos-primary" disabled={busy}>{busy ? 'Saving…' : 'Save vehicle'}</button></footer></form></Modal>}{order && <Order key={order.kind + (order.initialId || 'new')} {...order} register={register} onClose={() => setOrder(null)} onSent={async id => {
       setOrder(null);

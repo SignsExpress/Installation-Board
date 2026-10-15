@@ -50,10 +50,8 @@ function createGosRouter({
   });
   const masterDir = path.join(__dirname, 'catalogue');
   function docs(s) {
-    return [{
-      ...catalogue,
-      bundled: true
-    }, ...(s.documents || [])];
+    const uploaded = s.documents || [];
+    return [...(uploaded.some(d => d.id === catalogue.id) ? [] : [{ ...catalogue, bundled: true }]), ...uploaded];
   }
   function designs(s) {
     return docs(s).flatMap(doc => doc.pages.map(p => ({
@@ -171,8 +169,9 @@ function createGosRouter({
     url: '/api/gos/photos/' + p.file
   });
   function view(s) {
+    const { documentHistory, ...publicStore } = s;
     return {
-      ...s,
+      ...publicStore,
       vehicles: s.vehicles.map(v => ({
         ...v,
         matchedDesign: matchDesign(v, designs(s)),
@@ -187,6 +186,7 @@ function createGosRouter({
         id: d.id,
         name: d.name,
         pageCount: d.pages.length,
+        revision: d.filename,
         url: '/api/gos/documents/' + d.id + '.pdf'
       })),
       orders: s.orders.map(o => ({
@@ -355,28 +355,52 @@ function createGosRouter({
     const pdf = await PDFDocument.load(bytes);
     if (pdf.getPageCount() > 100) throw Error('A PDF can have at most 100 pages.');
     if (!Array.isArray(req.body.pages) || req.body.pages.length !== pdf.getPageCount()) throw Error('Each PDF page needs a preview and van label.');
-    const id = crypto.randomUUID(),
-      s = read();
+    const uploadId = crypto.randomUUID(), s = read();
+    const previous = req.body.replaceId ? docs(s).find(d => d.id === req.body.replaceId) : null;
+    if (req.body.replaceId && !previous) throw Error('PDF not found. Refresh and try again.');
+    const id = previous?.id || uploadId;
     const pages = req.body.pages.map((p, i) => {
       if (p.pageNumber !== i + 1 || !s.liveries.some(l => l.id === p.liveryId)) throw Error('Choose a livery category for every page.');
       const preview = imageBuffer(p.previewDataUrl),
-        file = id + '-page-' + (i + 1) + '.' + preview.ext;
+        file = uploadId + '-page-' + (i + 1) + '.' + preview.ext;
       fs.writeFileSync(path.join(documentsDir, file), preview.buffer);
       return {
-        id: id + '-page-' + (i + 1),
+        id: uploadId + '-page-' + (i + 1),
         pageNumber: i + 1,
         title: clean(p.title, 500) || 'Page ' + (i + 1),
         liveryId: p.liveryId,
         previewFile: file
       };
     });
-    fs.writeFileSync(path.join(documentsDir, id + '.pdf'), bytes);
+    fs.writeFileSync(path.join(documentsDir, uploadId + '.pdf'), bytes);
     await mutate(s => {
-      s.documents = [...(s.documents || []), {
-        id,
-        name: clean(req.body.name, 160) || 'Livery PDF',
-        filename: id + '.pdf',
-        pages
+      const old = previous && docs(s).find(d => d.id === previous.id);
+      if (previous && (!old || old.filename !== req.body.revision)) {
+        const error = Error('This PDF has changed. Refresh before replacing it.');
+        error.status = 409;
+        throw error;
+      }
+      if (old) {
+        const allDesigns = designs(s);
+        const oldDesigns = allDesigns.filter(d => d.documentId === old.id);
+        // Match labels, not positions, so reordered pages cannot change a van's artwork.
+        const key = p => clean(p.title).toLowerCase().replace(/\s+/g, ' ') + '|' + p.liveryId;
+        for (const page of pages) {
+          const matches = oldDesigns.filter(d => key(d) === key(page));
+          if (matches.length === 1 && pages.filter(p => key(p) === key(page)).length === 1) page.id = matches[0].id;
+        }
+        for (const v of s.vehicles) {
+          const assigned = matchDesign(v, allDesigns);
+          if (assigned?.documentId === old.id) {
+            // Removed drawings require a manual check instead of guessing another drawing.
+            v.designId = assigned.id;
+            v.version++;
+          }
+        }
+        s.documentHistory = [...(s.documentHistory || []), { ...old, replacedAt: new Date().toISOString() }];
+      }
+      s.documents = [...(s.documents || []).filter(d => d.id !== id), {
+        id, name: clean(req.body.name, 160) || 'Livery PDF', filename: uploadId + '.pdf', pages
       }];
     });
     res.json({

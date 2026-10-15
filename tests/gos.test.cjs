@@ -359,3 +359,55 @@ test('mail connection diagnostics use the existing transport without sending a m
   recipient: undefined,
   verifyMail: async () => true
 }));
+test('PDF replacement keeps assignments through reordered pages, protects old orders and rejects stale replacements', () => fixture(async ({req, dataDir, mails}) => {
+  const {PDFDocument} = require('pdf-lib');
+  const login = await req('/api/gos/login', {password:'GOS123'}), cookie=login.cookie;
+  const before=(await req('/api/gos/register',null,cookie)).body;
+  const liveryId=before.liveries[0].id;
+  async function upload(titles, replace) {
+    const pdf=await PDFDocument.create();
+    titles.forEach((_, i)=>pdf.addPage([300+i*100,200]));
+    return req('/api/gos/documents',{name:'Updated vans.pdf',dataUrl:'data:application/pdf;base64,'+Buffer.from(await pdf.save()).toString('base64'),pages:titles.map((title,i)=>({pageNumber:i+1,title,liveryId,previewDataUrl:png})),...(replace?{replaceId:replace.id,revision:replace.revision}:{})},cookie);
+  }
+  const added=await upload(['Drawing A','Drawing B']);
+  assert.equal(added.status,200);
+  let register=(await req('/api/gos/register',null,cookie)).body;
+  const original=register.documents.find(d=>d.id===added.body.id);
+  const design=register.designs.find(d=>d.documentId===original.id && d.title==='Drawing A');
+  const vehicle=register.vehicles[0];
+  assert.equal((await req('/api/gos/vehicles/'+vehicle.id,{...vehicle,liveryId,designId:design.id},cookie,'PATCH')).status,200);
+  const order={requestId:'replace-order-12345',kind:'livery',existingId:vehicle.id,designId:design.id};
+  assert.equal((await req('/api/gos/orders',order,cookie)).status,200);
+  const saved=JSON.parse(fs.readFileSync(path.join(dataDir,'register.json'))).orders[0];
+  assert.equal((await upload(['Drawing B','Drawing A'],original)).status,200);
+  register=(await req('/api/gos/register',null,cookie)).body;
+  const updated=register.vehicles.find(v=>v.id===vehicle.id);
+  assert.equal(updated.matchedDesign.id,design.id);
+  assert.equal(updated.matchedDesign.pageNumber,2);
+  assert.equal(register.documents.filter(d=>d.id===original.id).length,1);
+  assert.equal((await upload(['Drawing A'],original)).status,409);
+  const store=JSON.parse(fs.readFileSync(path.join(dataDir,'register.json')));
+  assert.equal(store.orders[0].design.filename,saved.design.filename);
+  assert.ok(fs.existsSync(path.join(dataDir,'documents',saved.design.filename)));
+  assert.equal(mails.length,1);
+  const current=register.documents.find(d=>d.id===original.id);
+  assert.equal((await upload(['Drawing B'],current)).status,200);
+  register=(await req('/api/gos/register',null,cookie)).body;
+  assert.equal(register.vehicles.find(v=>v.id===vehicle.id).matchedDesign,null);
+  assert.equal((await req('/api/gos/orders',{...order,requestId:'removed-drawing-12345'},cookie)).status,400);
+}));
+
+test('Bundled catalogue can be replaced without duplicate active pages', () => fixture(async ({req}) => {
+  const {PDFDocument}=require('pdf-lib');
+  const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
+  const original=(await req('/api/gos/register',null,cookie)).body;
+  const doc=original.documents[0], page=original.designs[0];
+  const pdf=await PDFDocument.create();pdf.addPage([300,200]);
+  const result=await req('/api/gos/documents',{name:'GOS replacement.pdf',replaceId:doc.id,revision:doc.revision,dataUrl:'data:application/pdf;base64,'+Buffer.from(await pdf.save()).toString('base64'),pages:[{pageNumber:1,title:page.title,liveryId:page.liveryId,previewDataUrl:png}]},cookie);
+  assert.equal(result.status,200);
+  const after=(await req('/api/gos/register',null,cookie)).body;
+  assert.equal(after.documents.length,1);
+  assert.equal(after.designs.length,1);
+  assert.equal(after.designs[0].id,page.id);
+  assert.equal((await req(after.designs[0].pdfUrl,null,cookie)).status,200);
+}));
