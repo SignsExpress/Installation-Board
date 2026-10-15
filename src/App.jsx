@@ -4135,7 +4135,11 @@ function HostLandingPage({
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
     canAccessOrderPanels(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
-    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null,
+    canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null
+  ].filter(Boolean);
+
+
+  const customerPortalCards = [
     canEditBoard(currentUser) ? <HostLaunchCard key="gos" icon="vehicle" label="GOS Vehicle Liveries" description="Customer fleet and livery orders" onClick={() => window.open("/gos", "_blank", "noopener,noreferrer")} /> : null,
     canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
@@ -4150,7 +4154,7 @@ function HostLandingPage({
   ].filter(Boolean);
   const personalCards = [
   ].filter(Boolean);
-  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, systemCards, personalCards].filter((items) => items.length).length;
+  const sectionCount = [boardCards, adminCards, toolsCards, operationsCards, customerPortalCards, systemCards, personalCards].filter((items) => items.length).length;
 
   return (
     <div className="app-shell host-landing-shell">
@@ -4168,6 +4172,7 @@ function HostLandingPage({
             <HostLaunchSection title="Admin">{adminCards}</HostLaunchSection>
             <HostLaunchSection title="Tools">{toolsCards}</HostLaunchSection>
             <HostLaunchSection title="Operations">{operationsCards}</HostLaunchSection>
+            <HostLaunchSection title="Customer Portals">{customerPortalCards}</HostLaunchSection>
             <HostLaunchSection title="System">{systemCards}</HostLaunchSection>
             <HostLaunchSection title="Personal">{personalCards}</HostLaunchSection>
           </div>

@@ -279,3 +279,7 @@ The vehicle editor now has Delete van followed by an in-page Are you sure confir
 Replace PDF for this van is available directly in the same editor. It accepts a one-page PDF and saves the current vehicle edits and explicit PDF assignment together, with a version check. Each van has its own immutable source files and active document version. Vehicle-specific pages are excluded from automatic matching and selection for other vans and from the shared catalogue management. Other vans using the original shared page remain unchanged. Previous order snapshots retain their original attachment.
 
 Validation: production build, server syntax checks and 18 regression tests pass, including deletion/auth/stale edits, per-van isolation, atomic field saves and retained historical PDFs. Initial local UI inspection verified the editor controls; a native browser-confirm test blocked its test tab, so implementation uses the in-page modal instead. No live van was deleted and no live test email was sent.
+
+## Dashboard Customer Portals heading - 15 October 2026
+
+Host Home now groups the existing IGLOO and GOS launch cards under Customer Portals instead of Tools. Existing permissions, destinations and new-tab behaviour are unchanged; the responsive column count includes the new section. Other module screens and operational data are untouched. Production build passes.
