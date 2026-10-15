@@ -4136,6 +4136,7 @@ function HostLandingPage({
     canAccessOrderPanels(currentUser) ? <HostLaunchCard key="order-panels" icon="materials" label="Order Panels" description="Panel cutting optimiser" onClick={() => goTo("/order-panels")} /> : null,
     canAccessVanEstimator(currentUser) ? <HostLaunchCard key="vehicle-pricing" icon="vehicle" label="Vehicle Pricing" description="Graphics calculator" onClick={() => goTo("/van-estimator")} /> : null,
     canAccessInstaller(currentUser) ? <HostLaunchCard key="subcontractors" icon="subcontractors" label="Subcontractors" description="Directory and coverage" onClick={() => goTo("/installer")} /> : null,
+    canEditBoard(currentUser) ? <HostLaunchCard key="gos" icon="vehicle" label="GOS Vehicle Liveries" description="Customer fleet and livery orders" onClick={() => window.open("/gos", "_blank", "noopener,noreferrer")} /> : null,
     canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
 

@@ -1,4 +1,5 @@
 const express = require("express");
+const { createGosRouter } = require("./gos/router.cjs");
 const cors = require("cors");
 const webPush = require("web-push");
 const nodemailer = require("nodemailer");
@@ -12882,6 +12883,15 @@ function createServer() {
         response.status(400).json({ error: error.message || "Could not delete user." });
       }
     });
+
+  app.use("/api/gos", createGosRouter({
+    dataDir: path.join(path.dirname(getDataFile()), "gos-vehicle-liveries"),
+    sendMail: async (message) => {
+      const config = getCreditApplicationTransportConfig();
+      if (!config) throw new Error("SMTP is not configured.");
+      return nodemailer.createTransport(config).sendMail({ ...message, from: getCreditApplicationFromAddress() });
+    }
+  }));
 
   app.use("/api", async (request, response, next) => {
     if (request.path.startsWith("/auth/")) {
