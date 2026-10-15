@@ -24,7 +24,7 @@ function wb(text) {
   return '';
 }
 function matchDesign(vehicle, designs) {
-  const candidates = designs.filter(d => d.liveryId === vehicle.liveryId);
+  const candidates = designs.filter(d => d.liveryId === vehicle.liveryId && (!d.vehicleId || d.vehicleId === vehicle.id));
   if (vehicle.designId) return candidates.find(d => d.id === vehicle.designId) || null;
   const text = [vehicle.group, vehicle.model, vehicle.wheelbase].join(' '),
     f = family(text);

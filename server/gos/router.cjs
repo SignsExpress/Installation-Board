@@ -169,7 +169,7 @@ function createGosRouter({
     url: '/api/gos/photos/' + p.file
   });
   function view(s) {
-    const { documentHistory, ...publicStore } = s;
+    const { documentHistory, deletedVehicles, ...publicStore } = s;
     return {
       ...publicStore,
       vehicles: s.vehicles.map(v => ({
@@ -182,7 +182,7 @@ function createGosRouter({
         photos: (l.photos || []).map(photoPublic)
       })),
       designs: designs(s),
-      documents: docs(s).map(d => ({
+      documents: docs(s).filter(d => !d.vehicleId).map(d => ({
         id: d.id,
         name: d.name,
         pageCount: d.pages.length,
@@ -253,7 +253,7 @@ function createGosRouter({
     for (const k of ['reg', 'name', 'division', 'year', 'make', 'model', 'group', 'wheelbase', 'colour', 'liveryId', 'designId', 'notes']) v[k] = clean(body[k] ?? old[k] ?? '', k === 'notes' ? 3000 : 300);
     v.reg = v.reg.toUpperCase();
     if (!v.reg || !v.model) throw Error('Registration and make/model are required.');
-    if (v.designId && !designs(s).some(d => d.id === v.designId && d.liveryId === v.liveryId)) throw Error('Select a PDF design in this livery category.');
+    if (v.designId && !designs(s).some(d => d.id === v.designId && d.liveryId === v.liveryId && (!d.vehicleId || d.vehicleId === v.id))) throw Error('Select a PDF design in this livery category.');
     if (!s.liveries.some(l => l.id === v.liveryId)) throw Error('Choose a livery.');
     if (s.vehicles.some(other => other.id !== old.id && regKey(other.reg) === regKey(v.reg))) throw Error('That registration already exists.');
     return v;
@@ -290,6 +290,20 @@ function createGosRouter({
     res.json({
       ok: true
     });
+  }));
+  router.delete('/vehicles/:id', route(async (req, res) => {
+    await mutate(s => {
+      const vehicle = s.vehicles.find(v => v.id === req.params.id);
+      if (!vehicle) throw Error('Van not found.');
+      if (req.body.version !== vehicle.version) {
+        const error = Error('This van has changed. Close and reopen it before deleting.');
+        error.status = 409;
+        throw error;
+      }
+      s.deletedVehicles = [...(s.deletedVehicles || []), { ...vehicle, deletedAt: new Date().toISOString() }];
+      s.vehicles = s.vehicles.filter(v => v.id !== vehicle.id);
+    });
+    res.json({ ok: true });
   }));
   router.post('/liveries', route(async (req, res) => {
     const name = clean(req.body.name, 120);
@@ -356,7 +370,9 @@ function createGosRouter({
     if (pdf.getPageCount() > 100) throw Error('A PDF can have at most 100 pages.');
     if (!Array.isArray(req.body.pages) || req.body.pages.length !== pdf.getPageCount()) throw Error('Each PDF page needs a preview and van label.');
     const uploadId = crypto.randomUUID(), s = read();
-    const previous = req.body.replaceId ? docs(s).find(d => d.id === req.body.replaceId) : null;
+    if (req.body.vehicleId && (req.body.replaceId || pdf.getPageCount() !== 1)) throw Error('Choose a one-page PDF for this van.');
+    const previous = req.body.vehicleId ? docs(s).find(d => d.vehicleId === req.body.vehicleId) : req.body.replaceId ? docs(s).find(d => d.id === req.body.replaceId) : null;
+    if (previous?.vehicleId && !req.body.vehicleId) throw Error('Replace this PDF from the van editor.');
     if (req.body.replaceId && !previous) throw Error('PDF not found. Refresh and try again.');
     const id = previous?.id || uploadId;
     const pages = req.body.pages.map((p, i) => {
@@ -369,13 +385,19 @@ function createGosRouter({
         pageNumber: i + 1,
         title: clean(p.title, 500) || 'Page ' + (i + 1),
         liveryId: p.liveryId,
-        previewFile: file
+        previewFile: file,
+        ...(req.body.vehicleId ? {vehicleId: clean(req.body.vehicleId, 80)} : {})
       };
     });
     fs.writeFileSync(path.join(documentsDir, uploadId + '.pdf'), bytes);
     await mutate(s => {
+      const van = req.body.vehicleId && s.vehicles.find(v => v.id === req.body.vehicleId);
+      if (req.body.vehicleId && (!van || van.version !== req.body.vehicleVersion)) {
+        const error = Error('This van has changed. Close and reopen it before replacing the PDF.');
+        error.status = 409; throw error;
+      }
       const old = previous && docs(s).find(d => d.id === previous.id);
-      if (previous && (!old || old.filename !== req.body.revision)) {
+      if (previous && (!old || old.filename !== (van ? previous.filename : req.body.revision))) {
         const error = Error('This PDF has changed. Refresh before replacing it.');
         error.status = 409;
         throw error;
@@ -391,7 +413,7 @@ function createGosRouter({
         }
         for (const v of s.vehicles) {
           const assigned = matchDesign(v, allDesigns);
-          if (assigned?.documentId === old.id) {
+          if (assigned?.documentId === old.id && v.id !== van?.id) {
             // Removed drawings require a manual check instead of guessing another drawing.
             v.designId = assigned.id;
             v.version++;
@@ -400,8 +422,13 @@ function createGosRouter({
         s.documentHistory = [...(s.documentHistory || []), { ...old, replacedAt: new Date().toISOString() }];
       }
       s.documents = [...(s.documents || []).filter(d => d.id !== id), {
-        id, name: clean(req.body.name, 160) || 'Livery PDF', filename: uploadId + '.pdf', pages
+        id, name: clean(req.body.name, 160) || 'Livery PDF', filename: uploadId + '.pdf', pages,
+        ...(van ? {vehicleId: van.id} : {})
       }];
+      if (van) {
+        const fields = vehicleFields({...req.body.vehicle, designId: pages[0].id}, s, van);
+        s.vehicles[s.vehicles.findIndex(v => v.id === van.id)] = {...fields, version: van.version + 1};
+      }
     });
     res.json({
       id
@@ -441,7 +468,7 @@ function createGosRouter({
       const livery = s.liveries.find(l => l.id === (body.existingId ? vehicle.liveryId : body.liveryId));
       if (!livery) throw Error('Choose a livery.');
       const design = body.existingId ? matchDesign(vehicle, designs(s)) : body.designId ? findDesign(s, body.designId) : null;
-      if (body.designId && (!design || design.liveryId !== livery.id)) throw Error('Select a PDF design from the chosen livery.');
+      if (body.designId && (!design || design.liveryId !== livery.id || (design.vehicleId && design.vehicleId !== vehicle.id))) throw Error('Select a PDF design from the chosen livery.');
       if (design && !body.existingId) vehicle.designId = design.id;
       const photos = vehicle.liveryId === livery.id && vehicle.photos?.length ? vehicle.photos : livery.photos;
       if (!design && !photos?.length) throw Error('Upload a vehicle or livery photo before ordering so the email can include the image.');
@@ -540,7 +567,7 @@ function createGosRouter({
         saved.status = 'sent';
         saved.sentAt = new Date().toISOString();
         saved.messageId = result?.messageId || '';
-        if (!s.vehicles.some(v => regKey(v.reg) === regKey(order.vehicle.reg))) s.vehicles.push(order.vehicle);
+        if (!s.vehicles.some(v => regKey(v.reg) === regKey(order.vehicle.reg)) && !(s.deletedVehicles || []).some(v => v.id === order.vehicle.id)) s.vehicles.push(order.vehicle);
       });
       res.json({
         ok: true,

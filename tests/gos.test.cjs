@@ -411,3 +411,50 @@ test('Bundled catalogue can be replaced without duplicate active pages', () => f
   assert.equal(after.designs[0].id,page.id);
   assert.equal((await req(after.designs[0].pdfUrl,null,cookie)).status,200);
 }));
+
+test('van-specific PDF updates save edits atomically, stay isolated and preserve earlier order PDFs', () => fixture(async ({req,dataDir}) => {
+  const {PDFDocument}=require('pdf-lib');
+  const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
+  const before=(await req('/api/gos/register',null,cookie)).body;
+  const van=before.vehicles.find(v=>v.reg==='HW70 KVT');
+  const pdf=await PDFDocument.create();pdf.addPage([320,200]);
+  const payload={name:'This van.pdf',vehicleId:van.id,vehicleVersion:van.version,vehicle:{...van,colour:'White'},dataUrl:'data:application/pdf;base64,'+Buffer.from(await pdf.save()).toString('base64'),pages:[{pageNumber:1,title:van.model,liveryId:van.liveryId,previewDataUrl:png}]};
+  assert.equal((await req('/api/gos/documents',payload)).status,401);
+  assert.equal((await req('/api/gos/documents',payload,cookie)).status,200);
+  let after=(await req('/api/gos/register',null,cookie)).body;
+  const changed=after.vehicles.find(v=>v.id===van.id);
+  assert.equal(changed.colour,'White');
+  assert.equal(changed.version,van.version+1);
+  assert.equal(changed.matchedDesign.vehicleId,van.id);
+  for(const other of before.vehicles.filter(v=>v.id!==van.id)) {
+    assert.equal(after.vehicles.find(v=>v.id===other.id).matchedDesign?.id,other.matchedDesign?.id);
+  }
+  assert.equal((await req('/api/gos/documents',payload,cookie)).status,409);
+  assert.equal((await req('/api/gos/orders',{requestId:'van-pdf-order-12345',kind:'livery',existingId:van.id,vehicleVersion:changed.version},cookie)).status,200);
+  const original=JSON.parse(fs.readFileSync(path.join(dataDir,'register.json'))).orders[0].design.filename;
+  assert.equal((await req('/api/gos/documents',{...payload,vehicleVersion:changed.version,vehicle:changed},cookie)).status,200);
+  const store=JSON.parse(fs.readFileSync(path.join(dataDir,'register.json')));
+  assert.equal(store.orders[0].design.filename,original);
+  assert.ok(fs.existsSync(path.join(dataDir,'documents',original)));
+  assert.equal(store.documents.filter(d=>d.vehicleId===van.id).length,1);
+}));
+
+test('deleting a van requires its current version, archives it and leaves orders intact', () => fixture(async ({req,dataDir}) => {
+  const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
+  const before=(await req('/api/gos/register',null,cookie)).body;
+  const van=before.vehicles.find(v=>v.reg==='HW70 KVT');
+  assert.equal((await req('/api/gos/orders',{requestId:'delete-van-order-12345',kind:'livery',existingId:van.id,vehicleVersion:van.version},cookie)).status,200);
+  const route='/api/gos/vehicles/'+van.id;
+  assert.equal((await req(route,{version:van.version},null,'DELETE')).status,401);
+  assert.equal((await req(route,{version:van.version+1},cookie,'DELETE')).status,409);
+  assert.equal((await req(route,{version:van.version},cookie,'DELETE')).status,200);
+  const after=(await req('/api/gos/register',null,cookie)).body;
+  assert.equal(after.vehicles.length,before.vehicles.length-1);
+  assert.equal(after.vehicles.some(v=>v.id===van.id),false);
+  assert.equal(after.orders[0].reg,van.reg);
+  assert.equal(after.deletedVehicles,undefined);
+  const store=JSON.parse(fs.readFileSync(path.join(dataDir,'register.json')));
+  assert.equal(store.deletedVehicles[0].id,van.id);
+  assert.equal(store.orders[0].vehicle.reg,van.reg);
+  assert.equal((await req('/api/gos/orders',{requestId:'deleted-van-order-12345',kind:'livery',existingId:van.id},cookie)).status,400);
+}));

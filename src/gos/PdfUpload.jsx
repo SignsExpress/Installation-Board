@@ -3,7 +3,8 @@ export default function PdfUpload({
   liveries,
   documents,
   designs,
-  onUpload
+  onUpload,
+  vehicle
 }) {
   const [replaceId, setReplaceId] = useState('');
   const target = documents.find(d => d.id === replaceId);
@@ -31,6 +32,7 @@ export default function PdfUpload({
         data: new Uint8Array(bytes.slice(0)),
         isEvalSupported: false
       }).promise;
+      if (vehicle && pdf.numPages !== 1) throw Error('Choose a one-page PDF for this van.');
       if (pdf.numPages > 100) throw Error('Choose a PDF with at most 100 pages.');
       const result = [];
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -54,8 +56,8 @@ export default function PdfUpload({
         const group = pdf.numPages === 19 ? i <= 9 ? 'Standard GOS' : i <= 14 ? 'Mechanical Electrical' : i <= 16 ? 'Electrical' : 'Custom Livery' : '';
         result.push({
           pageNumber: i,
-          title: title.slice(0, 500) || 'Page ' + i,
-          liveryId: designs.find(d => d.documentId === replaceId && d.title.toLowerCase() === title.slice(0, 500).toLowerCase())?.liveryId || liveries.find(l => l.name === group)?.id || '',
+          title: vehicle ? vehicle.reg + ' - ' + vehicle.model : title.slice(0, 500) || 'Page ' + i,
+          liveryId: vehicle?.liveryId || designs.find(d => d.documentId === replaceId && d.title.toLowerCase() === title.slice(0, 500).toLowerCase())?.liveryId || liveries.find(l => l.name === group)?.id || '',
           previewDataUrl: canvas.toDataURL('image/jpeg', .86)
         });
         page.cleanup();
@@ -67,7 +69,7 @@ export default function PdfUpload({
         dataUrl: 'data:application/pdf;base64,' + btoa(binary)
       });
       setPages(result);
-      setMessage('Check each van type and category, then save.');
+      setMessage(vehicle ? 'Check the drawing, then save.' : 'Check each van type and category, then save.');
     } catch (e) {
       setError(e.message);
     } finally {
@@ -82,6 +84,7 @@ export default function PdfUpload({
       if (pages.some(p => !p.liveryId)) throw Error('Choose a livery category for each page.');
       await onUpload({
         ...file,
+        ...(vehicle ? {vehicleId: vehicle.id, vehicleVersion: vehicle.version, vehicle} : {}),
         replaceId: target?.id,
         revision: target?.revision,
         pages
@@ -95,13 +98,13 @@ export default function PdfUpload({
       setBusy(false);
     }
   }
-  return <section className="gos-pdf-import"><h3>Add or replace a PDF</h3><label>What do you want to do?<select value={replaceId} disabled={busy || !!file} onChange={e => { setReplaceId(e.target.value); setMessage(''); }}><option value="">Upload a new PDF</option>{documents.map(d => <option key={d.id} value={d.id}>Replace {d.name}</option>)}</select></label>{target && <p>Replacing {target.name}. Check the van labels match. Old orders keep their original PDF.</p>}<label className="gos-upload-button">Choose PDF<input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => prepare(e.target.files[0])} /></label>{message && <p role="status">{message}</p>}{error && <p className="gos-error" role="alert">{error}</p>}{pages.length > 0 && <><div className="gos-pdf-import-pages">{pages.map((p, i) => <article key={p.pageNumber}><img src={p.previewDataUrl} alt={'PDF page ' + p.pageNumber} /><strong>Page {p.pageNumber}</strong><label>Van type<input value={p.title} onChange={e => setPages(rows => rows.map((r, j) => j === i ? {
+  return <section className="gos-pdf-import"><h3>{vehicle ? "Replace this van’s PDF" : "Add or replace a PDF"}</h3>{!vehicle && <label>What do you want to do?<select value={replaceId} disabled={busy || !!file} onChange={e => { setReplaceId(e.target.value); setMessage(''); }}><option value="">Upload a new PDF</option>{documents.map(d => <option key={d.id} value={d.id}>Replace {d.name}</option>)}</select></label>}{vehicle && <p>Choose a one-page PDF. Only this van will change.</p>}{target && <p>Replacing {target.name}. Check the van labels match. Old orders keep their original PDF.</p>}<label className="gos-upload-button">Choose PDF<input type="file" accept="application/pdf,.pdf" disabled={busy} onChange={e => prepare(e.target.files[0])} /></label>{message && <p role="status">{message}</p>}{error && <p className="gos-error" role="alert">{error}</p>}{pages.length > 0 && <><div className="gos-pdf-import-pages">{pages.map((p, i) => <article key={p.pageNumber}><img src={p.previewDataUrl} alt={'PDF page ' + p.pageNumber} /><strong>{vehicle ? vehicle.reg : "Page " + p.pageNumber}</strong>{!vehicle && <><label>Van type<input value={p.title} onChange={e => setPages(rows => rows.map((r, j) => j === i ? {
               ...r,
               title: e.target.value
             } : r))} /></label><label>Livery category<select value={p.liveryId} onChange={e => setPages(rows => rows.map((r, j) => j === i ? {
               ...r,
               liveryId: e.target.value
-            } : r))}><option value="">Choose category</option>{liveries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label></article>)}</div><button className="gos-primary" disabled={busy} onClick={save}>{busy ? 'Saving PDF…' : target ? 'Replace PDF' : 'Save PDF'}</button><button disabled={busy} onClick={() => {
+            } : r))}><option value="">Choose category</option>{liveries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label></>}</article>)}</div><button type="button" className="gos-primary" disabled={busy} onClick={save}>{busy ? 'Saving PDF…' : vehicle ? 'Save PDF and van' : target ? 'Replace PDF' : 'Save PDF'}</button><button type="button" disabled={busy} onClick={() => {
         setPages([]);
         setFile(null);
         setMessage('');
