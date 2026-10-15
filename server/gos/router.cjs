@@ -9,6 +9,7 @@ const {
 } = require('pdf-lib');
 const {
   matchDesign,
+  designLabelKey,
   pagePdf
 } = require('./pdf.cjs');
 const clean = (v, n = 500) => String(v ?? '').trim().slice(0, n);
@@ -406,7 +407,7 @@ function createGosRouter({
         const allDesigns = designs(s);
         const oldDesigns = allDesigns.filter(d => d.documentId === old.id);
         // Match labels, not positions, so reordered pages cannot change a van's artwork.
-        const key = p => clean(p.title).toLowerCase().replace(/\s+/g, ' ') + '|' + p.liveryId;
+        const key = p => designLabelKey(p.title) + '|' + p.liveryId;
         for (const page of pages) {
           const matches = oldDesigns.filter(d => key(d) === key(page));
           if (matches.length === 1 && pages.filter(p => key(p) === key(page)).length === 1) page.id = matches[0].id;

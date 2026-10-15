@@ -458,3 +458,23 @@ test('deleting a van requires its current version, archives it and leaves orders
   assert.equal(store.orders[0].vehicle.reg,van.reg);
   assert.equal((await req('/api/gos/orders',{requestId:'deleted-van-order-12345',kind:'livery',existingId:van.id},cookie)).status,400);
 }));
+
+test('replacement PDF labels without separator dots retain vehicle page IDs after reorder', () => fixture(async ({req}) => {
+  const {PDFDocument}=require('pdf-lib');
+  const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
+  const before=(await req('/api/gos/register',null,cookie)).body;
+  const pdf=await PDFDocument.create();
+  const reordered=before.designs.slice().reverse();
+  reordered.forEach(()=>pdf.addPage([320,200]));
+  const response=await req('/api/gos/documents',{name:'GOSVans.pdf',replaceId:before.documents[0].id,revision:before.documents[0].revision,dataUrl:'data:application/pdf;base64,'+Buffer.from(await pdf.save()).toString('base64'),pages:reordered.map((d,i)=>({pageNumber:i+1,title:d.title.replace(/[^a-z0-9 ]/gi,'').replace(/\s+/g,' '),liveryId:d.liveryId,previewDataUrl:png}))},cookie);
+  assert.equal(response.status,200);
+  const after=(await req('/api/gos/register',null,cookie)).body;
+  const matched=before.vehicles.filter(v=>v.matchedDesign);
+  assert.ok(matched.length>40);
+  for(const v of matched){
+    const current=after.vehicles.find(row=>row.id===v.id);
+    assert.equal(current.matchedDesign?.id,v.matchedDesign.id,v.reg);
+    assert.equal(current.matchedDesign.pageNumber,20-v.matchedDesign.pageNumber,v.reg);
+    assert.equal(current.matchedDesign.liveryId,v.liveryId);
+  }
+}));

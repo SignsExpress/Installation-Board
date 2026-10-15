@@ -4,6 +4,8 @@ const {
   StandardFonts,
   degrees
 } = require('pdf-lib');
+// PDF text extraction can omit punctuation present in catalogue labels.
+const designLabelKey = title => String(title || '').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g, '');
 function family(text) {
   const t = text.toLowerCase();
   if (t.includes('dropside') || t.includes('pickup') || t.includes('pick up')) return 'dropside';
@@ -106,6 +108,7 @@ async function pagePdf(bytes, pageNumber, boxes = []) {
   return Buffer.from(await out.save());
 }
 module.exports = {
+  designLabelKey,
   matchDesign,
   pagePdf,
   pdfBox

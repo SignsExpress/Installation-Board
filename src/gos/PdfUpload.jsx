@@ -13,6 +13,7 @@ export default function PdfUpload({
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
     [error, setError] = useState('');
+  const labelKey = title => String(title || '').normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g, '');
   async function prepare(input) {
     if (!input) return;
     setError('');
@@ -57,7 +58,7 @@ export default function PdfUpload({
         result.push({
           pageNumber: i,
           title: vehicle ? vehicle.reg + ' - ' + vehicle.model : title.slice(0, 500) || 'Page ' + i,
-          liveryId: vehicle?.liveryId || designs.find(d => d.documentId === replaceId && d.title.toLowerCase() === title.slice(0, 500).toLowerCase())?.liveryId || liveries.find(l => l.name === group)?.id || '',
+          liveryId: vehicle?.liveryId || designs.find(d => d.documentId === replaceId && labelKey(d.title) === labelKey(title.slice(0, 500)))?.liveryId || liveries.find(l => l.name === group)?.id || '',
           previewDataUrl: canvas.toDataURL('image/jpeg', .86)
         });
         page.cleanup();

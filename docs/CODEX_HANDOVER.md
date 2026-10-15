@@ -283,3 +283,9 @@ Validation: production build, server syntax checks and 18 regression tests pass,
 ## Dashboard Customer Portals heading - 15 October 2026
 
 Host Home now groups the existing IGLOO and GOS launch cards under Customer Portals instead of Tools. Existing permissions, destinations and new-tab behaviour are unchanged; the responsive column count includes the new section. Other module screens and operational data are untouched. Production build passes.
+
+## GOS replacement PDF label matching fix - 15 October 2026
+
+The first live catalogue replacement omitted the separator dot from the original corner labels. Exact string comparison generated new page IDs while keeping vans pinned to old IDs, leaving 49 links broken. Replacement matching and importer category lookup now ignore punctuation, spacing and letter case, while still requiring unique labels and the same livery category. Reordered pages retain their correct assignments; removed or genuinely changed designs still require review.
+
+The live register repair uses the original catalogue label/category and uniquely matching current uploaded pages, with vehicle version checks. Before/after snapshots and the exact repair plan are retained locally under ignored outputs; no operational data is committed. The uploaded PDF is retained and historical order attachments are unchanged. Production build, server syntax checks and 19 regression checks pass, including a full punctuation-free and reordered 19-page replacement across all originally matched vans.
