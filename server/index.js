@@ -12887,6 +12887,11 @@ function createServer() {
 
   app.use("/api/gos", createGosRouter({
     dataDir: path.join(path.dirname(getDataFile()), "gos-vehicle-liveries"),
+    verifyMail: async () => {
+      const config = getCreditApplicationTransportConfig();
+      if (!config) throw new Error("SMTP is not configured.");
+      return nodemailer.createTransport({ ...config, connectionTimeout: 15000, greetingTimeout: 10000, socketTimeout: 15000 }).verify();
+    },
     sendMail: async (message) => {
       const config = getCreditApplicationTransportConfig();
       if (!config) throw new Error("SMTP is not configured.");

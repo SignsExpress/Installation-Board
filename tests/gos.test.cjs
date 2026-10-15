@@ -50,7 +50,7 @@ async function fixture(fn, options = {}) {
     return {
       status: r.status,
       body: r.headers.get('content-type')?.includes('application/json') ? await r.json() : Buffer.from(await r.arrayBuffer()),
-      contentType:r.headers.get('content-type'),
+      contentType: r.headers.get('content-type'),
       cookie: r.headers.get('set-cookie')?.split(';')[0]
     };
   }
@@ -107,7 +107,7 @@ test('orders attach reference images; repair orders attach drawings; retries do 
     password: 'GOS123'
   })).cookie;
   let r = (await req('/api/gos/register', null, c)).body;
-  const v = r.vehicles[0];
+  const v = r.vehicles.find(v => v.make === 'Volkswagen');
   const request = {
     requestId: 'gos-order-test-0001',
     kind: 'livery',
@@ -190,32 +190,172 @@ test('SMTP failures are recorded as failed, not presented as successful', () => 
     throw Error('SMTP offline');
   }
 }));
-test('a new-registration order validates vehicle details and adds the vehicle only after mail acceptance', () => fixture(async ({req,mails}) => {
- const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
- const register=(await req('/api/gos/register',null,cookie)).body;
- const livery=register.liveries[0];
- await req('/api/gos/liveries/'+livery.id+'/photos',{dataUrl:png,name:'Approved design'},cookie);
- const request={requestId:'gos-new-vehicle-0004',kind:'livery',liveryId:livery.id,vehicle:{reg:'GOS TEST',make:'Ford',model:'Transit Custom',wheelbase:'L2 H1',colour:'White',liveryId:livery.id},contact:'Test contact',email:'contact@example.invalid'};
- assert.equal((await req('/api/gos/orders',{...request,vehicle:{...request.vehicle,colour:''}},cookie)).status,400);
- assert.equal((await req('/api/gos/orders',request,cookie)).status,200);
- const after=(await req('/api/gos/register',null,cookie)).body;
- assert.equal(after.vehicles.length,59);
- assert.equal(after.vehicles.find(v=>v.reg==='GOS TEST').colour,'White');
- assert.equal(mails.length,1);
- assert.match(mails[0].text,/Wheelbase \/ roof: L2 H1/);
- assert.equal(mails[0].attachments.length,1);
+test('a new-registration order validates vehicle details and adds the vehicle only after mail acceptance', () => fixture(async ({
+  req,
+  mails
+}) => {
+  const cookie = (await req('/api/gos/login', {
+    password: 'GOS123'
+  })).cookie;
+  const register = (await req('/api/gos/register', null, cookie)).body;
+  const livery = register.liveries[0];
+  await req('/api/gos/liveries/' + livery.id + '/photos', {
+    dataUrl: png,
+    name: 'Approved design'
+  }, cookie);
+  const request = {
+    requestId: 'gos-new-vehicle-0004',
+    kind: 'livery',
+    liveryId: livery.id,
+    vehicle: {
+      reg: 'GOS TEST',
+      make: 'Ford',
+      model: 'Transit Custom',
+      wheelbase: 'L2 H1',
+      colour: 'White',
+      liveryId: livery.id
+    },
+    contact: 'Test contact',
+    email: 'contact@example.invalid'
+  };
+  assert.equal((await req('/api/gos/orders', {
+    ...request,
+    vehicle: {
+      ...request.vehicle,
+      colour: ''
+    }
+  }, cookie)).status, 400);
+  assert.equal((await req('/api/gos/orders', request, cookie)).status, 200);
+  const after = (await req('/api/gos/register', null, cookie)).body;
+  assert.equal(after.vehicles.length, 59);
+  assert.equal(after.vehicles.find(v => v.reg === 'GOS TEST').colour, 'White');
+  assert.equal(mails.length, 1);
+  assert.match(mails[0].text, /Wheelbase \/ roof: L2 H1/);
+  assert.equal(mails[0].attachments.length, 1);
 }));
-test('PDF source pages require GOS access, imports retain PDFs and repair email attachments are PDF',()=>fixture(async({req,mails})=>{
- const {PDFDocument}=require('pdf-lib'),{pagePdf}=require('../server/gos/pdf.cjs');
- assert.equal((await req('/api/gos/documents/gos-master-v1.pdf')).status,401);
- const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
- const register=(await req('/api/gos/register',null,cookie)).body;
- assert.equal(register.designs.length,19);
- const page=await req('/api/gos/documents/gos-master-v1/pages/1.pdf',null,cookie);
- assert.equal(page.status,200);assert.match(page.contentType,/application\/pdf/);assert.equal(page.body.subarray(0,5).toString(),'%PDF-');
- const uploaded=await req('/api/gos/documents',{name:'Test original.pdf',dataUrl:'data:application/pdf;base64,'+page.body.toString('base64'),pages:[{pageNumber:1,title:'Test model',liveryId:register.liveries[0].id,previewDataUrl:png}]},cookie);
- assert.equal(uploaded.status,200);assert.equal((await req('/api/gos/register',null,cookie)).body.designs.length,20);
- const vehicle=register.vehicles.find(v=>v.reg==='HW70 KVT'),design=register.designs.find(d=>d.pageNumber===1);
- const response=await req('/api/gos/orders',{requestId:'gos-pdf-repair-0005',kind:'repair',existingId:vehicle.id,liveryId:vehicle.liveryId,designId:design.id,annotations:[{designId:design.id,boxes:[{x:.4,y:.4,w:.2,h:.15}]}],contact:'PDF QA',email:'pdf@example.invalid'},cookie);
- assert.equal(response.status,200);assert.equal(mails.length,1);assert.equal(mails[0].attachments[0].contentType,'application/pdf');assert.match(mails[0].attachments[0].filename,/\.pdf$/);assert.equal((await PDFDocument.load(mails[0].attachments[0].content)).getPageCount(),1);
+test('PDF source pages require GOS access, imports retain PDFs and repair email attachments are PDF', () => fixture(async ({
+  req,
+  mails
+}) => {
+  const {
+      PDFDocument
+    } = require('pdf-lib'),
+    {
+      pagePdf
+    } = require('../server/gos/pdf.cjs');
+  assert.equal((await req('/api/gos/documents/gos-master-v1.pdf')).status, 401);
+  const cookie = (await req('/api/gos/login', {
+    password: 'GOS123'
+  })).cookie;
+  const register = (await req('/api/gos/register', null, cookie)).body;
+  assert.equal(register.designs.length, 19);
+  const page = await req('/api/gos/documents/gos-master-v1/pages/1.pdf', null, cookie);
+  assert.equal(page.status, 200);
+  assert.match(page.contentType, /application\/pdf/);
+  assert.equal(page.body.subarray(0, 5).toString(), '%PDF-');
+  const uploaded = await req('/api/gos/documents', {
+    name: 'Test original.pdf',
+    dataUrl: 'data:application/pdf;base64,' + page.body.toString('base64'),
+    pages: [{
+      pageNumber: 1,
+      title: 'Test model',
+      liveryId: register.liveries[0].id,
+      previewDataUrl: png
+    }]
+  }, cookie);
+  assert.equal(uploaded.status, 200);
+  assert.equal((await req('/api/gos/register', null, cookie)).body.designs.length, 20);
+  const vehicle = register.vehicles.find(v => v.reg === 'HW70 KVT'),
+    design = register.designs.find(d => d.pageNumber === 1);
+  const response = await req('/api/gos/orders', {
+    requestId: 'gos-pdf-repair-0005',
+    kind: 'repair',
+    existingId: vehicle.id,
+    liveryId: vehicle.liveryId,
+    designId: design.id,
+    annotations: [{
+      designId: design.id,
+      boxes: [{
+        x: .4,
+        y: .4,
+        w: .2,
+        h: .15
+      }]
+    }],
+    contact: 'PDF QA',
+    email: 'pdf@example.invalid'
+  }, cookie);
+  assert.equal(response.status, 200);
+  assert.equal(mails.length, 1);
+  assert.equal(mails[0].attachments[0].contentType, 'application/pdf');
+  assert.match(mails[0].attachments[0].filename, /\.pdf$/);
+  assert.equal((await PDFDocument.load(mails[0].attachments[0].content)).getPageCount(), 1);
+}));
+test('registration-based orders need no contact fields and use the saved design plus requested To and Cc', () => fixture(async ({
+  req,
+  mails
+}) => {
+  const cookie = (await req('/api/gos/login', {
+    password: 'GOS123'
+  })).cookie;
+  const register = (await req('/api/gos/register', null, cookie)).body;
+  const v = register.vehicles.find(v => v.reg === 'HW70 KVT');
+  const request = {
+    requestId: 'gos-no-contact-test-0006',
+    kind: 'livery',
+    existingId: v.id,
+    vehicleVersion: v.version,
+    liveryId: 'ignored-client-category',
+    designId: 'ignored-client-design',
+    notes: 'Local test only'
+  };
+  assert.equal((await req('/api/gos/orders', request, cookie)).status, 200);
+  assert.equal(mails.length, 1);
+  assert.equal(mails[0].to, "eddy.d'antonio@signs-express.co.uk");
+  assert.equal(mails[0].cc, 'matt.rutlidge@signs-express.co.uk');
+  assert.equal(mails[0].replyTo, undefined);
+  assert.match(mails[0].text, /Livery: Standard GOS/);
+  assert.match(mails[0].text, /Source PDF page: 1/);
+  assert.equal(mails[0].attachments[0].contentType, 'application/pdf');
+  assert.equal((await req('/api/gos/orders', {
+    ...request,
+    requestId: 'gos-stale-order-0007',
+    vehicleVersion: 0
+  }, cookie)).status, 400);
+  assert.equal(mails.length, 1);
+}, {
+  recipient: undefined,
+  cc: undefined
+}));
+test('mail formatting preserves the apostrophe in Eddy’s address and includes Matt in the envelope', async () => {
+  const transport = require('nodemailer').createTransport({
+    streamTransport: true,
+    buffer: true,
+    newline: 'unix'
+  });
+  const info = await transport.sendMail({
+    from: 'portal@example.invalid',
+    to: "eddy.d'antonio@signs-express.co.uk",
+    cc: 'matt.rutlidge@signs-express.co.uk',
+    subject: 'LOCAL FORMAT TEST ONLY',
+    text: 'Not sent over SMTP.'
+  });
+  assert.ok(info.envelope.to.includes("eddy.d'antonio@signs-express.co.uk"));
+  assert.ok(info.envelope.to.includes('matt.rutlidge@signs-express.co.uk'));
+});
+test('mail connection diagnostics use the existing transport without sending a message', () => fixture(async ({
+  req,
+  mails
+}) => {
+  const cookie = (await req('/api/gos/login', {
+    password: 'GOS123'
+  })).cookie;
+  const status = await req('/api/gos/email-status', null, cookie);
+  assert.equal(status.status, 200);
+  assert.equal(status.body.verified, true);
+  assert.equal(status.body.to, "eddy.d'antonio@signs-express.co.uk");
+  assert.equal(mails.length, 0);
+}, {
+  recipient: undefined,
+  verifyMail: async () => true
 }));

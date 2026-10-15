@@ -31,7 +31,9 @@ function imageBuffer(data) {
 function createGosRouter({
   dataDir,
   sendMail,
-  recipient = process.env.GOS_ORDERS_TO || '',
+  verifyMail,
+  recipient = process.env.GOS_ORDERS_TO || "eddy.d'antonio@signs-express.co.uk",
+  cc = process.env.GOS_ORDERS_CC || 'matt.rutlidge@signs-express.co.uk',
   password = process.env.GOS_CUSTOMER_PASSWORD || 'GOS123',
   secure = process.env.NODE_ENV === 'production',
   preview = false
@@ -200,6 +202,46 @@ function createGosRouter({
     };
   }
   router.get('/register', route((req, res) => res.json(view(read()))));
+  let mailStatusCache = null,
+    mailStatusPromise = null;
+  router.get('/email-status', route(async (req, res) => {
+    if (!verifyMail) return res.json({
+      ready: Boolean(recipient && sendMail),
+      verified: false,
+      to: recipient,
+      cc
+    });
+    if (mailStatusCache && mailStatusCache.until > Date.now()) return res.status(mailStatusCache.code).json(mailStatusCache.result);
+    if (!mailStatusPromise) mailStatusPromise = (async () => {
+      try {
+        await verifyMail();
+        return {
+          until: Date.now() + 300000,
+          code: 200,
+          result: {
+            ready: true,
+            verified: true,
+            to: recipient,
+            cc
+          }
+        };
+      } catch {
+        return {
+          until: Date.now() + 30000,
+          code: 503,
+          result: {
+            ready: false,
+            verified: false,
+            error: 'The email connection could not be verified.'
+          }
+        };
+      }
+    })().finally(() => {
+      mailStatusPromise = null;
+    });
+    mailStatusCache = await mailStatusPromise;
+    res.status(mailStatusCache.code).json(mailStatusCache.result);
+  }));
   router.get('/photos/:file', route((req, res) => {
     if (!/^[a-f0-9-]+\.(jpg|png|webp)$/.test(req.params.file)) return res.status(404).end();
     res.sendFile(path.join(media, req.params.file));
@@ -354,13 +396,14 @@ function createGosRouter({
       const existing = s.orders.find(o => o.requestId === requestId);
       if (existing) return existing;
       if (!['livery', 'repair'].includes(body.kind)) throw Error('Choose a livery order or repair order.');
-      const contact = clean(body.contact, 160),
+      const contact = clean(body.contact, 160) || 'GOS customer portal',
         email = clean(body.email, 200);
-      if (!contact || !/^\S+@\S+\.\S+$/.test(email) || /[\r\n]/.test(email)) throw Error('Your name and a valid contact email are required.');
+      if (email && (!/^\S+@\S+\.\S+$/.test(email) || /[\r\n]/.test(email))) throw Error('Invalid reply email.');
       let vehicle;
       if (body.existingId) {
         vehicle = s.vehicles.find(v => v.id === body.existingId);
         if (!vehicle) throw Error('Vehicle not found.');
+        if (body.vehicleVersion !== undefined && body.vehicleVersion !== vehicle.version) throw Error('This vehicle has changed. Close and reopen the order to refresh it.');
         vehicle = structuredClone(vehicle);
       } else {
         vehicle = {
@@ -371,9 +414,9 @@ function createGosRouter({
         };
         if (!vehicle.make || !vehicle.wheelbase || !vehicle.colour) throw Error('Make, model, wheelbase and colour are required for a new registration.');
       }
-      const livery = s.liveries.find(l => l.id === body.liveryId);
+      const livery = s.liveries.find(l => l.id === (body.existingId ? vehicle.liveryId : body.liveryId));
       if (!livery) throw Error('Choose a livery.');
-      const design = body.designId ? findDesign(s, body.designId) : null;
+      const design = body.existingId ? matchDesign(vehicle, designs(s)) : body.designId ? findDesign(s, body.designId) : null;
       if (body.designId && (!design || design.liveryId !== livery.id)) throw Error('Select a PDF design from the chosen livery.');
       if (design && !body.existingId) vehicle.designId = design.id;
       const photos = vehicle.liveryId === livery.id && vehicle.photos?.length ? vehicle.photos : livery.photos;
@@ -458,10 +501,11 @@ function createGosRouter({
         })), null, 2),
         contentType: 'application/json'
       });
-      const details = [['Order', order.id], ['Type', order.kind === 'repair' ? 'Repair' : 'Vehicle livery'], ['Registration', order.vehicle.reg], ['Make', order.vehicle.make], ['Model', order.vehicle.model], ['Wheelbase / roof', order.vehicle.wheelbase], ['Colour', order.vehicle.colour], ['Division', order.vehicle.division], ['Driver', order.vehicle.name], ['Livery', order.livery.name], ['PDF design', order.design?.title], ['Source PDF page', order.design?.pageNumber], ['Contact', order.contact], ['Email', order.email], ['Notes', order.notes]].map(([k, v]) => k + ': ' + (v || 'Not supplied')).join('\n');
+      const details = [['Order', order.id], ['Type', order.kind === 'repair' ? 'Repair' : 'Vehicle livery'], ['Registration', order.vehicle.reg], ['Make', order.vehicle.make], ['Model', order.vehicle.model], ['Wheelbase / roof', order.vehicle.wheelbase], ['Colour', order.vehicle.colour], ['Division', order.vehicle.division], ['Driver', order.vehicle.name], ['Livery', order.livery.name], ['PDF design', order.design?.title], ['Source PDF page', order.design?.pageNumber], ['Requested via', 'GOS customer portal'], ['Notes', order.notes]].map(([k, v]) => k + ': ' + (v || 'Not supplied')).join('\n');
       const result = await sendMail({
         to: recipient,
-        replyTo: order.email,
+        cc,
+        replyTo: order.email || undefined,
         subject: 'GOS ' + (order.kind === 'repair' ? 'repair' : 'livery') + ' order — ' + order.vehicle.reg,
         text: details,
         attachments

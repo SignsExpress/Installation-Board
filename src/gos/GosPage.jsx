@@ -118,17 +118,18 @@ function Fields({
   liveries,
   divisions,
   full = true,
+  showLivery = true,
   designs = []
 }) {
   const update = (key, val) => onChange({
     ...value,
     [key]: val
   });
-  return <div className="gos-fields">{[['reg', 'Registration'], ['make', 'Make'], ['model', 'Model'], ['wheelbase', 'Wheelbase / roof'], ['colour', 'Colour'], ...(full ? [['name', 'Driver / assigned to'], ['division', 'Division'], ['year', 'Year'], ['group', 'Vehicle group']] : [])].map(([key, label]) => <label key={key}>{label}<input list={key === 'division' ? 'gos-divisions' : undefined} required={['reg', 'model'].includes(key)} value={value[key] || ''} onChange={e => update(key, e.target.value)} /></label>)}<datalist id="gos-divisions">{divisions.map(d => <option key={d}>{d}</option>)}</datalist><label>Livery<select required value={value.liveryId} onChange={e => onChange({
+  return <div className="gos-fields">{[['reg', 'Registration'], ['make', 'Make'], ['model', 'Model'], ['wheelbase', 'Wheelbase / roof'], ['colour', 'Colour'], ...(full ? [['name', 'Driver / assigned to'], ['division', 'Division'], ['year', 'Year'], ['group', 'Vehicle group']] : [])].map(([key, label]) => <label key={key}>{label}<input list={key === 'division' ? 'gos-divisions' : undefined} required={['reg', 'model'].includes(key)} value={value[key] || ''} onChange={e => update(key, e.target.value)} /></label>)}<datalist id="gos-divisions">{divisions.map(d => <option key={d}>{d}</option>)}</datalist>{showLivery && <label>Livery<select required value={value.liveryId} onChange={e => onChange({
         ...value,
         liveryId: e.target.value,
         designId: ''
-      })}><option value="">Choose a livery</option>{liveries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>{designs.length > 0 && <label className="gos-wide">PDF van design<select value={value.designId || ''} onChange={e => update('designId', e.target.value)}><option value="">Select matching van / wheelbase</option>{designs.filter(d => d.liveryId === value.liveryId).map(d => <option key={d.id} value={d.id}>Page {d.pageNumber} — {d.title}</option>)}</select></label>}{full && <label className="gos-wide">Vehicle notes<textarea rows={3} value={value.notes} onChange={e => update('notes', e.target.value)} /></label>}</div>;
+      })}><option value="">Choose a livery</option>{liveries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label>}{designs.length > 0 && <label className="gos-wide">PDF van design<select value={value.designId || ''} onChange={e => update('designId', e.target.value)}><option value="">Select matching van / wheelbase</option>{designs.filter(d => d.liveryId === value.liveryId).map(d => <option key={d.id} value={d.id}>Page {d.pageNumber} — {d.title}</option>)}</select></label>}{full && <label className="gos-wide">Vehicle notes<textarea rows={3} value={value.notes} onChange={e => update('notes', e.target.value)} /></label>}</div>;
 }
 function RepairImage({
   photo,
@@ -179,38 +180,54 @@ function Order({
   onClose,
   onSent
 }) {
-  const [mode, setMode] = useState(initialId ? 'existing' : 'existing'),
+  const initial = register.vehicles.find(v => v.id === initialId);
+  const [mode, setMode] = useState('existing'),
     [existingId, setExistingId] = useState(initialId || ''),
+    [regSearch, setRegSearch] = useState(initial?.reg || ''),
+    [showResults, setShowResults] = useState(!initialId),
     [vehicle, setVehicle] = useState({
       ...blank
     }),
-    [liveryId, setLiveryId] = useState(register.vehicles.find(v => v.id === initialId)?.liveryId || ''),
-    [designId, setDesignId] = useState(register.vehicles.find(v => v.id === initialId)?.matchedDesign?.id || ''),
-    [contact, setContact] = useState(''),
-    [email, setEmail] = useState(''),
+    [designId, setDesignId] = useState(''),
+    [choosingDesign, setChoosingDesign] = useState(true),
+    [designSearch, setDesignSearch] = useState(''),
     [notes, setNotes] = useState(''),
     [boxes, setBoxes] = useState({}),
     [error, setError] = useState(''),
     [sending, setSending] = useState(false);
   const requestId = useRef(crypto.randomUUID()),
     existing = register.vehicles.find(v => v.id === existingId),
+    design = mode === 'existing' ? existing?.matchedDesign : (register.designs || []).find(d => d.id === designId),
+    liveryId = mode === 'existing' ? existing?.liveryId : design?.liveryId,
     livery = register.liveries.find(l => l.id === liveryId);
-  const design = (register.designs || []).find(d => d.id === designId && d.liveryId === liveryId);
   const photos = design ? [{
     id: design.id,
     url: design.previewUrl,
     name: design.title
-  }] : mode === 'existing' && existing?.liveryId === liveryId && existing?.photos?.length ? existing.photos : livery?.photos || [];
+  }] : mode === 'existing' && existing?.photos?.length ? existing.photos : livery?.photos || [];
+  const normalized = s => String(s || '').toLowerCase().replace(/\s/g, '');
+  const matching = register.vehicles.filter(v => normalized([v.reg, v.model, v.name].join(' ')).includes(normalized(regSearch))).slice(0, 15);
   const divisions = [...new Set(register.vehicles.map(v => v.division).filter(Boolean))];
+  function chooseVehicle(v) {
+    setExistingId(v.id);
+    setRegSearch(v.reg);
+    setShowResults(false);
+    setBoxes({});
+    setError('');
+  }
   async function submit(e) {
     e.preventDefault();
     setError('');
+    if (mode === 'existing' && !existing) {
+      setError('Search for a registration and select the vehicle from the results.');
+      return;
+    }
     if (!photos.length) {
-      setError('Select the matching PDF design, or upload a reference document first.');
+      setError(mode === 'existing' ? 'This registration has no assigned PDF design. Update its vehicle record before ordering.' : 'Choose the livery for the new vehicle.');
       return;
     }
     if (kind === 'repair' && !photos.some(p => boxes[p.id]?.length)) {
-      setError('Draw at least one box on a photo to show the repair area.');
+      setError('Draw at least one box to show the repair area.');
       return;
     }
     setSending(true);
@@ -223,14 +240,13 @@ function Order({
         requestId: requestId.current,
         kind,
         existingId: mode === 'existing' ? existingId : null,
+        vehicleVersion: mode === 'existing' ? existing.version : undefined,
         vehicle: {
           ...vehicle,
           liveryId
         },
         liveryId,
         designId: design?.id || '',
-        contact,
-        email,
         notes,
         annotations
       });
@@ -243,39 +259,31 @@ function Order({
   }
   return <Modal title={kind === 'repair' ? 'Order a repair' : 'Order vehicle livery'} onClose={() => {
     if (!sending) onClose();
-  }}><form onSubmit={submit}><p className="gos-muted">Choose the vehicle and livery, then review the details before sending the order to Signs Express.</p><div className="gos-segment"><button type="button" aria-pressed={mode === 'existing'} onClick={() => {
+  }}><form onSubmit={submit}><p className="gos-muted">Find a registration to use its saved vehicle and livery details.</p><div className="gos-segment"><button type="button" aria-pressed={mode === 'existing'} onClick={() => {
           setMode('existing');
           setBoxes({});
         }}>Existing registration</button><button type="button" aria-pressed={mode === 'new'} onClick={() => {
           setMode('new');
-          setExistingId('');
           setBoxes({});
-        }}>New registration</button></div>{mode === 'existing' ? <><label>Vehicle<select required value={existingId} onChange={e => {
-            const v = register.vehicles.find(v => v.id === e.target.value);
-            setExistingId(e.target.value);
-            setLiveryId(v?.liveryId || '');
-            setDesignId(v?.matchedDesign?.id || '');
+        }}>New registration</button></div>{mode === 'existing' ? <><label>Search registration<input type="search" autoComplete="off" placeholder="Type a registration, driver or model…" value={regSearch} onFocus={() => setShowResults(true)} onChange={e => {
+            setRegSearch(e.target.value);
+            setExistingId('');
+            setShowResults(true);
             setBoxes({});
-          }}><option value="">Choose a registration</option>{register.vehicles.map(v => <option key={v.id} value={v.id}>{v.reg} — {v.model}</option>)}</select></label>{existing && <p className="gos-summary">{existing.make} · {existing.model} · {existing.wheelbase || 'Wheelbase not recorded'} · {existing.colour || 'Colour not recorded'}<br />{existing.division} · {existing.name}</p>}<label>Livery<select required value={liveryId} onChange={e => {
-            setLiveryId(e.target.value);
-            setDesignId('');
-            setBoxes({});
-          }}><option value="">Choose a livery</option>{register.liveries.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}</select></label></> : <Fields full={false} value={{
-        ...vehicle,
-        liveryId
-      }} onChange={v => {
-        setVehicle(v);
-        if (v.liveryId !== liveryId) {
-          setLiveryId(v.liveryId);
-          setBoxes({});
-        }
-      }} liveries={register.liveries} divisions={divisions} />}<label className="gos-design-choice">PDF van design<select value={design?.id || ''} onChange={e => {
-          setDesignId(e.target.value);
-          setBoxes({});
-        }}><option value="">Choose the matching van / wheelbase</option>{(register.designs || []).filter(d => d.liveryId === liveryId).map(d => <option key={d.id} value={d.id}>Page {d.pageNumber} — {d.title}</option>)}</select></label>{design && <p><a href={design.pdfUrl} target="_blank" rel="noreferrer">Open original PDF page</a> · <a href={design.documentUrl} target="_blank" rel="noreferrer">Open complete source PDF</a></p>}<section className="gos-order-images"><h3>{kind === 'repair' ? 'Mark the areas that need repairing' : 'Livery / vehicle reference'}</h3>{kind === 'repair' && <p>Drag boxes over the damaged graphics. You can mark several areas on each image; the original PDF page with your repair boxes will be attached to the order email.</p>}{!photos.length ? <p className="gos-empty">Choose a matching PDF design above. If the exact van is not listed, upload the correct PDF rather than selecting a different vehicle.</p> : photos.map(p => kind === 'repair' ? <RepairImage key={p.id} photo={p} boxes={boxes[p.id] || []} onChange={b => setBoxes({
+          }} onKeyDown={e => {
+            if (e.key === 'Enter' && showResults) {
+              e.preventDefault();
+              if (matching.length === 1) chooseVehicle(matching[0]);
+            }
+          }} /></label>{showResults && <div className="gos-reg-results" role="region" aria-label="Matching registrations">{matching.map(v => <button type="button" key={v.id} onClick={() => chooseVehicle(v)}><strong>{v.reg}</strong><span>{v.model}</span><small>{v.name}</small></button>)}{!matching.length && <p>No registrations match. Use New registration to add a vehicle.</p>}{matching.length === 15 && <p>Showing the first 15 matches. Keep typing to narrow the search.</p>}</div>}{existing && <p className="gos-summary"><strong>{existing.reg}</strong> · {existing.model} · {existing.wheelbase || 'Wheelbase not recorded'} · {existing.colour || 'Colour not recorded'}<br />{existing.division} · {existing.name}{livery && <><br /><span className="gos-tag">{livery.name}</span></>}</p>}</> : <><Fields full={false} showLivery={false} value={vehicle} onChange={setVehicle} liveries={register.liveries} divisions={divisions} /><section className="gos-new-artwork"><h3>Choose the livery for this vehicle</h3>{design && !choosingDesign ? <div className="gos-selected-artwork"><strong>{livery?.name}</strong><span>{design.title}</span><button type="button" onClick={() => setChoosingDesign(true)}>Change livery</button></div> : <><label>Find a livery / van type<input type="search" placeholder="E.g. Standard GOS, Transit Custom, LWB…" value={designSearch} onChange={e => setDesignSearch(e.target.value)} /></label><div className="gos-design-options">{(register.designs || []).filter(d => normalized(d.title + ' ' + register.liveries.find(l => l.id === d.liveryId)?.name).includes(normalized(designSearch))).map(d => <button type="button" key={d.id} aria-pressed={designId === d.id} onClick={() => {
+                setDesignId(d.id);
+                setChoosingDesign(false);
+                setBoxes({});
+              }}><img src={d.previewUrl} alt={d.title} loading="lazy" /><strong>{register.liveries.find(l => l.id === d.liveryId)?.name}</strong><span>{d.title}</span></button>)}</div></>}</section></>}
+ <section className="gos-order-images"><h3>{kind === 'repair' ? 'Mark the areas that need repairing' : 'Vehicle livery'}</h3>{kind === 'repair' && photos.length > 0 && <p>Drag boxes over the graphics that need repair. The marked PDF will be attached to your order.</p>}{!photos.length ? <p className="gos-empty">{mode === 'existing' ? existing ? 'No PDF design is assigned to this registration. Update the vehicle record in the register first.' : 'Search for and select a registration to see its livery.' : 'Choose a livery above to see the artwork.'}</p> : photos.map(p => kind === 'repair' ? <RepairImage key={p.id} photo={p} boxes={boxes[p.id] || []} onChange={b => setBoxes({
           ...boxes,
           [p.id]: b
-        })} /> : <img className="gos-order-image" key={p.id} src={p.url} alt={p.name || livery?.name} />)}</section><div className="gos-fields"><label>Your name<input required value={contact} onChange={e => setContact(e.target.value)} /></label><label>Contact email<input required type="email" value={email} onChange={e => setEmail(e.target.value)} /></label><label className="gos-wide">Order notes / reference<textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Purchase order, required date, delivery or repair instructions" /></label></div>{error && <p role="alert" className="gos-error">{error}</p>}{!register.orderingReady && <p className="gos-error">The order inbox has not been configured yet.</p>}<footer><button type="button" disabled={sending} onClick={onClose}>Cancel</button><button className="gos-primary" disabled={sending || !register.orderingReady}>{sending ? 'Sending order…' : 'Send ' + (kind === 'repair' ? 'repair' : 'livery') + ' order'}</button></footer></form></Modal>;
+        })} /> : <img className="gos-order-image" key={p.id} src={p.url} alt={p.name || livery?.name} />)}</section><label>Order notes / reference<textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Purchase order, required date, delivery or repair instructions" /></label>{error && <p role="alert" className="gos-error">{error}</p>}{!register.orderingReady && <p className="gos-error">Ordering is temporarily unavailable.</p>}<footer><button type="button" disabled={sending} onClick={onClose}>Cancel</button><button className="gos-primary" disabled={sending || !register.orderingReady}>{sending ? 'Sending order…' : 'Send ' + (kind === 'repair' ? 'repair' : 'livery') + ' order'}</button></footer></form></Modal>;
 }
 export default function GosPage() {
   const [register, setRegister] = useState(null),
@@ -357,10 +365,10 @@ export default function GosPage() {
     }
   }
   if (loading) return <div className="gos-app"><p className="gos-loading">Loading GOS Vehicle Liveries…</p></div>;
-  if (!register) return <div className="gos-app gos-login"><form onSubmit={login}><div className="gos-wordmark">GOS</div><p className="gos-eyebrow">VEHICLE LIVERIES</p><h1>Your fleet, every livery.</h1><p>View your vehicle register, request new graphics and mark repairs.</p><label>Portal password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>{error && <p role="alert" className="gos-error">{error}</p>}<button className="gos-primary" disabled={busy}>{busy ? 'Signing in…' : 'Open vehicle portal'}</button><small>Managed by Signs Express Central Lancashire & Southport</small></form></div>;
+  if (!register) return <div className="gos-app gos-login"><form onSubmit={login}><img className="gos-logo gos-login-logo" src="/gos/logo.svg" alt="GOS Services" /><p className="gos-eyebrow">VEHICLE LIVERIES</p><h1>Your fleet, every livery.</h1><p>View your vehicle register, request new graphics and mark repairs.</p><label>Portal password<input type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} /></label>{error && <p role="alert" className="gos-error">{error}</p>}<button className="gos-primary" disabled={busy}>{busy ? 'Signing in…' : 'Open vehicle portal'}</button><small>Managed by Signs Express Central Lancashire & Southport</small></form></div>;
   const divisions = [...new Set(register.vehicles.map(v => v.division).filter(Boolean))].sort();
   const vehicles = register.vehicles.filter(v => (!division || v.division === division) && (!liveryFilter || v.liveryId === liveryFilter) && (!search || [v.reg, v.name, v.division, v.model, v.group, register.liveries.find(l => l.id === v.liveryId)?.name].join(' ').toLowerCase().includes(search.toLowerCase()) || v.reg.replace(/\s/g, '').toLowerCase().includes(search.replace(/\s/g, '').toLowerCase())));
-  return <div className="gos-app"><header className="gos-top"><div><span className="gos-wordmark">GOS</span><span>Vehicle Liveries</span></div><nav><button onClick={() => setOrder({
+  return <div className="gos-app"><header className="gos-top"><div><img className="gos-logo" src="/gos/logo.svg" alt="GOS Services" /><span>Vehicle Liveries</span></div><nav><button onClick={() => setOrder({
           kind: 'livery'
         })} className="gos-primary">Order livery</button><button onClick={() => setOrder({
           kind: 'repair'
@@ -412,7 +420,10 @@ export default function GosPage() {
           } catch (e) {
             setError(e.message);
           }
-        }}><input required aria-label="New livery name" placeholder="New livery category" value={newLivery} onChange={e => setNewLivery(e.target.value)} /><button>Add category</button></form>{register.liveries.slice().sort((a,b)=>{const names=['Standard GOS','Mechanical Electrical','Electrical','Custom Livery','No Livery'];return (names.indexOf(a.name)<0?99:names.indexOf(a.name))-(names.indexOf(b.name)<0?99:names.indexOf(b.name));}).map(l => <section className="gos-category" key={l.id}><div className="gos-category-head"><h2>{l.name}</h2><button onClick={() => {
+        }}><input required aria-label="New livery name" placeholder="New livery category" value={newLivery} onChange={e => setNewLivery(e.target.value)} /><button>Add category</button></form>{register.liveries.slice().sort((a, b) => {
+          const names = ['Standard GOS', 'Mechanical Electrical', 'Electrical', 'Custom Livery', 'No Livery'];
+          return (names.indexOf(a.name) < 0 ? 99 : names.indexOf(a.name)) - (names.indexOf(b.name) < 0 ? 99 : names.indexOf(b.name));
+        }).map(l => <section className="gos-category" key={l.id}><div className="gos-category-head"><h2>{l.name}</h2><button onClick={() => {
               setTab('vehicles');
               setLiveryFilter(l.id);
               setDivision('');
