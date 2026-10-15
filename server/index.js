@@ -12273,6 +12273,7 @@ function createServer() {
     next();
   });
   app.use(cors());
+  app.use("/api/gos/documents", express.json({ limit: "40mb" }));
   app.use(express.json({ limit: "15mb" }));
   app.use(express.static(PUBLIC_DIR, {
     setHeaders(response, filePath) {

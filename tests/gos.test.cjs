@@ -49,7 +49,8 @@ async function fixture(fn, options = {}) {
     });
     return {
       status: r.status,
-      body: await r.json(),
+      body: r.headers.get('content-type')?.includes('application/json') ? await r.json() : Buffer.from(await r.arrayBuffer()),
+      contentType:r.headers.get('content-type'),
       cookie: r.headers.get('set-cookie')?.split(';')[0]
     };
   }
@@ -203,4 +204,18 @@ test('a new-registration order validates vehicle details and adds the vehicle on
  assert.equal(mails.length,1);
  assert.match(mails[0].text,/Wheelbase \/ roof: L2 H1/);
  assert.equal(mails[0].attachments.length,1);
+}));
+test('PDF source pages require GOS access, imports retain PDFs and repair email attachments are PDF',()=>fixture(async({req,mails})=>{
+ const {PDFDocument}=require('pdf-lib'),{pagePdf}=require('../server/gos/pdf.cjs');
+ assert.equal((await req('/api/gos/documents/gos-master-v1.pdf')).status,401);
+ const cookie=(await req('/api/gos/login',{password:'GOS123'})).cookie;
+ const register=(await req('/api/gos/register',null,cookie)).body;
+ assert.equal(register.designs.length,19);
+ const page=await req('/api/gos/documents/gos-master-v1/pages/1.pdf',null,cookie);
+ assert.equal(page.status,200);assert.match(page.contentType,/application\/pdf/);assert.equal(page.body.subarray(0,5).toString(),'%PDF-');
+ const uploaded=await req('/api/gos/documents',{name:'Test original.pdf',dataUrl:'data:application/pdf;base64,'+page.body.toString('base64'),pages:[{pageNumber:1,title:'Test model',liveryId:register.liveries[0].id,previewDataUrl:png}]},cookie);
+ assert.equal(uploaded.status,200);assert.equal((await req('/api/gos/register',null,cookie)).body.designs.length,20);
+ const vehicle=register.vehicles.find(v=>v.reg==='HW70 KVT'),design=register.designs.find(d=>d.pageNumber===1);
+ const response=await req('/api/gos/orders',{requestId:'gos-pdf-repair-0005',kind:'repair',existingId:vehicle.id,liveryId:vehicle.liveryId,designId:design.id,annotations:[{designId:design.id,boxes:[{x:.4,y:.4,w:.2,h:.15}]}],contact:'PDF QA',email:'pdf@example.invalid'},cookie);
+ assert.equal(response.status,200);assert.equal(mails.length,1);assert.equal(mails[0].attachments[0].contentType,'application/pdf');assert.match(mails[0].attachments[0].filename,/\.pdf$/);assert.equal((await PDFDocument.load(mails[0].attachments[0].content)).getPageCount(),1);
 }));

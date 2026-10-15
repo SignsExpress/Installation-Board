@@ -3,6 +3,14 @@ const express = require('express'),
   path = require('node:path'),
   crypto = require('node:crypto');
 const seed = require('./seed.json');
+const catalogue = require('./catalogue/catalogue.json');
+const {
+  PDFDocument
+} = require('pdf-lib');
+const {
+  matchDesign,
+  pagePdf
+} = require('./pdf.cjs');
 const clean = (v, n = 500) => String(v ?? '').trim().slice(0, n);
 const regKey = v => clean(v, 20).toUpperCase().replace(/\s/g, '');
 function imageBuffer(data) {
@@ -34,6 +42,34 @@ function createGosRouter({
   let queue = Promise.resolve();
   const file = path.join(dataDir, 'register.json'),
     media = path.join(dataDir, 'photos');
+  const documentsDir = path.join(dataDir, 'documents');
+  fs.mkdirSync(documentsDir, {
+    recursive: true
+  });
+  const masterDir = path.join(__dirname, 'catalogue');
+  function docs(s) {
+    return [{
+      ...catalogue,
+      bundled: true
+    }, ...(s.documents || [])];
+  }
+  function designs(s) {
+    return docs(s).flatMap(doc => doc.pages.map(p => ({
+      ...p,
+      documentId: doc.id,
+      id: p.id || doc.id + '-page-' + p.pageNumber,
+      liveryId: p.liveryId || s.liveries.find(l => l.name === p.liveryName)?.id,
+      previewUrl: '/api/gos/documents/' + doc.id + '/pages/' + p.pageNumber + '/preview',
+      pdfUrl: '/api/gos/documents/' + doc.id + '/pages/' + p.pageNumber + '.pdf',
+      documentUrl: '/api/gos/documents/' + doc.id + '.pdf'
+    })));
+  }
+  function documentFile(doc) {
+    return path.join(doc.bundled ? masterDir : documentsDir, doc.filename);
+  }
+  function findDesign(s, id) {
+    return designs(s).find(d => d.id === id);
+  }
   fs.mkdirSync(media, {
     recursive: true
   });
@@ -137,11 +173,19 @@ function createGosRouter({
       ...s,
       vehicles: s.vehicles.map(v => ({
         ...v,
+        matchedDesign: matchDesign(v, designs(s)),
         photos: (v.photos || []).map(photoPublic)
       })),
       liveries: s.liveries.map(l => ({
         ...l,
         photos: (l.photos || []).map(photoPublic)
+      })),
+      designs: designs(s),
+      documents: docs(s).map(d => ({
+        id: d.id,
+        name: d.name,
+        pageCount: d.pages.length,
+        url: '/api/gos/documents/' + d.id + '.pdf'
       })),
       orders: s.orders.map(o => ({
         id: o.id,
@@ -164,9 +208,10 @@ function createGosRouter({
     const v = {
       ...old
     };
-    for (const k of ['reg', 'name', 'division', 'year', 'make', 'model', 'group', 'wheelbase', 'colour', 'liveryId', 'notes']) v[k] = clean(body[k] ?? old[k] ?? '', k === 'notes' ? 3000 : 300);
+    for (const k of ['reg', 'name', 'division', 'year', 'make', 'model', 'group', 'wheelbase', 'colour', 'liveryId', 'designId', 'notes']) v[k] = clean(body[k] ?? old[k] ?? '', k === 'notes' ? 3000 : 300);
     v.reg = v.reg.toUpperCase();
     if (!v.reg || !v.model) throw Error('Registration and make/model are required.');
+    if (v.designId && !designs(s).some(d => d.id === v.designId && d.liveryId === v.liveryId)) throw Error('Select a PDF design in this livery category.');
     if (!s.liveries.some(l => l.id === v.liveryId)) throw Error('Choose a livery.');
     if (s.vehicles.some(other => other.id !== old.id && regKey(other.reg) === regKey(v.reg))) throw Error('That registration already exists.');
     return v;
@@ -242,6 +287,60 @@ function createGosRouter({
       ok: true
     });
   }));
+  router.get('/documents/:docId/pages/:pageNumber/preview', route((req, res) => {
+    const s = read(),
+      doc = docs(s).find(d => d.id === req.params.docId),
+      page = doc?.pages.find(p => p.pageNumber === Number(req.params.pageNumber));
+    if (!page) return res.status(404).end();
+    res.sendFile(path.join(doc.bundled ? masterDir : documentsDir, page.previewFile));
+  }));
+  router.get('/documents/:docId/pages/:page.pdf', route(async (req, res) => {
+    const doc = docs(read()).find(d => d.id === req.params.docId);
+    if (!doc) return res.status(404).end();
+    const bytes = await pagePdf(fs.readFileSync(documentFile(doc)), Number(req.params.page));
+    res.type('application/pdf').set('Content-Disposition', 'inline; filename="GOS-page-' + req.params.page + '.pdf"').send(bytes);
+  }));
+  router.get('/documents/:docId.pdf', route((req, res) => {
+    const doc = docs(read()).find(d => d.id === req.params.docId);
+    if (!doc) return res.status(404).end();
+    res.type('application/pdf').sendFile(documentFile(doc));
+  }));
+  router.post('/documents', route(async (req, res) => {
+    const m = /^data:application\/pdf;base64,([A-Za-z0-9+/=]+)$/.exec(req.body.dataUrl || '');
+    if (!m) throw Error('Upload a PDF document.');
+    const bytes = Buffer.from(m[1], 'base64');
+    if (bytes.length > 22 * 1024 * 1024 || bytes.toString('ascii', 0, 5) !== '%PDF-') throw Error('Use a valid PDF under 22MB.');
+    const pdf = await PDFDocument.load(bytes);
+    if (pdf.getPageCount() > 100) throw Error('A PDF can have at most 100 pages.');
+    if (!Array.isArray(req.body.pages) || req.body.pages.length !== pdf.getPageCount()) throw Error('Each PDF page needs a preview and van label.');
+    const id = crypto.randomUUID(),
+      s = read();
+    const pages = req.body.pages.map((p, i) => {
+      if (p.pageNumber !== i + 1 || !s.liveries.some(l => l.id === p.liveryId)) throw Error('Choose a livery category for every page.');
+      const preview = imageBuffer(p.previewDataUrl),
+        file = id + '-page-' + (i + 1) + '.' + preview.ext;
+      fs.writeFileSync(path.join(documentsDir, file), preview.buffer);
+      return {
+        id: id + '-page-' + (i + 1),
+        pageNumber: i + 1,
+        title: clean(p.title, 500) || 'Page ' + (i + 1),
+        liveryId: p.liveryId,
+        previewFile: file
+      };
+    });
+    fs.writeFileSync(path.join(documentsDir, id + '.pdf'), bytes);
+    await mutate(s => {
+      s.documents = [...(s.documents || []), {
+        id,
+        name: clean(req.body.name, 160) || 'Livery PDF',
+        filename: id + '.pdf',
+        pages
+      }];
+    });
+    res.json({
+      id
+    });
+  }));
   router.post('/orders', route(async (req, res) => {
     if (!recipient || !sendMail) {
       const e = Error('The order inbox is not configured yet. Please contact Signs Express.');
@@ -274,14 +373,23 @@ function createGosRouter({
       }
       const livery = s.liveries.find(l => l.id === body.liveryId);
       if (!livery) throw Error('Choose a livery.');
+      const design = body.designId ? findDesign(s, body.designId) : null;
+      if (body.designId && (!design || design.liveryId !== livery.id)) throw Error('Select a PDF design from the chosen livery.');
+      if (design && !body.existingId) vehicle.designId = design.id;
       const photos = vehicle.liveryId === livery.id && vehicle.photos?.length ? vehicle.photos : livery.photos;
-      if (!photos?.length) throw Error('Upload a vehicle or livery photo before ordering so the email can include the image.');
+      if (!design && !photos?.length) throw Error('Upload a vehicle or livery photo before ordering so the email can include the image.');
       let annotations = [];
       if (body.kind === 'repair') {
         if (!Array.isArray(body.annotations) || !body.annotations.length || body.annotations.length > 8) throw Error('Mark at least one repair area.');
         annotations = body.annotations.map(a => {
-          if (!photos.some(p => p.id === a.photoId)) throw Error('Repair image is not linked to this vehicle or livery.');
+          if (design && a.designId !== design.id) throw Error('Repair markings do not match the selected PDF page.');
+          if (!design && !photos.some(p => p.id === a.photoId)) throw Error('Repair image is not linked to this vehicle or livery.');
           if (!Array.isArray(a.boxes) || !a.boxes.length || a.boxes.length > 50 || !a.boxes.every(b => ['x', 'y', 'w', 'h'].every(k => Number.isFinite(b[k]) && b[k] >= 0 && b[k] <= 1) && b.w > 0 && b.h > 0 && b.x + b.w <= 1.001 && b.y + b.h <= 1.001)) throw Error('Invalid repair boxes.');
+          if (design) return {
+            designId: design.id,
+            pageNumber: design.pageNumber,
+            boxes: a.boxes
+          };
           const decoded = imageBuffer(a.dataUrl);
           const file = crypto.randomUUID() + '.' + decoded.ext;
           fs.writeFileSync(path.join(media, file), decoded.buffer);
@@ -302,6 +410,11 @@ function createGosRouter({
         email,
         notes: clean(body.notes, 5000),
         annotations,
+        design: design ? {
+          ...design,
+          filename: docs(s).find(d => d.id === design.documentId).filename,
+          bundled: docs(s).find(d => d.id === design.documentId).bundled
+        } : null,
         createdAt: new Date().toISOString(),
         status: 'pending'
       };
@@ -323,11 +436,20 @@ function createGosRouter({
     });
     try {
       const photos = order.vehicle.liveryId === order.livery.id && order.vehicle.photos?.length ? order.vehicle.photos : order.livery.photos;
-      const files = order.kind === 'repair' ? order.annotations : photos;
-      const attachments = files.map((p, i) => ({
+      const files = order.design ? [] : order.kind === 'repair' ? order.annotations : photos;
+      let attachments = files.map((p, i) => ({
         filename: (order.kind === 'repair' ? 'repair-marked-' : 'livery-') + (i + 1) + path.extname(p.file),
         path: path.join(media, p.file)
       }));
+      if (order.design) {
+        const boxes = order.kind === 'repair' ? order.annotations.flatMap(a => a.boxes) : [];
+        const content = await pagePdf(fs.readFileSync(documentFile(order.design)), order.design.pageNumber, boxes);
+        attachments = [{
+          filename: (order.kind === 'repair' ? 'GOS-repair-marked-' : 'GOS-livery-') + order.vehicle.reg.replace(/[^a-z0-9]/gi, '') + '.pdf',
+          content,
+          contentType: 'application/pdf'
+        }];
+      }
       if (order.kind === 'repair') attachments.push({
         filename: 'repair-areas.json',
         content: JSON.stringify(order.annotations.map(a => ({
@@ -336,7 +458,7 @@ function createGosRouter({
         })), null, 2),
         contentType: 'application/json'
       });
-      const details = [['Order', order.id], ['Type', order.kind === 'repair' ? 'Repair' : 'Vehicle livery'], ['Registration', order.vehicle.reg], ['Make', order.vehicle.make], ['Model', order.vehicle.model], ['Wheelbase / roof', order.vehicle.wheelbase], ['Colour', order.vehicle.colour], ['Division', order.vehicle.division], ['Driver', order.vehicle.name], ['Livery', order.livery.name], ['Contact', order.contact], ['Email', order.email], ['Notes', order.notes]].map(([k, v]) => k + ': ' + (v || 'Not supplied')).join('\n');
+      const details = [['Order', order.id], ['Type', order.kind === 'repair' ? 'Repair' : 'Vehicle livery'], ['Registration', order.vehicle.reg], ['Make', order.vehicle.make], ['Model', order.vehicle.model], ['Wheelbase / roof', order.vehicle.wheelbase], ['Colour', order.vehicle.colour], ['Division', order.vehicle.division], ['Driver', order.vehicle.name], ['Livery', order.livery.name], ['PDF design', order.design?.title], ['Source PDF page', order.design?.pageNumber], ['Contact', order.contact], ['Email', order.email], ['Notes', order.notes]].map(([k, v]) => k + ': ' + (v || 'Not supplied')).join('\n');
       const result = await sendMail({
         to: recipient,
         replyTo: order.email,
