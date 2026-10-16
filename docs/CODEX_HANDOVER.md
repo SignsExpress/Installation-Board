@@ -303,3 +303,7 @@ Validation: production build and six focused tests (workbook EUR/GBP parity, DHL
 ## Ireland Delivery quotation wording - 16 October 2026
 
 Added Quotation description below the reference numbers with the user's exact supplied title and paragraph. Copy description copies plain text and, where supported, HTML with the title bold for pasting into quotations. Clipboard errors fall back to selecting the visible description for manual copying; feedback is announced in a status region. Wording stays fixed as supplied rather than changing when calculator rates are edited. Production build passes. Calculator logic, operational data and other modules are unchanged.
+
+## Ireland Delivery compact layout and delivery total - 16 October 2026
+
+Reduced module typography, input heights, spacing, results card, reference numbers and quotation section padding. Removed Load spreadsheet example while retaining Reset. The headline is now Total cost to Signs Express - excluding goods and uses deliveryTotal (courier delivery + insurance + import fees) in GBP and EUR. Additional import charges remain separately listed; goods-inclusive total remains secondary. Quotation wording/copy and calculator formulas are unchanged. Production build and four calculator tests pass. Local browser QA verified the headline GBP215.47/EUR250.69 for goods GBP280 and delivery GBP102.37, and inspected the compact layout.
