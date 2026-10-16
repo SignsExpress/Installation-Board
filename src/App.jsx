@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import IrelandDelivery from "./ireland/IrelandDelivery";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 
 const JOB_TYPES = [
@@ -3011,6 +3012,7 @@ function MainNavBar({
     { key: "holidays", label: "Holidays", path: holidaysPath, allowed: holidaysAllowed },
     { key: "mileage", label: "Mileage", path: mileagePath, allowed: mileageAllowed },
     { key: "order-panels", label: "Order Panels", path: orderPanelsPath, allowed: orderPanelsAllowed },
+    { key: "ireland-delivery", label: "Ireland Delivery", path: "/ireland-delivery", allowed: true },
     { key: "van-estimator", label: "Vehicle Pricing", path: vanEstimatorPath, allowed: vanEstimatorAllowed },
     { key: "rams", label: "RAMS", path: ramsPath, allowed: ramsAllowed },
     { key: "social-post", label: "Social Post", path: socialPostPath, allowed: socialPostAllowed },
@@ -4130,6 +4132,7 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const toolsCards = [
+    <HostLaunchCard key="ireland-delivery" icon="vehicle" label="Ireland Delivery" description="Delivery and import fees" onClick={() => goTo("/ireland-delivery")} />,
     canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
@@ -4237,6 +4240,7 @@ function ClientLandingPage({
   ].filter(Boolean);
 
   const toolsCards = [
+    <HostLaunchCard key="ireland-delivery" icon="vehicle" label="Ireland Delivery" description="Delivery and import fees" onClick={() => goTo("/ireland-delivery")} />,
     canAccessSocialPost(currentUser) ? <HostLaunchCard key="social-post" icon="social" label="Social Post" description="LinkedIn draft writer" onClick={() => goTo("/social-post")} /> : null,
     canAccessDescriptionPull(currentUser) ? <HostLaunchCard key="description-pull" icon="social" label="Description Pull" description="Customer descriptions" onClick={() => goTo("/description-pull")} /> : null,
     canAccessProForma(currentUser) ? <HostLaunchCard key="pro-forma" icon="invoice" label="Pro-Forma" description="Editable invoice drafts" onClick={() => goTo(proFormaPath)} /> : null,
@@ -21311,6 +21315,7 @@ export default function App() {
   const isMileageRoute = pathname.startsWith("/mileage");
   const isMaterialsRoute = pathname.startsWith("/materials");
   const isOrderPanelsRoute = pathname.startsWith("/order-panels");
+  const isIrelandDeliveryRoute = pathname === "/ireland-delivery" || pathname === "/ireland-delivery/";
   const isVanEstimatorRoute = pathname.startsWith("/van-estimator");
   const isSocialPostRoute = pathname.startsWith("/social-post");
   const isDescriptionPullRoute = pathname.startsWith("/description-pull");
@@ -21473,9 +21478,9 @@ export default function App() {
   const showWip = Boolean(currentUser && canAccessBoard(currentUser) && isWipRoute);
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const installerOptions = useMemo(() => buildInstallerOptions(installerUsers.length ? installerUsers : loginUsers), [installerUsers, loginUsers]);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && (canAccessBoard(currentUser) || canAccessDesignBoard(currentUser) || canAccessFiltering(currentUser) || canAccessAttendance(currentUser) || canAccessHolidays(currentUser) || canAccessMileage(currentUser) || canAccessMaterials(currentUser) || canAccessOrderPanels(currentUser) || canAccessVanEstimator(currentUser) || canAccessRams(currentUser) || canAccessSocialPost(currentUser) || canAccessDescriptionPull(currentUser) || canAccessProForma(currentUser) || canAccessMustang(currentUser)) && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -21981,7 +21986,7 @@ export default function App() {
       return;
     }
 
-    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isMustangRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
+    if (!hostShellMode && !isClientRoute && !isMorningMeetingRoute && !isMustangRoute && !isHolidaysRoute && !isAttendanceRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isCreditApplicationRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isDesignBoardRoute && !isFilteringRoute && !isRamsRoute && !isNotificationsRoute) {
       window.location.replace(nextHomePath);
       return;
     }
@@ -22004,7 +22009,7 @@ export default function App() {
     if ((isFilteringRoute || isClientFilteringRoute) && nextFilteringPath !== window.location.pathname) {
       window.location.replace(nextFilteringPath);
     }
-  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isWipRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isOrderPanelsRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
+  }, [currentUser, isClientRoute, isClientBoardRoute, isClientDesignBoardRoute, isClientFilteringRoute, isClientRamsRoute, isInstallerRoute, isBoardRoute, isMorningMeetingRoute, isWipRoute, isMustangRoute, isDesignBoardRoute, isFilteringRoute, isAttendanceRoute, isHolidaysRoute, isMileageRoute, isMaterialsRoute, isOrderPanelsRoute, isIrelandDeliveryRoute, isVanEstimatorRoute, isSocialPostRoute, isDescriptionPullRoute, isCoreBridgeExplorerRoute, isCreditApplicationRoute, isTvInstallsRoute, isProFormaRoute, isClientProFormaRoute, isRamsRoute, isRamsLogicRoute, isNotificationsRoute, hostShellMode]);
 
   useEffect(() => {
     if (!currentUser || !showBoard) return undefined;
@@ -24234,6 +24239,10 @@ export default function App() {
         notifications={notifications}
       />
     );
+  }
+
+  if (currentUser && isIrelandDeliveryRoute) {
+    return <IrelandDelivery navigation={<MainNavBar currentUser={currentUser} active="ireland-delivery" onLogout={handleLogout} notifications={notifications} />} />;
   }
 
   if (showVanEstimator) {
