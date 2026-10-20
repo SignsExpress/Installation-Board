@@ -1365,8 +1365,14 @@ function getHolidayStaffEntry(value) {
   );
 }
 
-function getHolidayStaffPersonForUser(user) {
-  return getHolidayStaffEntry(user?.displayName)?.person || "";
+function getHolidayStaffPersonForUser(user, staffEntries = []) {
+  const userId = String(user?.id || "").trim();
+  const displayName = String(user?.displayName || "").trim().toLowerCase();
+  const liveMatch = (Array.isArray(staffEntries) ? staffEntries : []).find((entry) =>
+    (userId && String(entry?.userId || "").trim() === userId) ||
+    (displayName && [entry?.fullName, entry?.name].some((value) => String(value || "").trim().toLowerCase() === displayName))
+  );
+  return liveMatch?.person || getHolidayStaffEntry(user?.displayName)?.person || "";
 }
 
 function getHolidayStaffIdentityKey(value) {
@@ -14178,6 +14184,7 @@ function ClientRamsPage() {
 
 function HolidaysPage({
   currentUser,
+  message,
   onLogout,
   notifications,
   holidays,
@@ -14216,7 +14223,7 @@ function HolidaysPage({
   onCancelHolidayRequest
 }) {
   const canReview = canEditHolidays(currentUser);
-  const currentPerson = getHolidayStaffPersonForUser(currentUser);
+  const currentPerson = getHolidayStaffPersonForUser(currentUser, holidayStaff);
   const showingFutureYear = holidayYearStart > currentHolidayYearStart;
   const [selectedHolidayPerson, setSelectedHolidayPerson] = useState("");
   const cancellableHolidayRequests = useMemo(() => {
@@ -14297,6 +14304,8 @@ function HolidaysPage({
                 ) : null}
               </div>
             </div>
+
+          {message ? <div className={`flash ${message.tone}`}>{message.text}</div> : null}
 
           {holidayRequests.length ? (
             <section className="holiday-requests-panel">
@@ -14647,7 +14656,9 @@ function HolidaysPage({
               ) : (
                 <label>
                   Employee
-                  <input type="text" value={currentPerson} readOnly />
+                  <select value={currentPerson} onChange={() => {}}>
+                    {currentPerson ? <option value={currentPerson}>{currentPerson}</option> : <option value="">Account not linked</option>}
+                  </select>
                 </label>
               )}
 
@@ -22931,7 +22942,7 @@ export default function App() {
   async function submitHolidayRequest() {
     const person = canEditHolidays(currentUser)
       ? holidayRequestForm.person
-      : getHolidayStaffPersonForUser(currentUser);
+      : getHolidayStaffPersonForUser(currentUser, holidayStaff);
 
     if (!person || !holidayRequestForm.startDate || !holidayRequestForm.endDate) {
       setMessage(createMessage("Choose a person plus start and end dates.", "error"));
@@ -24363,6 +24374,7 @@ export default function App() {
     return (
       <HolidaysPage
         currentUser={currentUser}
+        message={message}
         onLogout={handleLogout}
         notifications={notifications}
         holidays={holidays}

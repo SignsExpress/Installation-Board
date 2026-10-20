@@ -937,10 +937,6 @@ function toHolidayCode(displayName) {
 function buildHolidayStaffList(users = [], allowanceEntries = []) {
   const merged = [];
   const seen = new Set();
-  const activeUserNames = new Set(
-    users.map((user) => String(user.displayName || "").trim().toLowerCase()).filter(Boolean)
-  );
-
   function addEntry(entry) {
     const normalizedName = String(entry?.name || entry?.fullName || "").trim();
     const normalizedPerson = String(entry?.person || "").trim();
@@ -958,14 +954,14 @@ function buildHolidayStaffList(users = [], allowanceEntries = []) {
   }
 
   HOLIDAY_STAFF.forEach((entry) => {
-    if (activeUserNames.has(String(entry.name || "").trim().toLowerCase())) {
-      addEntry({ ...entry, fullName: entry.name });
+    const matchingUser = users.find((user) => String(user.displayName || "").trim().toLowerCase() === String(entry.name || "").trim().toLowerCase());
+    if (matchingUser) {
+      addEntry({ ...entry, userId: matchingUser.id || "", fullName: entry.name });
     }
   });
 
-  const sourceNames = users.map((user) => user.displayName);
-
-  sourceNames.forEach((displayName) => {
+  users.forEach((user) => {
+    const displayName = user.displayName;
     const normalizedName = String(displayName || "").trim();
     if (!normalizedName) return;
     if (seen.has(normalizedName.toLowerCase())) return;
@@ -973,6 +969,7 @@ function buildHolidayStaffList(users = [], allowanceEntries = []) {
     const code = toHolidayCode(normalizedName) || normalizedName.slice(0, 2).toUpperCase();
     const person = toHolidayPersonLabel(normalizedName);
     const entry = {
+      userId: user.id || "",
       code,
       name: normalizedName,
       fullName: normalizedName,
@@ -1013,6 +1010,16 @@ function getHolidayStaffEntry(codeOrName) {
 
 function getHolidayStaffPerson(displayName) {
   return HOLIDAY_STAFF.find((entry) => entry.name.toLowerCase() === String(displayName || "").trim().toLowerCase())?.person || toHolidayPersonLabel(displayName);
+}
+
+function getHolidayStaffPersonForUser(user, staffEntries = []) {
+  const userId = String(user?.id || "").trim();
+  const displayName = String(user?.displayName || "").trim().toLowerCase();
+  const match = (Array.isArray(staffEntries) ? staffEntries : []).find((entry) =>
+    (userId && String(entry?.userId || "").trim() === userId) ||
+    (displayName && [entry?.fullName, entry?.name].some((value) => String(value || "").trim().toLowerCase() === displayName))
+  );
+  return match?.person || getHolidayStaffPerson(user?.displayName);
 }
 
 function formatHolidayRequestDateRange(startDate, endDate) {
@@ -5701,7 +5708,7 @@ async function getHolidayPayload(forUser, yearStart = getCurrentHolidayYearStart
   const store = await readStore();
   const usersStore = await readUsersStore();
   const holidayStaffList = buildHolidayStaffList(usersStore.users || [], store.holidayAllowances || []);
-  const currentPerson = getHolidayStaffPerson(forUser?.displayName);
+  const currentPerson = getHolidayStaffPersonForUser(forUser, holidayStaffList);
   const bounds = getHolidayYearBounds(yearStart);
   const startIso = toIsoDate(bounds.start);
   const endIso = toIsoDate(bounds.end);
@@ -16103,7 +16110,10 @@ app.get("/api/corebridge/orders", async (request, response) => {
 
   app.post("/api/holiday-requests", async (request, response) => {
     if (!requireHolidayAccess(request, response)) return;
-    const personLabel = getHolidayStaffPerson(request.user?.displayName);
+    const store = await readStore();
+    const usersStore = await readUsersStore();
+    const holidayStaffList = buildHolidayStaffList(usersStore.users || [], store.holidayAllowances || []);
+    const personLabel = getHolidayStaffPersonForUser(request.user, holidayStaffList);
     if (!personLabel && !canEditHolidays(request.user)) {
       response.status(400).json({ error: "This account is not linked to a holiday calendar code." });
       return;
@@ -16117,9 +16127,6 @@ app.get("/api/corebridge/orders", async (request, response) => {
       status: "pending"
     });
 
-    const store = await readStore();
-    const usersStore = await readUsersStore();
-    const holidayStaffList = buildHolidayStaffList(usersStore.users || [], store.holidayAllowances || []);
     if (!holidayStaffList.some((entry) => getHolidayStaffIdentityKey(entry.person) === getHolidayStaffIdentityKey(nextRequest.person))) {
       response.status(400).json({ error: "A valid employee is required." });
       return;
