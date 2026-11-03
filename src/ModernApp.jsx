@@ -7247,8 +7247,8 @@ const WIP_HEADER_ALIASES = {
   company: ["Company", "Customer", "Customer Name"],
   description: ["Description", "Job Description", "Items"],
   salesperson: ["Salesperson", "Sales Person", "Rep"],
-  productionLocation: ["Production Location"],
-  preTaxTotal: ["Pre-Tax Total", "Pre-Tax Value", "Pre Tax Total", "Pre Tax Value"]
+  productionLocation: ["Production Location", "Location"],
+  preTaxTotal: ["Pre-Tax Total", "Pre-Tax Value", "Pre Tax Total", "Pre Tax Value", "Order Subtotal"]
 };
 
 function getWipHeaderIndex(headers, field) {
@@ -8258,7 +8258,7 @@ function WipPage({ currentUser, onLogout, notifications, users = [] }) {
             <div>
               <span className="panel-kicker">Production planning</span>
               <h1>WIP</h1>
-              <p>Upload the production WIP Excel file, then drag jobs into the right day or status.</p>
+              <p>Upload the production WIP Excel or CSV file, then drag jobs into the right day or status.</p>
             </div>
             <div className="wip-actions">
               <label className="wip-upload-button">
