@@ -1,18 +1,20 @@
+@import url("https://fonts.googleapis.com/css2?family=Nunito+Sans:opsz,wght@6..12,300;6..12,400;6..12,700;6..12,800;6..12,900&display=swap");
+
 :root {
-  --scouts-green: #006b54;
-  --scouts-green-dark: #004c3c;
-  --scouts-lime: #c9dc33;
-  --scouts-ink: #172033;
-  --scouts-border: #d9e3df;
-  --scouts-soft: #f3f8f6;
+  --scouts-green: #7413dc;
+  --scouts-green-dark: #5c0daf;
+  --scouts-lime: #088486;
+  --scouts-ink: #000000;
+  --scouts-border: #ddd2ea;
+  --scouts-soft: #f7f2fc;
 }
 
 .scouts-shell,
 .scouts-admin-shell {
   min-height: 100vh;
-  background: #eef4f1;
+  background: #f3eff8;
   color: var(--scouts-ink);
-  font-family: Arial, sans-serif;
+  font-family: "Nunito Sans", Arial, sans-serif;
 }
 
 .scouts-header,
@@ -28,7 +30,8 @@
 
 .scouts-header > div:first-child,
 .scouts-admin-header > div:first-child { display: flex; align-items: center; gap: 14px; }
-.scouts-mark { color: var(--scouts-green); font-weight: 900; letter-spacing: 0.08em; }
+.scouts-brand-logo { display: block; width: 128px; height: 42px; object-fit: contain; object-position: left center; }
+.scouts-login-card .scouts-brand-logo { width: 112px; height: auto; max-height: 108px; margin-bottom: 18px; object-position: left bottom; }
 .scouts-header span { color: #52615d; font-size: 0.88rem; }
 .scouts-header-note { border-radius: 5px; padding: 7px 10px; background: #fff8db; color: #735c00; font-size: 0.75rem; font-weight: 800; }
 
@@ -39,6 +42,7 @@
 .scouts-section-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 18px; }
 .scouts-section-head > span { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; border-radius: 5px; background: var(--scouts-green); color: #fff; font-weight: 900; }
 .scouts-section h2, .scouts-section h3, .scouts-admin-shell h1, .scouts-admin-shell h2 { margin: 0; }
+.scouts-section h2, .scouts-admin-shell h1 { font-weight: 900; }
 .scouts-section-head p { margin: 3px 0 0; color: #64716e; font-size: 0.85rem; }
 .scouts-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .scouts-details-grid .wide { grid-column: 1 / -1; }
@@ -54,9 +58,12 @@
 .scouts-sign-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr); gap: 20px; align-items: center; }
 .scouts-sign-fields { display: grid; gap: 12px; }
 .scouts-size-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-height: 210px; padding: 18px; border-radius: 7px; background: #e7efec; }
-.scouts-sign-preview { display: grid; place-items: center; width: min(100%, 390px); max-height: 230px; min-height: 90px; border: 3px solid var(--scouts-green); border-radius: 6px; padding: 16px; background: #fff; box-shadow: 0 8px 22px rgba(0, 76, 60, 0.12); text-align: center; }
-.scouts-sign-preview strong { color: var(--scouts-green); font-size: clamp(1rem, 2.2vw, 1.8rem); overflow-wrap: anywhere; }
+.scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-width: 0; min-height: 210px; overflow: hidden; padding: 18px; border-radius: 7px; background: #f1eafa; }
+.scouts-sign-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(3px, 1.2vw, 10px); width: min(100%, 390px); max-width: 100%; max-height: 210px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border: 3px solid var(--scouts-green); border-radius: 5px; padding: clamp(6px, 2vw, 16px); background: #fff; box-shadow: 0 8px 22px rgba(116, 19, 220, 0.14); text-align: center; }
+.scouts-sign-preview img { display: block; width: auto; max-width: 48%; max-height: 52%; object-fit: contain; flex: 0 1 auto; }
+.scouts-sign-preview.is-linear { flex-direction: row; gap: clamp(8px, 2vw, 22px); }
+.scouts-sign-preview.is-linear img { width: min(35%, 170px); max-width: 35%; max-height: 70%; }
+.scouts-sign-preview strong { min-width: 0; color: var(--scouts-green); font-size: clamp(0.72rem, 1.5vw, 1.35rem); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
 .scouts-sign-stage > span { color: #5d6966; font-size: 0.75rem; font-weight: 800; }
 .scouts-line-price { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--scouts-border); padding-top: 10px; }
 .scouts-line-price strong { color: var(--scouts-green); font-size: 1.2rem; }
@@ -104,7 +111,7 @@
 .scouts-admin-signs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .scouts-admin-signs > div { border: 1px solid var(--scouts-border); border-radius: 7px; padding: 10px; }
 .scouts-admin-signs .scouts-sign-stage { min-height: 140px; padding: 10px; }
-.scouts-admin-signs .scouts-sign-preview { max-height: 140px; min-height: 70px; }
+.scouts-admin-signs .scouts-sign-preview { max-height: 140px; min-height: 0; }
 .scouts-admin-signs p { margin: 8px 0 0; font-size: 0.8rem; }
 .scouts-admin-empty { border: 1px dashed #b8c9c3; border-radius: 8px; padding: 40px; background: #fff; text-align: center; color: #64716e; }
 
@@ -112,6 +119,7 @@
   .scouts-header { align-items: flex-start; }
   .scouts-header > div:first-child { display: grid; gap: 3px; }
   .scouts-details-grid, .scouts-sign-layout { grid-template-columns: 1fr; }
+  .scouts-sign-stage { min-height: 180px; }
   .scouts-size-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-admin-order-head { display: grid; }
   .scouts-admin-order-head > div:last-child { justify-items: start; }

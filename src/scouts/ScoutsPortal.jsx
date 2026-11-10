@@ -25,9 +25,11 @@ function money(value) {
 function SignPreview({ sign }) {
   const width = Math.max(50, Number(sign.width) || 50);
   const height = Math.max(50, Number(sign.height) || 50);
+  const logoStyle = width / height > 2.2 ? "linear" : "stack";
   return (
     <div className="scouts-sign-stage">
-      <div className="scouts-sign-preview" style={{ aspectRatio: `${width} / ${height}` }}>
+      <div className={`scouts-sign-preview is-${logoStyle}`} style={{ aspectRatio: `${width} / ${height}` }}>
+        <img src={`/scouts/scouts-logo-${logoStyle}.png`} alt="Scouts" />
         <strong>{sign.groupName || "Your Group Name"}</strong>
       </div>
       <span>{width} x {height}mm</span>
@@ -121,7 +123,7 @@ export function ScoutsCustomerPortal() {
     return (
       <div className="scouts-shell scouts-login-shell">
         <section className="scouts-login-card">
-          <div className="scouts-mark">SCOUTS</div>
+          <img className="scouts-brand-logo" src="/scouts/scouts-logo-stack.png" alt="Scouts" />
           <p>Group sign ordering portal</p>
           <h1>Customer login</h1>
           <form onSubmit={unlock}>
@@ -153,7 +155,7 @@ export function ScoutsCustomerPortal() {
   return (
     <div className="scouts-shell">
       <header className="scouts-header">
-        <div><div className="scouts-mark">SCOUTS</div><span>Group sign ordering</span></div>
+        <div><img className="scouts-brand-logo" src="/scouts/scouts-logo-linear.png" alt="Scouts" /><span>Group sign ordering</span></div>
         <div className="scouts-header-note">Prototype pricing</div>
       </header>
       <main className="scouts-main">
@@ -232,7 +234,7 @@ export function ScoutsAdminOrders() {
 
   return (
     <div className="scouts-admin-shell">
-      <header className="scouts-admin-header"><div><a href="/">← Portal</a><div className="scouts-mark">SCOUTS</div><h1>Sign orders</h1></div><span>{orders.length} order{orders.length === 1 ? "" : "s"}</span></header>
+      <header className="scouts-admin-header"><div><a href="/">← Portal</a><img className="scouts-brand-logo" src="/scouts/scouts-logo-linear.png" alt="Scouts" /><h1>Sign orders</h1></div><span>{orders.length} order{orders.length === 1 ? "" : "s"}</span></header>
       <main className="scouts-admin-main">
         {loading ? <div className="scouts-loading">Loading orders...</div> : null}
         {error ? <div className="scouts-alert error">{error}</div> : null}
