@@ -64,17 +64,19 @@
 .scouts-size-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(110px, 0.65fr); gap: 10px; }
 .scouts-custom-size-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; border-left: 3px solid var(--scouts-green); padding: 10px 0 10px 12px; }
 .scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-width: 0; min-height: 210px; overflow: hidden; padding: 18px; border-radius: 7px; background: #f1eafa; }
-.scouts-sign-preview { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: auto; height: auto; max-width: 100%; max-height: 250px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border-radius: 2px; padding: clamp(9px, 2vw, 18px); background: #7413dc; box-shadow: 0 10px 24px rgba(55, 5, 108, 0.2); color: #fff; text-align: center; }
+.scouts-sign-preview { position: relative; display: block; width: auto; height: auto; max-width: 100%; max-height: 250px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border-radius: 2px; background: #7413dc; box-shadow: 0 10px 24px rgba(55, 5, 108, 0.2); color: #fff; text-align: center; }
 .scouts-sign-preview.is-landscape { width: min(100%, 390px); }
 .scouts-sign-preview.is-portrait { height: min(250px, 100%); }
-.scouts-sign-identity { display: grid; place-items: center; align-content: center; min-height: 0; }
-.scouts-sign-identity img { display: block; width: clamp(54px, 20%, 90px); max-height: 64%; object-fit: contain; }
-.scouts-sign-identity strong { min-width: 0; margin-top: clamp(2px, 0.6vw, 6px); color: #fff; font-size: clamp(0.58rem, 1.2vw, 1rem); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
-.scouts-sign-sections { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,0.28); padding-top: clamp(4px, 1vw, 8px); }
+.scouts-sign-identity { position: absolute; inset: 7% 8% auto; display: flex; height: 38%; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
+.scouts-sign-identity img { display: block; width: clamp(44px, 18%, 78px); max-height: 65%; object-fit: contain; flex: 0 1 auto; }
+.scouts-sign-identity strong { display: block; max-width: 100%; margin-top: clamp(1px, 0.45vw, 4px); color: #fff; font-size: clamp(0.52rem, 1vw, 0.9rem); font-weight: 800; line-height: 1; overflow-wrap: anywhere; }
+.scouts-sign-sections { position: absolute; top: 52%; left: 5%; right: 5%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,0.28); padding-top: clamp(4px, 1vw, 8px); }
 .scouts-sign-sections span { display: grid; gap: 0; min-width: 0; }
 .scouts-sign-sections b { font-size: clamp(0.38rem, 0.7vw, 0.62rem); line-height: 1; }
 .scouts-sign-sections small { margin-top: 2px; color: #fff; font-size: clamp(0.3rem, 0.52vw, 0.48rem); line-height: 1; }
-.scouts-sign-footer { display: flex; justify-content: space-between; gap: 10px; padding-top: clamp(6px, 1.2vw, 12px); font-size: clamp(0.38rem, 0.7vw, 0.62rem); }
+.scouts-sign-footer { position: absolute; right: 5%; bottom: 8%; left: 5%; display: flex; justify-content: space-between; gap: 10px; font-size: clamp(0.38rem, 0.7vw, 0.62rem); }
+.scouts-sign-preview.is-portrait .scouts-sign-identity { top: 7%; height: 36%; }
+.scouts-sign-preview.is-portrait .scouts-sign-sections { top: 54%; }
 .scouts-sign-preview.is-portrait .scouts-sign-sections { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 5px; }
 .scouts-sign-preview.is-portrait .scouts-sign-sections span:nth-child(n+4) { transform: translateX(50%); }
 .scouts-product-detail { display: flex; flex-wrap: wrap; gap: 6px; }
