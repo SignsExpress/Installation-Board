@@ -8,9 +8,21 @@ const SIGN_PRODUCTS = [
   { id: "landscape-1200x800", title: "Landscape Sign", width: 1200, height: 800, price: 50, code: "GE-128STACK-SIGN-C-P" },
   { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, price: 30, code: "GE-68STACK-SIGN-C-P" }
 ];
+const CUSTOM_PRODUCT_ID = "custom";
 
 function getSignProduct(sign) {
   return SIGN_PRODUCTS.find((product) => product.id === sign.productId) || SIGN_PRODUCTS[0];
+}
+
+function getSignDimensions(sign) {
+  if (sign.productId === CUSTOM_PRODUCT_ID) {
+    return {
+      width: Math.min(5000, Math.max(50, Number(sign.width) || 50)),
+      height: Math.min(5000, Math.max(50, Number(sign.height) || 50))
+    };
+  }
+  const product = getSignProduct(sign);
+  return { width: product.width, height: product.height };
 }
 
 function makeSign(groupName = "") {
@@ -26,7 +38,9 @@ function makeSign(groupName = "") {
 }
 
 function getSignPrice(sign) {
-  return getSignProduct(sign).price;
+  if (sign.productId !== CUSTOM_PRODUCT_ID) return getSignProduct(sign).price;
+  const { width, height } = getSignDimensions(sign);
+  return Math.round(Math.max(25, 10 + (width * height / 1000000) * (125 / 3)) * 100) / 100;
 }
 
 function money(value) {
@@ -35,11 +49,12 @@ function money(value) {
 
 function SignPreview({ sign }) {
   const product = getSignProduct(sign);
-  const portrait = product.height > product.width;
+  const { width, height } = getSignDimensions(sign);
+  const portrait = height > width;
   const sections = [["Beavers", "6-8"], ["Cubs", "8-10½"], ["Scouts", "10½-14"], ["Explorers", "14-18"], ["Network", "18-25"]];
   return (
     <div className="scouts-sign-stage">
-      <div className={`scouts-sign-preview ${portrait ? "is-portrait" : "is-landscape"}`} style={{ aspectRatio: `${product.width} / ${product.height}` }}>
+      <div className={`scouts-sign-preview ${portrait ? "is-portrait" : "is-landscape"}`} style={{ aspectRatio: `${width} / ${height}` }}>
         <div className="scouts-sign-identity">
           <img src="/scouts/scouts-logo-stack-white.png" alt="Scouts" />
           <strong>{sign.groupName || "Your Group Name"}</strong>
@@ -49,7 +64,7 @@ function SignPreview({ sign }) {
         </div>
         <div className="scouts-sign-footer"><b>scouts.org.uk/join</b><b>0345 300 1818</b></div>
       </div>
-      <span>{product.title} · {product.width} x {product.height}mm</span>
+      <span>{sign.productId === CUSTOM_PRODUCT_ID ? "Custom Sign" : product.title} · {width} x {height}mm</span>
     </div>
   );
 }
@@ -97,6 +112,7 @@ export function ScoutsCustomerPortal() {
     setSigns((current) => current.map((sign) => {
       if (sign.id !== id) return sign;
       if (key !== "productId") return { ...sign, [key]: value };
+      if (value === CUSTOM_PRODUCT_ID) return { ...sign, productId: CUSTOM_PRODUCT_ID };
       const product = SIGN_PRODUCTS.find((entry) => entry.id === value) || SIGN_PRODUCTS[0];
       return { ...sign, productId: product.id, width: product.width, height: product.height };
     }));
@@ -205,11 +221,12 @@ export function ScoutsCustomerPortal() {
                     <div className="scouts-sign-fields">
                       <label>Group name on sign<input required value={sign.groupName} onChange={(event) => updateSign(sign.id, "groupName", event.target.value)} /></label>
                       <div className="scouts-size-fields">
-                        <label className="scouts-product-select">Sign size<select value={sign.productId} onChange={(event) => updateSign(sign.id, "productId", event.target.value)}>{SIGN_PRODUCTS.map((entry) => <option key={entry.id} value={entry.id}>{entry.title} · {entry.width} x {entry.height}mm · {money(entry.price)}</option>)}</select></label>
+                        <label className="scouts-product-select">Sign size<select value={sign.productId} onChange={(event) => updateSign(sign.id, "productId", event.target.value)}>{SIGN_PRODUCTS.map((entry) => <option key={entry.id} value={entry.id}>{entry.title} · {entry.width} x {entry.height}mm · {money(entry.price)}</option>)}<option value={CUSTOM_PRODUCT_ID}>Custom size</option></select></label>
                         <label>Quantity<input required type="number" min="1" max="100" value={sign.quantity} onChange={(event) => updateSign(sign.id, "quantity", event.target.value)} /></label>
                       </div>
-                      <div className="scouts-product-detail"><span>{product.code}</span><span>Printed Materials</span></div>
-                      <div className="scouts-line-price"><span>{money(product.price)} each · VAT included</span><strong>{money(getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
+                      {sign.productId === CUSTOM_PRODUCT_ID ? <div className="scouts-custom-size-fields"><label>Width (mm)<input required type="number" min="50" max="5000" value={sign.width} onChange={(event) => updateSign(sign.id, "width", event.target.value)} /></label><label>Height (mm)<input required type="number" min="50" max="5000" value={sign.height} onChange={(event) => updateSign(sign.id, "height", event.target.value)} /></label></div> : null}
+                      <div className="scouts-product-detail"><span>{sign.productId === CUSTOM_PRODUCT_ID ? "CUSTOM" : product.code}</span><span>Printed Materials</span></div>
+                      <div className="scouts-line-price"><span>{sign.productId === CUSTOM_PRODUCT_ID ? "Estimated " : ""}{money(getSignPrice(sign))} each · VAT included</span><strong>{money(getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
                     </div>
                     <SignPreview sign={sign} />
                   </div>

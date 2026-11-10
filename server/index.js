@@ -102,6 +102,12 @@ const SCOUTS_SIGN_PRODUCTS = [
   { id: "landscape-1200x800", title: "Landscape Sign", width: 1200, height: 800, unitPrice: 50, code: "GE-128STACK-SIGN-C-P" },
   { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, unitPrice: 30, code: "GE-68STACK-SIGN-C-P" }
 ];
+const SCOUTS_CUSTOM_PRODUCT_ID = "custom";
+
+function getScoutsCustomUnitPrice(width, height) {
+  const areaSquareMetres = (width * height) / 1000000;
+  return Math.round(Math.max(25, 10 + areaSquareMetres * (125 / 3)) * 100) / 100;
+}
 const IGLOO_COOLER_FAMILIES = [
   ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
   ["Legacy", ["Legacy 20", "Legacy 54"]],
@@ -577,21 +583,27 @@ function getScoutsOrdersFile() {
 
 function sanitizeScoutsSign(payload = {}, index = 0) {
   const requestedProductId = sanitizeCreditApplicationText(payload.productId, 100);
+  const custom = requestedProductId === SCOUTS_CUSTOM_PRODUCT_ID;
+  const customWidth = Math.min(5000, Math.max(50, Math.round(Number(payload.width) || 0)));
+  const customHeight = Math.min(5000, Math.max(50, Math.round(Number(payload.height) || 0)));
   const product = SCOUTS_SIGN_PRODUCTS.find((entry) => entry.id === requestedProductId)
     || SCOUTS_SIGN_PRODUCTS.find((entry) => entry.width === Number(payload.width) && entry.height === Number(payload.height))
     || SCOUTS_SIGN_PRODUCTS[0];
+  const width = custom ? customWidth : product.width;
+  const height = custom ? customHeight : product.height;
+  const unitPrice = custom ? getScoutsCustomUnitPrice(width, height) : product.unitPrice;
   const quantity = Math.min(100, Math.max(1, Math.round(Number(payload.quantity) || 1)));
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || `sign-${index + 1}`,
-    productId: product.id,
-    title: product.title,
-    code: product.code,
+    productId: custom ? SCOUTS_CUSTOM_PRODUCT_ID : product.id,
+    title: custom ? "Custom Sign" : product.title,
+    code: custom ? "CUSTOM" : product.code,
     groupName: sanitizeCreditApplicationText(payload.groupName, 180),
-    width: product.width,
-    height: product.height,
+    width,
+    height,
     quantity,
-    unitPrice: product.unitPrice,
-    lineTotal: Math.round(product.unitPrice * quantity * 100) / 100
+    unitPrice,
+    lineTotal: Math.round(unitPrice * quantity * 100) / 100
   };
 }
 
@@ -13146,7 +13158,11 @@ function createServer() {
       const rawSigns = Array.isArray(request.body?.signs) ? request.body.signs : [];
       const invalidSign = rawSigns.some((sign) =>
         !String(sign?.groupName || "").trim()
-        || !SCOUTS_SIGN_PRODUCTS.some((product) => product.id === String(sign?.productId || ""))
+        || (
+          !SCOUTS_SIGN_PRODUCTS.some((product) => product.id === String(sign?.productId || ""))
+          && String(sign?.productId || "") !== SCOUTS_CUSTOM_PRODUCT_ID
+        )
+        || (String(sign?.productId || "") === SCOUTS_CUSTOM_PRODUCT_ID && (Number(sign?.width) < 50 || Number(sign?.width) > 5000 || Number(sign?.height) < 50 || Number(sign?.height) > 5000))
         || Number(sign?.quantity || 0) < 1
       );
       if (!String(request.body?.fullName || "").trim() || !String(request.body?.mobile || "").trim() || !looksLikeEmail(request.body?.email) || !String(request.body?.groupName || "").trim() || !String(request.body?.address || "").trim()) {
