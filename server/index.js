@@ -90,6 +90,12 @@ const IGLOO_IMAGE_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 const IGLOO_CUSTOMER_PASSWORD = String(process.env.IGLOO_CUSTOMER_PASSWORD || "SX123");
 const IGLOO_CUSTOMER_COOKIE_NAME = "igloo_customer_access";
 const IGLOO_CUSTOMER_COOKIE_VALUE = crypto.createHash("sha256").update("igloo:" + IGLOO_CUSTOMER_PASSWORD).digest("hex");
+const SCOUTS_CUSTOMER_USERNAME = String(process.env.SCOUTS_CUSTOMER_USERNAME || "Scouts");
+const SCOUTS_CUSTOMER_PASSWORD = String(process.env.SCOUTS_CUSTOMER_PASSWORD || "Signs01x");
+const SCOUTS_CUSTOMER_COOKIE_NAME = "scouts_customer_access";
+const SCOUTS_CUSTOMER_COOKIE_VALUE = crypto.createHash("sha256").update(`scouts:${SCOUTS_CUSTOMER_USERNAME}:${SCOUTS_CUSTOMER_PASSWORD}`).digest("hex");
+const SCOUTS_DELIVERY_FEE = 12.5;
+const SCOUTS_ORDER_TO = String(process.env.SCOUTS_ORDER_TO || CREDIT_APPLICATION_TO).trim();
 const IGLOO_COOLER_FAMILIES = [
   ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
   ["Legacy", ["Legacy 20", "Legacy 54"]],
@@ -559,6 +565,91 @@ function getDataFile() {
   return process.env.DATA_FILE || DEFAULT_DATA_FILE;
 }
 
+function getScoutsOrdersFile() {
+  return process.env.SCOUTS_ORDERS_FILE || path.join(path.dirname(getDataFile()), "scouts-orders.json");
+}
+
+function sanitizeScoutsSign(payload = {}, index = 0) {
+  const width = Math.min(5000, Math.max(50, Math.round(Number(payload.width) || 0)));
+  const height = Math.min(5000, Math.max(50, Math.round(Number(payload.height) || 0)));
+  const quantity = Math.min(100, Math.max(1, Math.round(Number(payload.quantity) || 1)));
+  const areaSquareMetres = (width * height) / 1000000;
+  const unitPrice = Math.round((35 + areaSquareMetres * 45) * 100) / 100;
+  return {
+    id: sanitizeCreditApplicationText(payload.id, 100) || `sign-${index + 1}`,
+    groupName: sanitizeCreditApplicationText(payload.groupName, 180),
+    width,
+    height,
+    quantity,
+    unitPrice,
+    lineTotal: Math.round(unitPrice * quantity * 100) / 100
+  };
+}
+
+function sanitizeScoutsOrder(payload = {}) {
+  const signs = (Array.isArray(payload.signs) ? payload.signs : [])
+    .map((entry, index) => sanitizeScoutsSign(entry, index))
+    .filter((entry) => entry.groupName && entry.width >= 50 && entry.height >= 50);
+  const collection = Boolean(payload.collection);
+  const signsTotal = Math.round(signs.reduce((sum, sign) => sum + sign.lineTotal, 0) * 100) / 100;
+  const deliveryFee = collection ? 0 : SCOUTS_DELIVERY_FEE;
+  return {
+    id: sanitizeCreditApplicationText(payload.id, 100) || makeId(),
+    fullName: sanitizeCreditApplicationText(payload.fullName, 180),
+    mobile: sanitizeCreditApplicationText(payload.mobile, 80),
+    email: sanitizeCreditApplicationText(payload.email, 180).toLowerCase(),
+    groupName: sanitizeCreditApplicationText(payload.groupName, 180),
+    address: sanitizeCreditApplicationMultiLine(payload.address, 1200),
+    collection,
+    signs,
+    signsTotal,
+    deliveryFee,
+    total: Math.round((signsTotal + deliveryFee) * 100) / 100,
+    status: sanitizeCreditApplicationText(payload.status, 80) || "Awaiting payment link",
+    emailSent: Boolean(payload.emailSent),
+    submittedAt: sanitizeCreditApplicationText(payload.submittedAt, 80) || new Date().toISOString()
+  };
+}
+
+async function readScoutsOrders() {
+  const file = getScoutsOrdersFile();
+  try {
+    const raw = await fsp.readFile(file, "utf8");
+    const parsed = JSON.parse(raw);
+    return (Array.isArray(parsed) ? parsed : []).map(sanitizeScoutsOrder);
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  }
+}
+
+async function writeScoutsOrders(orders) {
+  const file = getScoutsOrdersFile();
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  const nextOrders = (Array.isArray(orders) ? orders : []).map(sanitizeScoutsOrder);
+  const temporaryFile = `${file}.${process.pid}.tmp`;
+  await fsp.writeFile(temporaryFile, JSON.stringify(nextOrders, null, 2) + "\n", "utf8");
+  await fsp.rename(temporaryFile, file);
+  return nextOrders;
+}
+
+function buildScoutsSignArtworkSvg(sign, order) {
+  const safeGroupName = escapeHtml(sign.groupName || order.groupName || "Scouts Group");
+  const width = Math.max(50, Number(sign.width) || 50);
+  const height = Math.max(50, Number(sign.height) || 50);
+  const ratio = Math.min(900 / width, 500 / height);
+  const drawingWidth = Math.max(240, Math.round(width * ratio));
+  const drawingHeight = Math.max(120, Math.round(height * ratio));
+  const fontSize = Math.max(18, Math.min(54, Math.round(drawingWidth / Math.max(8, safeGroupName.length * 0.62))));
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${drawingWidth}" height="${drawingHeight}" viewBox="0 0 ${drawingWidth} ${drawingHeight}">
+  <rect width="100%" height="100%" rx="10" fill="#ffffff"/>
+  <rect x="2" y="2" width="${drawingWidth - 4}" height="${drawingHeight - 4}" rx="9" fill="none" stroke="#006b54" stroke-width="4"/>
+  <text x="50%" y="46%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#006b54">${safeGroupName}</text>
+  <text x="50%" y="72%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${Math.max(14, Math.round(fontSize * 0.42))}" fill="#334155">${width} x ${height}mm</text>
+</svg>`;
+}
+
 function getInstallersFile() {
   if (process.env.INSTALLERS_FILE) {
     return process.env.INSTALLERS_FILE;
@@ -688,9 +779,26 @@ function serializeIglooCustomerCookie({ clear = false } = {}) {
   return parts.join("; ");
 }
 
+function serializeScoutsCustomerCookie() {
+  const parts = [
+    `${SCOUTS_CUSTOMER_COOKIE_NAME}=${encodeURIComponent(SCOUTS_CUSTOMER_COOKIE_VALUE)}`,
+    "HttpOnly",
+    "Path=/",
+    "SameSite=Lax",
+    "Max-Age=" + (60 * 60 * 24 * 14)
+  ];
+  if (process.env.NODE_ENV === "production") parts.push("Secure");
+  return parts.join("; ");
+}
+
 function hasIglooCustomerAccess(request) {
   const cookies = parseCookies(request.headers.cookie);
   return cookies[IGLOO_CUSTOMER_COOKIE_NAME] === IGLOO_CUSTOMER_COOKIE_VALUE;
+}
+
+function hasScoutsCustomerAccess(request) {
+  const cookies = parseCookies(request.headers.cookie);
+  return cookies[SCOUTS_CUSTOMER_COOKIE_NAME] === SCOUTS_CUSTOMER_COOKIE_VALUE;
 }
 
 function serializeSessionCookie(sessionId, { expiresAt, clear = false } = {}) {
@@ -12919,6 +13027,18 @@ function createServer() {
       next();
       return;
     }
+    if (request.path === "/scouts/customer/unlock") {
+      next();
+      return;
+    }
+    if (request.path.startsWith("/scouts/customer")) {
+      if (!hasScoutsCustomerAccess(request)) {
+        response.status(401).json({ error: "Scouts portal login required." });
+        return;
+      }
+      next();
+      return;
+    }
     if (request.path.startsWith("/igloo/customer") || request.path.startsWith("/igloo/templates/") || request.path.startsWith("/igloo/images/") || request.path.startsWith("/igloo/completion-photos/")) {
       if (!hasIglooCustomerAccess(request)) {
         response.status(401).json({ error: "IGLOO password required." });
@@ -12976,6 +13096,105 @@ function createServer() {
     }
     response.setHeader("Set-Cookie", serializeIglooCustomerCookie());
     response.json({ ok: true });
+  });
+
+  app.post("/api/scouts/customer/unlock", (request, response) => {
+    const username = String(request.body?.username || "").trim();
+    const password = String(request.body?.password || "");
+    if (username.toLowerCase() !== SCOUTS_CUSTOMER_USERNAME.toLowerCase() || password !== SCOUTS_CUSTOMER_PASSWORD) {
+      response.status(401).json({ error: "Incorrect username or password." });
+      return;
+    }
+    response.setHeader("Set-Cookie", serializeScoutsCustomerCookie());
+    response.json({ ok: true });
+  });
+
+  app.get("/api/scouts/customer/session", (request, response) => {
+    response.json({ ok: true, deliveryFee: SCOUTS_DELIVERY_FEE, pricingStatus: "provisional" });
+  });
+
+  app.post("/api/scouts/customer/orders", async (request, response) => {
+    try {
+      const rawSigns = Array.isArray(request.body?.signs) ? request.body.signs : [];
+      const invalidSign = rawSigns.some((sign) =>
+        !String(sign?.groupName || "").trim() || Number(sign?.width) < 50 || Number(sign?.height) < 50 || Number(sign?.quantity || 0) < 1
+      );
+      if (!String(request.body?.fullName || "").trim() || !String(request.body?.mobile || "").trim() || !looksLikeEmail(request.body?.email) || !String(request.body?.groupName || "").trim() || !String(request.body?.address || "").trim()) {
+        response.status(400).json({ error: "Please complete all contact and group details." });
+        return;
+      }
+      if (!rawSigns.length || invalidSign) {
+        response.status(400).json({ error: "Add at least one valid sign with a group name, width and height." });
+        return;
+      }
+
+      let order = sanitizeScoutsOrder({ ...request.body, id: makeId(), submittedAt: new Date().toISOString() });
+      let orders = await readScoutsOrders();
+      orders.unshift(order);
+      await writeScoutsOrders(orders);
+
+      let emailWarning = "";
+      try {
+        const transportConfig = getCreditApplicationTransportConfig();
+        if (!transportConfig) throw new Error("SMTP is not configured.");
+        const signLines = order.signs.map((sign, index) =>
+          `${index + 1}. ${sign.groupName} - ${sign.width} x ${sign.height}mm - Qty ${sign.quantity} - £${sign.lineTotal.toFixed(2)}`
+        );
+        const transporter = nodemailer.createTransport(transportConfig);
+        await transporter.sendMail({
+          from: getCreditApplicationFromAddress(),
+          to: SCOUTS_ORDER_TO,
+          cc: order.email,
+          replyTo: order.email,
+          subject: `Scouts sign order - ${order.groupName} - ${order.id}`,
+          text: [
+            "A new Scouts sign order has been submitted.",
+            "",
+            `Order: ${order.id}`,
+            `Name: ${order.fullName}`,
+            `Mobile: ${order.mobile}`,
+            `Email: ${order.email}`,
+            `Group: ${order.groupName}`,
+            `Address: ${order.address}`,
+            `Fulfilment: ${order.collection ? "Collect from store" : "Delivery"}`,
+            "",
+            ...signLines,
+            "",
+            `Signs: £${order.signsTotal.toFixed(2)}`,
+            `Delivery: £${order.deliveryFee.toFixed(2)}`,
+            `Total: £${order.total.toFixed(2)}`,
+            "",
+            "Pricing is provisional pending the final Scouts pricing structure.",
+            "A payment link will be sent shortly."
+          ].join("\n"),
+          attachments: order.signs.map((sign, index) => ({
+            filename: `scouts-sign-${index + 1}-${sign.width}x${sign.height}.svg`,
+            content: buildScoutsSignArtworkSvg(sign, order),
+            contentType: "image/svg+xml"
+          }))
+        });
+        order = { ...order, emailSent: true };
+        orders = orders.map((entry) => entry.id === order.id ? order : entry);
+        await writeScoutsOrders(orders);
+      } catch (emailError) {
+        console.error("Could not send Scouts order email.", emailError.message || emailError);
+        emailWarning = "The order was saved, but the email could not be sent automatically.";
+      }
+
+      response.json({ order, emailWarning });
+    } catch (error) {
+      console.error("Could not save Scouts order.", error.message || error);
+      response.status(500).json({ error: "Could not save the order. Please try again." });
+    }
+  });
+
+  app.get("/api/scouts/admin/orders", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      response.json({ orders: await readScoutsOrders(), pricingStatus: "provisional" });
+    } catch (error) {
+      response.status(500).json({ error: "Could not load Scouts orders." });
+    }
   });
 
   app.get("/api/igloo/customer", async (request, response) => {

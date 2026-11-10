@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import IrelandDelivery from "./ireland/IrelandDelivery";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
+import { ScoutsAdminOrders, ScoutsCustomerPortal } from "./scouts/ScoutsPortal";
 
 const JOB_TYPES = [
   { value: "Install", colorClass: "job-type-install" },
@@ -4150,7 +4151,8 @@ function HostLandingPage({
 
   const customerPortalCards = [
     canEditBoard(currentUser) ? <HostLaunchCard key="gos" icon="vehicle" label="GOS Vehicle Liveries" description="Customer fleet and livery orders" onClick={() => window.open("/gos", "_blank", "noopener,noreferrer")} /> : null,
-    canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null
+    canEditBoard(currentUser) ? <HostLaunchCard key="igloo" icon="materials" label="IGLOO" description="Template catalogue" onClick={() => window.open("/igloo-admin", "_blank", "noopener,noreferrer")} /> : null,
+    canEditBoard(currentUser) ? <HostLaunchCard key="scouts" icon="materials" label="Scouts Signs" description="Customer sign orders" onClick={() => window.open("/scouts-admin", "_blank", "noopener,noreferrer")} /> : null
   ].filter(Boolean);
 
   const operationsCards = [
@@ -21343,6 +21345,8 @@ export default function App() {
   const isMustangRoute = pathname.startsWith("/mustang");
   const isIglooCustomerRoute = pathname.startsWith("/igloo") && !pathname.startsWith("/igloo-admin");
   const isIglooAdminRoute = pathname.startsWith("/igloo-admin");
+  const isScoutsCustomerRoute = pathname === "/scouts" || pathname === "/scouts/";
+  const isScoutsAdminRoute = pathname.startsWith("/scouts-admin");
   const isWipRoute = pathname.startsWith("/wip");
   const isBoardRoute = pathname.startsWith("/board");
   const isDesignBoardRoute = pathname.startsWith("/design-board");
@@ -21489,9 +21493,10 @@ export default function App() {
   const showWip = Boolean(currentUser && canAccessBoard(currentUser) && isWipRoute);
   const showMustang = Boolean(isMustangRoute);
   const showIglooAdmin = Boolean(currentUser && canEditBoard(currentUser) && isIglooAdminRoute);
-  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showScoutsAdmin = Boolean(currentUser && canEditBoard(currentUser) && isScoutsAdminRoute);
+  const showHostLanding = Boolean(currentUser && hostShellMode && !isInstallerRoute && !isBoardRoute && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isScoutsAdminRoute && !isDesignBoardRoute && !isClientDesignBoardRoute && !isFilteringRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isCoreBridgeExplorerRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const installerOptions = useMemo(() => buildInstallerOptions(installerUsers.length ? installerUsers : loginUsers), [installerUsers, loginUsers]);
-  const showClientLanding = Boolean(currentUser && !hostShellMode && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
+  const showClientLanding = Boolean(currentUser && !hostShellMode && !isClientBoardRoute && !isMorningMeetingRoute && !isWipRoute && !isMustangRoute && !isIglooAdminRoute && !isScoutsAdminRoute && !isClientDesignBoardRoute && !isClientFilteringRoute && !isClientRamsRoute && !isAttendanceRoute && !isHolidaysRoute && !isMileageRoute && !isMaterialsRoute && !isOrderPanelsRoute && !isIrelandDeliveryRoute && !isVanEstimatorRoute && !isSocialPostRoute && !isDescriptionPullRoute && !isTvInstallsRoute && !isProFormaRoute && !isClientProFormaRoute && !isRamsRoute && !isNotificationsRoute);
   const activeAdminJob = useMemo(() => {
     if (!editingId) return null;
     return jobs.find((job) => String(job.id || "") === String(editingId)) || null;
@@ -23996,6 +24001,10 @@ export default function App() {
     return <IglooCustomerPage />;
   }
 
+  if (isScoutsCustomerRoute) {
+    return <ScoutsCustomerPortal />;
+  }
+
   if (!authChecked) {
     return (
       <div className="app-shell">
@@ -24024,6 +24033,10 @@ export default function App() {
         notifications={notifications}
       />
     );
+  }
+
+  if (showScoutsAdmin) {
+    return <ScoutsAdminOrders />;
   }
 
   if (!currentUser) {
