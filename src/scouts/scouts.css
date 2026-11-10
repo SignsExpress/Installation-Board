@@ -47,9 +47,13 @@
 .scouts-details-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .scouts-details-grid .wide { grid-column: 1 / -1; }
 .scouts-section label, .scouts-login-card label { display: grid; gap: 6px; color: #42504d; font-size: 0.78rem; font-weight: 800; }
-.scouts-section input, .scouts-section textarea, .scouts-login-card input { width: 100%; min-height: 42px; border: 1px solid #cbd8d3; border-radius: 6px; padding: 9px 11px; background: #fff; color: var(--scouts-ink); font: inherit; }
+.scouts-section input, .scouts-section textarea, .scouts-section select, .scouts-login-card input { width: 100%; min-height: 42px; border: 1px solid #cfc4dd; border-radius: 6px; padding: 9px 11px; background: #fff; color: var(--scouts-ink); font: inherit; }
 .scouts-section textarea { resize: vertical; }
-.scouts-section input:focus, .scouts-section textarea:focus, .scouts-login-card input:focus { outline: 0; border-color: var(--scouts-green); box-shadow: 0 0 0 3px rgba(0, 107, 84, 0.12); }
+.scouts-section input:focus, .scouts-section textarea:focus, .scouts-section select:focus, .scouts-login-card input:focus { outline: 0; border-color: var(--scouts-green); box-shadow: 0 0 0 3px rgba(116, 19, 220, 0.13); }
+
+.scouts-product-spec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 16px; overflow: hidden; border: 1px solid var(--scouts-border); border-radius: 7px; background: var(--scouts-border); }
+.scouts-product-spec span { display: grid; gap: 2px; padding: 10px 12px; background: #fff; color: #544b5e; font-size: 0.76rem; }
+.scouts-product-spec b { color: #000; }
 
 .scouts-sign-list { display: grid; gap: 14px; }
 .scouts-sign-card { border: 1px solid var(--scouts-border); border-radius: 7px; padding: 16px; background: var(--scouts-soft); }
@@ -57,13 +61,23 @@
 .scouts-remove { border: 0; background: transparent; color: #b42318; font-weight: 800; }
 .scouts-sign-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr); gap: 20px; align-items: center; }
 .scouts-sign-fields { display: grid; gap: 12px; }
-.scouts-size-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.scouts-size-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(110px, 0.65fr); gap: 10px; }
 .scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-width: 0; min-height: 210px; overflow: hidden; padding: 18px; border-radius: 7px; background: #f1eafa; }
-.scouts-sign-preview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: clamp(3px, 1.2vw, 10px); width: min(100%, 390px); max-width: 100%; max-height: 210px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border: 3px solid var(--scouts-green); border-radius: 5px; padding: clamp(6px, 2vw, 16px); background: #fff; box-shadow: 0 8px 22px rgba(116, 19, 220, 0.14); text-align: center; }
-.scouts-sign-preview img { display: block; width: auto; max-width: 48%; max-height: 52%; object-fit: contain; flex: 0 1 auto; }
-.scouts-sign-preview.is-linear { flex-direction: row; gap: clamp(8px, 2vw, 22px); }
-.scouts-sign-preview.is-linear img { width: min(35%, 170px); max-width: 35%; max-height: 70%; }
-.scouts-sign-preview strong { min-width: 0; color: var(--scouts-green); font-size: clamp(0.72rem, 1.5vw, 1.35rem); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+.scouts-sign-preview { display: grid; grid-template-rows: minmax(0, 1fr) auto auto; width: auto; height: auto; max-width: 100%; max-height: 250px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border-radius: 2px; padding: clamp(9px, 2vw, 18px); background: #7413dc; box-shadow: 0 10px 24px rgba(55, 5, 108, 0.2); color: #fff; text-align: center; }
+.scouts-sign-preview.is-landscape { width: min(100%, 390px); }
+.scouts-sign-preview.is-portrait { height: min(250px, 100%); }
+.scouts-sign-identity { display: grid; place-items: center; align-content: center; min-height: 0; }
+.scouts-sign-identity img { display: block; width: clamp(54px, 20%, 90px); max-height: 64%; object-fit: contain; }
+.scouts-sign-identity strong { min-width: 0; margin-top: clamp(2px, 0.6vw, 6px); color: #fff; font-size: clamp(0.58rem, 1.2vw, 1rem); font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; }
+.scouts-sign-sections { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,0.28); padding-top: clamp(4px, 1vw, 8px); }
+.scouts-sign-sections span { display: grid; gap: 0; min-width: 0; }
+.scouts-sign-sections b { font-size: clamp(0.38rem, 0.7vw, 0.62rem); line-height: 1; }
+.scouts-sign-sections small { margin-top: 2px; color: #fff; font-size: clamp(0.3rem, 0.52vw, 0.48rem); line-height: 1; }
+.scouts-sign-footer { display: flex; justify-content: space-between; gap: 10px; padding-top: clamp(6px, 1.2vw, 12px); font-size: clamp(0.38rem, 0.7vw, 0.62rem); }
+.scouts-sign-preview.is-portrait .scouts-sign-sections { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 5px; }
+.scouts-sign-preview.is-portrait .scouts-sign-sections span:nth-child(n+4) { transform: translateX(50%); }
+.scouts-product-detail { display: flex; flex-wrap: wrap; gap: 6px; }
+.scouts-product-detail span { border-radius: 4px; padding: 4px 7px; background: #eee7f6; color: #574765; font-size: 0.7rem; font-weight: 800; }
 .scouts-sign-stage > span { color: #5d6966; font-size: 0.75rem; font-weight: 800; }
 .scouts-line-price { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--scouts-border); padding-top: 10px; }
 .scouts-line-price strong { color: var(--scouts-green); font-size: 1.2rem; }
@@ -119,6 +133,7 @@
   .scouts-header { align-items: flex-start; }
   .scouts-header > div:first-child { display: grid; gap: 3px; }
   .scouts-details-grid, .scouts-sign-layout { grid-template-columns: 1fr; }
+  .scouts-product-spec { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-sign-stage { min-height: 180px; }
   .scouts-size-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-admin-order-head { display: grid; }
@@ -129,5 +144,6 @@
   .scouts-main, .scouts-admin-main { width: min(100% - 20px, 1120px); padding-top: 10px; }
   .scouts-section { padding: 15px; }
   .scouts-size-fields, .scouts-fulfilment { grid-template-columns: 1fr; }
+  .scouts-product-spec { grid-template-columns: 1fr; }
   .scouts-header-note { display: none; }
 }

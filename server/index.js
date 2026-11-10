@@ -96,6 +96,12 @@ const SCOUTS_CUSTOMER_COOKIE_NAME = "scouts_customer_access";
 const SCOUTS_CUSTOMER_COOKIE_VALUE = crypto.createHash("sha256").update(`scouts:${SCOUTS_CUSTOMER_USERNAME}:${SCOUTS_CUSTOMER_PASSWORD}`).digest("hex");
 const SCOUTS_DELIVERY_FEE = 12.5;
 const SCOUTS_ORDER_TO = String(process.env.SCOUTS_ORDER_TO || CREDIT_APPLICATION_TO).trim();
+const SCOUTS_SIGN_PRODUCTS = [
+  { id: "landscape-600x400", title: "Landscape Sign", width: 600, height: 400, unitPrice: 25, code: "GE-46STACK-SIGN-C-P" },
+  { id: "landscape-800x600", title: "Landscape Sign", width: 800, height: 600, unitPrice: 30, code: "GE-86STACK-SIGN-C-P" },
+  { id: "landscape-1200x800", title: "Landscape Sign", width: 1200, height: 800, unitPrice: 50, code: "GE-128STACK-SIGN-C-P" },
+  { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, unitPrice: 30, code: "GE-68STACK-SIGN-C-P" }
+];
 const IGLOO_COOLER_FAMILIES = [
   ["Playmate", ["Playmate Mini (4 qt)", "Little Playmate (7 qt)", "Playmate Elite (16 qt)", "KoolTunes (16 qt Bluetooth Speaker)"]],
   ["Legacy", ["Legacy 20", "Legacy 54"]],
@@ -570,19 +576,22 @@ function getScoutsOrdersFile() {
 }
 
 function sanitizeScoutsSign(payload = {}, index = 0) {
-  const width = Math.min(5000, Math.max(50, Math.round(Number(payload.width) || 0)));
-  const height = Math.min(5000, Math.max(50, Math.round(Number(payload.height) || 0)));
+  const requestedProductId = sanitizeCreditApplicationText(payload.productId, 100);
+  const product = SCOUTS_SIGN_PRODUCTS.find((entry) => entry.id === requestedProductId)
+    || SCOUTS_SIGN_PRODUCTS.find((entry) => entry.width === Number(payload.width) && entry.height === Number(payload.height))
+    || SCOUTS_SIGN_PRODUCTS[0];
   const quantity = Math.min(100, Math.max(1, Math.round(Number(payload.quantity) || 1)));
-  const areaSquareMetres = (width * height) / 1000000;
-  const unitPrice = Math.round((35 + areaSquareMetres * 45) * 100) / 100;
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || `sign-${index + 1}`,
+    productId: product.id,
+    title: product.title,
+    code: product.code,
     groupName: sanitizeCreditApplicationText(payload.groupName, 180),
-    width,
-    height,
+    width: product.width,
+    height: product.height,
     quantity,
-    unitPrice,
-    lineTotal: Math.round(unitPrice * quantity * 100) / 100
+    unitPrice: product.unitPrice,
+    lineTotal: Math.round(product.unitPrice * quantity * 100) / 100
   };
 }
 
@@ -635,18 +644,37 @@ async function writeScoutsOrders(orders) {
 
 function buildScoutsSignArtworkSvg(sign, order) {
   const safeGroupName = escapeHtml(sign.groupName || order.groupName || "Scouts Group");
-  const width = Math.max(50, Number(sign.width) || 50);
-  const height = Math.max(50, Number(sign.height) || 50);
-  const ratio = Math.min(900 / width, 500 / height);
-  const drawingWidth = Math.max(240, Math.round(width * ratio));
-  const drawingHeight = Math.max(120, Math.round(height * ratio));
-  const fontSize = Math.max(18, Math.min(54, Math.round(drawingWidth / Math.max(8, safeGroupName.length * 0.62))));
+  const portrait = Number(sign.height) > Number(sign.width);
+  const drawingWidth = portrait ? 600 : 900;
+  const drawingHeight = Math.round(drawingWidth * Number(sign.height) / Number(sign.width));
+  const logoWidth = portrait ? 210 : 180;
+  const logoHeight = Math.round(logoWidth * 0.748);
+  const logoX = Math.round((drawingWidth - logoWidth) / 2);
+  const logoY = Math.round(drawingHeight * 0.07);
+  const groupY = Math.round(drawingHeight * 0.35);
+  const dividerY = Math.round(drawingHeight * 0.525);
+  const sectionsY = Math.round(drawingHeight * 0.61);
+  const footerY = Math.round(drawingHeight * 0.92);
+  const fontSize = Math.max(24, Math.min(portrait ? 42 : 48, Math.round(drawingWidth / Math.max(9, safeGroupName.length * 0.62))));
+  let logoData = "";
+  try {
+    logoData = fs.readFileSync(path.join(__dirname, "..", "public", "scouts", "scouts-logo-stack-white.png")).toString("base64");
+  } catch (_error) {
+    logoData = "";
+  }
+  const sections = [
+    ["Beavers", "6-8"], ["Cubs", "8-10½"], ["Scouts", "10½-14"], ["Explorers", "14-18"], ["Network", "18-25"]
+  ];
+  const sectionWidth = drawingWidth / sections.length;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${drawingWidth}" height="${drawingHeight}" viewBox="0 0 ${drawingWidth} ${drawingHeight}">
-  <rect width="100%" height="100%" rx="10" fill="#ffffff"/>
-  <rect x="2" y="2" width="${drawingWidth - 4}" height="${drawingHeight - 4}" rx="9" fill="none" stroke="#006b54" stroke-width="4"/>
-  <text x="50%" y="46%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#006b54">${safeGroupName}</text>
-  <text x="50%" y="72%" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${Math.max(14, Math.round(fontSize * 0.42))}" fill="#334155">${width} x ${height}mm</text>
+  <rect width="100%" height="100%" fill="#7413dc"/>
+  ${logoData ? `<image href="data:image/png;base64,${logoData}" x="${logoX}" y="${logoY}" width="${logoWidth}" height="${logoHeight}" preserveAspectRatio="xMidYMid meet"/>` : ""}
+  <text x="50%" y="${groupY}" text-anchor="middle" font-family="Nunito Sans, Arial, sans-serif" font-size="${fontSize}" font-weight="800" fill="#ffffff">${safeGroupName}</text>
+  <line x1="10%" x2="90%" y1="${dividerY}" y2="${dividerY}" stroke="#ffffff" stroke-opacity="0.3" stroke-width="2"/>
+  ${sections.map(([name, ages], index) => `<text x="${sectionWidth * index + sectionWidth / 2}" y="${sectionsY}" text-anchor="middle" font-family="Nunito Sans, Arial, sans-serif" font-size="${portrait ? 21 : 23}" font-weight="800" fill="#ffffff">${name}</text><text x="${sectionWidth * index + sectionWidth / 2}" y="${sectionsY + 25}" text-anchor="middle" font-family="Nunito Sans, Arial, sans-serif" font-size="${portrait ? 13 : 14}" fill="#ffffff">${ages}</text>`).join("")}
+  <text x="8%" y="${footerY}" font-family="Nunito Sans, Arial, sans-serif" font-size="${portrait ? 20 : 22}" font-weight="700" fill="#ffffff">scouts.org.uk/join</text>
+  <text x="92%" y="${footerY}" text-anchor="end" font-family="Nunito Sans, Arial, sans-serif" font-size="${portrait ? 20 : 22}" font-weight="700" fill="#ffffff">0345 300 1818</text>
 </svg>`;
 }
 
@@ -13110,14 +13138,16 @@ function createServer() {
   });
 
   app.get("/api/scouts/customer/session", (request, response) => {
-    response.json({ ok: true, deliveryFee: SCOUTS_DELIVERY_FEE, pricingStatus: "provisional" });
+    response.json({ ok: true, deliveryFee: SCOUTS_DELIVERY_FEE, pricingStatus: "approved" });
   });
 
   app.post("/api/scouts/customer/orders", async (request, response) => {
     try {
       const rawSigns = Array.isArray(request.body?.signs) ? request.body.signs : [];
       const invalidSign = rawSigns.some((sign) =>
-        !String(sign?.groupName || "").trim() || Number(sign?.width) < 50 || Number(sign?.height) < 50 || Number(sign?.quantity || 0) < 1
+        !String(sign?.groupName || "").trim()
+        || !SCOUTS_SIGN_PRODUCTS.some((product) => product.id === String(sign?.productId || ""))
+        || Number(sign?.quantity || 0) < 1
       );
       if (!String(request.body?.fullName || "").trim() || !String(request.body?.mobile || "").trim() || !looksLikeEmail(request.body?.email) || !String(request.body?.groupName || "").trim() || !String(request.body?.address || "").trim()) {
         response.status(400).json({ error: "Please complete all contact and group details." });
@@ -13138,7 +13168,7 @@ function createServer() {
         const transportConfig = getCreditApplicationTransportConfig();
         if (!transportConfig) throw new Error("SMTP is not configured.");
         const signLines = order.signs.map((sign, index) =>
-          `${index + 1}. ${sign.groupName} - ${sign.width} x ${sign.height}mm - Qty ${sign.quantity} - £${sign.lineTotal.toFixed(2)}`
+          `${index + 1}. ${sign.title} ${sign.width} x ${sign.height}mm (${sign.code}) - ${sign.groupName} - Qty ${sign.quantity} - £${sign.lineTotal.toFixed(2)} inc VAT`
         );
         const transporter = nodemailer.createTransport(transportConfig);
         await transporter.sendMail({
@@ -13164,7 +13194,9 @@ function createServer() {
             `Delivery: £${order.deliveryFee.toFixed(2)}`,
             `Total: £${order.total.toFixed(2)}`,
             "",
-            "Pricing is provisional pending the final Scouts pricing structure.",
+            "Specification: full-colour print on 3mm Dibond, suitable for outdoor use.",
+            "Lead time: dispatch within 5 working days from order.",
+            "Sign prices include VAT at 20%.",
             "A payment link will be sent shortly."
           ].join("\n"),
           attachments: order.signs.map((sign, index) => ({
@@ -13191,7 +13223,7 @@ function createServer() {
   app.get("/api/scouts/admin/orders", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
-      response.json({ orders: await readScoutsOrders(), pricingStatus: "provisional" });
+      response.json({ orders: await readScoutsOrders(), pricingStatus: "approved" });
     } catch (error) {
       response.status(500).json({ error: "Could not load Scouts orders." });
     }

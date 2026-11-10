@@ -2,20 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import "./scouts.css";
 
 const DELIVERY_FEE = 12.5;
+const SIGN_PRODUCTS = [
+  { id: "landscape-600x400", title: "Landscape Sign", width: 600, height: 400, price: 25, code: "GE-46STACK-SIGN-C-P" },
+  { id: "landscape-800x600", title: "Landscape Sign", width: 800, height: 600, price: 30, code: "GE-86STACK-SIGN-C-P" },
+  { id: "landscape-1200x800", title: "Landscape Sign", width: 1200, height: 800, price: 50, code: "GE-128STACK-SIGN-C-P" },
+  { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, price: 30, code: "GE-68STACK-SIGN-C-P" }
+];
+
+function getSignProduct(sign) {
+  return SIGN_PRODUCTS.find((product) => product.id === sign.productId) || SIGN_PRODUCTS[0];
+}
 
 function makeSign(groupName = "") {
+  const product = SIGN_PRODUCTS[0];
   return {
     id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `sign-${Date.now()}-${Math.random()}`,
     groupName,
-    width: 600,
-    height: 300,
+    productId: product.id,
+    width: product.width,
+    height: product.height,
     quantity: 1
   };
 }
 
 function getSignPrice(sign) {
-  const area = (Math.max(0, Number(sign.width) || 0) * Math.max(0, Number(sign.height) || 0)) / 1000000;
-  return Math.round((35 + area * 45) * 100) / 100;
+  return getSignProduct(sign).price;
 }
 
 function money(value) {
@@ -23,16 +34,22 @@ function money(value) {
 }
 
 function SignPreview({ sign }) {
-  const width = Math.max(50, Number(sign.width) || 50);
-  const height = Math.max(50, Number(sign.height) || 50);
-  const logoStyle = width / height > 2.2 ? "linear" : "stack";
+  const product = getSignProduct(sign);
+  const portrait = product.height > product.width;
+  const sections = [["Beavers", "6-8"], ["Cubs", "8-10½"], ["Scouts", "10½-14"], ["Explorers", "14-18"], ["Network", "18-25"]];
   return (
     <div className="scouts-sign-stage">
-      <div className={`scouts-sign-preview is-${logoStyle}`} style={{ aspectRatio: `${width} / ${height}` }}>
-        <img src={`/scouts/scouts-logo-${logoStyle}.png`} alt="Scouts" />
-        <strong>{sign.groupName || "Your Group Name"}</strong>
+      <div className={`scouts-sign-preview ${portrait ? "is-portrait" : "is-landscape"}`} style={{ aspectRatio: `${product.width} / ${product.height}` }}>
+        <div className="scouts-sign-identity">
+          <img src="/scouts/scouts-logo-stack-white.png" alt="Scouts" />
+          <strong>{sign.groupName || "Your Group Name"}</strong>
+        </div>
+        <div className="scouts-sign-sections">
+          {sections.map(([name, ages]) => <span key={name}><b>{name}</b><small>{ages}</small></span>)}
+        </div>
+        <div className="scouts-sign-footer"><b>scouts.org.uk/join</b><b>0345 300 1818</b></div>
       </div>
-      <span>{width} x {height}mm</span>
+      <span>{product.title} · {product.width} x {product.height}mm</span>
     </div>
   );
 }
@@ -77,7 +94,12 @@ export function ScoutsCustomerPortal() {
   }
 
   function updateSign(id, key, value) {
-    setSigns((current) => current.map((sign) => sign.id === id ? { ...sign, [key]: value } : sign));
+    setSigns((current) => current.map((sign) => {
+      if (sign.id !== id) return sign;
+      if (key !== "productId") return { ...sign, [key]: value };
+      const product = SIGN_PRODUCTS.find((entry) => entry.id === value) || SIGN_PRODUCTS[0];
+      return { ...sign, productId: product.id, width: product.width, height: product.height };
+    }));
   }
 
   async function unlock(event) {
@@ -156,7 +178,7 @@ export function ScoutsCustomerPortal() {
     <div className="scouts-shell">
       <header className="scouts-header">
         <div><img className="scouts-brand-logo" src="/scouts/scouts-logo-linear.png" alt="Scouts" /><span>Group sign ordering</span></div>
-        <div className="scouts-header-note">Prototype pricing</div>
+        <div className="scouts-header-note">Meeting place signs</div>
       </header>
       <main className="scouts-main">
         <form onSubmit={submitOrder}>
@@ -172,25 +194,27 @@ export function ScoutsCustomerPortal() {
           </section>
 
           <section className="scouts-section">
-            <div className="scouts-section-head"><span>2</span><div><h2>Your signs</h2><p>Enter finished sizes in millimetres.</p></div></div>
+            <div className="scouts-section-head"><span>2</span><div><h2>Your signs</h2><p>Choose a finished sign size and see your artwork update instantly.</p></div></div>
+            <div className="scouts-product-spec"><span><b>Material</b> 3mm Dibond</span><span><b>Finish</b> Full-colour outdoor print</span><span><b>Lead time</b> Dispatch in 5 working days</span><span><b>Prices</b> Include VAT at 20%</span></div>
             <div className="scouts-sign-list">
-              {signs.map((sign, index) => (
-                <article className="scouts-sign-card" key={sign.id}>
+              {signs.map((sign, index) => {
+                const product = getSignProduct(sign);
+                return <article className="scouts-sign-card" key={sign.id}>
                   <div className="scouts-sign-card-head"><h3>Sign {index + 1}</h3>{signs.length > 1 ? <button type="button" className="scouts-remove" onClick={() => setSigns((current) => current.filter((entry) => entry.id !== sign.id))}>Remove</button> : null}</div>
                   <div className="scouts-sign-layout">
                     <div className="scouts-sign-fields">
                       <label>Group name on sign<input required value={sign.groupName} onChange={(event) => updateSign(sign.id, "groupName", event.target.value)} /></label>
                       <div className="scouts-size-fields">
-                        <label>Width (mm)<input required type="number" min="50" max="5000" value={sign.width} onChange={(event) => updateSign(sign.id, "width", event.target.value)} /></label>
-                        <label>Height (mm)<input required type="number" min="50" max="5000" value={sign.height} onChange={(event) => updateSign(sign.id, "height", event.target.value)} /></label>
+                        <label className="scouts-product-select">Sign size<select value={sign.productId} onChange={(event) => updateSign(sign.id, "productId", event.target.value)}>{SIGN_PRODUCTS.map((entry) => <option key={entry.id} value={entry.id}>{entry.title} · {entry.width} x {entry.height}mm · {money(entry.price)}</option>)}</select></label>
                         <label>Quantity<input required type="number" min="1" max="100" value={sign.quantity} onChange={(event) => updateSign(sign.id, "quantity", event.target.value)} /></label>
                       </div>
-                      <div className="scouts-line-price"><span>Sign price</span><strong>{money(getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
+                      <div className="scouts-product-detail"><span>{product.code}</span><span>Printed Materials</span></div>
+                      <div className="scouts-line-price"><span>{money(product.price)} each · VAT included</span><strong>{money(getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
                     </div>
                     <SignPreview sign={sign} />
                   </div>
-                </article>
-              ))}
+                </article>;
+              })}
             </div>
             <button type="button" className="scouts-add-sign" onClick={() => setSigns((current) => [...current, makeSign(details.groupName)])}>+ Add another sign</button>
           </section>
@@ -205,7 +229,7 @@ export function ScoutsCustomerPortal() {
               <div><span>Signs</span><strong>{money(signsTotal)}</strong></div>
               <div><span>{collection ? "Collection" : "Delivery"}</span><strong>{collection ? "Free" : money(deliveryFee)}</strong></div>
               <div className="total"><span>Total</span><strong>{money(total)}</strong></div>
-              <small>Prototype prices shown for demonstration. Final pricing will be added from the approved Scouts price list.</small>
+              <small>Sign prices include VAT at 20%. Delivery is shown separately and collection is free.</small>
             </div>
             {error ? <div className="scouts-alert error">{error}</div> : null}
             <button className="scouts-order-button" type="submit" disabled={submitting}>{submitting ? "Sending order..." : "ORDER SIGNS"}</button>
@@ -245,7 +269,7 @@ export function ScoutsAdminOrders() {
               <div className="scouts-admin-order-head"><div><span>{order.id}</span><h2>{order.groupName}</h2><p>{order.fullName} · {order.email} · {order.mobile}</p></div><div><strong>{money(order.total)}</strong><span>{order.status}</span></div></div>
               <div className="scouts-admin-meta"><span>{order.collection ? "Collect from store" : `Deliver to: ${order.address}`}</span><span>{new Date(order.submittedAt).toLocaleString("en-GB")}</span><span>{order.emailSent ? "Email sent" : "Email needs sending"}</span></div>
               <div className="scouts-admin-signs">
-                {order.signs.map((sign, index) => <div key={sign.id}><SignPreview sign={sign} /><p><strong>Sign {index + 1}</strong> · Qty {sign.quantity} · {money(sign.lineTotal)}</p></div>)}
+                {order.signs.map((sign, index) => <div key={sign.id}><SignPreview sign={sign} /><p><strong>Sign {index + 1}</strong> · {sign.code} · Qty {sign.quantity} · {money(sign.lineTotal)} inc VAT</p></div>)}
               </div>
             </article>
           ))}
