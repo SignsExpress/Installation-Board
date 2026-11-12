@@ -1,5 +1,6 @@
 const express = require("express");
 const { createGosRouter } = require("./gos/router.cjs");
+const { createStaffHistoryRouter } = require("./staff-history");
 const cors = require("cors");
 const webPush = require("web-push");
 const nodemailer = require("nodemailer");
@@ -13111,6 +13112,15 @@ function createServer() {
   app.get("/healthz", (request, response) => {
     response.json({ ok: true });
   });
+
+  app.use("/api/staff-history", createStaffHistoryRouter({
+    dataDir: path.dirname(getDataFile()),
+    isOwner: async (user) => {
+      if (!user?.id || !canManagePermissions(user)) return false;
+      const { users } = await readUsersStore();
+      return users.some((entry) => entry.id === user.id && canManagePermissions(entry));
+    }
+  }));
 
   app.get("/api/diagnostics/memory", (request, response) => {
     if (!requirePermissionsManager(request, response)) return;

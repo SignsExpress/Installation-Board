@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import IrelandDelivery from "./ireland/IrelandDelivery";
+import StaffHistory from "./StaffHistory";
 import InstallerDirectoryHost from "./installer/InstallerDirectoryHostV2";
 import { ScoutsAdminOrders, ScoutsCustomerPortal } from "./scouts/ScoutsPortal";
 
@@ -4133,6 +4134,7 @@ function HostLandingPage({
   ].filter(Boolean);
 
   const adminCards = [
+    currentUser?.canManagePermissions ? <HostLaunchCard key="staff-history" icon="attendance" label="Staff History" description="Private staff records and charts" onClick={() => goTo("/staff-history")} /> : null,
     canAccessAttendance(currentUser) ? <HostLaunchCard key="attendance" icon="attendance" label="Attendance" description="Clocking and records" onClick={() => goTo("/attendance")} /> : null,
     canAccessHolidays(currentUser) ? <HostLaunchCard key="holidays" icon="holidays" label="Holidays" description="Requests and calendar" onClick={() => goTo("/holidays")} /> : null,
     canAccessMileage(currentUser) ? <HostLaunchCard key="mileage" icon="mileage" label="Mileage" description="Claims and journeys" onClick={() => goTo("/mileage")} /> : null
@@ -21324,6 +21326,7 @@ export default function App() {
   const isClientFilteringRoute = pathname.startsWith("/client/filtering");
   const isInstallerRoute = pathname.startsWith("/installer");
   const isAttendanceRoute = pathname.startsWith("/attendance");
+  const isStaffHistoryRoute = pathname === "/staff-history" || pathname === "/staff-history/";
   const isHolidaysRoute = pathname.startsWith("/holidays");
   const isMileageRoute = pathname.startsWith("/mileage");
   const isMaterialsRoute = pathname.startsWith("/materials");
@@ -24080,6 +24083,13 @@ export default function App() {
         </div>
       </div>
     );
+  }
+
+  if (isStaffHistoryRoute) {
+    const navigation = <MainNavBar currentUser={currentUser} onLogout={handleLogout} notifications={notifications} />;
+    return currentUser.canManagePermissions
+      ? <StaffHistory navigation={navigation} />
+      : <div className="app-shell">{navigation}<main className="page"><p>This module is private.</p></main></div>;
   }
 
   if (showMorningMeeting) {
