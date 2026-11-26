@@ -108,6 +108,12 @@ const DEFAULT_SCOUTS_DELIVERY_RATES = [
   { id: "medium", label: "Over 1.00m² to 1.20m²", maxArea: 1.2, costPrice: 17, sellPrice: 30 },
   { id: "large", label: "Over 1.20m²", maxArea: null, costPrice: 75, sellPrice: 95 }
 ];
+const DEFAULT_SCOUTS_PRODUCT_INFO = {
+  material: "3mm Dibond",
+  finish: "Full-colour outdoor print",
+  leadTime: "Dispatch in 5 working days",
+  priceNote: "Include VAT at 20%"
+};
 
 function getScoutsCustomUnitPrice(width, height) {
   const areaSquareMetres = (width * height) / 1000000;
@@ -594,6 +600,13 @@ function sanitizeScoutsPricing(payload = {}) {
   const costPerSquareMetre = Math.max(0, Math.min(10000, Number(payload.costPerSquareMetre) || 0));
   const grossProfitMargin = Math.max(0, Math.min(95, Number(payload.grossProfitMargin) || 0));
   const customerNotes = sanitizeCreditApplicationMultiLine(payload.customerNotes, 2000);
+  const suppliedProductInfo = payload.productInfo && typeof payload.productInfo === "object" ? payload.productInfo : {};
+  const productInfo = {
+    material: sanitizeCreditApplicationText(suppliedProductInfo.material, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.material,
+    finish: sanitizeCreditApplicationText(suppliedProductInfo.finish, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.finish,
+    leadTime: sanitizeCreditApplicationText(suppliedProductInfo.leadTime, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.leadTime,
+    priceNote: sanitizeCreditApplicationText(suppliedProductInfo.priceNote, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.priceNote
+  };
   const rawCcEmails = Array.isArray(payload.ccEmails) ? payload.ccEmails : String(payload.ccEmails || "").split(/[\n,;]+/);
   const ccEmails = [...new Set(rawCcEmails.map((email) => String(email || "").trim().toLowerCase()).filter(looksLikeEmail))].slice(0, 20);
   const suppliedRates = Array.isArray(payload.deliveryRates) ? payload.deliveryRates : [];
@@ -611,6 +624,7 @@ function sanitizeScoutsPricing(payload = {}) {
     deliveryRates,
     grossProfitMargin: Math.round(grossProfitMargin * 100) / 100,
     customerNotes,
+    productInfo,
     ccEmails,
     vatRate: 20,
     updatedAt: sanitizeCreditApplicationText(payload.updatedAt, 80)
@@ -643,6 +657,7 @@ function getScoutsPublicPricing(settings) {
       configured: false,
       vatRate: 20,
       customerNotes: "",
+      productInfo: DEFAULT_SCOUTS_PRODUCT_INFO,
       deliveryRates: DEFAULT_SCOUTS_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
       products: SCOUTS_SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.unitPrice }))
     };
@@ -654,6 +669,7 @@ function getScoutsPublicPricing(settings) {
     configured: true,
     vatRate: settings.vatRate,
     customerNotes: settings.customerNotes,
+    productInfo: settings.productInfo,
     deliveryRates: settings.deliveryRates.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
     products: SCOUTS_SIGN_PRODUCTS.map((product) => ({
       ...product,
@@ -13330,9 +13346,10 @@ function createServer() {
             `Delivery: £${order.deliveryFee.toFixed(2)}`,
             `Total: £${order.total.toFixed(2)}`,
             "",
-            "Specification: full-colour print on 3mm Dibond, suitable for outdoor use.",
-            "Lead time: dispatch within 5 working days from order.",
-            "Sign prices include VAT at 20%.",
+            `Material: ${pricingSettings.productInfo.material}`,
+            `Finish: ${pricingSettings.productInfo.finish}`,
+            `Lead time: ${pricingSettings.productInfo.leadTime}`,
+            `Price note: ${pricingSettings.productInfo.priceNote}`,
             "A payment link will be sent shortly."
           ].join("\n"),
           attachments: order.signs.map((sign, index) => ({
@@ -13382,7 +13399,7 @@ function createServer() {
         response.status(400).json({ error: "Enter valid pricing, delivery rates, and CC email addresses." });
         return;
       }
-      const pricing = await writeScoutsPricing({ costPerSquareMetre, grossProfitMargin, deliveryRates, customerNotes: request.body?.customerNotes, ccEmails: rawCcEmails });
+      const pricing = await writeScoutsPricing({ costPerSquareMetre, grossProfitMargin, deliveryRates, customerNotes: request.body?.customerNotes, ccEmails: rawCcEmails, productInfo: request.body?.productInfo });
       response.json({ pricing, publicPricing: getScoutsPublicPricing(pricing) });
     } catch (error) {
       console.error("Could not save Scouts pricing.", error.message || error);

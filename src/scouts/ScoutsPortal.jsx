@@ -18,6 +18,7 @@ const DEFAULT_PUBLIC_PRICING = {
   configured: false,
   vatRate: 20,
   customerNotes: "",
+  productInfo: { material: "3mm Dibond", finish: "Full-colour outdoor print", leadTime: "Dispatch in 5 working days", priceNote: "Include VAT at 20%" },
   deliveryRates: DEFAULT_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
   products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.price }))
 };
@@ -250,7 +251,7 @@ export function ScoutsCustomerPortal() {
 
           <section className="scouts-section">
             <div className="scouts-section-head"><span>2</span><div><h2>Your signs</h2><p>Choose a finished sign size and see your artwork update instantly.</p></div></div>
-            <div className="scouts-product-spec"><span><b>Material</b> 3mm Dibond</span><span><b>Finish</b> Full-colour outdoor print</span><span><b>Lead time</b> Dispatch in 5 working days</span><span><b>Prices</b> Include VAT at 20%</span></div>
+            <div className="scouts-product-spec"><span><b>Material</b>{pricing.productInfo?.material || DEFAULT_PUBLIC_PRICING.productInfo.material}</span><span><b>Finish</b>{pricing.productInfo?.finish || DEFAULT_PUBLIC_PRICING.productInfo.finish}</span><span><b>Lead time</b>{pricing.productInfo?.leadTime || DEFAULT_PUBLIC_PRICING.productInfo.leadTime}</span><span><b>Prices</b>{pricing.productInfo?.priceNote || DEFAULT_PUBLIC_PRICING.productInfo.priceNote}</span></div>
             <div className="scouts-sign-list">
               {signs.map((sign, index) => {
                 const product = getSignProduct(sign);
@@ -308,6 +309,7 @@ export function ScoutsAdminOrders() {
     grossProfitMargin: "",
     customerNotes: "",
     ccEmails: "",
+    productInfo: { ...DEFAULT_PUBLIC_PRICING.productInfo },
     deliveryRates: DEFAULT_DELIVERY_RATES.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
   });
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -334,6 +336,7 @@ export function ScoutsAdminOrders() {
             grossProfitMargin: payload.pricing.configured ? String(payload.pricing.grossProfitMargin) : "",
             customerNotes: payload.pricing.customerNotes || "",
             ccEmails: (payload.pricing.ccEmails || []).join("\n"),
+            productInfo: { ...DEFAULT_PUBLIC_PRICING.productInfo, ...(payload.pricing.productInfo || {}) },
             deliveryRates: (payload.pricing.deliveryRates || DEFAULT_DELIVERY_RATES).map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
           });
         }
@@ -347,6 +350,10 @@ export function ScoutsAdminOrders() {
       ...current,
       deliveryRates: current.deliveryRates.map((rate) => rate.id === id ? { ...rate, [key]: value } : rate)
     }));
+  }
+
+  function updateProductInfo(key, value) {
+    setPricingForm((current) => ({ ...current, productInfo: { ...current.productInfo, [key]: value } }));
   }
 
   async function savePricing(event) {
@@ -367,6 +374,7 @@ export function ScoutsAdminOrders() {
         grossProfitMargin: String(payload.pricing.grossProfitMargin),
         customerNotes: payload.pricing.customerNotes || "",
         ccEmails: (payload.pricing.ccEmails || []).join("\n"),
+        productInfo: { ...DEFAULT_PUBLIC_PRICING.productInfo, ...(payload.pricing.productInfo || {}) },
         deliveryRates: payload.pricing.deliveryRates.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
       });
       setPricingMessage("Customer sell prices updated.");
@@ -392,6 +400,7 @@ export function ScoutsAdminOrders() {
           <div className="scouts-pricing-results">
             {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm</span><strong>{money(product.sellPrice)}</strong></div>)}
           </div>
+          <div className="scouts-product-info-settings"><div className="scouts-delivery-pricing-head"><h3>Customer product information</h3><span>Shown above the sign selector</span></div><div><label>Material<input value={pricingForm.productInfo.material} onChange={(event) => updateProductInfo("material", event.target.value)} /></label><label>Finish<input value={pricingForm.productInfo.finish} onChange={(event) => updateProductInfo("finish", event.target.value)} /></label><label>Lead time<input value={pricingForm.productInfo.leadTime} onChange={(event) => updateProductInfo("leadTime", event.target.value)} /></label><label>Price note<input value={pricingForm.productInfo.priceNote} onChange={(event) => updateProductInfo("priceNote", event.target.value)} /></label></div></div>
           <div className="scouts-delivery-pricing"><div className="scouts-delivery-pricing-head"><h3>Delivery bands</h3><span>Applied once per order using its largest individual panel</span></div>{pricingForm.deliveryRates.map((rate) => { const sellExVat = Number(rate.sellPrice) / 1.2; const deliveryGp = sellExVat > 0 ? Math.round(((sellExVat - Number(rate.costPrice)) / sellExVat) * 1000) / 10 : 0; return <div className="scouts-delivery-rate" key={rate.id}><strong>{rate.label}</strong><label>Your cost (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.costPrice} onChange={(event) => updateDeliveryRate(rate.id, "costPrice", event.target.value)} /></label><label>Customer sell (£ inc VAT)<input required type="number" min="0" step="0.01" value={rate.sellPrice} onChange={(event) => updateDeliveryRate(rate.id, "sellPrice", event.target.value)} /></label><span className="margin">GP {deliveryGp}%</span></div>; })}</div>
           <div className="scouts-admin-settings"><label>Customer notice<textarea rows="4" value={pricingForm.customerNotes} onChange={(event) => setPricingForm((current) => ({ ...current, customerNotes: event.target.value }))} placeholder="Explain delivery fees, lead times, or anything all customers should see" /></label><label>CC order emails<textarea rows="4" value={pricingForm.ccEmails} onChange={(event) => setPricingForm((current) => ({ ...current, ccEmails: event.target.value }))} placeholder="One email address per line" /><small>Every order email will also be sent to these addresses.</small></label></div>
           <div className="scouts-pricing-save-row"><button type="button" onClick={savePricing} disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save all pricing settings"}</button></div>

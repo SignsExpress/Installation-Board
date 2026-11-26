@@ -139,6 +139,8 @@
 .scouts-pricing-results > div { display: grid; gap: 2px; padding: 9px 11px; background: var(--scouts-soft); }
 .scouts-pricing-results span { color: #675d70; font-size: 0.7rem; }
 .scouts-pricing-results strong { color: var(--scouts-green); font-size: 1rem; }
+.scouts-product-info-settings { margin-top: 15px; border-top: 1px solid var(--scouts-border); padding-top: 14px; }
+.scouts-product-info-settings > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .scouts-delivery-pricing { margin-top: 15px; border-top: 1px solid var(--scouts-border); padding-top: 14px; }
 .scouts-delivery-pricing-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 .scouts-delivery-pricing-head h3 { margin: 0; font-size: 0.95rem; }
@@ -182,6 +184,7 @@
   .scouts-pricing-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-delivery-rate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-delivery-rate > strong { grid-column: 1 / -1; }
+  .scouts-product-info-settings > div:last-child { grid-template-columns: 1fr; }
   .scouts-admin-settings { grid-template-columns: 1fr; }
 }
 
