@@ -593,6 +593,9 @@ function getScoutsPricingFile() {
 function sanitizeScoutsPricing(payload = {}) {
   const costPerSquareMetre = Math.max(0, Math.min(10000, Number(payload.costPerSquareMetre) || 0));
   const grossProfitMargin = Math.max(0, Math.min(95, Number(payload.grossProfitMargin) || 0));
+  const customerNotes = sanitizeCreditApplicationMultiLine(payload.customerNotes, 2000);
+  const rawCcEmails = Array.isArray(payload.ccEmails) ? payload.ccEmails : String(payload.ccEmails || "").split(/[\n,;]+/);
+  const ccEmails = [...new Set(rawCcEmails.map((email) => String(email || "").trim().toLowerCase()).filter(looksLikeEmail))].slice(0, 20);
   const suppliedRates = Array.isArray(payload.deliveryRates) ? payload.deliveryRates : [];
   const deliveryRates = DEFAULT_SCOUTS_DELIVERY_RATES.map((fallback) => {
     const supplied = suppliedRates.find((rate) => String(rate?.id || "") === fallback.id) || {};
@@ -607,6 +610,8 @@ function sanitizeScoutsPricing(payload = {}) {
     costPerSquareMetre: Math.round(costPerSquareMetre * 100) / 100,
     deliveryRates,
     grossProfitMargin: Math.round(grossProfitMargin * 100) / 100,
+    customerNotes,
+    ccEmails,
     vatRate: 20,
     updatedAt: sanitizeCreditApplicationText(payload.updatedAt, 80)
   };
@@ -637,6 +642,7 @@ function getScoutsPublicPricing(settings) {
     return {
       configured: false,
       vatRate: 20,
+      customerNotes: "",
       deliveryRates: DEFAULT_SCOUTS_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
       products: SCOUTS_SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.unitPrice }))
     };
@@ -647,6 +653,7 @@ function getScoutsPublicPricing(settings) {
   return {
     configured: true,
     vatRate: settings.vatRate,
+    customerNotes: settings.customerNotes,
     deliveryRates: settings.deliveryRates.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
     products: SCOUTS_SIGN_PRODUCTS.map((product) => ({
       ...product,
@@ -716,6 +723,7 @@ function sanitizeScoutsOrder(payload = {}, publicPricing = getScoutsPublicPricin
     email: sanitizeCreditApplicationText(payload.email, 180).toLowerCase(),
     groupName: sanitizeCreditApplicationText(payload.groupName, 180),
     address: sanitizeCreditApplicationMultiLine(payload.address, 1200),
+    orderNotes: sanitizeCreditApplicationMultiLine(payload.orderNotes, 2000),
     collection,
     signs,
     signsTotal,
@@ -13283,7 +13291,8 @@ function createServer() {
         return;
       }
 
-      const publicPricing = getScoutsPublicPricing(await readScoutsPricing());
+      const pricingSettings = await readScoutsPricing();
+      const publicPricing = getScoutsPublicPricing(pricingSettings);
       let order = sanitizeScoutsOrder({ ...request.body, id: makeId(), submittedAt: new Date().toISOString() }, publicPricing);
       let orders = await readScoutsOrders();
       orders.unshift(order);
@@ -13300,7 +13309,7 @@ function createServer() {
         await transporter.sendMail({
           from: getCreditApplicationFromAddress(),
           to: SCOUTS_ORDER_TO,
-          cc: order.email,
+          cc: [...new Set([order.email, ...pricingSettings.ccEmails])],
           replyTo: order.email,
           subject: `Scouts sign order - ${order.groupName} - ${order.id}`,
           text: [
@@ -13312,6 +13321,7 @@ function createServer() {
             `Email: ${order.email}`,
             `Group: ${order.groupName}`,
             `Address: ${order.address}`,
+            `Order notes / requests: ${order.orderNotes || "None"}`,
             `Fulfilment: ${order.collection ? "Collect from store" : "Delivery"}`,
             "",
             ...signLines,
@@ -13362,15 +13372,17 @@ function createServer() {
       const costPerSquareMetre = Number(request.body?.costPerSquareMetre);
       const grossProfitMargin = Number(request.body?.grossProfitMargin);
       const deliveryRates = Array.isArray(request.body?.deliveryRates) ? request.body.deliveryRates : [];
+      const rawCcEmails = Array.isArray(request.body?.ccEmails) ? request.body.ccEmails : String(request.body?.ccEmails || "").split(/[\n,;]+/);
+      const invalidCcEmail = rawCcEmails.some((email) => String(email || "").trim() && !looksLikeEmail(email));
       const invalidDeliveryRate = DEFAULT_SCOUTS_DELIVERY_RATES.some((expected) => {
         const rate = deliveryRates.find((entry) => String(entry?.id || "") === expected.id);
         return !rate || !Number.isFinite(Number(rate.costPrice)) || Number(rate.costPrice) < 0 || !Number.isFinite(Number(rate.sellPrice)) || Number(rate.sellPrice) < 0;
       });
-      if (!Number.isFinite(costPerSquareMetre) || !Number.isFinite(grossProfitMargin) || !(costPerSquareMetre > 0) || grossProfitMargin < 0 || grossProfitMargin >= 95 || invalidDeliveryRate) {
-        response.status(400).json({ error: "Enter a cost per m², a gross profit margin below 95%, and valid delivery cost and sell prices." });
+      if (!Number.isFinite(costPerSquareMetre) || !Number.isFinite(grossProfitMargin) || !(costPerSquareMetre > 0) || grossProfitMargin < 0 || grossProfitMargin >= 95 || invalidDeliveryRate || invalidCcEmail) {
+        response.status(400).json({ error: "Enter valid pricing, delivery rates, and CC email addresses." });
         return;
       }
-      const pricing = await writeScoutsPricing({ costPerSquareMetre, grossProfitMargin, deliveryRates });
+      const pricing = await writeScoutsPricing({ costPerSquareMetre, grossProfitMargin, deliveryRates, customerNotes: request.body?.customerNotes, ccEmails: rawCcEmails });
       response.json({ pricing, publicPricing: getScoutsPublicPricing(pricing) });
     } catch (error) {
       console.error("Could not save Scouts pricing.", error.message || error);

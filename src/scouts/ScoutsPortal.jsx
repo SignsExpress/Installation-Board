@@ -17,6 +17,7 @@ const DEFAULT_DELIVERY_RATES = [
 const DEFAULT_PUBLIC_PRICING = {
   configured: false,
   vatRate: 20,
+  customerNotes: "",
   deliveryRates: DEFAULT_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
   products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.price }))
 };
@@ -76,13 +77,18 @@ function SignPreview({ sign }) {
   const product = getSignProduct(sign);
   const { width, height } = getSignDimensions(sign);
   const portrait = height > width;
+  const groupName = sign.groupName || "Your Group Name";
+  const groupNameLength = groupName.length;
+  const groupNameFontSize = portrait
+    ? (groupNameLength <= 18 ? 17 : groupNameLength <= 36 ? 14 : groupNameLength <= 60 ? 11 : 9)
+    : (groupNameLength <= 22 ? 20 : groupNameLength <= 42 ? 17 : groupNameLength <= 70 ? 13 : 10);
   const sections = [["Beavers", "6-8"], ["Cubs", "8-10½"], ["Scouts", "10½-14"], ["Explorers", "14-18"], ["Network", "18-25"]];
   return (
     <div className="scouts-sign-stage">
       <div className={`scouts-sign-preview ${portrait ? "is-portrait" : "is-landscape"}`} style={{ aspectRatio: `${width} / ${height}` }}>
         <div className="scouts-sign-identity">
           <img src="/scouts/scouts-logo-stack-white.png" alt="Scouts" />
-          <strong>{sign.groupName || "Your Group Name"}</strong>
+          <strong style={{ fontSize: `${groupNameFontSize}px` }}>{groupName}</strong>
         </div>
         <div className="scouts-sign-sections">
           {sections.map(([name, ages]) => <span key={name}><b>{name}</b><small>{ages}</small></span>)}
@@ -103,7 +109,7 @@ export function ScoutsCustomerPortal() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState(null);
-  const [details, setDetails] = useState({ fullName: "", mobile: "", email: "", groupName: "", address: "" });
+  const [details, setDetails] = useState({ fullName: "", mobile: "", email: "", groupName: "", address: "", orderNotes: "" });
   const [collection, setCollection] = useState(false);
   const [signs, setSigns] = useState([makeSign("")]);
   const [pricing, setPricing] = useState(DEFAULT_PUBLIC_PRICING);
@@ -123,6 +129,8 @@ export function ScoutsCustomerPortal() {
   const signsTotal = useMemo(() => signs.reduce((sum, sign) => sum + getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1), 0), [pricing, signs]);
   const deliveryFee = collection ? 0 : getDeliveryPrice(signs, pricing);
   const total = signsTotal + deliveryFee;
+  const totalExVat = total / 1.2;
+  const vatAmount = total - totalExVat;
 
   function updateDetails(key, value) {
     setDetails((current) => {
@@ -269,15 +277,18 @@ export function ScoutsCustomerPortal() {
 
           <section className="scouts-section scouts-checkout">
             <div className="scouts-section-head"><span>3</span><div><h2>Delivery and total</h2><p>Choose delivery or collection.</p></div></div>
+            {pricing.customerNotes ? <div className="scouts-customer-notice"><strong>Before you order</strong><p>{pricing.customerNotes}</p></div> : null}
             <div className="scouts-fulfilment">
               <button type="button" className={!collection ? "active" : ""} onClick={() => setCollection(false)}>Delivery</button>
               <button type="button" className={collection ? "active" : ""} onClick={() => setCollection(true)}>Collect from store</button>
             </div>
+            <label className="scouts-order-notes">Order notes or special requests<textarea rows="4" value={details.orderNotes} onChange={(event) => updateDetails("orderNotes", event.target.value)} placeholder="Add anything we should know about this order" /></label>
             <div className="scouts-total-box">
-              <div><span>Signs</span><strong>{money(signsTotal)}</strong></div>
-              <div><span>{collection ? "Collection" : "Delivery"}</span><strong>{collection ? "Free" : money(deliveryFee)}</strong></div>
-              <div className="total"><span>Total</span><strong>{money(total)}</strong></div>
-              <small>Sign prices include VAT at 20%. Delivery is shown separately and collection is free.</small>
+              <div><span>Signs including VAT</span><strong>{money(signsTotal)}</strong></div>
+              <div><span>{collection ? "Collection" : "Delivery including VAT"}</span><strong>{collection ? "Free" : money(deliveryFee)}</strong></div>
+              <div className="net"><span>Subtotal excluding VAT</span><strong>{money(totalExVat)}</strong></div>
+              <div><span>VAT at 20%</span><strong>{money(vatAmount)}</strong></div>
+              <div className="total"><span>Total including VAT</span><strong>{money(total)}</strong></div>
             </div>
             {error ? <div className="scouts-alert error">{error}</div> : null}
             <button className="scouts-order-button" type="submit" disabled={submitting}>{submitting ? "Sending order..." : "ORDER SIGNS"}</button>
@@ -295,6 +306,8 @@ export function ScoutsAdminOrders() {
   const [pricingForm, setPricingForm] = useState({
     costPerSquareMetre: "",
     grossProfitMargin: "",
+    customerNotes: "",
+    ccEmails: "",
     deliveryRates: DEFAULT_DELIVERY_RATES.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
   });
   const [pricingSaving, setPricingSaving] = useState(false);
@@ -319,6 +332,8 @@ export function ScoutsAdminOrders() {
           setPricingForm({
             costPerSquareMetre: payload.pricing.configured ? String(payload.pricing.costPerSquareMetre) : "",
             grossProfitMargin: payload.pricing.configured ? String(payload.pricing.grossProfitMargin) : "",
+            customerNotes: payload.pricing.customerNotes || "",
+            ccEmails: (payload.pricing.ccEmails || []).join("\n"),
             deliveryRates: (payload.pricing.deliveryRates || DEFAULT_DELIVERY_RATES).map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
           });
         }
@@ -350,6 +365,8 @@ export function ScoutsAdminOrders() {
       setPricingForm({
         costPerSquareMetre: String(payload.pricing.costPerSquareMetre),
         grossProfitMargin: String(payload.pricing.grossProfitMargin),
+        customerNotes: payload.pricing.customerNotes || "",
+        ccEmails: (payload.pricing.ccEmails || []).join("\n"),
         deliveryRates: payload.pricing.deliveryRates.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
       });
       setPricingMessage("Customer sell prices updated.");
@@ -376,6 +393,8 @@ export function ScoutsAdminOrders() {
             {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm</span><strong>{money(product.sellPrice)}</strong></div>)}
           </div>
           <div className="scouts-delivery-pricing"><div className="scouts-delivery-pricing-head"><h3>Delivery bands</h3><span>Applied once per order using its largest individual panel</span></div>{pricingForm.deliveryRates.map((rate) => { const sellExVat = Number(rate.sellPrice) / 1.2; const deliveryGp = sellExVat > 0 ? Math.round(((sellExVat - Number(rate.costPrice)) / sellExVat) * 1000) / 10 : 0; return <div className="scouts-delivery-rate" key={rate.id}><strong>{rate.label}</strong><label>Your cost (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.costPrice} onChange={(event) => updateDeliveryRate(rate.id, "costPrice", event.target.value)} /></label><label>Customer sell (£ inc VAT)<input required type="number" min="0" step="0.01" value={rate.sellPrice} onChange={(event) => updateDeliveryRate(rate.id, "sellPrice", event.target.value)} /></label><span className="margin">GP {deliveryGp}%</span></div>; })}</div>
+          <div className="scouts-admin-settings"><label>Customer notice<textarea rows="4" value={pricingForm.customerNotes} onChange={(event) => setPricingForm((current) => ({ ...current, customerNotes: event.target.value }))} placeholder="Explain delivery fees, lead times, or anything all customers should see" /></label><label>CC order emails<textarea rows="4" value={pricingForm.ccEmails} onChange={(event) => setPricingForm((current) => ({ ...current, ccEmails: event.target.value }))} placeholder="One email address per line" /><small>Every order email will also be sent to these addresses.</small></label></div>
+          <div className="scouts-pricing-save-row"><button type="button" onClick={savePricing} disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save all pricing settings"}</button></div>
         </section> : null}
         {error ? <div className="scouts-alert error">{error}</div> : null}
         {!loading && !orders.length ? <div className="scouts-admin-empty">No Scouts orders have been placed yet.</div> : null}
@@ -384,6 +403,7 @@ export function ScoutsAdminOrders() {
             <article className="scouts-admin-order" key={order.id}>
               <div className="scouts-admin-order-head"><div><span>{order.id}</span><h2>{order.groupName}</h2><p>{order.fullName} · {order.email} · {order.mobile}</p></div><div><strong>{money(order.total)}</strong><span>{order.status}</span></div></div>
               <div className="scouts-admin-meta"><span>{order.collection ? "Collect from store" : `Deliver to: ${order.address}`}</span><span>{new Date(order.submittedAt).toLocaleString("en-GB")}</span><span>{order.emailSent ? "Email sent" : "Email needs sending"}</span></div>
+              {order.orderNotes ? <div className="scouts-admin-order-note"><strong>Customer notes</strong><p>{order.orderNotes}</p></div> : null}
               <div className="scouts-admin-signs">
                 {order.signs.map((sign, index) => <div key={sign.id}><SignPreview sign={sign} /><p><strong>Sign {index + 1}</strong> · {sign.code} · Qty {sign.quantity} · {money(sign.lineTotal)} inc VAT</p></div>)}
               </div>

@@ -63,19 +63,20 @@
 .scouts-sign-fields { display: grid; gap: 12px; }
 .scouts-size-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(110px, 0.65fr); gap: 10px; }
 .scouts-custom-size-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; border-left: 3px solid var(--scouts-green); padding: 10px 0 10px 12px; }
-.scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-width: 0; min-height: 210px; overflow: hidden; padding: 18px; border-radius: 7px; background: #f1eafa; }
+.scouts-sign-stage { display: grid; place-items: center; gap: 8px; min-width: 0; min-height: 270px; overflow: hidden; padding: 18px; border-radius: 7px; background: #f1eafa; }
 .scouts-sign-preview { position: relative; display: block; width: auto; height: auto; max-width: 100%; max-height: 250px; min-width: 0; min-height: 0; overflow: hidden; box-sizing: border-box; border-radius: 2px; background: #7413dc; box-shadow: 0 10px 24px rgba(55, 5, 108, 0.2); color: #fff; text-align: center; }
 .scouts-sign-preview.is-landscape { width: min(100%, 390px); }
-.scouts-sign-preview.is-portrait { height: min(250px, 100%); }
+.scouts-sign-preview.is-portrait { width: 165px; height: 220px; max-width: 100%; max-height: 220px; }
 .scouts-sign-identity { position: absolute; inset: 7% 8% auto; display: flex; height: 38%; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
 .scouts-sign-identity img { display: block; width: clamp(44px, 18%, 78px); max-height: 65%; object-fit: contain; flex: 0 1 auto; }
-.scouts-sign-identity strong { display: block; max-width: 100%; margin-top: clamp(1px, 0.45vw, 4px); color: #fff; font-size: clamp(0.52rem, 1vw, 0.9rem); font-weight: 800; line-height: 1; overflow-wrap: anywhere; }
+.scouts-sign-identity strong { display: block; max-width: 100%; max-height: 3.15em; margin-top: clamp(1px, 0.45vw, 4px); overflow: hidden; color: #fff; font-weight: 800; line-height: 1.05; overflow-wrap: anywhere; white-space: normal; }
 .scouts-sign-sections { position: absolute; top: 52%; left: 5%; right: 5%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,0.28); padding-top: clamp(4px, 1vw, 8px); }
 .scouts-sign-sections span { display: grid; gap: 0; min-width: 0; }
 .scouts-sign-sections b { font-size: clamp(0.38rem, 0.7vw, 0.62rem); line-height: 1; }
 .scouts-sign-sections small { margin-top: 2px; color: #fff; font-size: clamp(0.3rem, 0.52vw, 0.48rem); line-height: 1; }
 .scouts-sign-footer { position: absolute; right: 5%; bottom: 8%; left: 5%; display: flex; justify-content: space-between; gap: 10px; font-size: clamp(0.38rem, 0.7vw, 0.62rem); }
 .scouts-sign-preview.is-portrait .scouts-sign-identity { top: 7%; height: 36%; }
+.scouts-sign-preview.is-portrait .scouts-sign-identity img { max-height: 48%; }
 .scouts-sign-preview.is-portrait .scouts-sign-sections { top: 54%; }
 .scouts-sign-preview.is-portrait .scouts-sign-sections { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 5px; }
 .scouts-sign-preview.is-portrait .scouts-sign-sections span:nth-child(n+4) { transform: translateX(50%); }
@@ -91,9 +92,14 @@
 .scouts-fulfilment button.active { border-color: var(--scouts-green); background: var(--scouts-soft); color: var(--scouts-green); box-shadow: inset 0 0 0 1px var(--scouts-green); }
 .scouts-total-box { display: grid; gap: 8px; border-radius: 7px; padding: 16px; background: #f5f8f7; }
 .scouts-total-box > div { display: flex; justify-content: space-between; gap: 16px; }
+.scouts-total-box .net { margin-top: 4px; border-top: 1px solid var(--scouts-border); padding-top: 10px; }
 .scouts-total-box .total { margin-top: 4px; border-top: 1px solid var(--scouts-border); padding-top: 12px; font-size: 1.25rem; }
 .scouts-total-box .total strong { color: var(--scouts-green); }
 .scouts-total-box small { color: #697572; }
+.scouts-order-notes { margin: 0 0 16px; }
+.scouts-customer-notice { margin-bottom: 16px; border-left: 4px solid var(--scouts-green); border-radius: 5px; padding: 11px 13px; background: #f4edfb; }
+.scouts-customer-notice strong { color: var(--scouts-green-dark); font-size: 0.8rem; }
+.scouts-customer-notice p { margin: 4px 0 0; white-space: pre-wrap; color: #4d4356; font-size: 0.8rem; line-height: 1.45; }
 .scouts-order-button, .scouts-login-card button { width: 100%; min-height: 48px; margin-top: 16px; border: 0; border-radius: 6px; background: var(--scouts-green); color: #fff; font-size: 0.95rem; font-weight: 900; letter-spacing: 0.04em; }
 .scouts-order-button:hover, .scouts-login-card button:hover { background: var(--scouts-green-dark); }
 .scouts-order-button:disabled { opacity: 0.6; }
@@ -140,6 +146,14 @@
 .scouts-delivery-rate { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.65fr) minmax(150px, 0.75fr) 70px; gap: 10px; align-items: end; border-top: 1px solid #eee7f5; padding: 9px 0; }
 .scouts-delivery-rate > strong { align-self: center; font-size: 0.8rem; }
 .scouts-delivery-rate .margin { align-self: center; color: var(--scouts-green); font-size: 0.75rem; font-weight: 900; text-align: right; }
+.scouts-admin-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; border-top: 1px solid var(--scouts-border); padding-top: 14px; }
+.scouts-admin-settings textarea { width: 100%; resize: vertical; border: 1px solid #cfc4dd; border-radius: 6px; padding: 9px 10px; font: inherit; }
+.scouts-admin-settings small { color: #6a6171; font-weight: 400; }
+.scouts-pricing-save-row { display: flex; justify-content: flex-end; margin-top: 12px; }
+.scouts-pricing-save-row button { min-height: 40px; border: 0; border-radius: 6px; padding: 0 16px; background: var(--scouts-green); color: #fff; font-weight: 900; }
+.scouts-admin-order-note { margin-bottom: 14px; border-left: 3px solid var(--scouts-green); padding: 8px 11px; background: var(--scouts-soft); }
+.scouts-admin-order-note strong { font-size: 0.75rem; }
+.scouts-admin-order-note p { margin: 3px 0 0; white-space: pre-wrap; font-size: 0.8rem; }
 .scouts-admin-orders { display: grid; gap: 16px; }
 .scouts-admin-order { border: 1px solid var(--scouts-border); border-radius: 8px; padding: 18px; background: #fff; }
 .scouts-admin-order-head { display: flex; justify-content: space-between; gap: 20px; }
@@ -168,6 +182,7 @@
   .scouts-pricing-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-delivery-rate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-delivery-rate > strong { grid-column: 1 / -1; }
+  .scouts-admin-settings { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
