@@ -112,7 +112,7 @@ const DEFAULT_SCOUTS_PRODUCT_INFO = {
   material: "3mm Dibond",
   finish: "Full-colour outdoor print",
   leadTime: "Dispatch in 5 working days",
-  priceNote: "Include VAT at 20%"
+  priceNote: "Exclude VAT"
 };
 
 function getScoutsCustomUnitPrice(width, height) {
@@ -601,11 +601,12 @@ function sanitizeScoutsPricing(payload = {}) {
   const grossProfitMargin = Math.max(0, Math.min(95, Number(payload.grossProfitMargin) || 0));
   const customerNotes = sanitizeCreditApplicationMultiLine(payload.customerNotes, 2000);
   const suppliedProductInfo = payload.productInfo && typeof payload.productInfo === "object" ? payload.productInfo : {};
+  const suppliedPriceNote = sanitizeCreditApplicationText(suppliedProductInfo.priceNote, 180);
   const productInfo = {
     material: sanitizeCreditApplicationText(suppliedProductInfo.material, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.material,
     finish: sanitizeCreditApplicationText(suppliedProductInfo.finish, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.finish,
     leadTime: sanitizeCreditApplicationText(suppliedProductInfo.leadTime, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.leadTime,
-    priceNote: sanitizeCreditApplicationText(suppliedProductInfo.priceNote, 180) || DEFAULT_SCOUTS_PRODUCT_INFO.priceNote
+    priceNote: !suppliedPriceNote || suppliedPriceNote === "Include VAT at 20%" ? DEFAULT_SCOUTS_PRODUCT_INFO.priceNote : suppliedPriceNote
   };
   const rawCcEmails = Array.isArray(payload.ccEmails) ? payload.ccEmails : String(payload.ccEmails || "").split(/[\n,;]+/);
   const ccEmails = [...new Set(rawCcEmails.map((email) => String(email || "").trim().toLowerCase()).filter(looksLikeEmail))].slice(0, 20);
@@ -663,8 +664,7 @@ function getScoutsPublicPricing(settings) {
     };
   }
   const marginMultiplier = 1 / (1 - settings.grossProfitMargin / 100);
-  const vatMultiplier = 1 + settings.vatRate / 100;
-  const sellFromCost = (cost) => Math.round(cost * marginMultiplier * vatMultiplier * 100) / 100;
+  const sellFromCost = (cost) => Math.round(cost * marginMultiplier * 100) / 100;
   return {
     configured: true,
     vatRate: settings.vatRate,
@@ -732,6 +732,17 @@ function sanitizeScoutsOrder(payload = {}, publicPricing = getScoutsPublicPricin
   const collection = Boolean(payload.collection);
   const signsTotal = Math.round(signs.reduce((sum, sign) => sum + sign.lineTotal, 0) * 100) / 100;
   const deliveryFee = collection ? 0 : (preservePrices && Number.isFinite(Number(payload.deliveryFee)) ? Number(payload.deliveryFee) : getScoutsDeliverySellPrice(signs, publicPricing));
+  const pricesIncludeVat = preservePrices ? payload.pricesIncludeVat !== false : false;
+  const calculatedSubtotalExVat = Math.round((signsTotal + deliveryFee) * 100) / 100;
+  const calculatedVatAmount = Math.round(calculatedSubtotalExVat * 0.2 * 100) / 100;
+  const preservedTotal = preservePrices && Number.isFinite(Number(payload.total)) ? Number(payload.total) : null;
+  const subtotalExVat = preservePrices && Number.isFinite(Number(payload.subtotalExVat))
+    ? Number(payload.subtotalExVat)
+    : (preservedTotal !== null && pricesIncludeVat ? Math.round((preservedTotal / 1.2) * 100) / 100 : calculatedSubtotalExVat);
+  const vatAmount = preservePrices && Number.isFinite(Number(payload.vatAmount))
+    ? Number(payload.vatAmount)
+    : (preservedTotal !== null ? Math.round((preservedTotal - subtotalExVat) * 100) / 100 : calculatedVatAmount);
+  const total = preservedTotal !== null ? preservedTotal : Math.round((subtotalExVat + vatAmount) * 100) / 100;
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || makeId(),
     fullName: sanitizeCreditApplicationText(payload.fullName, 180),
@@ -744,7 +755,10 @@ function sanitizeScoutsOrder(payload = {}, publicPricing = getScoutsPublicPricin
     signs,
     signsTotal,
     deliveryFee,
-    total: Math.round((signsTotal + deliveryFee) * 100) / 100,
+    subtotalExVat,
+    vatAmount,
+    total,
+    pricesIncludeVat,
     status: sanitizeCreditApplicationText(payload.status, 80) || "Awaiting payment link",
     emailSent: Boolean(payload.emailSent),
     submittedAt: sanitizeCreditApplicationText(payload.submittedAt, 80) || new Date().toISOString()
@@ -13319,7 +13333,7 @@ function createServer() {
         const transportConfig = getCreditApplicationTransportConfig();
         if (!transportConfig) throw new Error("SMTP is not configured.");
         const signLines = order.signs.map((sign, index) =>
-          `${index + 1}. ${sign.title} ${sign.width} x ${sign.height}mm (${sign.code}) - ${sign.groupName} - Qty ${sign.quantity} - £${sign.lineTotal.toFixed(2)} inc VAT`
+          `${index + 1}. ${sign.title} ${sign.width} x ${sign.height}mm (${sign.code}) - ${sign.groupName} - Qty ${sign.quantity} - £${sign.lineTotal.toFixed(2)} ex VAT`
         );
         const transporter = nodemailer.createTransport(transportConfig);
         await transporter.sendMail({
@@ -13342,9 +13356,11 @@ function createServer() {
             "",
             ...signLines,
             "",
-            `Signs: £${order.signsTotal.toFixed(2)}`,
-            `Delivery: £${order.deliveryFee.toFixed(2)}`,
-            `Total: £${order.total.toFixed(2)}`,
+            `Signs ex VAT: £${order.signsTotal.toFixed(2)}`,
+            `Delivery ex VAT: £${order.deliveryFee.toFixed(2)}`,
+            `Subtotal ex VAT: £${order.subtotalExVat.toFixed(2)}`,
+            `VAT at 20%: £${order.vatAmount.toFixed(2)}`,
+            `Total inc VAT: £${order.total.toFixed(2)}`,
             "",
             `Material: ${pricingSettings.productInfo.material}`,
             `Finish: ${pricingSettings.productInfo.finish}`,

@@ -18,7 +18,7 @@ const DEFAULT_PUBLIC_PRICING = {
   configured: false,
   vatRate: 20,
   customerNotes: "",
-  productInfo: { material: "3mm Dibond", finish: "Full-colour outdoor print", leadTime: "Dispatch in 5 working days", priceNote: "Include VAT at 20%" },
+  productInfo: { material: "3mm Dibond", finish: "Full-colour outdoor print", leadTime: "Dispatch in 5 working days", priceNote: "Exclude VAT" },
   deliveryRates: DEFAULT_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
   products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.price }))
 };
@@ -129,9 +129,9 @@ export function ScoutsCustomerPortal() {
 
   const signsTotal = useMemo(() => signs.reduce((sum, sign) => sum + getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1), 0), [pricing, signs]);
   const deliveryFee = collection ? 0 : getDeliveryPrice(signs, pricing);
-  const total = signsTotal + deliveryFee;
-  const totalExVat = total / 1.2;
-  const vatAmount = total - totalExVat;
+  const totalExVat = signsTotal + deliveryFee;
+  const vatAmount = totalExVat * 0.2;
+  const total = totalExVat + vatAmount;
 
   function updateDetails(key, value) {
     setDetails((current) => {
@@ -266,7 +266,7 @@ export function ScoutsCustomerPortal() {
                       </div>
                       {sign.productId === CUSTOM_PRODUCT_ID ? <div className="scouts-custom-size-fields"><label>Width (mm)<input required type="number" min="50" max="5000" value={sign.width} onChange={(event) => updateSign(sign.id, "width", event.target.value)} /></label><label>Height (mm)<input required type="number" min="50" max="5000" value={sign.height} onChange={(event) => updateSign(sign.id, "height", event.target.value)} /></label></div> : null}
                       <div className="scouts-product-detail"><span>{sign.productId === CUSTOM_PRODUCT_ID ? "CUSTOM" : product.code}</span><span>Printed Materials</span></div>
-                      <div className="scouts-line-price"><span>{sign.productId === CUSTOM_PRODUCT_ID && !pricing.configured ? "Estimated " : ""}{money(getSignPrice(sign, pricing))} each · VAT included</span><strong>{money(getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
+                      <div className="scouts-line-price"><span>{sign.productId === CUSTOM_PRODUCT_ID && !pricing.configured ? "Estimated " : ""}{money(getSignPrice(sign, pricing))} each · ex VAT</span><strong>{money(getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
                     </div>
                     <SignPreview sign={sign} />
                   </div>
@@ -285,8 +285,8 @@ export function ScoutsCustomerPortal() {
             </div>
             <label className="scouts-order-notes">Order notes or special requests<textarea rows="4" value={details.orderNotes} onChange={(event) => updateDetails("orderNotes", event.target.value)} placeholder="Add anything we should know about this order" /></label>
             <div className="scouts-total-box">
-              <div><span>Signs including VAT</span><strong>{money(signsTotal)}</strong></div>
-              <div><span>{collection ? "Collection" : "Delivery including VAT"}</span><strong>{collection ? "Free" : money(deliveryFee)}</strong></div>
+              <div><span>Signs excluding VAT</span><strong>{money(signsTotal)}</strong></div>
+              <div><span>{collection ? "Collection" : "Delivery excluding VAT"}</span><strong>{collection ? "Free" : money(deliveryFee)}</strong></div>
               <div className="net"><span>Subtotal excluding VAT</span><strong>{money(totalExVat)}</strong></div>
               <div><span>VAT at 20%</span><strong>{money(vatAmount)}</strong></div>
               <div className="total"><span>Total including VAT</span><strong>{money(total)}</strong></div>
@@ -318,7 +318,7 @@ export function ScoutsAdminOrders() {
   const calculatedPricing = useMemo(() => {
     const costPerSquareMetre = Math.max(0, Number(pricingForm.costPerSquareMetre) || 0);
     const grossProfitMargin = Math.max(0, Math.min(94.99, Number(pricingForm.grossProfitMargin) || 0));
-    const multiplier = (1 / (1 - grossProfitMargin / 100)) * 1.2;
+    const multiplier = 1 / (1 - grossProfitMargin / 100);
     return {
       products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.width * product.height / 1000000 * costPerSquareMetre * multiplier }))
     };
@@ -391,17 +391,17 @@ export function ScoutsAdminOrders() {
       <main className="scouts-admin-main">
         {loading ? <div className="scouts-loading">Loading orders...</div> : null}
         {!loading ? <section className="scouts-pricing-panel">
-          <div className="scouts-pricing-head"><div><span>Admin only</span><h2>Customer pricing</h2><p>Panel sell prices include 20% VAT and use your target gross-profit margin. Delivery cost and sell prices are set separately by the largest panel in the order.</p></div>{pricingMessage ? <strong>{pricingMessage}</strong> : null}</div>
+          <div className="scouts-pricing-head"><div><span>Admin only</span><h2>Customer pricing</h2><p>All cost and sell prices below exclude VAT. Panel sell prices use your target gross-profit margin. VAT is added separately at customer checkout.</p></div>{pricingMessage ? <strong>{pricingMessage}</strong> : null}</div>
           <form onSubmit={savePricing}>
             <label>Panel cost per m² (£)<input required type="number" min="0.01" step="0.01" value={pricingForm.costPerSquareMetre} onChange={(event) => setPricingForm((current) => ({ ...current, costPerSquareMetre: event.target.value }))} /></label>
             <label>Gross profit margin (%)<input required type="number" min="0" max="94.99" step="0.01" value={pricingForm.grossProfitMargin} onChange={(event) => setPricingForm((current) => ({ ...current, grossProfitMargin: event.target.value }))} /></label>
             <button type="submit" disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save customer prices"}</button>
           </form>
           <div className="scouts-pricing-results">
-            {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm</span><strong>{money(product.sellPrice)}</strong></div>)}
+            {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm · ex VAT</span><strong>{money(product.sellPrice)}</strong></div>)}
           </div>
           <div className="scouts-product-info-settings"><div className="scouts-delivery-pricing-head"><h3>Customer product information</h3><span>Shown above the sign selector</span></div><div><label>Material<input value={pricingForm.productInfo.material} onChange={(event) => updateProductInfo("material", event.target.value)} /></label><label>Finish<input value={pricingForm.productInfo.finish} onChange={(event) => updateProductInfo("finish", event.target.value)} /></label><label>Lead time<input value={pricingForm.productInfo.leadTime} onChange={(event) => updateProductInfo("leadTime", event.target.value)} /></label><label>Price note<input value={pricingForm.productInfo.priceNote} onChange={(event) => updateProductInfo("priceNote", event.target.value)} /></label></div></div>
-          <div className="scouts-delivery-pricing"><div className="scouts-delivery-pricing-head"><h3>Delivery bands</h3><span>Applied once per order using its largest individual panel</span></div>{pricingForm.deliveryRates.map((rate) => { const sellExVat = Number(rate.sellPrice) / 1.2; const deliveryGp = sellExVat > 0 ? Math.round(((sellExVat - Number(rate.costPrice)) / sellExVat) * 1000) / 10 : 0; return <div className="scouts-delivery-rate" key={rate.id}><strong>{rate.label}</strong><label>Your cost (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.costPrice} onChange={(event) => updateDeliveryRate(rate.id, "costPrice", event.target.value)} /></label><label>Customer sell (£ inc VAT)<input required type="number" min="0" step="0.01" value={rate.sellPrice} onChange={(event) => updateDeliveryRate(rate.id, "sellPrice", event.target.value)} /></label><span className="margin">GP {deliveryGp}%</span></div>; })}</div>
+          <div className="scouts-delivery-pricing"><div className="scouts-delivery-pricing-head"><h3>Delivery bands</h3><span>Applied once per order using its largest individual panel</span></div>{pricingForm.deliveryRates.map((rate) => { const sellExVat = Number(rate.sellPrice); const deliveryGp = sellExVat > 0 ? Math.round(((sellExVat - Number(rate.costPrice)) / sellExVat) * 1000) / 10 : 0; return <div className="scouts-delivery-rate" key={rate.id}><strong>{rate.label}</strong><label>Your cost (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.costPrice} onChange={(event) => updateDeliveryRate(rate.id, "costPrice", event.target.value)} /></label><label>Customer sell (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.sellPrice} onChange={(event) => updateDeliveryRate(rate.id, "sellPrice", event.target.value)} /></label><span className="margin">GP {deliveryGp}%</span></div>; })}</div>
           <div className="scouts-admin-settings"><label>Customer notice<textarea rows="4" value={pricingForm.customerNotes} onChange={(event) => setPricingForm((current) => ({ ...current, customerNotes: event.target.value }))} placeholder="Explain delivery fees, lead times, or anything all customers should see" /></label><label>CC order emails<textarea rows="4" value={pricingForm.ccEmails} onChange={(event) => setPricingForm((current) => ({ ...current, ccEmails: event.target.value }))} placeholder="One email address per line" /><small>Every order email will also be sent to these addresses.</small></label></div>
           <div className="scouts-pricing-save-row"><button type="button" onClick={savePricing} disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save all pricing settings"}</button></div>
         </section> : null}
@@ -414,7 +414,7 @@ export function ScoutsAdminOrders() {
               <div className="scouts-admin-meta"><span>{order.collection ? "Collect from store" : `Deliver to: ${order.address}`}</span><span>{new Date(order.submittedAt).toLocaleString("en-GB")}</span><span>{order.emailSent ? "Email sent" : "Email needs sending"}</span></div>
               {order.orderNotes ? <div className="scouts-admin-order-note"><strong>Customer notes</strong><p>{order.orderNotes}</p></div> : null}
               <div className="scouts-admin-signs">
-                {order.signs.map((sign, index) => <div key={sign.id}><SignPreview sign={sign} /><p><strong>Sign {index + 1}</strong> · {sign.code} · Qty {sign.quantity} · {money(sign.lineTotal)} inc VAT</p></div>)}
+                {order.signs.map((sign, index) => <div key={sign.id}><SignPreview sign={sign} /><p><strong>Sign {index + 1}</strong> · {sign.code} · Qty {sign.quantity} · {money(sign.lineTotal)} {order.pricesIncludeVat ? "inc VAT" : "ex VAT"}</p></div>)}
               </div>
             </article>
           ))}
