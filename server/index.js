@@ -582,7 +582,75 @@ function getScoutsOrdersFile() {
   return process.env.SCOUTS_ORDERS_FILE || path.join(path.dirname(getDataFile()), "scouts-orders.json");
 }
 
-function sanitizeScoutsSign(payload = {}, index = 0) {
+function getScoutsPricingFile() {
+  return process.env.SCOUTS_PRICING_FILE || path.join(path.dirname(getDataFile()), "scouts-pricing.json");
+}
+
+function sanitizeScoutsPricing(payload = {}) {
+  const costPerSquareMetre = Math.max(0, Math.min(10000, Number(payload.costPerSquareMetre) || 0));
+  const deliveryCostPerOrder = Math.max(0, Math.min(10000, Number(payload.deliveryCostPerOrder) || 0));
+  const grossProfitMargin = Math.max(0, Math.min(95, Number(payload.grossProfitMargin) || 0));
+  return {
+    configured: Boolean(payload.configured) && costPerSquareMetre > 0,
+    costPerSquareMetre: Math.round(costPerSquareMetre * 100) / 100,
+    deliveryCostPerOrder: Math.round(deliveryCostPerOrder * 100) / 100,
+    grossProfitMargin: Math.round(grossProfitMargin * 100) / 100,
+    vatRate: 20,
+    updatedAt: sanitizeCreditApplicationText(payload.updatedAt, 80)
+  };
+}
+
+async function readScoutsPricing() {
+  try {
+    const raw = await fsp.readFile(getScoutsPricingFile(), "utf8");
+    return sanitizeScoutsPricing(JSON.parse(raw));
+  } catch (error) {
+    if (error.code === "ENOENT") return sanitizeScoutsPricing();
+    throw error;
+  }
+}
+
+async function writeScoutsPricing(payload) {
+  const file = getScoutsPricingFile();
+  const pricing = sanitizeScoutsPricing({ ...payload, configured: true, updatedAt: new Date().toISOString() });
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  const temporaryFile = `${file}.${process.pid}.tmp`;
+  await fsp.writeFile(temporaryFile, JSON.stringify(pricing, null, 2) + "\n", "utf8");
+  await fsp.rename(temporaryFile, file);
+  return pricing;
+}
+
+function getScoutsPublicPricing(settings) {
+  if (!settings?.configured) {
+    return {
+      configured: false,
+      vatRate: 20,
+      deliverySellPrice: SCOUTS_DELIVERY_FEE,
+      products: SCOUTS_SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.unitPrice }))
+    };
+  }
+  const marginMultiplier = 1 / (1 - settings.grossProfitMargin / 100);
+  const vatMultiplier = 1 + settings.vatRate / 100;
+  const sellFromCost = (cost) => Math.round(cost * marginMultiplier * vatMultiplier * 100) / 100;
+  return {
+    configured: true,
+    vatRate: settings.vatRate,
+    deliverySellPrice: sellFromCost(settings.deliveryCostPerOrder),
+    products: SCOUTS_SIGN_PRODUCTS.map((product) => ({
+      ...product,
+      sellPrice: sellFromCost((product.width * product.height / 1000000) * settings.costPerSquareMetre)
+    }))
+  };
+}
+
+function getScoutsCustomSellPrice(width, height, publicPricing) {
+  if (!publicPricing?.configured) return getScoutsCustomUnitPrice(width, height);
+  const reference = publicPricing.products.find((product) => product.id === SCOUTS_SIGN_PRODUCTS[0].id);
+  const sellPerSquareMetre = reference.sellPrice / ((reference.width * reference.height) / 1000000);
+  return Math.round((width * height / 1000000) * sellPerSquareMetre * 100) / 100;
+}
+
+function sanitizeScoutsSign(payload = {}, index = 0, publicPricing = getScoutsPublicPricing(), preservePrice = false) {
   const requestedProductId = sanitizeCreditApplicationText(payload.productId, 100);
   const custom = requestedProductId === SCOUTS_CUSTOM_PRODUCT_ID;
   const customWidth = Math.min(5000, Math.max(50, Math.round(Number(payload.width) || 0)));
@@ -592,7 +660,9 @@ function sanitizeScoutsSign(payload = {}, index = 0) {
     || SCOUTS_SIGN_PRODUCTS[0];
   const width = custom ? customWidth : product.width;
   const height = custom ? customHeight : product.height;
-  const unitPrice = custom ? getScoutsCustomUnitPrice(width, height) : product.unitPrice;
+  const configuredProduct = publicPricing.products.find((entry) => entry.id === product.id);
+  const calculatedUnitPrice = custom ? getScoutsCustomSellPrice(width, height, publicPricing) : (configuredProduct?.sellPrice ?? product.unitPrice);
+  const unitPrice = preservePrice && Number.isFinite(Number(payload.unitPrice)) ? Number(payload.unitPrice) : calculatedUnitPrice;
   const quantity = Math.min(100, Math.max(1, Math.round(Number(payload.quantity) || 1)));
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || `sign-${index + 1}`,
@@ -608,13 +678,13 @@ function sanitizeScoutsSign(payload = {}, index = 0) {
   };
 }
 
-function sanitizeScoutsOrder(payload = {}) {
+function sanitizeScoutsOrder(payload = {}, publicPricing = getScoutsPublicPricing(), preservePrices = false) {
   const signs = (Array.isArray(payload.signs) ? payload.signs : [])
-    .map((entry, index) => sanitizeScoutsSign(entry, index))
+    .map((entry, index) => sanitizeScoutsSign(entry, index, publicPricing, preservePrices))
     .filter((entry) => entry.groupName && entry.width >= 50 && entry.height >= 50);
   const collection = Boolean(payload.collection);
   const signsTotal = Math.round(signs.reduce((sum, sign) => sum + sign.lineTotal, 0) * 100) / 100;
-  const deliveryFee = collection ? 0 : SCOUTS_DELIVERY_FEE;
+  const deliveryFee = collection ? 0 : (preservePrices && Number.isFinite(Number(payload.deliveryFee)) ? Number(payload.deliveryFee) : publicPricing.deliverySellPrice);
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || makeId(),
     fullName: sanitizeCreditApplicationText(payload.fullName, 180),
@@ -638,7 +708,7 @@ async function readScoutsOrders() {
   try {
     const raw = await fsp.readFile(file, "utf8");
     const parsed = JSON.parse(raw);
-    return (Array.isArray(parsed) ? parsed : []).map(sanitizeScoutsOrder);
+    return (Array.isArray(parsed) ? parsed : []).map((order) => sanitizeScoutsOrder(order, getScoutsPublicPricing(), true));
   } catch (error) {
     if (error.code === "ENOENT") return [];
     throw error;
@@ -648,7 +718,7 @@ async function readScoutsOrders() {
 async function writeScoutsOrders(orders) {
   const file = getScoutsOrdersFile();
   await fsp.mkdir(path.dirname(file), { recursive: true });
-  const nextOrders = (Array.isArray(orders) ? orders : []).map(sanitizeScoutsOrder);
+  const nextOrders = (Array.isArray(orders) ? orders : []).map((order) => sanitizeScoutsOrder(order, getScoutsPublicPricing(), true));
   const temporaryFile = `${file}.${process.pid}.tmp`;
   await fsp.writeFile(temporaryFile, JSON.stringify(nextOrders, null, 2) + "\n", "utf8");
   await fsp.rename(temporaryFile, file);
@@ -13159,8 +13229,13 @@ function createServer() {
     response.json({ ok: true });
   });
 
-  app.get("/api/scouts/customer/session", (request, response) => {
-    response.json({ ok: true, deliveryFee: SCOUTS_DELIVERY_FEE, pricingStatus: "approved" });
+  app.get("/api/scouts/customer/session", async (request, response) => {
+    try {
+      const pricing = getScoutsPublicPricing(await readScoutsPricing());
+      response.json({ ok: true, pricing });
+    } catch (error) {
+      response.status(500).json({ error: "Could not load Scouts pricing." });
+    }
   });
 
   app.post("/api/scouts/customer/orders", async (request, response) => {
@@ -13184,7 +13259,8 @@ function createServer() {
         return;
       }
 
-      let order = sanitizeScoutsOrder({ ...request.body, id: makeId(), submittedAt: new Date().toISOString() });
+      const publicPricing = getScoutsPublicPricing(await readScoutsPricing());
+      let order = sanitizeScoutsOrder({ ...request.body, id: makeId(), submittedAt: new Date().toISOString() }, publicPricing);
       let orders = await readScoutsOrders();
       orders.unshift(order);
       await writeScoutsOrders(orders);
@@ -13249,9 +13325,28 @@ function createServer() {
   app.get("/api/scouts/admin/orders", async (request, response) => {
     if (!requireBoardAdmin(request, response)) return;
     try {
-      response.json({ orders: await readScoutsOrders(), pricingStatus: "approved" });
+      const pricing = await readScoutsPricing();
+      response.json({ orders: await readScoutsOrders(), pricing, publicPricing: getScoutsPublicPricing(pricing) });
     } catch (error) {
       response.status(500).json({ error: "Could not load Scouts orders." });
+    }
+  });
+
+  app.put("/api/scouts/admin/pricing", async (request, response) => {
+    if (!requireBoardAdmin(request, response)) return;
+    try {
+      const costPerSquareMetre = Number(request.body?.costPerSquareMetre);
+      const deliveryCostPerOrder = Number(request.body?.deliveryCostPerOrder);
+      const grossProfitMargin = Number(request.body?.grossProfitMargin);
+      if (!Number.isFinite(costPerSquareMetre) || !Number.isFinite(deliveryCostPerOrder) || !Number.isFinite(grossProfitMargin) || !(costPerSquareMetre > 0) || deliveryCostPerOrder < 0 || grossProfitMargin < 0 || grossProfitMargin >= 95) {
+        response.status(400).json({ error: "Enter a cost per m², delivery cost, and a gross profit margin below 95%." });
+        return;
+      }
+      const pricing = await writeScoutsPricing({ costPerSquareMetre, deliveryCostPerOrder, grossProfitMargin });
+      response.json({ pricing, publicPricing: getScoutsPublicPricing(pricing) });
+    } catch (error) {
+      console.error("Could not save Scouts pricing.", error.message || error);
+      response.status(500).json({ error: "Could not save Scouts pricing." });
     }
   });
 

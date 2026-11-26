@@ -9,6 +9,12 @@ const SIGN_PRODUCTS = [
   { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, price: 30, code: "GE-68STACK-SIGN-C-P" }
 ];
 const CUSTOM_PRODUCT_ID = "custom";
+const DEFAULT_PUBLIC_PRICING = {
+  configured: false,
+  vatRate: 20,
+  deliverySellPrice: DELIVERY_FEE,
+  products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.price }))
+};
 
 function getSignProduct(sign) {
   return SIGN_PRODUCTS.find((product) => product.id === sign.productId) || SIGN_PRODUCTS[0];
@@ -37,10 +43,15 @@ function makeSign(groupName = "") {
   };
 }
 
-function getSignPrice(sign) {
-  if (sign.productId !== CUSTOM_PRODUCT_ID) return getSignProduct(sign).price;
+function getSignPrice(sign, pricing = DEFAULT_PUBLIC_PRICING) {
+  if (sign.productId !== CUSTOM_PRODUCT_ID) {
+    return pricing.products.find((product) => product.id === sign.productId)?.sellPrice ?? getSignProduct(sign).price;
+  }
   const { width, height } = getSignDimensions(sign);
-  return Math.round(Math.max(25, 10 + (width * height / 1000000) * (125 / 3)) * 100) / 100;
+  if (!pricing.configured) return Math.round(Math.max(25, 10 + (width * height / 1000000) * (125 / 3)) * 100) / 100;
+  const reference = pricing.products[0];
+  const sellPerSquareMetre = reference.sellPrice / ((reference.width * reference.height) / 1000000);
+  return Math.round((width * height / 1000000) * sellPerSquareMetre * 100) / 100;
 }
 
 function money(value) {
@@ -81,19 +92,22 @@ export function ScoutsCustomerPortal() {
   const [details, setDetails] = useState({ fullName: "", mobile: "", email: "", groupName: "", address: "" });
   const [collection, setCollection] = useState(false);
   const [signs, setSigns] = useState([makeSign("")]);
+  const [pricing, setPricing] = useState(DEFAULT_PUBLIC_PRICING);
 
   useEffect(() => {
     fetch("/api/scouts/customer/session")
-      .then((response) => {
+      .then(async (response) => {
         if (!response.ok) throw new Error("locked");
+        const payload = await response.json();
+        if (payload.pricing) setPricing(payload.pricing);
         setUnlocked(true);
       })
       .catch(() => setUnlocked(false))
       .finally(() => setChecking(false));
   }, []);
 
-  const signsTotal = useMemo(() => signs.reduce((sum, sign) => sum + getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1), 0), [signs]);
-  const deliveryFee = collection ? 0 : DELIVERY_FEE;
+  const signsTotal = useMemo(() => signs.reduce((sum, sign) => sum + getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1), 0), [pricing, signs]);
+  const deliveryFee = collection ? 0 : pricing.deliverySellPrice;
   const total = signsTotal + deliveryFee;
 
   function updateDetails(key, value) {
@@ -133,6 +147,9 @@ export function ScoutsCustomerPortal() {
     }
     setUnlocked(true);
     setPassword("");
+    const sessionResponse = await fetch("/api/scouts/customer/session");
+    const sessionPayload = await sessionResponse.json().catch(() => ({}));
+    if (sessionPayload.pricing) setPricing(sessionPayload.pricing);
   }
 
   async function submitOrder(event) {
@@ -226,7 +243,7 @@ export function ScoutsCustomerPortal() {
                       </div>
                       {sign.productId === CUSTOM_PRODUCT_ID ? <div className="scouts-custom-size-fields"><label>Width (mm)<input required type="number" min="50" max="5000" value={sign.width} onChange={(event) => updateSign(sign.id, "width", event.target.value)} /></label><label>Height (mm)<input required type="number" min="50" max="5000" value={sign.height} onChange={(event) => updateSign(sign.id, "height", event.target.value)} /></label></div> : null}
                       <div className="scouts-product-detail"><span>{sign.productId === CUSTOM_PRODUCT_ID ? "CUSTOM" : product.code}</span><span>Printed Materials</span></div>
-                      <div className="scouts-line-price"><span>{sign.productId === CUSTOM_PRODUCT_ID ? "Estimated " : ""}{money(getSignPrice(sign))} each · VAT included</span><strong>{money(getSignPrice(sign) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
+                      <div className="scouts-line-price"><span>{sign.productId === CUSTOM_PRODUCT_ID && !pricing.configured ? "Estimated " : ""}{money(getSignPrice(sign, pricing))} each · VAT included</span><strong>{money(getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1))}</strong></div>
                     </div>
                     <SignPreview sign={sign} />
                   </div>
@@ -261,6 +278,20 @@ export function ScoutsAdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pricingForm, setPricingForm] = useState({ costPerSquareMetre: "", deliveryCostPerOrder: "", grossProfitMargin: "" });
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingMessage, setPricingMessage] = useState("");
+
+  const calculatedPricing = useMemo(() => {
+    const costPerSquareMetre = Math.max(0, Number(pricingForm.costPerSquareMetre) || 0);
+    const deliveryCostPerOrder = Math.max(0, Number(pricingForm.deliveryCostPerOrder) || 0);
+    const grossProfitMargin = Math.max(0, Math.min(94.99, Number(pricingForm.grossProfitMargin) || 0));
+    const multiplier = (1 / (1 - grossProfitMargin / 100)) * 1.2;
+    return {
+      deliverySellPrice: deliveryCostPerOrder * multiplier,
+      products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.width * product.height / 1000000 * costPerSquareMetre * multiplier }))
+    };
+  }, [pricingForm]);
 
   useEffect(() => {
     fetch("/api/scouts/admin/orders")
@@ -268,16 +299,62 @@ export function ScoutsAdminOrders() {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || "Could not load orders.");
         setOrders(Array.isArray(payload.orders) ? payload.orders : []);
+        if (payload.pricing) {
+          setPricingForm({
+            costPerSquareMetre: payload.pricing.configured ? String(payload.pricing.costPerSquareMetre) : "",
+            deliveryCostPerOrder: payload.pricing.configured ? String(payload.pricing.deliveryCostPerOrder) : "",
+            grossProfitMargin: payload.pricing.configured ? String(payload.pricing.grossProfitMargin) : ""
+          });
+        }
       })
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function savePricing(event) {
+    event.preventDefault();
+    setPricingSaving(true);
+    setPricingMessage("");
+    setError("");
+    try {
+      const response = await fetch("/api/scouts/admin/pricing", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pricingForm)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not save pricing.");
+      setPricingForm({
+        costPerSquareMetre: String(payload.pricing.costPerSquareMetre),
+        deliveryCostPerOrder: String(payload.pricing.deliveryCostPerOrder),
+        grossProfitMargin: String(payload.pricing.grossProfitMargin)
+      });
+      setPricingMessage("Customer sell prices updated.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save pricing.");
+    } finally {
+      setPricingSaving(false);
+    }
+  }
 
   return (
     <div className="scouts-admin-shell">
       <header className="scouts-admin-header"><div><a href="/">← Portal</a><img className="scouts-brand-logo" src="/scouts/scouts-logo-linear.png" alt="Scouts" /><h1>Sign orders</h1></div><span>{orders.length} order{orders.length === 1 ? "" : "s"}</span></header>
       <main className="scouts-admin-main">
         {loading ? <div className="scouts-loading">Loading orders...</div> : null}
+        {!loading ? <section className="scouts-pricing-panel">
+          <div className="scouts-pricing-head"><div><span>Admin only</span><h2>Customer pricing</h2><p>Enter costs excluding VAT. Sell prices include 20% VAT and use your target gross-profit margin.</p></div>{pricingMessage ? <strong>{pricingMessage}</strong> : null}</div>
+          <form onSubmit={savePricing}>
+            <label>Panel cost per m² (£)<input required type="number" min="0.01" step="0.01" value={pricingForm.costPerSquareMetre} onChange={(event) => setPricingForm((current) => ({ ...current, costPerSquareMetre: event.target.value }))} /></label>
+            <label>Delivery cost per order (£)<input required type="number" min="0" step="0.01" value={pricingForm.deliveryCostPerOrder} onChange={(event) => setPricingForm((current) => ({ ...current, deliveryCostPerOrder: event.target.value }))} /></label>
+            <label>Gross profit margin (%)<input required type="number" min="0" max="94.99" step="0.01" value={pricingForm.grossProfitMargin} onChange={(event) => setPricingForm((current) => ({ ...current, grossProfitMargin: event.target.value }))} /></label>
+            <button type="submit" disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save customer prices"}</button>
+          </form>
+          <div className="scouts-pricing-results">
+            {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm</span><strong>{money(product.sellPrice)}</strong></div>)}
+            <div className="delivery"><span>Delivery per order</span><strong>{money(calculatedPricing.deliverySellPrice)}</strong></div>
+          </div>
+        </section> : null}
         {error ? <div className="scouts-alert error">{error}</div> : null}
         {!loading && !orders.length ? <div className="scouts-admin-empty">No Scouts orders have been placed yet.</div> : null}
         <div className="scouts-admin-orders">
