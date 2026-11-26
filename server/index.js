@@ -95,7 +95,6 @@ const SCOUTS_CUSTOMER_USERNAME = String(process.env.SCOUTS_CUSTOMER_USERNAME || 
 const SCOUTS_CUSTOMER_PASSWORD = String(process.env.SCOUTS_CUSTOMER_PASSWORD || "Signs01x");
 const SCOUTS_CUSTOMER_COOKIE_NAME = "scouts_customer_access";
 const SCOUTS_CUSTOMER_COOKIE_VALUE = crypto.createHash("sha256").update(`scouts:${SCOUTS_CUSTOMER_USERNAME}:${SCOUTS_CUSTOMER_PASSWORD}`).digest("hex");
-const SCOUTS_DELIVERY_FEE = 12.5;
 const SCOUTS_ORDER_TO = String(process.env.SCOUTS_ORDER_TO || CREDIT_APPLICATION_TO).trim();
 const SCOUTS_SIGN_PRODUCTS = [
   { id: "landscape-600x400", title: "Landscape Sign", width: 600, height: 400, unitPrice: 25, code: "GE-46STACK-SIGN-C-P" },
@@ -104,6 +103,11 @@ const SCOUTS_SIGN_PRODUCTS = [
   { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, unitPrice: 30, code: "GE-68STACK-SIGN-C-P" }
 ];
 const SCOUTS_CUSTOM_PRODUCT_ID = "custom";
+const DEFAULT_SCOUTS_DELIVERY_RATES = [
+  { id: "small", label: "Up to 1.00m²", maxArea: 1, costPrice: 8, sellPrice: 21 },
+  { id: "medium", label: "Over 1.00m² to 1.20m²", maxArea: 1.2, costPrice: 17, sellPrice: 30 },
+  { id: "large", label: "Over 1.20m²", maxArea: null, costPrice: 75, sellPrice: 95 }
+];
 
 function getScoutsCustomUnitPrice(width, height) {
   const areaSquareMetres = (width * height) / 1000000;
@@ -588,12 +592,20 @@ function getScoutsPricingFile() {
 
 function sanitizeScoutsPricing(payload = {}) {
   const costPerSquareMetre = Math.max(0, Math.min(10000, Number(payload.costPerSquareMetre) || 0));
-  const deliveryCostPerOrder = Math.max(0, Math.min(10000, Number(payload.deliveryCostPerOrder) || 0));
   const grossProfitMargin = Math.max(0, Math.min(95, Number(payload.grossProfitMargin) || 0));
+  const suppliedRates = Array.isArray(payload.deliveryRates) ? payload.deliveryRates : [];
+  const deliveryRates = DEFAULT_SCOUTS_DELIVERY_RATES.map((fallback) => {
+    const supplied = suppliedRates.find((rate) => String(rate?.id || "") === fallback.id) || {};
+    return {
+      ...fallback,
+      costPrice: Math.round(Math.max(0, Math.min(10000, Number(supplied.costPrice ?? fallback.costPrice) || 0)) * 100) / 100,
+      sellPrice: Math.round(Math.max(0, Math.min(10000, Number(supplied.sellPrice ?? fallback.sellPrice) || 0)) * 100) / 100
+    };
+  });
   return {
     configured: Boolean(payload.configured) && costPerSquareMetre > 0,
     costPerSquareMetre: Math.round(costPerSquareMetre * 100) / 100,
-    deliveryCostPerOrder: Math.round(deliveryCostPerOrder * 100) / 100,
+    deliveryRates,
     grossProfitMargin: Math.round(grossProfitMargin * 100) / 100,
     vatRate: 20,
     updatedAt: sanitizeCreditApplicationText(payload.updatedAt, 80)
@@ -625,7 +637,7 @@ function getScoutsPublicPricing(settings) {
     return {
       configured: false,
       vatRate: 20,
-      deliverySellPrice: SCOUTS_DELIVERY_FEE,
+      deliveryRates: DEFAULT_SCOUTS_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
       products: SCOUTS_SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.unitPrice }))
     };
   }
@@ -635,12 +647,24 @@ function getScoutsPublicPricing(settings) {
   return {
     configured: true,
     vatRate: settings.vatRate,
-    deliverySellPrice: sellFromCost(settings.deliveryCostPerOrder),
+    deliveryRates: settings.deliveryRates.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
     products: SCOUTS_SIGN_PRODUCTS.map((product) => ({
       ...product,
       sellPrice: sellFromCost((product.width * product.height / 1000000) * settings.costPerSquareMetre)
     }))
   };
+}
+
+function getScoutsDeliverySellPrice(signs, publicPricing) {
+  const largestPanelArea = (Array.isArray(signs) ? signs : []).reduce((largest, sign) => {
+    const area = (Number(sign.width) || 0) * (Number(sign.height) || 0) / 1000000;
+    return Math.max(largest, area);
+  }, 0);
+  const rates = Array.isArray(publicPricing?.deliveryRates) && publicPricing.deliveryRates.length
+    ? publicPricing.deliveryRates
+    : DEFAULT_SCOUTS_DELIVERY_RATES;
+  const rate = rates.find((entry) => entry.maxArea === null || largestPanelArea <= Number(entry.maxArea)) || rates[rates.length - 1];
+  return Math.round((Number(rate?.sellPrice) || 0) * 100) / 100;
 }
 
 function getScoutsCustomSellPrice(width, height, publicPricing) {
@@ -684,7 +708,7 @@ function sanitizeScoutsOrder(payload = {}, publicPricing = getScoutsPublicPricin
     .filter((entry) => entry.groupName && entry.width >= 50 && entry.height >= 50);
   const collection = Boolean(payload.collection);
   const signsTotal = Math.round(signs.reduce((sum, sign) => sum + sign.lineTotal, 0) * 100) / 100;
-  const deliveryFee = collection ? 0 : (preservePrices && Number.isFinite(Number(payload.deliveryFee)) ? Number(payload.deliveryFee) : publicPricing.deliverySellPrice);
+  const deliveryFee = collection ? 0 : (preservePrices && Number.isFinite(Number(payload.deliveryFee)) ? Number(payload.deliveryFee) : getScoutsDeliverySellPrice(signs, publicPricing));
   return {
     id: sanitizeCreditApplicationText(payload.id, 100) || makeId(),
     fullName: sanitizeCreditApplicationText(payload.fullName, 180),
@@ -13336,13 +13360,17 @@ function createServer() {
     if (!requireBoardAdmin(request, response)) return;
     try {
       const costPerSquareMetre = Number(request.body?.costPerSquareMetre);
-      const deliveryCostPerOrder = Number(request.body?.deliveryCostPerOrder);
       const grossProfitMargin = Number(request.body?.grossProfitMargin);
-      if (!Number.isFinite(costPerSquareMetre) || !Number.isFinite(deliveryCostPerOrder) || !Number.isFinite(grossProfitMargin) || !(costPerSquareMetre > 0) || deliveryCostPerOrder < 0 || grossProfitMargin < 0 || grossProfitMargin >= 95) {
-        response.status(400).json({ error: "Enter a cost per m², delivery cost, and a gross profit margin below 95%." });
+      const deliveryRates = Array.isArray(request.body?.deliveryRates) ? request.body.deliveryRates : [];
+      const invalidDeliveryRate = DEFAULT_SCOUTS_DELIVERY_RATES.some((expected) => {
+        const rate = deliveryRates.find((entry) => String(entry?.id || "") === expected.id);
+        return !rate || !Number.isFinite(Number(rate.costPrice)) || Number(rate.costPrice) < 0 || !Number.isFinite(Number(rate.sellPrice)) || Number(rate.sellPrice) < 0;
+      });
+      if (!Number.isFinite(costPerSquareMetre) || !Number.isFinite(grossProfitMargin) || !(costPerSquareMetre > 0) || grossProfitMargin < 0 || grossProfitMargin >= 95 || invalidDeliveryRate) {
+        response.status(400).json({ error: "Enter a cost per m², a gross profit margin below 95%, and valid delivery cost and sell prices." });
         return;
       }
-      const pricing = await writeScoutsPricing({ costPerSquareMetre, deliveryCostPerOrder, grossProfitMargin });
+      const pricing = await writeScoutsPricing({ costPerSquareMetre, grossProfitMargin, deliveryRates });
       response.json({ pricing, publicPricing: getScoutsPublicPricing(pricing) });
     } catch (error) {
       console.error("Could not save Scouts pricing.", error.message || error);

@@ -9,10 +9,15 @@ const SIGN_PRODUCTS = [
   { id: "portrait-600x800", title: "Portrait Sign", width: 600, height: 800, price: 30, code: "GE-68STACK-SIGN-C-P" }
 ];
 const CUSTOM_PRODUCT_ID = "custom";
+const DEFAULT_DELIVERY_RATES = [
+  { id: "small", label: "Up to 1.00m²", maxArea: 1, costPrice: 8, sellPrice: 21 },
+  { id: "medium", label: "Over 1.00m² to 1.20m²", maxArea: 1.2, costPrice: 17, sellPrice: 30 },
+  { id: "large", label: "Over 1.20m²", maxArea: null, costPrice: 75, sellPrice: 95 }
+];
 const DEFAULT_PUBLIC_PRICING = {
   configured: false,
   vatRate: 20,
-  deliverySellPrice: DELIVERY_FEE,
+  deliveryRates: DEFAULT_DELIVERY_RATES.map(({ id, label, maxArea, sellPrice }) => ({ id, label, maxArea, sellPrice })),
   products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.price }))
 };
 
@@ -52,6 +57,15 @@ function getSignPrice(sign, pricing = DEFAULT_PUBLIC_PRICING) {
   const reference = pricing.products[0];
   const sellPerSquareMetre = reference.sellPrice / ((reference.width * reference.height) / 1000000);
   return Math.round((width * height / 1000000) * sellPerSquareMetre * 100) / 100;
+}
+
+function getDeliveryPrice(signs, pricing = DEFAULT_PUBLIC_PRICING) {
+  const largestPanelArea = signs.reduce((largest, sign) => {
+    const { width, height } = getSignDimensions(sign);
+    return Math.max(largest, width * height / 1000000);
+  }, 0);
+  const rates = pricing.deliveryRates?.length ? pricing.deliveryRates : DEFAULT_PUBLIC_PRICING.deliveryRates;
+  return rates.find((rate) => rate.maxArea === null || largestPanelArea <= Number(rate.maxArea))?.sellPrice ?? DELIVERY_FEE;
 }
 
 function money(value) {
@@ -107,7 +121,7 @@ export function ScoutsCustomerPortal() {
   }, []);
 
   const signsTotal = useMemo(() => signs.reduce((sum, sign) => sum + getSignPrice(sign, pricing) * Math.max(1, Number(sign.quantity) || 1), 0), [pricing, signs]);
-  const deliveryFee = collection ? 0 : pricing.deliverySellPrice;
+  const deliveryFee = collection ? 0 : getDeliveryPrice(signs, pricing);
   const total = signsTotal + deliveryFee;
 
   function updateDetails(key, value) {
@@ -278,17 +292,19 @@ export function ScoutsAdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [pricingForm, setPricingForm] = useState({ costPerSquareMetre: "", deliveryCostPerOrder: "", grossProfitMargin: "" });
+  const [pricingForm, setPricingForm] = useState({
+    costPerSquareMetre: "",
+    grossProfitMargin: "",
+    deliveryRates: DEFAULT_DELIVERY_RATES.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
+  });
   const [pricingSaving, setPricingSaving] = useState(false);
   const [pricingMessage, setPricingMessage] = useState("");
 
   const calculatedPricing = useMemo(() => {
     const costPerSquareMetre = Math.max(0, Number(pricingForm.costPerSquareMetre) || 0);
-    const deliveryCostPerOrder = Math.max(0, Number(pricingForm.deliveryCostPerOrder) || 0);
     const grossProfitMargin = Math.max(0, Math.min(94.99, Number(pricingForm.grossProfitMargin) || 0));
     const multiplier = (1 / (1 - grossProfitMargin / 100)) * 1.2;
     return {
-      deliverySellPrice: deliveryCostPerOrder * multiplier,
       products: SIGN_PRODUCTS.map((product) => ({ ...product, sellPrice: product.width * product.height / 1000000 * costPerSquareMetre * multiplier }))
     };
   }, [pricingForm]);
@@ -302,14 +318,21 @@ export function ScoutsAdminOrders() {
         if (payload.pricing) {
           setPricingForm({
             costPerSquareMetre: payload.pricing.configured ? String(payload.pricing.costPerSquareMetre) : "",
-            deliveryCostPerOrder: payload.pricing.configured ? String(payload.pricing.deliveryCostPerOrder) : "",
-            grossProfitMargin: payload.pricing.configured ? String(payload.pricing.grossProfitMargin) : ""
+            grossProfitMargin: payload.pricing.configured ? String(payload.pricing.grossProfitMargin) : "",
+            deliveryRates: (payload.pricing.deliveryRates || DEFAULT_DELIVERY_RATES).map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
           });
         }
       })
       .catch((loadError) => setError(loadError.message))
       .finally(() => setLoading(false));
   }, []);
+
+  function updateDeliveryRate(id, key, value) {
+    setPricingForm((current) => ({
+      ...current,
+      deliveryRates: current.deliveryRates.map((rate) => rate.id === id ? { ...rate, [key]: value } : rate)
+    }));
+  }
 
   async function savePricing(event) {
     event.preventDefault();
@@ -326,8 +349,8 @@ export function ScoutsAdminOrders() {
       if (!response.ok) throw new Error(payload.error || "Could not save pricing.");
       setPricingForm({
         costPerSquareMetre: String(payload.pricing.costPerSquareMetre),
-        deliveryCostPerOrder: String(payload.pricing.deliveryCostPerOrder),
-        grossProfitMargin: String(payload.pricing.grossProfitMargin)
+        grossProfitMargin: String(payload.pricing.grossProfitMargin),
+        deliveryRates: payload.pricing.deliveryRates.map((rate) => ({ ...rate, costPrice: String(rate.costPrice), sellPrice: String(rate.sellPrice) }))
       });
       setPricingMessage("Customer sell prices updated.");
     } catch (saveError) {
@@ -343,17 +366,16 @@ export function ScoutsAdminOrders() {
       <main className="scouts-admin-main">
         {loading ? <div className="scouts-loading">Loading orders...</div> : null}
         {!loading ? <section className="scouts-pricing-panel">
-          <div className="scouts-pricing-head"><div><span>Admin only</span><h2>Customer pricing</h2><p>Enter costs excluding VAT. Sell prices include 20% VAT and use your target gross-profit margin.</p></div>{pricingMessage ? <strong>{pricingMessage}</strong> : null}</div>
+          <div className="scouts-pricing-head"><div><span>Admin only</span><h2>Customer pricing</h2><p>Panel sell prices include 20% VAT and use your target gross-profit margin. Delivery cost and sell prices are set separately by the largest panel in the order.</p></div>{pricingMessage ? <strong>{pricingMessage}</strong> : null}</div>
           <form onSubmit={savePricing}>
             <label>Panel cost per m² (£)<input required type="number" min="0.01" step="0.01" value={pricingForm.costPerSquareMetre} onChange={(event) => setPricingForm((current) => ({ ...current, costPerSquareMetre: event.target.value }))} /></label>
-            <label>Delivery cost per order (£)<input required type="number" min="0" step="0.01" value={pricingForm.deliveryCostPerOrder} onChange={(event) => setPricingForm((current) => ({ ...current, deliveryCostPerOrder: event.target.value }))} /></label>
             <label>Gross profit margin (%)<input required type="number" min="0" max="94.99" step="0.01" value={pricingForm.grossProfitMargin} onChange={(event) => setPricingForm((current) => ({ ...current, grossProfitMargin: event.target.value }))} /></label>
             <button type="submit" disabled={pricingSaving}>{pricingSaving ? "Saving..." : "Save customer prices"}</button>
           </form>
           <div className="scouts-pricing-results">
             {calculatedPricing.products.map((product) => <div key={product.id}><span>{product.width} × {product.height}mm</span><strong>{money(product.sellPrice)}</strong></div>)}
-            <div className="delivery"><span>Delivery per order</span><strong>{money(calculatedPricing.deliverySellPrice)}</strong></div>
           </div>
+          <div className="scouts-delivery-pricing"><div className="scouts-delivery-pricing-head"><h3>Delivery bands</h3><span>Applied once per order using its largest individual panel</span></div>{pricingForm.deliveryRates.map((rate) => { const sellExVat = Number(rate.sellPrice) / 1.2; const deliveryGp = sellExVat > 0 ? Math.round(((sellExVat - Number(rate.costPrice)) / sellExVat) * 1000) / 10 : 0; return <div className="scouts-delivery-rate" key={rate.id}><strong>{rate.label}</strong><label>Your cost (£ ex VAT)<input required type="number" min="0" step="0.01" value={rate.costPrice} onChange={(event) => updateDeliveryRate(rate.id, "costPrice", event.target.value)} /></label><label>Customer sell (£ inc VAT)<input required type="number" min="0" step="0.01" value={rate.sellPrice} onChange={(event) => updateDeliveryRate(rate.id, "sellPrice", event.target.value)} /></label><span className="margin">GP {deliveryGp}%</span></div>; })}</div>
         </section> : null}
         {error ? <div className="scouts-alert error">{error}</div> : null}
         {!loading && !orders.length ? <div className="scouts-admin-empty">No Scouts orders have been placed yet.</div> : null}

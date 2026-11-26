@@ -123,17 +123,23 @@
 .scouts-pricing-head h2 { margin: 3px 0; font-size: 1.25rem; }
 .scouts-pricing-head p { margin: 0; color: #665e6d; font-size: 0.8rem; }
 .scouts-pricing-head > strong { border-radius: 5px; padding: 7px 10px; background: #eaf8ee; color: #16723a; font-size: 0.78rem; }
-.scouts-pricing-panel form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: end; }
+.scouts-pricing-panel form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) auto; gap: 10px; align-items: end; }
 .scouts-pricing-panel label { display: grid; gap: 5px; color: #42394b; font-size: 0.74rem; font-weight: 800; }
 .scouts-pricing-panel input { width: 100%; min-height: 40px; border: 1px solid #cfc4dd; border-radius: 6px; padding: 8px 10px; font: inherit; }
 .scouts-pricing-panel input:focus { outline: 0; border-color: var(--scouts-green); box-shadow: 0 0 0 3px rgba(116, 19, 220, 0.13); }
 .scouts-pricing-panel button { min-height: 40px; border: 0; border-radius: 6px; padding: 0 15px; background: var(--scouts-green); color: #fff; font-weight: 900; }
 .scouts-pricing-panel button:disabled { opacity: 0.6; }
-.scouts-pricing-results { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; margin-top: 14px; overflow: hidden; border: 1px solid var(--scouts-border); border-radius: 6px; background: var(--scouts-border); }
+.scouts-pricing-results { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 14px; overflow: hidden; border: 1px solid var(--scouts-border); border-radius: 6px; background: var(--scouts-border); }
 .scouts-pricing-results > div { display: grid; gap: 2px; padding: 9px 11px; background: var(--scouts-soft); }
 .scouts-pricing-results span { color: #675d70; font-size: 0.7rem; }
 .scouts-pricing-results strong { color: var(--scouts-green); font-size: 1rem; }
-.scouts-pricing-results .delivery { background: #eee4f8; }
+.scouts-delivery-pricing { margin-top: 15px; border-top: 1px solid var(--scouts-border); padding-top: 14px; }
+.scouts-delivery-pricing-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.scouts-delivery-pricing-head h3 { margin: 0; font-size: 0.95rem; }
+.scouts-delivery-pricing-head span { color: #6a6171; font-size: 0.72rem; }
+.scouts-delivery-rate { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(130px, 0.65fr) minmax(150px, 0.75fr) 70px; gap: 10px; align-items: end; border-top: 1px solid #eee7f5; padding: 9px 0; }
+.scouts-delivery-rate > strong { align-self: center; font-size: 0.8rem; }
+.scouts-delivery-rate .margin { align-self: center; color: var(--scouts-green); font-size: 0.75rem; font-weight: 900; text-align: right; }
 .scouts-admin-orders { display: grid; gap: 16px; }
 .scouts-admin-order { border: 1px solid var(--scouts-border); border-radius: 8px; padding: 18px; background: #fff; }
 .scouts-admin-order-head { display: flex; justify-content: space-between; gap: 20px; }
@@ -160,6 +166,8 @@
   .scouts-admin-order-head > div:last-child { justify-items: start; }
   .scouts-pricing-panel form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .scouts-pricing-results { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scouts-delivery-rate { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scouts-delivery-rate > strong { grid-column: 1 / -1; }
 }
 
 @media (max-width: 480px) {
@@ -170,4 +178,8 @@
   .scouts-header-note { display: none; }
   .scouts-pricing-panel form, .scouts-pricing-results { grid-template-columns: 1fr; }
   .scouts-pricing-head { display: grid; }
+  .scouts-delivery-pricing-head { display: grid; }
+  .scouts-delivery-rate { grid-template-columns: 1fr; }
+  .scouts-delivery-rate > strong { grid-column: auto; }
+  .scouts-delivery-rate .margin { text-align: left; }
 }
